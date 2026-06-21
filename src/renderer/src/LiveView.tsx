@@ -18,6 +18,11 @@ function LiveView(): JSX.Element {
     }
   }, [])
 
+  // Re-fetch song lines whenever a new song is loaded into the engine.
+  useEffect(() => {
+    if (live?.songTitle) window.wf.getInfo().then(setInfo)
+  }, [live?.songTitle])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const k = e.key.toLowerCase()

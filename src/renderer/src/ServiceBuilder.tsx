@@ -13,6 +13,7 @@ function ServiceBuilder(): JSX.Element {
   const [openId, setOpenId] = useState<number | null>(null)
   const [service, setService] = useState<ServiceFull | null>(null)
   const [songs, setSongs] = useState<SongSummary[]>([])
+  const [liveSongId, setLiveSongId] = useState<number | null>(null)
 
   const [newName, setNewName] = useState('')
   const [songPick, setSongPick] = useState('')
@@ -81,6 +82,11 @@ function ServiceBuilder(): JSX.Element {
     await window.wf.serviceAddItem(openId, { type: 'scripture', payload: { reference: ref.trim() } })
     setRef('')
     reload()
+  }
+
+  const goLive = async (songId: number): Promise<void> => {
+    await window.wf.liveLoadSong(songId)
+    setLiveSongId(songId)
   }
 
   const move = async (id: number, dir: 'up' | 'down'): Promise<void> => {
@@ -164,6 +170,19 @@ function ServiceBuilder(): JSX.Element {
                   <span className="text-lg">{ICON[it.type]}</span>
                   <span className="min-w-0 flex-1 truncate text-sm">{it.title}</span>
                   <div className="flex items-center gap-1 text-slate-400">
+                    {it.type === 'song' && it.ref_id != null && (
+                      <button
+                        onClick={() => goLive(it.ref_id!)}
+                        className={`rounded px-2 py-0.5 text-xs font-semibold transition-colors ${
+                          liveSongId === it.ref_id
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : 'hover:bg-emerald-500/20 hover:text-emerald-300'
+                        }`}
+                        title="Send to live outputs"
+                      >
+                        {liveSongId === it.ref_id ? 'LIVE' : '▶'}
+                      </button>
+                    )}
                     <button onClick={() => move(it.id, 'up')} className="rounded px-1.5 hover:bg-white/10">
                       ↑
                     </button>

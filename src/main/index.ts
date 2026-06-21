@@ -32,7 +32,8 @@ const startTime = Date.now()
 let operatorWin: BrowserWindow | null = null
 const outputWins = new Map<string, BrowserWindow>()
 
-// Canonical live state.
+// Canonical live state. liveSong is swapped at runtime via wf:live:loadSong.
+let liveSong: Song = DEMO_SONG
 const state: { mode: Mode; index: number } = { mode: 'lyrics', index: 0 }
 
 // Restore position after a crash/forced-quit. MUST run after app is ready —
@@ -42,18 +43,19 @@ function restoreRecovery(): void {
   const recovered = readRecovery()
   if (recovered) {
     state.mode = (recovered.mode as Mode) ?? 'lyrics'
-    state.index = Math.min(Math.max(recovered.index ?? 0, 0), DEMO_SONG.lines.length - 1)
+    state.index = Math.min(Math.max(recovered.index ?? 0, 0), liveSong.lines.length - 1)
   }
 }
 
 function renderState(): LiveState {
-  const lines = DEMO_SONG.lines
+  const lines = liveSong.lines
   return {
     mode: state.mode,
     index: state.index,
     line: lines[state.index] ?? '',
     next: lines[state.index + 1] ?? '',
     total: lines.length,
+    songTitle: liveSong.title,
     ts: Date.now()
   }
 }
@@ -206,7 +208,7 @@ function layoutOutputs(): void {
 
 // --- IPC: renderers send intents; main mutates canonical state + broadcasts ---
 ipcMain.on('wf:intent', (_e, type: Intent) => {
-  const last = DEMO_SONG.lines.length - 1
+  const last = liveSong.lines.length - 1
   if (type === 'next') {
     if (state.mode !== 'lyrics') state.mode = 'lyrics'
     else if (state.index < last) state.index++
@@ -222,13 +224,30 @@ ipcMain.on('wf:intent', (_e, type: Intent) => {
 ipcMain.handle(
   'wf:getInfo',
   (): AppInfo => ({
-    song: DEMO_SONG,
+    song: liveSong,
     state: renderState(),
     displays: describeDisplays(),
     outputs: outputWins.size,
     startupMs: Date.now() - startTime
   })
 )
+
+// --- Live engine: load a song from the library into the outputs ---
+ipcMain.handle('wf:live:loadSong', async (_e, id: number) => {
+  const full = await getSong(id)
+  if (!full) return
+  const lines: string[] = []
+  for (const section of [...full.sections].sort((a, b) => a.ordinal - b.ordinal)) {
+    for (const raw of section.lyrics.split('\n')) {
+      const line = raw.trim()
+      if (line) lines.push(line)
+    }
+  }
+  liveSong = { title: full.title, lines }
+  state.mode = 'lyrics'
+  state.index = 0
+  broadcast()
+})
 ipcMain.handle('wf:getState', (): LiveState => renderState())
 
 // --- Song library IPC (Phase 1) ---

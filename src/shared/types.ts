@@ -9,6 +9,7 @@ export interface LiveState {
   line: string
   next: string
   total: number
+  songTitle: string
   ts: number
 }
 

@@ -47,7 +47,10 @@ const wf = {
 
   // Scripture
   scriptureLookup: (reference: string): Promise<ScriptureResult> =>
-    ipcRenderer.invoke('wf:scripture:lookup', reference)
+    ipcRenderer.invoke('wf:scripture:lookup', reference),
+
+  // Live engine
+  liveLoadSong: (id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', id)
 }
 
 try {
