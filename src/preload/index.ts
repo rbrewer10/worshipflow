@@ -1,5 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Intent, LiveState, AppInfo, SongSummary, SongFull, SongInput } from '../shared/types'
+import type {
+  Intent,
+  LiveState,
+  AppInfo,
+  SongSummary,
+  SongFull,
+  SongInput,
+  ServiceSummary,
+  ServiceFull,
+  NewServiceItem
+} from '../shared/types'
 
 // The safe API surface exposed to the renderer (window.wf).
 // The main process is the single source of truth; renderers send intents and
@@ -19,7 +29,20 @@ const wf = {
   songsList: (search?: string): Promise<SongSummary[]> => ipcRenderer.invoke('wf:songs:list', search),
   songGet: (id: number): Promise<SongFull | null> => ipcRenderer.invoke('wf:songs:get', id),
   songCreate: (input: SongInput): Promise<number> => ipcRenderer.invoke('wf:songs:create', input),
-  songDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:songs:delete', id)
+  songDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:songs:delete', id),
+
+  // Service builder
+  servicesList: (): Promise<ServiceSummary[]> => ipcRenderer.invoke('wf:services:list'),
+  serviceCreate: (name: string, date?: string): Promise<number> =>
+    ipcRenderer.invoke('wf:services:create', name, date),
+  serviceDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:services:delete', id),
+  serviceGet: (id: number): Promise<ServiceFull | null> => ipcRenderer.invoke('wf:services:get', id),
+  serviceAddItem: (serviceId: number, item: NewServiceItem): Promise<number> =>
+    ipcRenderer.invoke('wf:services:addItem', serviceId, item),
+  serviceRemoveItem: (itemId: number): Promise<void> =>
+    ipcRenderer.invoke('wf:services:removeItem', itemId),
+  serviceMoveItem: (itemId: number, dir: 'up' | 'down'): Promise<void> =>
+    ipcRenderer.invoke('wf:services:moveItem', itemId, dir)
 }
 
 try {

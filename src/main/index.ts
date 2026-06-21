@@ -1,9 +1,22 @@
 import { app, shell, BrowserWindow, screen, ipcMain } from 'electron'
 import { join } from 'path'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, NewServiceItem } from '../shared/types'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
-import { initDb, listSongs, getSong, createSong, deleteSong } from './db'
+import {
+  initDb,
+  listSongs,
+  getSong,
+  createSong,
+  deleteSong,
+  listServices,
+  createService,
+  deleteService,
+  getService,
+  addServiceItem,
+  removeServiceItem,
+  moveServiceItem
+} from './db'
 
 // WorshipFlow — main process ("the brain").
 // Owns the monitors: enumerates displays, opens & positions the operator window
@@ -222,6 +235,19 @@ ipcMain.handle('wf:songs:list', (_e, search?: string) => listSongs(search ?? '')
 ipcMain.handle('wf:songs:get', (_e, id: number) => getSong(id))
 ipcMain.handle('wf:songs:create', (_e, input: SongInput) => createSong(input))
 ipcMain.handle('wf:songs:delete', (_e, id: number) => deleteSong(id))
+
+// --- Service builder IPC (Phase 1) ---
+ipcMain.handle('wf:services:list', () => listServices())
+ipcMain.handle('wf:services:create', (_e, name: string, date?: string) => createService(name, date))
+ipcMain.handle('wf:services:delete', (_e, id: number) => deleteService(id))
+ipcMain.handle('wf:services:get', (_e, id: number) => getService(id))
+ipcMain.handle('wf:services:addItem', (_e, serviceId: number, item: NewServiceItem) =>
+  addServiceItem(serviceId, item)
+)
+ipcMain.handle('wf:services:removeItem', (_e, itemId: number) => removeServiceItem(itemId))
+ipcMain.handle('wf:services:moveItem', (_e, itemId: number, dir: 'up' | 'down') =>
+  moveServiceItem(itemId, dir)
+)
 
 app.whenReady().then(async () => {
   await initDb()

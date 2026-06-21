@@ -60,3 +60,31 @@ export interface SongInput {
   ccli?: string
   sections: SongSection[]
 }
+
+// --- Service builder (Phase 1) ---
+export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown'
+
+export interface ServiceSummary {
+  id: number
+  name: string
+  service_date: string | null
+}
+
+export interface ServiceItem {
+  id: number
+  ordinal: number
+  type: ServiceItemType
+  ref_id: number | null
+  payload: Record<string, unknown>
+  title: string
+}
+
+export interface ServiceFull extends ServiceSummary {
+  items: ServiceItem[]
+}
+
+export interface NewServiceItem {
+  type: ServiceItemType
+  ref_id?: number | null
+  payload?: Record<string, unknown>
+}
