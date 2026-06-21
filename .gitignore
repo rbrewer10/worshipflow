@@ -1,0 +1,12 @@
+node_modules
+dist
+out
+.DS_Store
+*.log
+# Local media / data (not source)
+/media
+/data
+*.sqlite
+*.sqlite3
+# Google Drive junk (this repo must live off Drive, but just in case)
+desktop.ini
