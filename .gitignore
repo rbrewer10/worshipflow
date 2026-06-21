@@ -6,6 +6,8 @@ out
 # Local media / data (not source)
 /media
 /data
+# Demo/sample media — kept local, not committed (large binaries)
+src/renderer/public/assets/*.mp4
 *.sqlite
 *.sqlite3
 # Google Drive junk (this repo must live off Drive, but just in case)

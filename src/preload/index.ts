@@ -1,9 +1,19 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import type { Intent, LiveState, AppInfo } from '../shared/types'
 
-// WorshipFlow bridge — the safe API surface exposed to the renderer.
-// Engine IPC (state broadcast, display info, output control) lands here in Phase 0.
+// The safe API surface exposed to the renderer (window.wf).
+// The main process is the single source of truth; renderers send intents and
+// subscribe to broadcast state — they never hold authority.
 const wf = {
-  version: '0.0.1'
+  version: '0.0.1',
+  sendIntent: (type: Intent): void => ipcRenderer.send('wf:intent', type),
+  onState: (cb: (s: LiveState) => void): (() => void) => {
+    const handler = (_e: unknown, s: LiveState): void => cb(s)
+    ipcRenderer.on('wf:state', handler)
+    return () => ipcRenderer.removeListener('wf:state', handler)
+  },
+  getInfo: (): Promise<AppInfo> => ipcRenderer.invoke('wf:getInfo'),
+  getState: (): Promise<LiveState> => ipcRenderer.invoke('wf:getState')
 }
 
 try {
