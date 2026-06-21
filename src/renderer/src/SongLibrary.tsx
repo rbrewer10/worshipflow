@@ -59,6 +59,18 @@ function SongLibrary(): JSX.Element {
     refresh()
   }
 
+  const pickBg = async (id: number): Promise<void> => {
+    const result = await window.wf.dialogOpenFile()
+    if (result.canceled || !result.filePaths[0]) return
+    await window.wf.songSetBackground(id, result.filePaths[0])
+    refresh()
+  }
+
+  const clearBg = async (id: number): Promise<void> => {
+    await window.wf.songSetBackground(id, null)
+    refresh()
+  }
+
   return (
     <div className="flex h-full min-h-0 gap-4 p-4">
       {/* Library list */}
@@ -78,15 +90,40 @@ function SongLibrary(): JSX.Element {
           {songs.map((s) => (
             <div
               key={s.id}
-              className="group flex items-center justify-between rounded-lg px-3 py-2 hover:bg-white/[0.05]"
+              className="group flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-white/[0.05]"
             >
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium">{s.title}</div>
                 {s.author && <div className="text-xs text-slate-400">{s.author}</div>}
               </div>
+              {s.background ? (
+                <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
+                  <span
+                    className="max-w-[90px] truncate text-xs text-emerald-400"
+                    title={s.background}
+                  >
+                    🎬 {s.background.split(/[/\\]/).pop()}
+                  </span>
+                  <button
+                    onClick={() => clearBg(s.id)}
+                    className="rounded px-1 text-slate-500 hover:text-red-400"
+                    title="Remove background"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => pickBg(s.id)}
+                  className="shrink-0 rounded px-2 py-0.5 text-xs text-slate-500 opacity-0 hover:bg-white/10 hover:text-slate-300 group-hover:opacity-100"
+                  title="Assign background video or image"
+                >
+                  + bg
+                </button>
+              )}
               <button
                 onClick={() => remove(s.id)}
-                className="rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
+                className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
               >
                 Delete
               </button>

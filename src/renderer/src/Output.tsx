@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { LiveState, Mode } from '../../shared/types'
 
+function toAssetUrl(p: string): string {
+  return 'wf-asset://?path=' + encodeURIComponent(p)
+}
+
+function isVideo(p: string): boolean {
+  return /\.(mp4|webm|mov|avi|mkv)$/i.test(p)
+}
+
 // A "dumb" fullscreen output. Subscribes to broadcast state and renders it:
 // motion background + crossfading lyric layers, or logo / black. Holds no
 // authority — the main process tells it what to show.
@@ -13,11 +21,13 @@ function Output(): JSX.Element {
     b: ''
   })
   const [fps, setFps] = useState(0)
-  const [videoOk, setVideoOk] = useState(true)
+  const [bgSrc, setBgSrc] = useState<string | null>(null)
+  const [bgReady, setBgReady] = useState(false)
 
   useEffect(() => {
     const apply = (s: LiveState): void => {
       setMode(s.mode)
+      setBgSrc(s.background ?? null)
       if (s.mode === 'lyrics') {
         setLayers((prev) =>
           prev.front === 0
@@ -30,6 +40,9 @@ function Output(): JSX.Element {
     window.wf.getState().then(apply)
     return off
   }, [])
+
+  // Reset ready-state when source changes so gradient shows while new video loads.
+  useEffect(() => { setBgReady(false) }, [bgSrc])
 
   // On-screen FPS meter (smoothness measurement).
   useEffect(() => {
@@ -52,22 +65,41 @@ function Output(): JSX.Element {
   const black = mode === 'black'
   const logo = mode === 'logo'
   const bgVisibility = black ? 'hidden' : 'visible'
+  const showVideo = bgSrc !== null && bgReady
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black" style={{ cursor: 'none' }}>
-      {videoOk ? (
-        <video
-          className="absolute inset-0 h-full w-full object-cover"
-          src="assets/motion.mp4"
-          autoPlay
-          loop
-          muted
-          playsInline
-          onError={() => setVideoOk(false)}
-          style={{ visibility: bgVisibility }}
-        />
-      ) : (
-        <div className="wf-fallback absolute inset-0" style={{ visibility: bgVisibility }} />
+      {/* Animated gradient fallback — always present underneath the video */}
+      <div
+        className="wf-fallback absolute inset-0 transition-opacity duration-700"
+        style={{ opacity: showVideo ? 0 : 1, visibility: bgVisibility }}
+      />
+
+      {/* Per-song background — video or image, fades in when ready */}
+      {bgSrc && (
+        isVideo(bgSrc) ? (
+          <video
+            key={bgSrc}
+            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
+            style={{ opacity: showVideo ? 1 : 0, visibility: bgVisibility }}
+            src={toAssetUrl(bgSrc)}
+            autoPlay
+            loop
+            muted
+            playsInline
+            onCanPlay={() => setBgReady(true)}
+            onError={() => setBgReady(false)}
+          />
+        ) : (
+          <img
+            key={bgSrc}
+            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
+            style={{ opacity: showVideo ? 1 : 0, visibility: bgVisibility }}
+            src={toAssetUrl(bgSrc)}
+            onLoad={() => setBgReady(true)}
+            onError={() => setBgReady(false)}
+          />
+        )
       )}
 
       {!black && !logo && (

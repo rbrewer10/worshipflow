@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, screen, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
 import { join } from 'path'
 import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, NewServiceItem } from '../shared/types'
 import { DEMO_SONG } from './demoSong'
@@ -9,6 +9,7 @@ import {
   getSong,
   createSong,
   deleteSong,
+  setSongBackground,
   listServices,
   createService,
   deleteService,
@@ -28,6 +29,13 @@ import { lookupScripture } from './scripture'
 
 const PRELOAD = join(__dirname, '../preload/index.js')
 const startTime = Date.now()
+
+// Register wf-asset:// before the app is ready so Chromium recognises it.
+// Output windows load from http://localhost (dev) which blocks file:// cross-origin;
+// this protocol proxies local media files through the main process instead.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'wf-asset', privileges: { bypassCSP: true, stream: true, supportFetchAPI: true } }
+])
 
 let operatorWin: BrowserWindow | null = null
 const outputWins = new Map<string, BrowserWindow>()
@@ -56,6 +64,7 @@ function renderState(): LiveState {
     next: lines[state.index + 1] ?? '',
     total: lines.length,
     songTitle: liveSong.title,
+    background: liveSong.background ?? null,
     ts: Date.now()
   }
 }
@@ -243,7 +252,7 @@ ipcMain.handle('wf:live:loadSong', async (_e, id: number) => {
       if (line) lines.push(line)
     }
   }
-  liveSong = { title: full.title, lines }
+  liveSong = { title: full.title, lines, background: full.background ?? null }
   state.mode = 'lyrics'
   state.index = 0
   broadcast()
@@ -272,7 +281,37 @@ ipcMain.handle('wf:services:moveItem', (_e, itemId: number, dir: 'up' | 'down') 
 // --- Scripture IPC (Phase 1) ---
 ipcMain.handle('wf:scripture:lookup', (_e, reference: string) => lookupScripture(reference))
 
+// --- Song background / file dialog ---
+ipcMain.handle('wf:songs:setBackground', (_e, id: number, path: string | null) =>
+  setSongBackground(id, path)
+)
+ipcMain.handle('wf:dialog:openFile', async () => {
+  const opts = {
+    title: 'Choose background media',
+    filters: [
+      { name: 'Video', extensions: ['mp4', 'webm', 'mov'] },
+      { name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }
+    ],
+    properties: ['openFile'] as const
+  }
+  return operatorWin
+    ? await dialog.showOpenDialog(operatorWin, opts)
+    : await dialog.showOpenDialog(opts)
+})
+
 app.whenReady().then(async () => {
+  // Serve local media files via wf-asset://?path=<encoded-absolute-path>.
+  // Forward Range headers so video seeking and looping work correctly.
+  protocol.handle('wf-asset', (request) => {
+    const url = new URL(request.url)
+    const filePath = url.searchParams.get('path') ?? ''
+    const fileUrl = 'file:///' + filePath.replace(/\\/g, '/')
+    const headers: Record<string, string> = {}
+    const range = request.headers.get('range')
+    if (range) headers['range'] = range
+    return net.fetch(fileUrl, { headers })
+  })
+
   await initDb()
   restoreRecovery()
   createOperator()

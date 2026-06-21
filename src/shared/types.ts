@@ -10,6 +10,7 @@ export interface LiveState {
   next: string
   total: number
   songTitle: string
+  background: string | null
   ts: number
 }
 
@@ -23,6 +24,7 @@ export interface DisplayInfo {
 export interface Song {
   title: string
   lines: string[]
+  background?: string | null
 }
 
 export interface AppInfo {
@@ -48,6 +50,7 @@ export interface SongSummary {
   id: number
   title: string
   author: string | null
+  background: string | null
 }
 
 export interface SongFull extends SongSummary {
@@ -59,6 +62,7 @@ export interface SongInput {
   title: string
   author?: string
   ccli?: string
+  background?: string | null
   sections: SongSection[]
 }
 

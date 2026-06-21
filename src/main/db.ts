@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS song (
   title TEXT NOT NULL,
   author TEXT,
   ccli TEXT,
+  background TEXT,
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS song_section (
@@ -61,6 +62,8 @@ export async function initDb(): Promise<void> {
   db = existsSync(dbPath) ? new SQL.Database(readFileSync(dbPath)) : new SQL.Database()
   db.run('PRAGMA foreign_keys = ON;')
   db.run(SCHEMA)
+  // Migrate existing DBs that predate the background column.
+  try { db.run('ALTER TABLE song ADD COLUMN background TEXT') } catch { /* already exists */ }
   persist()
 }
 
@@ -71,11 +74,11 @@ function persist(): void {
 
 export function listSongs(search = ''): SongSummary[] {
   const sql = search
-    ? `SELECT DISTINCT s.id, s.title, s.author FROM song s
+    ? `SELECT DISTINCT s.id, s.title, s.author, s.background FROM song s
        LEFT JOIN song_section sec ON sec.song_id = s.id
        WHERE s.title LIKE $q OR s.author LIKE $q OR sec.lyrics LIKE $q
        ORDER BY s.title COLLATE NOCASE`
-    : `SELECT id, title, author FROM song ORDER BY title COLLATE NOCASE`
+    : `SELECT id, title, author, background FROM song ORDER BY title COLLATE NOCASE`
 
   const stmt = db.prepare(sql)
   if (search) stmt.bind({ $q: `%${search}%` })
@@ -86,13 +89,19 @@ export function listSongs(search = ''): SongSummary[] {
 }
 
 export function getSong(id: number): SongFull | null {
-  const head = db.prepare('SELECT id, title, author, ccli FROM song WHERE id = ?')
+  const head = db.prepare('SELECT id, title, author, ccli, background FROM song WHERE id = ?')
   head.bind([id])
   if (!head.step()) {
     head.free()
     return null
   }
-  const row = head.getAsObject() as { id: number; title: string; author: string | null; ccli: string | null }
+  const row = head.getAsObject() as {
+    id: number
+    title: string
+    author: string | null
+    ccli: string | null
+    background: string | null
+  }
   head.free()
 
   const secStmt = db.prepare(
@@ -103,16 +112,17 @@ export function getSong(id: number): SongFull | null {
   while (secStmt.step()) sections.push(secStmt.getAsObject() as unknown as SongSection)
   secStmt.free()
 
-  return { id: row.id, title: row.title, author: row.author, ccli: row.ccli, sections }
+  return { id: row.id, title: row.title, author: row.author, ccli: row.ccli, background: row.background, sections }
 }
 
 export function createSong(input: SongInput): number {
   db.run('BEGIN')
   try {
-    db.run('INSERT INTO song (title, author, ccli, created_at) VALUES (?,?,?,?)', [
+    db.run('INSERT INTO song (title, author, ccli, background, created_at) VALUES (?,?,?,?,?)', [
       input.title,
       input.author ?? null,
       input.ccli ?? null,
+      input.background ?? null,
       Date.now()
     ])
     const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number
@@ -136,6 +146,11 @@ export function createSong(input: SongInput): number {
 
 export function deleteSong(id: number): void {
   db.run('DELETE FROM song WHERE id = ?', [id])
+  persist()
+}
+
+export function setSongBackground(id: number, path: string | null): void {
+  db.run('UPDATE song SET background = ? WHERE id = ?', [path, id])
   persist()
 }
 

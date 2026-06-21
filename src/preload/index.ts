@@ -50,7 +50,13 @@ const wf = {
     ipcRenderer.invoke('wf:scripture:lookup', reference),
 
   // Live engine
-  liveLoadSong: (id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', id)
+  liveLoadSong: (id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', id),
+
+  // Song background + file dialog
+  songSetBackground: (id: number, path: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:songs:setBackground', id, path),
+  dialogOpenFile: (): Promise<{ canceled: boolean; filePaths: string[] }> =>
+    ipcRenderer.invoke('wf:dialog:openFile')
 }
 
 try {

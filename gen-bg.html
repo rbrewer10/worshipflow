@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WorshipFlow — Generate Motion Background</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0a0a14; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; color: #fff; }
+  canvas { width: 480px; height: 270px; border: 1px solid #333; border-radius: 8px; }
+  #ui { margin-top: 16px; text-align: center; }
+  #bar-wrap { width: 480px; height: 6px; background: #222; border-radius: 3px; margin: 10px 0; }
+  #bar { height: 6px; background: #4f7fff; border-radius: 3px; width: 0%; transition: width 0.1s; }
+  #status { font-size: 14px; color: #aaa; margin-bottom: 8px; }
+  #dl { display: none; background: #4f7fff; color: #fff; border: none; border-radius: 8px; padding: 10px 28px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+  #dl:hover { background: #6b93ff; }
+  p.note { font-size: 12px; color: #555; margin-top: 12px; max-width: 480px; text-align: center; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div id="ui">
+  <div id="status">Starting…</div>
+  <div id="bar-wrap"><div id="bar"></div></div>
+  <button id="dl">⬇ Download worship-bg.webm</button>
+  <p class="note">Opens in WorshipFlow via the <strong>+ bg</strong> button on any song. WebM plays in all Electron/Chromium output windows.</p>
+</div>
+<script>
+const canvas = document.getElementById('c')
+const ctx = canvas.getContext('2d')
+const W = 1920, H = 1080
+const DURATION_SEC = 16
+const FPS = 30
+const TOTAL_FRAMES = DURATION_SEC * FPS
+
+let t = 0
+
+// Slowly drifting radial colour field + light rays + star particles
+function draw() {
+  // --- Background gradient ---
+  const cx = W / 2 + Math.sin(t * 0.0018) * 180
+  const cy = H / 2 + Math.cos(t * 0.0014) * 100
+  const hue = 225 + Math.sin(t * 0.004) * 18
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.85)
+  g.addColorStop(0,   `hsl(${hue},      55%, 16%)`)
+  g.addColorStop(0.4, `hsl(${hue + 15}, 45%, 10%)`)
+  g.addColorStop(0.8, `hsl(${hue + 30}, 60%,  5%)`)
+  g.addColorStop(1,   `hsl(240,         70%,  2%)`)
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, W, H)
+
+  // --- Subtle cross-shaped light bloom ---
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  const bloom = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, 340)
+  const ba = 0.022 + Math.sin(t * 0.007) * 0.010
+  bloom.addColorStop(0,   `rgba(180,190,255,${ba})`)
+  bloom.addColorStop(0.4, `rgba(140,155,255,${ba * 0.4})`)
+  bloom.addColorStop(1,   'rgba(100,120,255,0)')
+  ctx.fillStyle = bloom
+  ctx.fillRect(0, 0, W, H)
+  ctx.restore()
+
+  // --- Light rays fanning from above centre ---
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  const RAY_COUNT = 9
+  for (let i = 0; i < RAY_COUNT; i++) {
+    const spread = 0.72
+    const base   = -Math.PI / 2
+    const angle  = base + (i / (RAY_COUNT - 1) - 0.5) * spread + Math.sin(t * 0.0025 + i * 1.3) * 0.055
+    const len    = H * 1.35
+    const alpha  = (0.025 + Math.sin(t * 0.008 + i * 0.8) * 0.012)
+    const rg = ctx.createLinearGradient(0, 0, 0, len)
+    rg.addColorStop(0,   `rgba(170,185,255,${alpha})`)
+    rg.addColorStop(0.6, `rgba(130,150,255,${alpha * 0.3})`)
+    rg.addColorStop(1,   'rgba(100,120,255,0)')
+    ctx.save()
+    ctx.translate(W / 2 + Math.sin(t * 0.0015) * 60, -40)
+    ctx.rotate(angle)
+    ctx.fillStyle = rg
+    const hw = 55 + i * 4
+    ctx.beginPath()
+    ctx.moveTo(-hw, 0)
+    ctx.lineTo(hw, 0)
+    ctx.lineTo(hw * 0.5, len)
+    ctx.lineTo(-hw * 0.5, len)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+  }
+  ctx.restore()
+
+  // --- Star / particle field ---
+  for (let i = 0; i < 80; i++) {
+    // deterministic positions based on index, drifting slowly
+    const x = (((i * 239 + t * 0.08 * (i % 3 === 0 ? 1 : -0.5)) % W) + W) % W
+    const y = (((i * 173 + t * 0.05 * (i % 2 === 0 ? 1 : -0.7)) % H) + H) % H
+    const alpha = ((Math.sin(t * 0.015 + i * 0.7) + 1) / 2) * 0.45
+    const r = 0.8 + (i % 4) * 0.4
+    ctx.fillStyle = `rgba(210,218,255,${alpha})`
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  t++
+}
+
+// --- MediaRecorder ---
+const chunks = []
+const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+  ? 'video/webm;codecs=vp9'
+  : 'video/webm'
+
+const stream = canvas.captureStream(FPS)
+const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 })
+
+rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+rec.onstop = () => {
+  const blob = new Blob(chunks, { type: 'video/webm' })
+  const url  = URL.createObjectURL(blob)
+  const btn  = document.getElementById('dl')
+  btn.onclick = () => {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'worship-bg.webm'
+    a.click()
+  }
+  btn.style.display = 'inline-block'
+  document.getElementById('status').textContent = 'Ready! Save the file, then use + bg in WorshipFlow.'
+  document.getElementById('bar').style.width = '100%'
+}
+
+rec.start(200) // collect chunks every 200 ms
+
+let frame = 0
+const bar  = document.getElementById('bar')
+const status = document.getElementById('status')
+
+function loop() {
+  draw()
+  frame++
+  bar.style.width = Math.round((frame / TOTAL_FRAMES) * 100) + '%'
+  status.textContent = `Recording… ${Math.ceil((TOTAL_FRAMES - frame) / FPS)}s left`
+  if (frame < TOTAL_FRAMES) {
+    requestAnimationFrame(loop)
+  } else {
+    rec.stop()
+  }
+}
+
+// Short delay so MediaRecorder is fully initialised before we start drawing
+setTimeout(() => { requestAnimationFrame(loop) }, 300)
+</script>
+</body>
+</html>
