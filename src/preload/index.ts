@@ -8,7 +8,8 @@ import type {
   SongInput,
   ServiceSummary,
   ServiceFull,
-  NewServiceItem
+  NewServiceItem,
+  ScriptureResult
 } from '../shared/types'
 
 // The safe API surface exposed to the renderer (window.wf).
@@ -42,7 +43,11 @@ const wf = {
   serviceRemoveItem: (itemId: number): Promise<void> =>
     ipcRenderer.invoke('wf:services:removeItem', itemId),
   serviceMoveItem: (itemId: number, dir: 'up' | 'down'): Promise<void> =>
-    ipcRenderer.invoke('wf:services:moveItem', itemId, dir)
+    ipcRenderer.invoke('wf:services:moveItem', itemId, dir),
+
+  // Scripture
+  scriptureLookup: (reference: string): Promise<ScriptureResult> =>
+    ipcRenderer.invoke('wf:scripture:lookup', reference)
 }
 
 try {

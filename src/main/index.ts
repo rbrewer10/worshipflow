@@ -17,6 +17,7 @@ import {
   removeServiceItem,
   moveServiceItem
 } from './db'
+import { lookupScripture } from './scripture'
 
 // WorshipFlow — main process ("the brain").
 // Owns the monitors: enumerates displays, opens & positions the operator window
@@ -248,6 +249,9 @@ ipcMain.handle('wf:services:removeItem', (_e, itemId: number) => removeServiceIt
 ipcMain.handle('wf:services:moveItem', (_e, itemId: number, dir: 'up' | 'down') =>
   moveServiceItem(itemId, dir)
 )
+
+// --- Scripture IPC (Phase 1) ---
+ipcMain.handle('wf:scripture:lookup', (_e, reference: string) => lookupScripture(reference))
 
 app.whenReady().then(async () => {
   await initDb()

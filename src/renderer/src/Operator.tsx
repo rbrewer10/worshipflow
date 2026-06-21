@@ -3,10 +3,11 @@ import type { ReactNode } from 'react'
 import LiveView from './LiveView'
 import SongLibrary from './SongLibrary'
 import ServiceBuilder from './ServiceBuilder'
+import ScriptureLookup from './ScriptureLookup'
 
-// Operator shell: global nav + the active view. Phase 1 adds Service + Songs
-// tabs alongside the Phase 0 Live control surface.
-type View = 'live' | 'service' | 'songs'
+// Operator shell: global nav + the active view. Phase 1 adds Service, Scripture,
+// and Songs tabs alongside the Phase 0 Live control surface.
+type View = 'live' | 'service' | 'scripture' | 'songs'
 
 function Operator(): JSX.Element {
   const [view, setView] = useState<View>('live')
@@ -21,12 +22,23 @@ function Operator(): JSX.Element {
         <Tab active={view === 'service'} onClick={() => setView('service')}>
           Service
         </Tab>
+        <Tab active={view === 'scripture'} onClick={() => setView('scripture')}>
+          Scripture
+        </Tab>
         <Tab active={view === 'songs'} onClick={() => setView('songs')}>
           Songs
         </Tab>
       </nav>
       <div className="min-h-0 flex-1">
-        {view === 'live' ? <LiveView /> : view === 'service' ? <ServiceBuilder /> : <SongLibrary />}
+        {view === 'live' ? (
+          <LiveView />
+        ) : view === 'service' ? (
+          <ServiceBuilder />
+        ) : view === 'scripture' ? (
+          <ScriptureLookup />
+        ) : (
+          <SongLibrary />
+        )}
       </div>
     </div>
   )

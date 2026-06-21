@@ -88,3 +88,16 @@ export interface NewServiceItem {
   ref_id?: number | null
   payload?: Record<string, unknown>
 }
+
+// --- Scripture / KJV (Phase 1) ---
+export interface ScriptureVerse {
+  n: number
+  text: string
+}
+
+export interface ScriptureResult {
+  ok: boolean
+  reference?: string
+  verses?: ScriptureVerse[]
+  error?: string
+}
