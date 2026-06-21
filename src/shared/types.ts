@@ -31,3 +31,32 @@ export interface AppInfo {
   outputs: number
   startupMs: number
 }
+
+// --- Song library (Phase 1) ---
+export type SectionKind = 'verse' | 'chorus' | 'bridge' | 'tag' | 'intro' | 'ending' | 'section'
+
+export interface SongSection {
+  id?: number
+  kind: SectionKind
+  label?: string | null
+  ordinal: number
+  lyrics: string
+}
+
+export interface SongSummary {
+  id: number
+  title: string
+  author: string | null
+}
+
+export interface SongFull extends SongSummary {
+  ccli: string | null
+  sections: SongSection[]
+}
+
+export interface SongInput {
+  title: string
+  author?: string
+  ccli?: string
+  sections: SongSection[]
+}

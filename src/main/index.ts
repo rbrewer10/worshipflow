@@ -1,8 +1,9 @@
 import { app, shell, BrowserWindow, screen, ipcMain } from 'electron'
 import { join } from 'path'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput } from '../shared/types'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
+import { initDb, listSongs, getSong, createSong, deleteSong } from './db'
 
 // WorshipFlow — main process ("the brain").
 // Owns the monitors: enumerates displays, opens & positions the operator window
@@ -216,7 +217,14 @@ ipcMain.handle(
 )
 ipcMain.handle('wf:getState', (): LiveState => renderState())
 
-app.whenReady().then(() => {
+// --- Song library IPC (Phase 1) ---
+ipcMain.handle('wf:songs:list', (_e, search?: string) => listSongs(search ?? ''))
+ipcMain.handle('wf:songs:get', (_e, id: number) => getSong(id))
+ipcMain.handle('wf:songs:create', (_e, input: SongInput) => createSong(input))
+ipcMain.handle('wf:songs:delete', (_e, id: number) => deleteSong(id))
+
+app.whenReady().then(async () => {
+  await initDb()
   restoreRecovery()
   createOperator()
   layoutOutputs()

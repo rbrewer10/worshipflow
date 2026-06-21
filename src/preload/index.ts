@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Intent, LiveState, AppInfo } from '../shared/types'
+import type { Intent, LiveState, AppInfo, SongSummary, SongFull, SongInput } from '../shared/types'
 
 // The safe API surface exposed to the renderer (window.wf).
 // The main process is the single source of truth; renderers send intents and
@@ -13,7 +13,13 @@ const wf = {
     return () => ipcRenderer.removeListener('wf:state', handler)
   },
   getInfo: (): Promise<AppInfo> => ipcRenderer.invoke('wf:getInfo'),
-  getState: (): Promise<LiveState> => ipcRenderer.invoke('wf:getState')
+  getState: (): Promise<LiveState> => ipcRenderer.invoke('wf:getState'),
+
+  // Song library
+  songsList: (search?: string): Promise<SongSummary[]> => ipcRenderer.invoke('wf:songs:list', search),
+  songGet: (id: number): Promise<SongFull | null> => ipcRenderer.invoke('wf:songs:get', id),
+  songCreate: (input: SongInput): Promise<number> => ipcRenderer.invoke('wf:songs:create', input),
+  songDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:songs:delete', id)
 }
 
 try {
