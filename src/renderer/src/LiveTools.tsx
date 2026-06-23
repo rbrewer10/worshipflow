@@ -72,7 +72,7 @@ function LiveTools(): JSX.Element {
   return (
     <aside className="flex w-80 shrink-0 flex-col gap-3 overflow-auto border-l border-white/[0.07] bg-[#15151a] p-3">
       {/* Stage message + presets */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           Stage Message
           {live?.stageMessage && <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">LIVE</span>}
@@ -113,7 +113,7 @@ function LiveTools(): JSX.Element {
       </section>
 
       {/* Quick scripture + Bible translation */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Quick Scripture</h2>
         <div className="flex gap-2">
           <input type="text" value={scriptureRef} onChange={(e) => setScriptureRef(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && quickScripture()} placeholder="John 3:16"
@@ -130,7 +130,7 @@ function LiveTools(): JSX.Element {
       </section>
 
       {/* Text size */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Text size</h2>
         <div className="flex items-center gap-2">
           <button onClick={() => window.wf.liveSetFontScale((live?.fontScale ?? 6) - 0.5)} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-sm font-semibold hover:bg-white/[0.12]">A −</button>
@@ -141,7 +141,7 @@ function LiveTools(): JSX.Element {
       </section>
 
       {/* Auto-advance */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300">Auto-Advance</span>
           {autoAdvanceRunning && <span className="text-xs text-emerald-400">● {((live?.autoAdvanceMs ?? 0) / 1000).toFixed(1)}s{autoAdvanceLoop ? ' ↻' : ''}</span>}
@@ -164,10 +164,10 @@ function LiveTools(): JSX.Element {
       </button>
       {showMore && (
         <div className="space-y-3">
-          <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+          <div className="rounded-lg border border-white/[0.07] bg-black/30 p-2">
             <span className="text-xs font-semibold text-slate-300">⏱ Hymn Timer: {Math.floor(hmsElapsedSecs / 60)}:{String(hmsElapsedSecs % 60).padStart(2, '0')}</span>
           </div>
-          <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+          <div className="rounded-lg border border-white/[0.07] bg-black/30 p-2">
             <span className="text-xs font-semibold text-slate-300">Verse #: {live?.verseNumber ?? '—'}</span>
           </div>
           <button onClick={() => setShowCheatSheet(!showCheatSheet)} className="w-full rounded-lg border border-blue-500/30 bg-blue-600/20 px-3 py-2 text-xs font-semibold text-blue-300 hover:bg-blue-600/30">⌨️ Keyboard Shortcuts</button>
@@ -188,7 +188,7 @@ function LiveTools(): JSX.Element {
               ))}
             </div>
           )}
-          <div className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs text-slate-400">
+          <div className="rounded-lg border border-white/[0.07] bg-black/30 p-2 text-xs text-slate-400">
             <div className="mb-1 font-semibold text-slate-300">Displays</div>
             <div><b className="text-slate-100">{info?.displays.length ?? '…'}</b> display(s) · <span className={info && info.outputs > 0 ? 'text-emerald-400' : 'text-amber-400'}>{info?.outputs ?? 0} live</span></div>
             {info?.displays.map((d) => (<div key={d.id}>• {d.bounds.width}×{d.bounds.height}{d.primary && <span className="ml-1 text-emerald-400">(primary)</span>}</div>))}
