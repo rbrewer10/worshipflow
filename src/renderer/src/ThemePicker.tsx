@@ -28,7 +28,7 @@ function ThemePicker({ serviceId, themeId, colors, onChange }: {
   }
 
   return (
-    <div className="mb-3 rounded-lg border border-white/10 bg-black/20 p-2">
+    <div className="mb-3 rounded-lg border border-white/[0.07] bg-[#1a1a1d] p-2">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between text-xs font-semibold text-slate-300"
