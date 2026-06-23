@@ -152,7 +152,7 @@ function SongLibrary(): JSX.Element {
       )}
       <div className="flex h-full min-h-0 gap-4 p-4">
       {/* Library list */}
-      <div className="flex w-96 flex-col rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <div className="flex w-96 flex-col rounded-xl border border-white/[0.07] bg-[#15151a] p-3">
         <CcliPanel />
         <PptxImport onImported={() => refresh()} />
         <input
@@ -220,7 +220,7 @@ function SongLibrary(): JSX.Element {
       </div>
 
       {/* Add / Edit form */}
-      <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             {editId != null ? 'Edit song' : 'Add a song'}
@@ -284,7 +284,7 @@ function SongLibrary(): JSX.Element {
 
         {/* Arrangement editor — only shows when there are multiple sections */}
         {parsedSections.length > 1 && (
-          <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="mt-3 rounded-lg border border-white/[0.07] bg-black/30 p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 Play order
@@ -343,7 +343,7 @@ function SongLibrary(): JSX.Element {
         )}
 
         {/* Lines per slide */}
-        <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+        <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.07] bg-black/30 px-3 py-2">
           <span className="text-xs text-slate-400">Lines per slide:</span>
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4].map((v) => (
@@ -363,7 +363,7 @@ function SongLibrary(): JSX.Element {
         </div>
 
         {/* Font size */}
-        <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+        <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.07] bg-black/30 px-3 py-2">
           <span className="text-xs text-slate-400">Text size on screen:</span>
           <div className="flex items-center gap-1">
             {[3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
