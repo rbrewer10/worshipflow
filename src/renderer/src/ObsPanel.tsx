@@ -73,7 +73,7 @@ function ObsPanel(): JSX.Element {
     setSceneMap((cur) => ({ ...cur, [ctx]: scene }))
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+    <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
       <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
         🎬 OBS Studio
         <span className={`inline-block h-2 w-2 rounded-full ${status.connected ? 'bg-emerald-400' : 'bg-red-500'}`} />
@@ -84,7 +84,7 @@ function ObsPanel(): JSX.Element {
 
       <div className="space-y-3">
         {/* Connection */}
-        <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+        <div className="rounded-lg border border-white/[0.07] bg-black/30 p-2">
           <div className="mb-1.5 text-xs font-semibold text-slate-300">Connection</div>
           <div className="flex flex-wrap gap-1.5">
             <input
@@ -154,7 +154,7 @@ function ObsPanel(): JSX.Element {
 
         {/* Scenes */}
         {status.connected && (
-          <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+          <div className="rounded-lg border border-white/[0.07] bg-black/30 p-2">
             <div className="mb-1.5 text-xs font-semibold text-slate-300">Scenes</div>
             <div className="flex flex-wrap gap-1.5">
               {status.scenes.length === 0 && <span className="text-xs text-slate-600">No scenes found.</span>}
@@ -176,7 +176,7 @@ function ObsPanel(): JSX.Element {
         )}
 
         {/* Auto-switch */}
-        <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+        <div className="rounded-lg border border-white/[0.07] bg-black/30 p-2">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={autoSwitch} onChange={(e) => setAutoSwitch(e.target.checked)} className="h-4 w-4" />
             <span className="text-xs font-semibold text-slate-300">Auto-switch scenes with the service</span>
