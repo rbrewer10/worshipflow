@@ -61,6 +61,8 @@ const wf = {
     ipcRenderer.invoke('wf:services:setItemPayload', itemId, payload),
   serviceReorder: (serviceId: number, orderedIds: number[]): Promise<void> =>
     ipcRenderer.invoke('wf:services:reorder', serviceId, orderedIds),
+  serviceSlides: (serviceId: number): Promise<{ id: number; slides: string[] }[]> =>
+    ipcRenderer.invoke('wf:service:slides', serviceId),
   serviceImportImages: (): Promise<{ id: number; name: string; count: number } | null> =>
     ipcRenderer.invoke('wf:service:importImages'),
   serviceImportPptx: (): Promise<{ id: number; name: string; count: number } | null> =>
@@ -73,6 +75,8 @@ const wf = {
   // Live engine
   stageOpen: (): Promise<void> => ipcRenderer.invoke('wf:stage:open'),
   liveSetItemId: (id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', id),
+  liveGoLiveAt: (itemId: number, slideIndex: number): Promise<void> =>
+    ipcRenderer.invoke('wf:live:goLiveAt', itemId, slideIndex),
   liveSetFontScale: (scale: number): Promise<void> => ipcRenderer.invoke('wf:live:setFontScale', scale),
   liveSaveFontScale: (): Promise<void> => ipcRenderer.invoke('wf:live:saveFontScale'),
   liveSetStageMessage: (msg: string | null): Promise<void> => ipcRenderer.invoke('wf:live:setStageMessage', msg),

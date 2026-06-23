@@ -5,7 +5,7 @@ import { readFileSync } from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, NewServiceItem, ServiceItem, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle } from '../shared/types'
 import { DEFAULT_THEME_ID } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -400,6 +400,22 @@ async function doLoadScripture(reference: string): Promise<void> {
   state.index = 0
 }
 
+// Order a song's sections (honoring arrangement) and group into slide lines.
+function songLines(full: SongFull): string[] {
+  const sorted = [...full.sections].sort((a, b) => a.ordinal - b.ordinal)
+  const ordered = full.arrangement && full.arrangement.length > 0
+    ? full.arrangement.map((i) => sorted[i]).filter(Boolean)
+    : sorted
+  const rawLines: string[] = []
+  for (const section of ordered) {
+    for (const raw of section.lyrics.split('\n')) {
+      const line = raw.trim()
+      if (line) rawLines.push(line)
+    }
+  }
+  return groupLines(rawLines, full.linesPerSlide ?? 2)
+}
+
 async function doLoadSong(id: number): Promise<void> {
   clearCountdown()
   clearAutoAdvance()
@@ -408,20 +424,7 @@ async function doLoadSong(id: number): Promise<void> {
   liveSongId = id
   liveScriptureRef = null
   liveBgFit = 'cover'
-  const sorted = [...full.sections].sort((a, b) => a.ordinal - b.ordinal)
-  const ordered =
-    full.arrangement && full.arrangement.length > 0
-      ? full.arrangement.map((i) => sorted[i]).filter(Boolean)
-      : sorted
-  const rawLines: string[] = []
-  for (const section of ordered) {
-    for (const raw of section.lyrics.split('\n')) {
-      const line = raw.trim()
-      if (line) rawLines.push(line)
-    }
-  }
-  const lps = full.linesPerSlide ?? 2
-  liveSong = { title: full.title, lines: groupLines(rawLines, lps), background: full.background ?? null }
+  liveSong = { title: full.title, lines: songLines(full), background: full.background ?? null }
   liveFontScale = full.fontScale ?? 6
   liveSongMeta = { author: full.author, copyright: full.copyright, ccli: full.ccli }
   hmsLoadedAt = Date.now()  // Start hymn timer
@@ -434,6 +437,35 @@ async function doLoadSong(id: number): Promise<void> {
     loggedSongIds.add(id)
     recordSongUsage({ songId: id, title: full.title, author: full.author, ccli: full.ccli, copyright: full.copyright })
   }
+}
+
+// Pure: the slides an item would show, without going live (for the slide grid).
+async function computeItemSlides(item: ServiceItem): Promise<string[]> {
+  if (item.type === 'song' && item.ref_id != null) {
+    const full = await getSong(item.ref_id)
+    return full ? songLines(full) : []
+  }
+  if (item.type === 'scripture') {
+    const ref = item.payload.reference as string
+    if (!ref) return []
+    const result = bibleTranslation === 'kjv' ? lookupScripture(ref) : await fetchScripture(ref, bibleTranslation)
+    if (!result.ok || !result.verses) return []
+    return result.verses.length === 1 ? [result.verses[0].text] : result.verses.map((v) => `${v.n}  ${v.text}`)
+  }
+  if (item.type === 'text' || item.type === 'ticker') {
+    const title = (item.payload.title as string) ?? ''
+    const body = (item.payload.body as string) ?? (item.payload.text as string) ?? ''
+    const lines: string[] = []
+    if (title) lines.push(title)
+    body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
+    return lines.length ? lines : (title ? [title] : [])
+  }
+  if (item.type === 'countdown' || item.type === 'welcome') {
+    const secs = (item.payload.seconds as number) ?? 0
+    return [`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`]
+  }
+  if (item.type === 'image') return ['🖼']
+  return []
 }
 
 // Clear CCLI song metadata when a non-song goes live.
@@ -877,6 +909,21 @@ ipcMain.handle('wf:services:setItemPayload', (_e, itemId: number, payload: Recor
 ipcMain.handle('wf:services:reorder', (_e, serviceId: number, orderedIds: number[]) =>
   reorderServiceItems(serviceId, orderedIds)
 )
+ipcMain.handle('wf:service:slides', async (_e, serviceId: number): Promise<{ id: number; slides: string[] }[]> => {
+  const svc = getService(serviceId)
+  if (!svc) return []
+  const out: { id: number; slides: string[] }[] = []
+  for (const item of svc.items) {
+    if (itemCanGoLive(item)) out.push({ id: item.id, slides: await computeItemSlides(item) })
+  }
+  return out
+})
+ipcMain.handle('wf:live:goLiveAt', async (_e, itemId: number, slideIndex: number) => {
+  await handleTabletLoadItem(itemId)  // loads the item live (index 0) + broadcasts + resolves theme
+  const last = liveSong.lines.length - 1
+  state.index = Math.max(0, Math.min(slideIndex, last < 0 ? 0 : last))
+  broadcast()
+})
 
 // --- Scripture IPC ---
 ipcMain.handle('wf:scripture:lookup', (_e, reference: string) => lookupScripture(reference))
