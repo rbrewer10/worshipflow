@@ -63,7 +63,7 @@ function CardEditPanel({ item, onClose, onChanged, onDelete }: {
   const resetColors = (): void => setStyle({ theme: item.style?.theme ?? 'sanctuary' })
 
   return (
-    <div className="flex w-80 shrink-0 flex-col gap-3 overflow-auto rounded-xl border border-white/10 bg-white/[0.03] p-3">
+    <div className="flex w-80 shrink-0 flex-col gap-3 overflow-auto rounded-xl border border-white/[0.07] bg-[#15151a] p-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold capitalize">{item.type}</h3>
         <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-300">✕ Close</button>
