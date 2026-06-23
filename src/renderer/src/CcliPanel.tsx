@@ -55,7 +55,7 @@ function CcliPanel(): JSX.Element {
   }
 
   return (
-    <div className="mb-3 rounded-lg border border-white/10 bg-black/20 p-2">
+    <div className="mb-3 rounded-lg border border-white/[0.07] bg-[#1a1a1d] p-2">
       <div className="mb-1.5 flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">© CCLI</span>
         <button
@@ -80,7 +80,7 @@ function CcliPanel(): JSX.Element {
       {showReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => setShowReport(false)}>
           <div
-            className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-white/10 bg-[var(--wf-bg-secondary)] p-4 shadow-2xl"
+            className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -110,7 +110,7 @@ function CcliPanel(): JSX.Element {
                 <p className="py-8 text-center text-sm text-slate-500">No songs used yet. Songs are logged automatically when they go live.</p>
               ) : (
                 <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-[var(--wf-bg-secondary)] text-slate-500">
+                  <thead className="sticky top-0 bg-[#1a1a1d] text-slate-500">
                     <tr>
                       <th className="py-1 pr-3 font-semibold">When</th>
                       <th className="py-1 pr-3 font-semibold">Title</th>
