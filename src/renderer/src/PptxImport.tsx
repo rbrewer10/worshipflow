@@ -53,7 +53,7 @@ function PptxImport({ onImported }: { onImported: () => void }): JSX.Element {
       {parsed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={close}>
           <div
-            className="flex max-h-[82vh] w-full max-w-3xl flex-col rounded-xl border border-white/10 bg-[var(--wf-bg-secondary)] p-4 shadow-2xl"
+            className="flex max-h-[82vh] w-full max-w-3xl flex-col rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-1 flex items-center justify-between">
@@ -66,7 +66,7 @@ function PptxImport({ onImported }: { onImported: () => void }): JSX.Element {
 
             <div className="min-h-0 flex-1 space-y-2 overflow-auto">
               {parsed.map((song, i) => (
-                <div key={i} className="rounded-lg border border-white/10 bg-black/20 p-2">
+                <div key={i} className="rounded-lg border border-white/[0.07] bg-black/30 p-2">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
