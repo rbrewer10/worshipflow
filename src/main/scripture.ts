@@ -72,7 +72,10 @@ function resolveBook(s: string): number | null {
 }
 
 function clean(t: string): string {
-  return t.replace(/[{}]/g, '').trim()
+  // KJV data wraps translator/margin notes in { … } — remove them entirely
+  // (not just the braces) so notes like "{ for ever: Heb. to length of days}"
+  // don't show on screen. Then collapse the leftover whitespace.
+  return t.replace(/\{[^}]*\}/g, '').replace(/\s+/g, ' ').trim()
 }
 
 export function lookupScripture(input: string): ScriptureResult {

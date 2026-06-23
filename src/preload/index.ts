@@ -9,12 +9,17 @@ import type {
   ServiceSummary,
   ServiceFull,
   NewServiceItem,
-  ScriptureResult
+  ScriptureResult,
+  Theme,
+  ObsStatus,
+  SceneContext,
+  BibleTranslation,
+  SongUsage,
+  ParsedPptxSong,
+  ThemeColors,
+  ItemStyle
 } from '../shared/types'
 
-// The safe API surface exposed to the renderer (window.wf).
-// The main process is the single source of truth; renderers send intents and
-// subscribe to broadcast state — they never hold authority.
 const wf = {
   version: '0.0.1',
   sendIntent: (type: Intent): void => ipcRenderer.send('wf:intent', type),
@@ -30,7 +35,9 @@ const wf = {
   songsList: (search?: string): Promise<SongSummary[]> => ipcRenderer.invoke('wf:songs:list', search),
   songGet: (id: number): Promise<SongFull | null> => ipcRenderer.invoke('wf:songs:get', id),
   songCreate: (input: SongInput): Promise<number> => ipcRenderer.invoke('wf:songs:create', input),
+  songUpdate: (id: number, input: SongInput): Promise<void> => ipcRenderer.invoke('wf:songs:update', id, input),
   songDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:songs:delete', id),
+  songsImportPptx: (): Promise<ParsedPptxSong[]> => ipcRenderer.invoke('wf:songs:importPptx'),
 
   // Service builder
   servicesList: (): Promise<ServiceSummary[]> => ipcRenderer.invoke('wf:services:list'),
@@ -44,19 +51,97 @@ const wf = {
     ipcRenderer.invoke('wf:services:removeItem', itemId),
   serviceMoveItem: (itemId: number, dir: 'up' | 'down'): Promise<void> =>
     ipcRenderer.invoke('wf:services:moveItem', itemId, dir),
+  serviceUpdateItemNotes: (itemId: number, notes: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:services:updateItemNotes', itemId, notes),
+  serviceSetTheme: (serviceId: number, themeId: string | null, colors: ThemeColors | null): Promise<void> =>
+    ipcRenderer.invoke('wf:service:setTheme', serviceId, themeId, colors),
+  serviceSetItemStyle: (itemId: number, style: ItemStyle | null): Promise<void> =>
+    ipcRenderer.invoke('wf:services:setItemStyle', itemId, style),
+  serviceSetItemPayload: (itemId: number, payload: Record<string, unknown>): Promise<void> =>
+    ipcRenderer.invoke('wf:services:setItemPayload', itemId, payload),
+  serviceReorder: (serviceId: number, orderedIds: number[]): Promise<void> =>
+    ipcRenderer.invoke('wf:services:reorder', serviceId, orderedIds),
+  serviceImportImages: (): Promise<{ id: number; name: string; count: number } | null> =>
+    ipcRenderer.invoke('wf:service:importImages'),
+  serviceImportPptx: (): Promise<{ id: number; name: string; count: number } | null> =>
+    ipcRenderer.invoke('wf:service:importPptx'),
 
   // Scripture
   scriptureLookup: (reference: string): Promise<ScriptureResult> =>
     ipcRenderer.invoke('wf:scripture:lookup', reference),
 
   // Live engine
+  stageOpen: (): Promise<void> => ipcRenderer.invoke('wf:stage:open'),
+  liveSetItemId: (id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', id),
+  liveSetFontScale: (scale: number): Promise<void> => ipcRenderer.invoke('wf:live:setFontScale', scale),
+  liveSaveFontScale: (): Promise<void> => ipcRenderer.invoke('wf:live:saveFontScale'),
+  liveSetStageMessage: (msg: string | null): Promise<void> => ipcRenderer.invoke('wf:live:setStageMessage', msg),
   liveLoadSong: (id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', id),
+  liveLoadScripture: (reference: string): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadScripture', reference),
+  liveLoadText: (title: string, body: string, background?: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadText', title, body, background ?? null),
+  liveLoadCountdown: (seconds: number): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadCountdown', seconds),
+  liveLoadMedia: (filePath: string, title: string): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadMedia', filePath, title),
 
   // Song background + file dialog
   songSetBackground: (id: number, path: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:songs:setBackground', id, path),
+  songSetFontScale: (id: number, scale: number): Promise<void> =>
+    ipcRenderer.invoke('wf:songs:setFontScale', id, scale),
   dialogOpenFile: (): Promise<{ canceled: boolean; filePaths: string[] }> =>
-    ipcRenderer.invoke('wf:dialog:openFile')
+    ipcRenderer.invoke('wf:dialog:openFile'),
+
+  // Tablet remote
+  getTabletUrl: (): Promise<string> =>
+    ipcRenderer.invoke('wf:getTabletUrl'),
+  setActiveService: (serviceId: number | null): Promise<void> =>
+    ipcRenderer.invoke('wf:setActiveService', serviceId),
+
+  // Features
+  featuresStartAutoAdvance: (durationMs: number, loop?: boolean): Promise<void> =>
+    ipcRenderer.invoke('wf:features:startAutoAdvance', durationMs, loop),
+  featuresStopAutoAdvance: (): Promise<void> =>
+    ipcRenderer.invoke('wf:features:stopAutoAdvance'),
+  featuresSetTheme: (theme: Theme): Promise<void> =>
+    ipcRenderer.invoke('wf:features:setTheme', theme),
+  featuresSetBibleTranslation: (trans: BibleTranslation): Promise<void> =>
+    ipcRenderer.invoke('wf:features:setBibleTranslation', trans),
+  featuresSetVerseNumber: (v: number | null): Promise<void> =>
+    ipcRenderer.invoke('wf:features:setVerseNumber', v),
+  featuresGetServiceLog: (): Promise<Array<{ ts: number; event: string }>> =>
+    ipcRenderer.invoke('wf:features:getServiceLog'),
+  featuresClearServiceLog: (): Promise<void> =>
+    ipcRenderer.invoke('wf:features:clearServiceLog'),
+
+  // OBS integration
+  getObsUrl: (): Promise<string> => ipcRenderer.invoke('wf:getObsUrl'),
+  obsOnStatus: (cb: (s: ObsStatus) => void): (() => void) => {
+    const handler = (_e: unknown, s: ObsStatus): void => cb(s)
+    ipcRenderer.on('wf:obs:status', handler)
+    return () => ipcRenderer.removeListener('wf:obs:status', handler)
+  },
+  obsGetStatus: (): Promise<ObsStatus> => ipcRenderer.invoke('wf:obs:getStatus'),
+  obsConnect: (host: string, port: number, password: string): Promise<ObsStatus> =>
+    ipcRenderer.invoke('wf:obs:connect', host, port, password),
+  obsDisconnect: (): Promise<void> => ipcRenderer.invoke('wf:obs:disconnect'),
+  obsStartStream: (): Promise<void> => ipcRenderer.invoke('wf:obs:startStream'),
+  obsStopStream: (): Promise<void> => ipcRenderer.invoke('wf:obs:stopStream'),
+  obsStartRecord: (): Promise<void> => ipcRenderer.invoke('wf:obs:startRecord'),
+  obsStopRecord: (): Promise<void> => ipcRenderer.invoke('wf:obs:stopRecord'),
+  obsSetScene: (sceneName: string): Promise<void> =>
+    ipcRenderer.invoke('wf:obs:setScene', sceneName),
+  obsSetAutoSwitch: (enabled: boolean, map: Record<SceneContext, string>): Promise<void> =>
+    ipcRenderer.invoke('wf:obs:setAutoSwitch', enabled, map),
+
+  // CCLI
+  ccliGetLicense: (): Promise<string | null> => ipcRenderer.invoke('wf:ccli:getLicense'),
+  ccliSetLicense: (license: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:ccli:setLicense', license),
+  ccliListUsage: (): Promise<SongUsage[]> => ipcRenderer.invoke('wf:ccli:listUsage'),
+  ccliClearUsage: (): Promise<void> => ipcRenderer.invoke('wf:ccli:clearUsage')
 }
 
 try {

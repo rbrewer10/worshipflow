@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { LiveState, Mode } from '../../shared/types'
+import type { LiveState, Mode, ThemeColors } from '../../shared/types'
+import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -23,17 +24,46 @@ function Output(): JSX.Element {
   const [fps, setFps] = useState(0)
   const [bgSrc, setBgSrc] = useState<string | null>(null)
   const [bgReady, setBgReady] = useState(false)
+  const [clockLine, setClockLine] = useState('')
+  const [fontScale, setFontScale] = useState(6)
+  const [tickerText, setTickerText] = useState('')
+  const [bgFit, setBgFit] = useState<'cover' | 'contain'>('cover')
+  const [slideThemeId, setSlideThemeId] = useState<string>('sanctuary')
+  const [slideThemeColors, setSlideThemeColors] = useState<ThemeColors | null>(null)
+  const [ccli, setCcli] = useState<{
+    author: string | null
+    copyright: string | null
+    ccli: string | null
+    license: string | null
+  }>({ author: null, copyright: null, ccli: null, license: null })
 
   useEffect(() => {
     const apply = (s: LiveState): void => {
       setMode(s.mode)
       setBgSrc(s.background ?? null)
-      if (s.mode === 'lyrics') {
+      setBgFit(s.bgFit ?? 'cover')
+      setSlideThemeId(s.slideTheme ?? 'sanctuary')
+      setSlideThemeColors(s.slideThemeColors ?? null)
+      setFontScale(s.fontScale ?? 6)
+      setCcli({
+        author: s.songAuthor ?? null,
+        copyright: s.songCopyright ?? null,
+        ccli: s.songCcli ?? null,
+        license: s.ccliLicense ?? null
+      })
+      if (s.mode === 'countdown') {
+        setClockLine(s.line)
+        setTickerText('')
+      } else if (s.mode === 'lyrics') {
         setLayers((prev) =>
           prev.front === 0
             ? { front: 1, a: prev.a, b: s.line }
             : { front: 0, a: s.line, b: prev.b }
         )
+        setTickerText('')
+      } else if (s.songTitle?.includes('Announcement')) {
+        // Ticker mode: show the line as scrolling text
+        setTickerText(s.line || '')
       }
     }
     const off = window.wf.onState(apply)
@@ -64,24 +94,29 @@ function Output(): JSX.Element {
 
   const black = mode === 'black'
   const logo = mode === 'logo'
+  const countdown = mode === 'countdown'
   const bgVisibility = black ? 'hidden' : 'visible'
   const showVideo = bgSrc !== null && bgReady
+  const theme = getTheme(slideThemeId)
+  const colors = resolveColors(theme, slideThemeColors)
+  const posAlign = theme.position === 'top' ? 'flex-start' : theme.position === 'bottom' ? 'flex-end' : 'center'
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black" style={{ cursor: 'none' }}>
-      {/* Animated gradient fallback — always present underneath the video */}
-      <div
-        className="wf-fallback absolute inset-0 transition-opacity duration-700"
-        style={{ opacity: showVideo ? 0 : 1, visibility: bgVisibility }}
-      />
+      {/* Theme background — shown when no per-item background is active and not black */}
+      {!black && !showVideo && (
+        theme.kind === 'static'
+          ? <div className="absolute inset-0" style={{ background: staticBackgroundCss(theme, colors) }} />
+          : <MotionBackground effect={theme.effect!} colors={colors} />
+      )}
 
       {/* Per-song background — video or image, fades in when ready */}
       {bgSrc && (
         isVideo(bgSrc) ? (
           <video
             key={bgSrc}
-            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
-            style={{ opacity: showVideo ? 1 : 0, visibility: bgVisibility }}
+            className="absolute inset-0 h-full w-full transition-opacity duration-700"
+            style={{ opacity: showVideo ? 1 : 0, visibility: bgVisibility, objectFit: bgFit }}
             src={toAssetUrl(bgSrc)}
             autoPlay
             loop
@@ -93,8 +128,8 @@ function Output(): JSX.Element {
         ) : (
           <img
             key={bgSrc}
-            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
-            style={{ opacity: showVideo ? 1 : 0, visibility: bgVisibility }}
+            className="absolute inset-0 h-full w-full transition-opacity duration-700"
+            style={{ opacity: showVideo ? 1 : 0, visibility: bgVisibility, objectFit: bgFit }}
             src={toAssetUrl(bgSrc)}
             onLoad={() => setBgReady(true)}
             onError={() => setBgReady(false)}
@@ -102,11 +137,59 @@ function Output(): JSX.Element {
         )
       )}
 
-      {!black && !logo && (
+      {!black && !logo && !countdown && (
         <>
-          <LyricLayer text={layers.a} show={layers.front === 0} />
-          <LyricLayer text={layers.b} show={layers.front === 1} />
+          <LyricLayer text={layers.a} show={layers.front === 0} fontScale={fontScale}
+            fontFamily={FONT_FAMILY[theme.font]} color={colors.text} align={posAlign} />
+          <LyricLayer text={layers.b} show={layers.front === 1} fontScale={fontScale}
+            fontFamily={FONT_FAMILY[theme.font]} color={colors.text} align={posAlign} />
         </>
+      )}
+
+      {/* CCLI copyright footer — shown on song slides when copyright info exists */}
+      {!black && !logo && !countdown && (ccli.author || ccli.copyright || ccli.ccli) && (
+        <div className="absolute bottom-0 left-0 right-0 px-[3vw] pb-[1.5vh] text-center">
+          <div
+            className="mx-auto text-[1.1vw] font-medium leading-snug text-white/75"
+            style={{ textShadow: '0 2px 6px rgba(0,0,0,.95)' }}
+          >
+            {[
+              ccli.author,
+              ccli.copyright,
+              ccli.ccli ? `CCLI Song #${ccli.ccli}` : null,
+              ccli.license ? `CCLI License #${ccli.license}` : null
+            ]
+              .filter(Boolean)
+              .join('  ·  ')}
+          </div>
+        </div>
+      )}
+
+      {countdown && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="mb-6 text-[2.5vw] font-semibold uppercase tracking-[0.35em] text-blue-200">
+            Service begins in
+          </div>
+          <div
+            className="font-mono text-[20vw] font-black leading-none tabular-nums text-white"
+            style={{ textShadow: '0 4px 40px rgba(0,0,0,.9)' }}
+          >
+            {clockLine}
+          </div>
+        </div>
+      )}
+
+      {tickerText && !black && !logo && !countdown && (
+        <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t-4 border-amber-500 bg-gradient-to-r from-amber-900/85 via-amber-800/85 to-amber-900/85">
+          <div
+            className="wf-ticker-track py-3 text-3xl font-bold text-amber-100"
+            style={{ animationDuration: `${Math.max(12, tickerText.length * 0.35)}s` }}
+          >
+            {/* Two identical copies → seamless loop at translateX(-50%). */}
+            <span className="px-12">📢 {tickerText}</span>
+            <span className="px-12">📢 {tickerText}</span>
+          </div>
+        </div>
       )}
 
       {logo && (
@@ -133,18 +216,58 @@ function Output(): JSX.Element {
   )
 }
 
-function LyricLayer({ text, show }: { text: string; show: boolean }): JSX.Element {
+function LyricLayer({ text, show, fontScale, fontFamily, color, align }: {
+  text: string; show: boolean; fontScale: number; fontFamily: string; color: string; align: string
+}): JSX.Element {
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center px-[8vw] py-[6vh] text-center transition-opacity duration-500"
-      style={{ opacity: show ? 1 : 0 }}
+      className="absolute inset-0 flex justify-center px-[8vw] py-[6vh] text-center transition-opacity duration-500"
+      style={{ opacity: show ? 1 : 0, alignItems: align }}
     >
       <span
-        className="text-[6vw] font-bold leading-tight text-white"
-        style={{ textShadow: '0 3px 24px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)' }}
+        className="font-bold leading-tight"
+        style={{
+          fontSize: `${fontScale}vw`,
+          fontFamily,
+          color,
+          textShadow: '0 3px 24px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)',
+          whiteSpace: 'pre-line'
+        }}
       >
         {text}
       </span>
+    </div>
+  )
+}
+
+// Code-generated animated theme backgrounds (no video files).
+function MotionBackground({ effect, colors }: {
+  effect: 'aurora' | 'bokeh' | 'rays' | 'drift'
+  colors: { primary: string; secondary: string }
+}): JSX.Element {
+  if (effect === 'aurora') {
+    return <div className="absolute inset-0" style={{
+      background: `linear-gradient(120deg, ${colors.primary}, ${colors.secondary}, ${colors.primary})`,
+      backgroundSize: '320% 320%', animation: 'themeAurora 9s ease infinite' }} />
+  }
+  if (effect === 'drift') {
+    return <div className="absolute inset-0" style={{
+      background: `radial-gradient(circle at 30% 30%, ${colors.primary}, ${colors.secondary})`,
+      backgroundSize: '200% 200%', animation: 'themeDrift 12s ease-in-out infinite' }} />
+  }
+  if (effect === 'rays') {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
+        <div className="absolute inset-y-0" style={{ width: '6vw', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent)', animation: 'themeRay 6s linear infinite' }} />
+        <div className="absolute inset-y-0" style={{ width: '3.5vw', left: '20vw', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent)', animation: 'themeRay 8s linear infinite' }} />
+      </div>
+    )
+  }
+  return (
+    <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
+      <div className="tb-blob" style={{ width: '16vw', height: '16vw', background: colors.secondary, top: '12%', left: '14%', animation: 'themeFloatA 7s ease-in-out infinite' }} />
+      <div className="tb-blob" style={{ width: '12vw', height: '12vw', background: colors.secondary, bottom: '14%', right: '18%', animation: 'themeFloatB 8s ease-in-out infinite' }} />
+      <div className="tb-blob" style={{ width: '9vw', height: '9vw', background: colors.secondary, top: '40%', right: '40%', animation: 'themeFloatA 6s ease-in-out infinite' }} />
     </div>
   )
 }

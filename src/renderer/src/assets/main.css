@@ -1,3 +1,8 @@
+@font-face { font-family: 'Poppins'; src: url('./fonts/Poppins-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'PT Serif'; src: url('./fonts/PTSerif-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Anton'; src: url('./fonts/Anton-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Cormorant Garamond'; src: url('./fonts/CormorantGaramond-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,20 +14,471 @@ body,
   margin: 0;
 }
 
-/* Animated background used by output windows when no motion video is present. */
-.wf-fallback {
-  background:
-    radial-gradient(60% 80% at 30% 30%, #16307a 0%, transparent 60%),
-    radial-gradient(50% 70% at 80% 70%, #3a1f6e 0%, transparent 60%),
-    linear-gradient(120deg, #0a0f2c, #0a1b3a);
-  animation: wf-drift 18s ease-in-out infinite alternate;
+/* ════════════════════════════════════════════════════════════════════════════════
+   THEME SYSTEM — 4 Complete Professional Themes
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Modern Church Theme (Default) */
+  --wf-primary: #8b5cf6;
+  --wf-primary-dark: #6d28d9;
+  --wf-secondary: #06b6d4;
+  --wf-secondary-dark: #0891b2;
+  --wf-accent: #f59e0b;
+  --wf-accent-light: #fbbf24;
+  --wf-bg-primary: #0f172a;
+  --wf-bg-secondary: #1e293b;
+  --wf-bg-tertiary: #334155;
+  --wf-text-primary: #f1f5f9;
+  --wf-text-secondary: #cbd5e1;
+  --wf-border: rgba(148, 163, 184, 0.15);
+  --wf-glass-bg: rgba(15, 23, 42, 0.7);
+  --wf-success: #10b981;
+  --wf-warning: #f59e0b;
+  --wf-error: #ef4444;
 }
 
-@keyframes wf-drift {
+/* Minimalist Professional - Clean LIGHT steel-blue (high contrast for older eyes) */
+html[data-theme="minimalist"] {
+  --wf-primary: #1d4ed8;
+  --wf-primary-dark: #1e3a8a;
+  --wf-secondary: #0369a1;
+  --wf-secondary-dark: #075985;
+  --wf-accent: #0284c7;
+  --wf-accent-light: #0ea5e9;
+  --wf-bg-primary: #dbe3ee;
+  --wf-bg-secondary: #eaf0f7;
+  --wf-bg-tertiary: #cdd8e6;
+  --wf-text-primary: #0f172a;
+  --wf-text-secondary: #334155;
+  --wf-border: rgba(30, 58, 138, 0.22);
+  --wf-glass-bg: rgba(255, 255, 255, 0.95);
+  --wf-success: #047857;
+  --wf-warning: #b45309;
+  --wf-error: #b91c1c;
+}
+
+/* Vibrant Creative - Bold & Energetic */
+html[data-theme="vibrant"] {
+  --wf-primary: #dc2626;
+  --wf-primary-dark: #991b1b;
+  --wf-secondary: #ea580c;
+  --wf-secondary-dark: #c2410c;
+  --wf-accent: #fbbf24;
+  --wf-accent-light: #fcd34d;
+  --wf-bg-primary: #1f1f1f;
+  --wf-bg-secondary: #2d2d2d;
+  --wf-bg-tertiary: #3f3f3f;
+  --wf-text-primary: #fafafa;
+  --wf-text-secondary: #d4d4d4;
+  --wf-border: rgba(220, 38, 38, 0.25);
+  --wf-glass-bg: rgba(31, 31, 31, 0.9);
+  --wf-success: #10b981;
+  --wf-warning: #fbbf24;
+  --wf-error: #ef4444;
+}
+
+/* Dark Premium - Cool & Professional */
+html[data-theme="dark-premium"] {
+  --wf-primary: #06b6d4;
+  --wf-primary-dark: #0891b2;
+  --wf-secondary: #3b82f6;
+  --wf-secondary-dark: #2563eb;
+  --wf-accent: #14b8a6;
+  --wf-accent-light: #2dd4bf;
+  --wf-bg-primary: #1a1a2e;
+  --wf-bg-secondary: #16213e;
+  --wf-bg-tertiary: #0f3460;
+  --wf-text-primary: #ecf0f1;
+  --wf-text-secondary: #bdc3c7;
+  --wf-border: rgba(6, 182, 212, 0.2);
+  --wf-glass-bg: rgba(26, 26, 46, 0.9);
+  --wf-success: #10b981;
+  --wf-warning: #fbbf24;
+  --wf-error: #ef4444;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   BASE STYLING & ANIMATIONS
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+body {
+  background-color: #2b2b30;  /* matte grey app base */
+  color: var(--wf-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Flat fallback surface (operator chrome should not animate). */
+.wf-fallback {
+  background: #15151a;
+}
+
+/* Smooth transitions */
+* {
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   MODERN BUTTON STYLES
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Primary Gradient Button */
+  .btn-primary {
+    @apply px-6 py-3 rounded-xl font-semibold text-white text-center cursor-pointer;
+    background: linear-gradient(135deg, var(--wf-primary), var(--wf-secondary));
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    position: relative;
+    overflow: hidden;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 500ms;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  .btn-primary:hover::before {
+    left: 100%;
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  /* Secondary Button */
+  .btn-secondary {
+    @apply px-5 py-2 rounded-lg font-semibold border-2 transition-all;
+    background: var(--wf-glass-bg);
+    border-color: var(--wf-secondary);
+    color: var(--wf-secondary);
+    backdrop-filter: blur(10px);
+  }
+
+  .btn-secondary:hover {
+    background: var(--wf-secondary);
+    color: var(--wf-bg-primary);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Danger Button */
+  .btn-danger {
+    @apply px-5 py-2 rounded-lg font-semibold text-white;
+    background: linear-gradient(135deg, var(--wf-error), #ff6b9d);
+    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+  }
+
+  .btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(239, 68, 68, 0.4);
+  }
+
+  /* Success Button */
+  .btn-success {
+    @apply px-5 py-2 rounded-lg font-semibold text-white;
+    background: linear-gradient(135deg, var(--wf-success), #00d084);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  }
+
+  .btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(16, 185, 129, 0.4);
+  }
+
+  /* Icon Button */
+  .btn-icon {
+    @apply w-10 h-10 rounded-lg flex items-center justify-center;
+    background: var(--wf-glass-bg);
+    border: 1px solid var(--wf-border);
+    color: var(--wf-text-secondary);
+    cursor: pointer;
+  }
+
+  .btn-icon:hover {
+    background: var(--wf-bg-tertiary);
+    color: var(--wf-primary);
+    transform: scale(1.05);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   MODERN CARD STYLES
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .card {
+    @apply rounded-2xl border p-4 backdrop-blur-xl;
+    background: var(--wf-glass-bg);
+    border-color: var(--wf-border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    border-color: var(--wf-secondary);
+  }
+
+  .card-lg {
+    @apply card p-6;
+  }
+
+  .card-interactive {
+    @apply card cursor-pointer;
+  }
+
+  .card-interactive:hover {
+    border-color: var(--wf-primary);
+  }
+
+  .card-active {
+    @apply card;
+    border-color: var(--wf-primary);
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   MODERN INPUT STYLES
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  input, textarea, select {
+    @apply rounded-lg border-2 px-4 py-2.5 text-sm font-medium;
+    background: var(--wf-glass-bg);
+    border-color: var(--wf-border);
+    color: var(--wf-text-primary);
+    backdrop-filter: blur(10px);
+    transition: all 200ms;
+  }
+
+  /* Native dropdown options: always dark + readable so popups never render
+     invisible (white-on-light) in any theme. */
+  option {
+    background-color: #1e293b;
+    color: #ffffff;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: var(--wf-text-secondary);
+    opacity: 0.6;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--wf-primary);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+    background: var(--wf-bg-secondary);
+  }
+
+  /* Input with validation */
+  input.valid {
+    border-color: var(--wf-success);
+  }
+
+  input.valid:focus {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+  }
+
+  input.error {
+    border-color: var(--wf-error);
+  }
+
+  input.error:focus {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   SECTION HEADERS & TYPOGRAPHY
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .section-title {
+    @apply text-xl font-bold mb-1;
+    color: var(--wf-text-primary);
+    background: linear-gradient(135deg, var(--wf-primary), var(--wf-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .section-subtitle {
+    @apply text-sm font-medium mb-4;
+    color: var(--wf-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .badge {
+    @apply inline-block px-3 py-1 rounded-full text-xs font-bold;
+    background: linear-gradient(135deg, var(--wf-primary), var(--wf-secondary));
+    color: white;
+  }
+
+  .badge-success {
+    @apply inline-block px-3 py-1 rounded-full text-xs font-bold;
+    background: var(--wf-success);
+    color: white;
+  }
+
+  .badge-warning {
+    @apply inline-block px-3 py-1 rounded-full text-xs font-bold;
+    background: var(--wf-warning);
+    color: white;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.4); }
+}
+
+/* Stage message banner — pulsing glow grabs attention; the TEXT stays solid/readable. */
+@keyframes stage-alert {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(0,0,0,0); }
+  50% { box-shadow: inset 0 0 0 6px rgba(0,0,0,0.45), 0 0 28px 4px rgba(245,158,11,0.85); }
+}
+.stage-alert { animation: stage-alert 1.1s ease-in-out infinite; }
+
+/* Blinking attention icon (icon only blinks, never the message text). */
+@keyframes blink-icon {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+.blink-icon { animation: blink-icon 0.9s step-start infinite; }
+
+/* Slide-theme motion backgrounds (code-generated, no video files). */
+@keyframes themeAurora { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes themeFloatA { 0%{transform:translate(0,0)} 50%{transform:translate(2vw,-3vh)} 100%{transform:translate(0,0)} }
+@keyframes themeFloatB { 0%{transform:translate(0,0)} 50%{transform:translate(-2.4vw,2.2vh)} 100%{transform:translate(0,0)} }
+@keyframes themeRay { 0%{transform:translateX(-80%) skewX(-18deg)} 100%{transform:translateX(220%) skewX(-18deg)} }
+@keyframes themeDrift { 0%{background-position:0% 0%} 50%{background-position:100% 100%} 100%{background-position:0% 0%} }
+.tb-blob{position:absolute;border-radius:50%;filter:blur(40px);opacity:.65}
+
+/* Smooth scrolling ticker (announcement marquee on the output screen). */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.wf-ticker-track {
+  display: inline-flex;
+  white-space: nowrap;
+  will-change: transform;
+  animation: ticker-scroll linear infinite;
+}
+
+/* Modal animation */
+@keyframes modal-appear {
   from {
-    filter: hue-rotate(0deg) brightness(1);
+    transform: scale(0.95) translateY(-20px);
+    opacity: 0;
   }
   to {
-    filter: hue-rotate(40deg) brightness(1.18);
+    transform: scale(1) translateY(0);
+    opacity: 1;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════
+   READABILITY LAYER — high contrast for older eyes (applies to ALL themes)
+   The app's panels/labels use faint dark-only utility classes; these overrides
+   strengthen them everywhere at once so every box and word stands out clearly.
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+/* Muted label/body text — the biggest readability killer. Brighten substantially. */
+body .text-slate-600 { color: #93a4ba !important; }
+body .text-slate-500 { color: #aab8ca !important; }
+body .text-slate-400 { color: #cdd8e4 !important; }
+body .text-slate-300 { color: #e3e9f1 !important; }
+
+/* Panel backgrounds — faint white overlays become clearly visible cards. */
+body .bg-white\/\[0\.02\] { background-color: rgba(255,255,255,0.06) !important; }
+body .bg-white\/\[0\.03\] { background-color: rgba(255,255,255,0.07) !important; }
+body .bg-white\/\[0\.04\] { background-color: rgba(255,255,255,0.08) !important; }
+body .bg-white\/\[0\.05\] { background-color: rgba(255,255,255,0.09) !important; }
+body .bg-white\/\[0\.06\] { background-color: rgba(255,255,255,0.11) !important; }
+
+/* Nested/input wells — give them a darker base so they read as distinct fields. */
+body .bg-black\/20 { background-color: rgba(0,0,0,0.38) !important; }
+body .bg-black\/30 { background-color: rgba(0,0,0,0.42) !important; }
+body .bg-black\/40 { background-color: rgba(0,0,0,0.50) !important; }
+
+/* Borders — faint hairlines become defined edges that separate every box. */
+body .border-white\/10 { border-color: rgba(255,255,255,0.22) !important; }
+
+/* ── Minimalist = genuine LIGHT theme: flip the dark-only utilities to light ── */
+html[data-theme="minimalist"] body,
+html[data-theme="minimalist"] .text-slate-300,
+html[data-theme="minimalist"] .text-slate-400,
+html[data-theme="minimalist"] .text-slate-500,
+html[data-theme="minimalist"] .text-slate-600 { color: #1e293b !important; }
+html[data-theme="minimalist"] .text-slate-500 { color: #475569 !important; }
+html[data-theme="minimalist"] .text-slate-600 { color: #64748b !important; }
+html[data-theme="minimalist"] .text-white,
+html[data-theme="minimalist"] .text-slate-100 { color: #0f172a !important; }
+
+html[data-theme="minimalist"] .bg-white\/\[0\.02\],
+html[data-theme="minimalist"] .bg-white\/\[0\.03\],
+html[data-theme="minimalist"] .bg-white\/\[0\.04\],
+html[data-theme="minimalist"] .bg-white\/\[0\.05\],
+html[data-theme="minimalist"] .bg-white\/\[0\.06\] { background-color: #ffffff !important; }
+
+html[data-theme="minimalist"] .bg-black\/20,
+html[data-theme="minimalist"] .bg-black\/30,
+html[data-theme="minimalist"] .bg-black\/40 { background-color: #eef2f8 !important; }
+
+html[data-theme="minimalist"] .border-white\/10 { border-color: #c3cedd !important; }
+
+/* Keep the projector preview/output boxes dark with light text in every theme. */
+html[data-theme="minimalist"] .bg-black { color: #ffffff !important; }
+
+/* Scroll bar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--wf-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--wf-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wf-secondary);
 }
