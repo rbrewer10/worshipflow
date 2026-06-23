@@ -156,7 +156,7 @@ function ServiceBuilder(): JSX.Element {
 
       <div className="flex h-full min-h-0 gap-4 p-4">
         {/* Services list */}
-        <div className="flex w-72 flex-col rounded-xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="flex w-72 flex-col rounded-xl border border-white/[0.07] bg-[#15151a] p-3">
           <div className="mb-3 flex gap-2">
             <input value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && create()}
@@ -196,7 +196,7 @@ function ServiceBuilder(): JSX.Element {
         </div>
 
         {/* Open service */}
-        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-4">
           {!service ? (
             <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
               Select a service, or create one to start building your order of worship.
