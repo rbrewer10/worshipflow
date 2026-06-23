@@ -53,7 +53,7 @@ function ScriptureLookup(): JSX.Element {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-white/10 bg-white/[0.03] p-5">
+      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-5">
         {!result && (
           <p className="py-10 text-center text-sm text-slate-500">
             Look up any passage in the King James Version.
