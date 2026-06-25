@@ -16,7 +16,7 @@ function AppShell(): JSX.Element {
       <div className="flex h-screen flex-col text-slate-100">
         <TopBar view={view} setView={setView} />
         <div className="flex min-h-0 flex-1">
-          <ServiceRail />
+          {view === 'live' && <ServiceRail />}
           <main className="min-h-0 flex-1 overflow-hidden">
             {view === 'live' ? <LiveView />
               : view === 'service' ? <ServiceBuilder />

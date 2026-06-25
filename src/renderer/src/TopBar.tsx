@@ -19,26 +19,29 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
   }, [])
 
   return (
-    <header className="flex items-center gap-3 border-b border-white/[0.07] bg-[#141418] px-4 py-2.5">
-      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500 text-sm font-bold text-[#06270f]">✝</div>
-      <span className="text-sm font-medium text-white">WorshipFlow</span>
+    <header className="flex items-center gap-3 border-b border-white/[0.07] bg-[#141418] px-4 py-3.5">
+      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-500 text-base font-bold text-[#06270f]">✝</div>
+      <span className="text-base font-medium text-white">WorshipFlow</span>
       <div className="flex flex-1 justify-center gap-1">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setView(t.id)}
-            className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              view === t.id ? 'bg-[#26262c] text-white' : 'text-slate-400 hover:text-slate-200'
+            className={`flex items-center gap-2 px-6 py-2.5 text-base font-medium transition-colors ${
+              view === t.id
+                ? 'border-b-2 border-emerald-400 text-white'
+                : 'rounded-md text-slate-300 hover:text-slate-100'
             }`}
           >
-            {t.live && <span className={`h-1.5 w-1.5 rounded-full ${outputs > 0 ? 'bg-emerald-400' : 'bg-slate-600'}`} />}
+            {t.live && <span className={`h-2 w-2 rounded-full ${outputs > 0 ? 'bg-emerald-400' : 'bg-slate-600'}`} />}
             {t.label}
           </button>
         ))}
       </div>
-      <span className={`text-[11px] font-medium ${outputs > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
-        {outputs > 0 ? `● ${outputs} output${outputs === 1 ? '' : 's'}` : '○ no output'}
-      </span>
+      {outputs > 0
+        ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-300 ring-1 ring-emerald-500/40">● {outputs} live</span>
+        : <span className="text-xs text-slate-600">○ no output</span>
+      }
       <button
         onClick={() => window.wf.stageOpen()}
         title="Open stage display"

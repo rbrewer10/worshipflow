@@ -71,9 +71,39 @@ function LiveTools(): JSX.Element {
 
   return (
     <aside className="flex w-80 shrink-0 flex-col gap-3 overflow-auto border-l border-white/[0.07] bg-[#15151a] p-3">
+      {/* Emergency controls */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => window.wf.sendIntent('black')}
+          className="flex-1 rounded-xl bg-black px-3 py-3 text-sm font-bold text-white ring-1 ring-white/10 hover:ring-white/25"
+        >
+          ⬛ Black
+        </button>
+        <button
+          onClick={() => window.wf.sendIntent('logo')}
+          className="flex-1 rounded-xl border border-white/[0.07] bg-[#1a1a1d] px-3 py-3 text-sm font-bold text-slate-300 hover:bg-white/[0.08]"
+        >
+          🔲 Logo
+        </button>
+        <button
+          onClick={() => window.wf.sendIntent('lyrics')}
+          className="flex-1 rounded-xl border border-emerald-500/30 bg-emerald-600/15 px-3 py-3 text-sm font-bold text-emerald-300 hover:bg-emerald-600/25"
+        >
+          ▶ Live
+        </button>
+      </div>
+
+      {/* Keyboard shortcut strip */}
+      <div className="flex justify-around rounded-lg border border-white/[0.07] bg-black/20 px-2 py-1.5 text-[10px] text-slate-500">
+        <span><span className="font-bold text-slate-400">Space</span> Next</span>
+        <span><span className="font-bold text-slate-400">←→</span> Prev/Next</span>
+        <span><span className="font-bold text-slate-400">B</span> Black</span>
+        <span><span className="font-bold text-slate-400">L</span> Logo</span>
+      </div>
+
       {/* Stage message + presets */}
       <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
-        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-300">
           Stage Message
           {live?.stageMessage && <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">LIVE</span>}
           {msgSent && <span className="ml-2 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400 animate-[fade-in_0.2s_ease-out]">✓ Sent to stage</span>}
@@ -82,7 +112,7 @@ function LiveTools(): JSX.Element {
           <input type="text" value={stageMsg} onChange={(e) => setStageMsg(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendStageMessage()} placeholder="Message to worship leader / pastor..."
             className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-sm outline-none placeholder:text-slate-600 focus:border-blue-500" />
-          <button onClick={() => sendStageMessage()} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20">Send</button>
+          <button onClick={() => sendStageMessage()} className="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-bold text-[#1a0a00] hover:bg-amber-400">Send</button>
           <button onClick={clearStageMessage} className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-slate-500 hover:text-slate-300">Clear</button>
         </div>
         <div className="mt-2 flex items-center justify-between">
@@ -93,7 +123,7 @@ function LiveTools(): JSX.Element {
           <div className="mt-1.5 flex flex-wrap gap-2">
             {presets.length === 0 && <span className="text-xs text-slate-600">No quick messages — tap ✏️ Edit to add some.</span>}
             {presets.map((p, i) => (
-              <button key={i} onClick={() => sendStageMessage(p)} className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-slate-300 hover:border-amber-500/40 hover:bg-amber-500/15 hover:text-amber-200">{p}</button>
+              <button key={i} onClick={() => setStageMsg(p)} className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-slate-300 hover:border-amber-500/40 hover:bg-amber-500/15 hover:text-amber-200">{p}</button>
             ))}
           </div>
         ) : (
@@ -114,7 +144,7 @@ function LiveTools(): JSX.Element {
 
       {/* Quick scripture + Bible translation */}
       <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
-        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Quick Scripture</h2>
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Quick Scripture</h2>
         <div className="flex gap-2">
           <input type="text" value={scriptureRef} onChange={(e) => setScriptureRef(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && quickScripture()} placeholder="John 3:16"
             className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-sm outline-none placeholder:text-slate-600 focus:border-blue-500" />
@@ -131,7 +161,7 @@ function LiveTools(): JSX.Element {
 
       {/* Text size */}
       <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
-        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Text size</h2>
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Text size</h2>
         <div className="flex items-center gap-2">
           <button onClick={() => window.wf.liveSetFontScale((live?.fontScale ?? 6) - 0.5)} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-sm font-semibold hover:bg-white/[0.12]">A −</button>
           <span className="text-xs text-slate-500">{(live?.fontScale ?? 6).toFixed(1)}vw</span>
@@ -144,8 +174,16 @@ function LiveTools(): JSX.Element {
       <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300">Auto-Advance</span>
-          {autoAdvanceRunning && <span className="text-xs text-emerald-400">● {((live?.autoAdvanceMs ?? 0) / 1000).toFixed(1)}s{autoAdvanceLoop ? ' ↻' : ''}</span>}
+          {autoAdvanceRunning && <span className="text-xs font-bold text-emerald-400">● running{autoAdvanceLoop ? ' ↻' : ''}</span>}
         </div>
+        {autoAdvanceRunning && (
+          <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-none"
+              style={{ width: `${Math.min(100, ((live?.autoAdvanceMs ?? 0) / (parseFloat(autoAdvanceSecs) * 1000)) * 100)}%` }}
+            />
+          </div>
+        )}
         <div className="flex gap-1.5">
           <input type="number" value={autoAdvanceSecs} onChange={(e) => setAutoAdvanceSecs(e.target.value)} className="w-16 rounded border border-white/10 bg-black/40 px-2 py-1 text-xs text-slate-300" />
           <button onClick={() => window.wf.featuresStartAutoAdvance(parseFloat(autoAdvanceSecs) * 1000, autoAdvanceLoop)} className="flex-1 rounded bg-blue-600/40 px-2 py-1 text-xs font-semibold text-blue-300 hover:bg-blue-600/60">Start</button>
@@ -156,6 +194,14 @@ function LiveTools(): JSX.Element {
           <span className="text-[11px] text-slate-400">↻ Loop back to start at the end</span>
         </label>
       </section>
+
+      {/* Status strip: hymn timer + verse */}
+      {(hmsElapsedSecs > 0 || live?.verseNumber != null) && (
+        <div className="flex gap-2 rounded-lg border border-white/[0.07] bg-black/20 px-3 py-1.5 text-xs text-slate-400">
+          {hmsElapsedSecs > 0 && <span>⏱ {Math.floor(hmsElapsedSecs / 60)}:{String(hmsElapsedSecs % 60).padStart(2, '0')}</span>}
+          {live?.verseNumber != null && <span>· Verse {live.verseNumber}</span>}
+        </div>
+      )}
 
       <ObsPanel />
 
