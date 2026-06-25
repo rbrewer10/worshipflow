@@ -67,6 +67,10 @@ const wf = {
     ipcRenderer.invoke('wf:service:importImages'),
   serviceImportPptx: (): Promise<{ id: number; name: string; count: number } | null> =>
     ipcRenderer.invoke('wf:service:importPptx'),
+  serviceExport: (serviceId: number): Promise<{ canceled: boolean }> =>
+    ipcRenderer.invoke('wf:services:export', serviceId),
+  serviceImportFile: (): Promise<{ canceled: boolean; serviceId: number | null }> =>
+    ipcRenderer.invoke('wf:services:import'),
 
   // Scripture
   scriptureLookup: (reference: string): Promise<ScriptureResult> =>

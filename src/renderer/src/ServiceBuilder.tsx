@@ -58,6 +58,19 @@ function ServiceBuilder(): JSX.Element {
     if (res) { refreshServices(); open(res.id) }
   }
 
+  const exportService = async (): Promise<void> => {
+    if (openId == null) return
+    await window.wf.serviceExport(openId)
+  }
+
+  const importServiceFile = async (): Promise<void> => {
+    const res = await window.wf.serviceImportFile()
+    if (!res.canceled && res.serviceId != null) {
+      refreshServices()
+      open(res.serviceId)
+    }
+  }
+
   const del = (id: number): void => {
     const svc = services.find((s) => s.id === id)
     setConfirmDelete({ type: 'service', id, name: svc?.name ?? 'Service' })
@@ -176,6 +189,11 @@ function ServiceBuilder(): JSX.Element {
               title="Import a .pptx directly — text becomes editable, backgrounds extracted where possible">
               📑 Import .pptx (editable text)
             </button>
+            <button onClick={importServiceFile}
+              className="w-full rounded-lg border border-violet-500/30 bg-violet-600/15 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-600/25"
+              title="Load a .wfservice file exported from another computer">
+              📂 Load saved service (.wfservice)
+            </button>
             {importing && <p className="text-center text-[11px] text-slate-500">Importing…</p>}
           </div>
           <div className="min-h-0 flex-1 space-y-1 overflow-auto">
@@ -205,9 +223,16 @@ function ServiceBuilder(): JSX.Element {
             <>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-semibold">{service.name}</h2>
-                <button onClick={handlePrint}
-                  className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold hover:bg-white/[0.12]"
-                  title="Print service order">🖨 Print</button>
+                <div className="flex gap-2">
+                  <button onClick={exportService}
+                    className="rounded-lg border border-violet-500/30 bg-violet-600/15 px-3 py-1.5 text-xs font-semibold text-violet-200 hover:bg-violet-600/25"
+                    title="Save this service to a file you can bring to another computer">
+                    💾 Save to file
+                  </button>
+                  <button onClick={handlePrint}
+                    className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold hover:bg-white/[0.12]"
+                    title="Print service order">🖨 Print</button>
+                </div>
               </div>
 
               {openId != null && (

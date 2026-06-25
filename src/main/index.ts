@@ -1,11 +1,11 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
 import { join, basename, dirname } from 'path'
 import { createServer } from 'http'
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle } from '../shared/types'
 import { DEFAULT_THEME_ID } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -909,6 +909,67 @@ ipcMain.handle('wf:services:setItemPayload', (_e, itemId: number, payload: Recor
 ipcMain.handle('wf:services:reorder', (_e, serviceId: number, orderedIds: number[]) =>
   reorderServiceItems(serviceId, orderedIds)
 )
+
+ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {
+  const svc = getService(serviceId)
+  if (!svc) return { canceled: true }
+  const itemsWithSongs = await Promise.all(
+    svc.items.map(async (item) => {
+      const song = item.type === 'song' && item.ref_id != null ? getSong(item.ref_id) : null
+      return { ...item, song }
+    })
+  )
+  const bundle = { version: 1, name: svc.name, service_date: svc.service_date, theme: svc.theme, themeColors: svc.themeColors, items: itemsWithSongs }
+  const { filePath, canceled } = await dialog.showSaveDialog({
+    title: 'Export Service',
+    defaultPath: `${svc.name.replace(/[/\\?%*:|"<>]/g, '-')}.wfservice`,
+    filters: [{ name: 'WorshipFlow Service', extensions: ['wfservice'] }]
+  })
+  if (canceled || !filePath) return { canceled: true }
+  writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8')
+  return { canceled: false }
+})
+
+ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serviceId: number | null }> => {
+  const { filePaths, canceled } = await dialog.showOpenDialog({
+    title: 'Import Service',
+    filters: [{ name: 'WorshipFlow Service', extensions: ['wfservice'] }],
+    properties: ['openFile']
+  })
+  if (canceled || filePaths.length === 0) return { canceled: true, serviceId: null }
+  const bundle = JSON.parse(readFileSync(filePaths[0], 'utf-8')) as {
+    version: number
+    name: string
+    service_date: string | null
+    theme: string | null
+    themeColors: ThemeColors | null
+    items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
+  }
+  const serviceId = createService(bundle.name, bundle.service_date ?? undefined)
+  if (bundle.theme) setServiceTheme(serviceId, bundle.theme, bundle.themeColors ?? null)
+  for (const item of bundle.items) {
+    let ref_id: number | null = null
+    if (item.type === 'song' && item.song) {
+      const existing = listSongs(item.song.title).find((s) => s.title === item.song!.title)
+      ref_id = existing ? existing.id : createSong({
+        title: item.song.title,
+        author: item.song.author ?? undefined,
+        ccli: item.song.ccli ?? undefined,
+        copyright: item.song.copyright ?? undefined,
+        publisher: item.song.publisher ?? undefined,
+        background: item.song.background,
+        sections: item.song.sections,
+        arrangement: item.song.arrangement ?? undefined,
+        fontScale: item.song.fontScale ?? undefined,
+        linesPerSlide: item.song.linesPerSlide ?? undefined,
+      })
+    }
+    const itemId = addServiceItem(serviceId, { type: item.type, ref_id, payload: item.payload })
+    if (item.notes) updateServiceItemNotes(itemId, item.notes)
+    if (item.style) setServiceItemStyle(itemId, item.style)
+  }
+  return { canceled: false, serviceId }
+})
 ipcMain.handle('wf:service:slides', async (_e, serviceId: number): Promise<{ id: number; slides: string[] }[]> => {
   const svc = getService(serviceId)
   if (!svc) return []
