@@ -59,7 +59,7 @@ async function loadItem(item: ServiceItem): Promise<void> {
 // Simplified, touch-friendly operator surface for volunteers.
 // PREV / NEXT take up most of the screen; BLACK / LOGO are at the top.
 // The keyboard shortcuts (Space = next, ← = prev, B/L) also work.
-function VolunteerView(): JSX.Element {
+function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
   const [live, setLive] = useState<LiveState | null>(null)
   const [services, setServices] = useState<ServiceSummary[]>([])
   const [activeServiceId, setActiveServiceId] = useState<number | null>(null)
@@ -149,7 +149,14 @@ function VolunteerView(): JSX.Element {
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
-        <div className="ml-auto text-xs text-slate-500">Space / → next · ← prev · B black · L logo</div>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs text-slate-500">Space / → next · ← prev · B black · L logo</span>
+          {onExit && (
+            <button onClick={onExit} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-slate-400 hover:bg-white/[0.12] hover:text-white">
+              ✕ Exit
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Main: PREV | content | NEXT ── */}

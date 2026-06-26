@@ -70,7 +70,7 @@ function LiveTools(): JSX.Element {
   const clearStageMessage = (): void => { setStageMsg(''); window.wf.liveSetStageMessage(null) }
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col gap-3 overflow-auto border-l border-white/[0.07] bg-[#15151a] p-3">
+    <aside className="flex w-96 shrink-0 flex-col gap-3 overflow-auto border-l border-white/[0.07] bg-[#15151a] p-3">
       {/* Emergency controls */}
       <div className="flex gap-2">
         <button

@@ -43,6 +43,13 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
         : <span className="text-xs text-slate-600">○ no output</span>
       }
       <button
+        onClick={() => setView('volunteer')}
+        title="Switch to simplified volunteer view"
+        className={`rounded px-2 py-1 text-xs font-semibold ${view === 'volunteer' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'}`}
+      >
+        👤 Volunteer
+      </button>
+      <button
         onClick={() => window.wf.stageOpen()}
         title="Open stage display"
         className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"

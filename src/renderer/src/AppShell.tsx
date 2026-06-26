@@ -6,11 +6,19 @@ import LiveView from './LiveView'
 import ServiceBuilder from './ServiceBuilder'
 import SongLibrary from './SongLibrary'
 import ScriptureLookup from './ScriptureLookup'
+import VolunteerView from './VolunteerView'
 
-export type View = 'live' | 'service' | 'songs' | 'scripture'
+export type View = 'live' | 'service' | 'songs' | 'scripture' | 'volunteer'
 
 function AppShell(): JSX.Element {
   const [view, setView] = useState<View>('live')
+  if (view === 'volunteer') {
+    return (
+      <ServiceProvider>
+        <VolunteerView onExit={() => setView('live')} />
+      </ServiceProvider>
+    )
+  }
   return (
     <ServiceProvider>
       <div className="flex h-screen flex-col text-slate-100">
