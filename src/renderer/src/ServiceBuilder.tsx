@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react'
-import type { LiveState, ServiceItem, SongSummary } from '../../shared/types'
-import ThemePicker from './ThemePicker'
-import ServiceDeck from './ServiceDeck'
-import CardEditPanel from './CardEditPanel'
-import { sendItemLive } from './liveActions'
+import { useState } from 'react'
+import type { ServiceItem } from '../../shared/types'
+import ServiceEditor from './ServiceEditor'
 import { useService } from './ServiceContext'
 
 const ICON: Record<ServiceItem['type'], string> = {
@@ -17,25 +14,12 @@ const ICON: Record<ServiceItem['type'], string> = {
 }
 
 function ServiceBuilder(): JSX.Element {
-  const { services, activeServiceId: openId, activeService: service, selectService, reloadActiveService, refreshServices } = useService()
-  const [songs, setSongs] = useState<SongSummary[]>([])
+  const { services, activeServiceId: openId, activeService: service, selectService, refreshServices } = useService()
   const [newName, setNewName] = useState('')
   const [importing, setImporting] = useState(false)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [live, setLive] = useState<LiveState | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<{ type: 'service' | 'item'; id: number; name: string } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null)
 
-  const refreshSongs = (): void => { window.wf.songsList().then(setSongs) }
-  const reload = reloadActiveService
-  const open = (id: number): void => { setSelectedId(null); selectService(id) }
-
-  useEffect(() => {
-    refreshSongs()
-    const off = window.wf.onState(setLive)
-    window.wf.getState().then(setLive)
-    return off
-  }, [])
-  useEffect(() => { if (openId != null) refreshSongs() }, [openId])
+  const open = (id: number): void => { selectService(id) }
 
   const create = async (): Promise<void> => {
     if (!newName.trim()) return
@@ -73,50 +57,19 @@ function ServiceBuilder(): JSX.Element {
 
   const del = (id: number): void => {
     const svc = services.find((s) => s.id === id)
-    setConfirmDelete({ type: 'service', id, name: svc?.name ?? 'Service' })
+    setConfirmDelete({ id, name: svc?.name ?? 'Service' })
   }
   const confirmServiceDelete = async (): Promise<void> => {
-    if (!confirmDelete || confirmDelete.type !== 'service') return
+    if (!confirmDelete) return
     await window.wf.serviceDelete(confirmDelete.id)
     if (openId === confirmDelete.id) selectService(null)
     refreshServices()
     setConfirmDelete(null)
   }
-  const delItem = (item: ServiceItem): void => setConfirmDelete({ type: 'item', id: item.id, name: item.title })
-  const confirmItemDelete = async (): Promise<void> => {
-    if (!confirmDelete || confirmDelete.type !== 'item') return
-    await window.wf.serviceRemoveItem(confirmDelete.id)
-    if (selectedId === confirmDelete.id) setSelectedId(null)
-    reload()
-    setConfirmDelete(null)
-  }
-
-  const addSong = async (songId: number): Promise<void> => {
-    if (openId == null) return
-    const id = await window.wf.serviceAddItem(openId, { type: 'song', ref_id: songId })
-    reload()
-    setSelectedId(id)
-  }
-  const addCard = async (type: ServiceItem['type']): Promise<void> => {
-    if (openId == null) return
-    if (type === 'image') {
-      const result = await window.wf.dialogOpenFile()
-      if (result.canceled || !result.filePaths[0]) return
-      const id = await window.wf.serviceAddItem(openId, { type: 'image', payload: { path: result.filePaths[0] } })
-      reload()
-      setSelectedId(id)
-      return
-    }
-    const payload: Record<string, unknown> = (type === 'countdown' || type === 'welcome') ? { seconds: 300 } : {}
-    const id = await window.wf.serviceAddItem(openId, { type, payload })
-    reload()
-    setSelectedId(id)
-  }
 
   const handlePrint = (): void => window.print()
 
   const items = service?.items ?? []
-  const selectedItem = service?.items.find((it) => it.id === selectedId) ?? null
 
   return (
     <>
@@ -145,20 +98,18 @@ function ServiceBuilder(): JSX.Element {
       </div>
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="max-w-sm rounded-xl border border-gray-200 bg-white p-5 shadow-lg">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
-              Delete {confirmDelete.type === 'service' ? 'Service' : 'Item'}?
-            </h3>
-            <p className="mb-4 text-sm text-gray-500">
-              Are you sure you want to delete <span className="font-semibold text-gray-900">{confirmDelete.name}</span>? This cannot be undone.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="max-w-sm rounded-xl border border-white/10 bg-slate-900 p-5 shadow-2xl">
+            <h3 className="mb-2 text-lg font-semibold text-white">Delete Service?</h3>
+            <p className="mb-4 text-sm text-slate-400">
+              Are you sure you want to delete <span className="font-semibold text-white">{confirmDelete.name}</span>? This cannot be undone.
             </p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/10">
                 Cancel
               </button>
-              <button onClick={confirmDelete.type === 'service' ? confirmServiceDelete : confirmItemDelete}
+              <button onClick={confirmServiceDelete}
                 className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500">
                 Delete
               </button>
@@ -167,45 +118,47 @@ function ServiceBuilder(): JSX.Element {
         </div>
       )}
 
-      <div className="flex h-full min-h-0 gap-4 bg-gray-50 p-4">
+      <div className="flex h-full min-h-0 gap-4 bg-[#0b0b0f] p-4">
         {/* Services list */}
-        <div className="flex w-72 flex-col rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div className="flex w-72 flex-col rounded-xl border border-white/[0.07] bg-[#18181c] p-3">
           <div className="mb-3 flex gap-2">
             <input value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && create()}
               placeholder="New service name…"
-              className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500" />
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-400 focus:border-blue-500" />
             <button onClick={create} disabled={!newName.trim()}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold hover:bg-blue-500 disabled:opacity-40">+</button>
+              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-40">+</button>
           </div>
           <div className="mb-3 space-y-1.5">
             <button onClick={importImages} disabled={importing}
-              className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+              className="w-full rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50"
               title="Export your PowerPoint slides as images first (File → Save As → PNG)">
               🖼 Import slides as images
             </button>
             <button onClick={importPptx} disabled={importing}
-              className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+              className="w-full rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-300 hover:bg-blue-500/20 disabled:opacity-50"
               title="Import a .pptx directly — text becomes editable, backgrounds extracted where possible">
               📑 Import .pptx (editable text)
             </button>
             <button onClick={importServiceFile}
-              className="w-full rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100"
+              className="w-full rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-300 hover:bg-violet-500/20"
               title="Load a .wfservice file exported from another computer">
               📂 Load saved service (.wfservice)
             </button>
-            {importing && <p className="text-center text-[11px] text-gray-400">Importing…</p>}
+            {importing && <p className="text-center text-[11px] text-slate-400">Importing…</p>}
           </div>
           <div className="min-h-0 flex-1 space-y-1 overflow-auto">
-            {services.length === 0 && <p className="px-1 py-6 text-center text-sm text-gray-400">No saved services yet.</p>}
+            {services.length === 0 && <p className="px-1 py-6 text-center text-sm text-slate-500">No saved services yet.</p>}
             {services.map((s) => (
               <div key={s.id} onClick={() => open(s.id)}
-                className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 ${
-                  openId === s.id ? 'bg-blue-50 ring-1 ring-blue-200 text-blue-700' : 'text-gray-900 hover:bg-gray-50'
+                className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 transition-colors ${
+                  openId === s.id
+                    ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30 text-white'
+                    : 'text-slate-300 hover:bg-white/[0.05]'
                 }`}>
                 <span className="truncate text-sm font-medium">{s.name}</span>
                 <button onClick={(e) => { e.stopPropagation(); del(s.id) }}
-                  className="rounded px-2 py-0.5 text-xs text-gray-400 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100">
+                  className="rounded px-2 py-0.5 text-xs text-slate-500 opacity-0 hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100">
                   Delete
                 </button>
               </div>
@@ -214,54 +167,22 @@ function ServiceBuilder(): JSX.Element {
         </div>
 
         {/* Open service */}
-        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          {!service ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-white/[0.07] bg-[#18181c]">
+          {openId == null ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
               Select a service, or create one to start building your order of worship.
             </div>
           ) : (
-            <>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">{service.name}</h2>
+            <ServiceEditor
+              serviceId={openId}
+              headerActions={
                 <div className="flex gap-2">
-                  <button onClick={exportService}
-                    className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
-                    title="Save this service to a file you can bring to another computer">
-                    💾 Save to file
-                  </button>
-                  <button onClick={handlePrint}
-                    className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100"
-                    title="Print service order">🖨 Print</button>
+                  <button onClick={() => window.wf.serviceOpen(openId)} className="rounded-lg px-2 py-1 text-xs font-semibold text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300" title="Open this service in its own window">⧉ Pop out</button>
+                  <button onClick={exportService} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-300 hover:bg-violet-500/20" title="Save this service to a file">💾 Save to file</button>
+                  <button onClick={handlePrint} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-white/[0.12]" title="Print service order">🖨 Print</button>
                 </div>
-              </div>
-
-              {openId != null && (
-                <ThemePicker serviceId={openId} themeId={service.theme} colors={service.themeColors} onChange={reload} />
-              )}
-
-              <div className="flex min-h-0 flex-1 gap-3">
-                <ServiceDeck
-                  service={service}
-                  songs={songs}
-                  liveItemId={live?.liveServiceItemId ?? null}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  onAdd={addCard}
-                  onAddSong={addSong}
-                  onGoLive={(it) => sendItemLive(it)}
-                  onDelete={delItem}
-                  onReordered={reload}
-                />
-                {selectedItem && (
-                  <CardEditPanel
-                    item={selectedItem}
-                    onClose={() => setSelectedId(null)}
-                    onChanged={reload}
-                    onDelete={delItem}
-                  />
-                )}
-              </div>
-            </>
+              }
+            />
           )}
         </div>
       </div>

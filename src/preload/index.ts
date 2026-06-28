@@ -114,6 +114,7 @@ const wf = {
   settingSet: (key: string, value: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:setting:set', key, value),
   editorOpen: (songId: number): Promise<void> => ipcRenderer.invoke('wf:editor:open', songId),
+  serviceOpen: (serviceId: number): Promise<void> => ipcRenderer.invoke('wf:service:open', serviceId),
 
   // Tablet remote
   getTabletUrl: (): Promise<string> =>

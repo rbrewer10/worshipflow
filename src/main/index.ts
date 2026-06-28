@@ -1306,6 +1306,31 @@ ipcMain.handle('wf:editor:open', (_e: unknown, songId: number) => {
     editorWin?.show()
   })
 })
+let serviceWin: BrowserWindow | null = null
+ipcMain.handle('wf:service:open', (_e: unknown, serviceId: number) => {
+  if (serviceWin && !serviceWin.isDestroyed()) {
+    serviceWin.focus()
+    loadRoute(serviceWin, '/service', { serviceId: String(serviceId) })
+    return
+  }
+  serviceWin = new BrowserWindow({
+    width: 1600,
+    height: 1000,
+    minWidth: 1100,
+    minHeight: 700,
+    title: 'WorshipFlow — Service Builder',
+    backgroundColor: '#0b0b0f',
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: { preload: PRELOAD, sandbox: false }
+  })
+  serviceWin.on('closed', () => { serviceWin = null })
+  loadRoute(serviceWin, '/service', { serviceId: String(serviceId) })
+  serviceWin.once('ready-to-show', () => {
+    serviceWin?.maximize()
+    serviceWin?.show()
+  })
+})
 ipcMain.handle('wf:dialog:openFile', async () => {
   const opts = {
     title: 'Choose media file',
