@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { LiveState, Mode, ThemeColors } from '../../shared/types'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
+import type { MotionEffect } from '../../shared/themes'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -242,7 +243,7 @@ function LyricLayer({ text, show, fontScale, fontFamily, color, align }: {
 
 // Code-generated animated theme backgrounds (no video files).
 function MotionBackground({ effect, colors }: {
-  effect: 'aurora' | 'bokeh' | 'rays' | 'drift'
+  effect: MotionEffect
   colors: { primary: string; secondary: string }
 }): JSX.Element {
   if (effect === 'aurora') {
@@ -263,6 +264,89 @@ function MotionBackground({ effect, colors }: {
       </div>
     )
   }
+  if (effect === 'fire') {
+    return <div className="absolute inset-0" style={{
+      background: `radial-gradient(ellipse at 50% 120%, ${colors.secondary} 0%, ${colors.primary} 60%)`,
+      backgroundSize: '150% 200%', animation: 'themeFire 4s ease-in-out infinite' }} />
+  }
+  if (effect === 'starfield') {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
+        <div className="absolute" style={{ inset: '-33% 0 0', height: '166%',
+          backgroundImage: `radial-gradient(circle, ${colors.secondary} 1px, transparent 1px)`,
+          backgroundSize: '80px 80px', animation: 'themeStarfield 8s linear infinite' }} />
+        <div className="absolute" style={{ inset: '-33% 0 0', height: '166%',
+          backgroundImage: `radial-gradient(circle, ${colors.secondary}99 1px, transparent 1px)`,
+          backgroundSize: '40px 40px', animation: 'themeStarfield 14s linear infinite' }} />
+      </div>
+    )
+  }
+  if (effect === 'waterfall') {
+    return <div className="absolute inset-0" style={{
+      background: `repeating-linear-gradient(180deg, ${colors.primary} 0px, ${colors.secondary}55 40px, ${colors.primary} 80px)`,
+      backgroundSize: '100% 200px', animation: 'themeWaterfall 3s linear infinite' }} />
+  }
+  if (effect === 'embers') {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
+        {Array.from({ length: 12 }, (_, i) => (
+          <div key={i} className="absolute rounded-full" style={{
+            width: `${4 + (i % 5)}px`, height: `${4 + (i % 5)}px`,
+            background: colors.secondary, bottom: `${(i * 7) % 50}%`, left: `${(i * 17 + 5) % 90}%`,
+            '--dx': `${((i % 5) - 2) * 20}px`,
+            opacity: 0.8, filter: 'blur(1px)',
+            animation: `themeEmber ${3 + (i % 4)}s ${i * 0.4}s ease-out infinite`
+          } as React.CSSProperties} />
+        ))}
+      </div>
+    )
+  }
+  if (effect === 'shimmer') {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary}44, ${colors.primary})` }}>
+        <div className="absolute inset-y-0" style={{ width: '30%', background: `linear-gradient(90deg, transparent, ${colors.secondary}55, transparent)`, animation: 'themeShimmer 4s linear infinite' }} />
+      </div>
+    )
+  }
+  if (effect === 'cosmic') {
+    return <div className="absolute inset-0" style={{
+      background: `radial-gradient(ellipse at 50% 50%, ${colors.secondary}88 0%, ${colors.primary} 60%)`,
+      backgroundSize: '200% 200%', animation: 'themeCosmic 8s ease-in-out infinite' }} />
+  }
+  if (effect === 'cross-glow') {
+    return (
+      <div className="absolute inset-0" style={{ background: colors.primary }}>
+        <div className="absolute" style={{ top: '45%', left: '30%', right: '30%', height: '8%',
+          background: `radial-gradient(ellipse, ${colors.secondary}cc, transparent)`,
+          animation: 'themeCrossGlow 3s ease-in-out infinite' }} />
+        <div className="absolute" style={{ left: '47%', top: '25%', bottom: '25%', width: '4%',
+          background: `radial-gradient(ellipse, ${colors.secondary}cc, transparent)`,
+          animation: 'themeCrossGlow 3s ease-in-out infinite' }} />
+      </div>
+    )
+  }
+  if (effect === 'mist') {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
+        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 40%, ${colors.secondary}33 100%)`, animation: 'themeMist 8s ease-in-out infinite' }} />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${colors.secondary}22, transparent 60%)`, animation: 'themeMist 12s ease-in-out infinite reverse' }} />
+      </div>
+    )
+  }
+  if (effect === 'neon') {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 50%, ${colors.secondary}33 0%, transparent 70%)`, animation: 'themeNeon 2s ease-in-out infinite' }} />
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 20% 80%, ${colors.secondary}22 0%, transparent 50%)`, animation: 'themeNeon 3s ease-in-out infinite 1s' }} />
+      </div>
+    )
+  }
+  if (effect === 'sunrise') {
+    return <div className="absolute inset-0" style={{
+      background: `radial-gradient(ellipse at 50% 130%, ${colors.secondary} 0%, ${colors.primary} 55%)`,
+      backgroundSize: '100% 200%', animation: 'themeSunrise 10s ease-in-out infinite' }} />
+  }
+  // bokeh (default fallback)
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
       <div className="tb-blob" style={{ width: '16vw', height: '16vw', background: colors.secondary, top: '12%', left: '14%', animation: 'themeFloatA 7s ease-in-out infinite' }} />
