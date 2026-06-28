@@ -101,7 +101,8 @@ function Output(): JSX.Element {
   const bgVisibility = black ? 'hidden' : 'visible'
   const isThemeBg = bgSrc?.startsWith('theme:') ?? false
   const showVideo = bgSrc !== null && !isThemeBg && bgReady
-  const theme = getTheme(slideThemeId)
+  const resolvedThemeId = isThemeBg ? bgSrc!.slice(6) : slideThemeId
+  const theme = getTheme(resolvedThemeId)
   const colors = resolveColors(theme, slideThemeColors)
   const posAlign = theme.position === 'top' ? 'flex-start' : theme.position === 'bottom' ? 'flex-end' : 'center'
 

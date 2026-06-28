@@ -212,7 +212,7 @@ export function updateSong(id: number, input: SongInput): void {
   db.run('BEGIN')
   try {
     db.run(
-      'UPDATE song SET title = ?, author = ?, ccli = ?, copyright = ?, publisher = ?, arrangement = ?, font_scale = ?, lines_per_slide = ? WHERE id = ?',
+      'UPDATE song SET title = ?, author = ?, ccli = ?, copyright = ?, publisher = ?, arrangement = ?, font_scale = ?, lines_per_slide = ?, bg_motion = ? WHERE id = ?',
       [
         input.title,
         input.author ?? null,
@@ -222,6 +222,7 @@ export function updateSong(id: number, input: SongInput): void {
         input.arrangement && input.arrangement.length > 0 ? JSON.stringify(input.arrangement) : null,
         input.fontScale ?? null,
         input.linesPerSlide ?? null,
+        input.bgMotion ?? null,
         id
       ]
     )
