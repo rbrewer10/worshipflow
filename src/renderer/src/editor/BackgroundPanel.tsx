@@ -40,11 +40,34 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const [dragging, setDragging] = useState(false)
+  const [apiKey, setApiKey] = useState<string | null>(null)
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [apiKeySaved, setApiKeySaved] = useState(false)
+  const [provider, setProvider] = useState<'pollinations' | 'replicate'>('pollinations')
   const dropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (tab === 'uploads') loadUploads()
+    if (tab === 'ai') {
+      window.wf.settingGet('replicate_api_key').then((k) => { setApiKey(k); setApiKeyInput(k ?? '') })
+      window.wf.settingGet('ai_provider').then((p) => setProvider(p === 'replicate' ? 'replicate' : 'pollinations'))
+    }
   }, [tab])
+
+  function chooseProvider(p: 'pollinations' | 'replicate'): void {
+    setProvider(p)
+    setAiError('')
+    window.wf.settingSet('ai_provider', p)
+  }
+
+  async function saveApiKey(): Promise<void> {
+    const v = apiKeyInput.trim()
+    await window.wf.settingSet('replicate_api_key', v || null)
+    setApiKey(v || null)
+    setApiKeySaved(true)
+    setTimeout(() => setApiKeySaved(false), 2000)
+    if (v) setAiError('')
+  }
 
   async function loadUploads(): Promise<void> {
     try {
@@ -302,6 +325,63 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
         {tab === 'ai' && (
           <div className="flex flex-col gap-3">
 
+            {/* Provider toggle */}
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] p-1">
+              <button
+                onClick={() => chooseProvider('pollinations')}
+                className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                  provider === 'pollinations' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                ✦ Free
+              </button>
+              <button
+                onClick={() => chooseProvider('replicate')}
+                className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                  provider === 'replicate' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Replicate
+              </button>
+            </div>
+
+            {provider === 'pollinations' ? (
+              <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2 text-[11px] leading-relaxed text-emerald-300/90">
+                Free · no key needed · powered by Pollinations.ai. Generation can take ~10–40s.
+              </p>
+            ) : (
+              /* Replicate API key */
+              <div className={`rounded-xl border p-3 ${apiKey ? 'border-white/[0.08] bg-white/[0.03]' : 'border-amber-500/30 bg-amber-500/[0.07]'}`}>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Replicate API key
+                  </label>
+                  {apiKey
+                    ? <span className="text-[10px] font-semibold text-emerald-400">● Set</span>
+                    : <span className="text-[10px] font-semibold text-amber-400">Required</span>}
+                </div>
+                <div className="flex gap-1.5">
+                  <input
+                    type="password"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder="r8_…"
+                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:border-indigo-500/70 focus:outline-none"
+                  />
+                  <button
+                    onClick={saveApiKey}
+                    disabled={apiKeyInput.trim() === (apiKey ?? '')}
+                    className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {apiKeySaved ? '✓ Saved' : 'Save'}
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-600">
+                  Get a token at replicate.com/account/api-tokens · stored locally on this computer
+                </p>
+              </div>
+            )}
+
             {/* Prompt label + textarea */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -376,8 +456,9 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
 
             {/* Fine print */}
             <p className="text-[10px] leading-relaxed text-slate-600">
-              Powered by Replicate Flux Schnell · ~$0.003 / image
-              <br />Set your API key in Settings → Integrations
+              {provider === 'pollinations'
+                ? 'Free image generation · Pollinations.ai'
+                : 'Powered by Replicate Flux Schnell · ~$0.003 / image'}
             </p>
           </div>
         )}

@@ -1,6 +1,6 @@
 // Types shared across main, preload, and renderer.
 
-import type { ThemeColors } from './themes'
+import type { ThemeColors, FontKey } from './themes'
 export type { ThemeColors } from './themes'
 
 export type Mode = 'lyrics' | 'black' | 'logo' | 'countdown'
@@ -43,6 +43,8 @@ export interface LiveState {
   ccliLicense?: string | null  // church's CCLI license number (global setting)
   slideTheme?: string                 // projector slide-theme id (distinct from operator-UI `theme`)
   slideThemeColors?: ThemeColors | null
+  songTextColor?: string | null
+  songFont?: string | null
 }
 
 export interface DisplayInfo {
@@ -93,6 +95,8 @@ export interface SongFull extends SongSummary {
   fontScale: number | null
   linesPerSlide: number | null
   bgMotion: 'pan' | 'zoom' | 'shimmer' | null
+  textColor: string | null
+  font: FontKey | null
 }
 
 export interface SongInput {
@@ -107,6 +111,8 @@ export interface SongInput {
   fontScale?: number | null
   linesPerSlide?: number | null
   bgMotion?: 'pan' | 'zoom' | 'shimmer' | null
+  textColor?: string | null
+  font?: FontKey | null
 }
 
 // A song parsed from a PowerPoint (.pptx) file, pending import.

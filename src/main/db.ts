@@ -88,6 +88,8 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE song ADD COLUMN copyright TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE song ADD COLUMN publisher TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE song ADD COLUMN bg_motion TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE song ADD COLUMN text_color TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE song ADD COLUMN font TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN notes TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
@@ -119,7 +121,7 @@ export function listSongs(search = ''): SongSummary[] {
 
 export function getSong(id: number): SongFull | null {
   const head = db.prepare(
-    'SELECT id, title, author, ccli, copyright, publisher, background, arrangement, font_scale, lines_per_slide, bg_motion FROM song WHERE id = ?'
+    'SELECT id, title, author, ccli, copyright, publisher, background, arrangement, font_scale, lines_per_slide, bg_motion, text_color, font FROM song WHERE id = ?'
   )
   head.bind([id])
   if (!head.step()) {
@@ -138,6 +140,8 @@ export function getSong(id: number): SongFull | null {
     font_scale: number | null
     lines_per_slide: number | null
     bg_motion: string | null
+    text_color: string | null
+    font: string | null
   }
   head.free()
 
@@ -162,6 +166,8 @@ export function getSong(id: number): SongFull | null {
     fontScale: row.font_scale ?? null,
     linesPerSlide: row.lines_per_slide ?? null,
     bgMotion: (row.bg_motion as SongFull['bgMotion']) ?? null,
+    textColor: row.text_color ?? null,
+    font: (row.font as SongFull['font']) ?? null,
     sections
   }
 }
@@ -212,7 +218,7 @@ export function updateSong(id: number, input: SongInput): void {
   db.run('BEGIN')
   try {
     db.run(
-      'UPDATE song SET title = ?, author = ?, ccli = ?, copyright = ?, publisher = ?, arrangement = ?, font_scale = ?, lines_per_slide = ?, bg_motion = ? WHERE id = ?',
+      'UPDATE song SET title = ?, author = ?, ccli = ?, copyright = ?, publisher = ?, arrangement = ?, font_scale = ?, lines_per_slide = ?, bg_motion = ?, text_color = ?, font = ? WHERE id = ?',
       [
         input.title,
         input.author ?? null,
@@ -223,6 +229,8 @@ export function updateSong(id: number, input: SongInput): void {
         input.fontScale ?? null,
         input.linesPerSlide ?? null,
         input.bgMotion ?? null,
+        input.textColor ?? null,
+        input.font ?? null,
         id
       ]
     )
@@ -257,6 +265,14 @@ export function setSongFontScale(id: number, scale: number): void {
 export function setSongBgMotion(id: number, motion: string | null): void {
   db.run('UPDATE song SET bg_motion = ? WHERE id = ?', [motion, id])
   persist()
+}
+
+export function setSongTextColor(id: number, color: string | null): void {
+  db.run('UPDATE song SET text_color = ? WHERE id = ?', [color, id]); persist()
+}
+
+export function setSongFont(id: number, font: string | null): void {
+  db.run('UPDATE song SET font = ? WHERE id = ?', [font, id]); persist()
 }
 
 // --- Services ---

@@ -32,6 +32,8 @@ function Output(): JSX.Element {
   const [bgMotion, setBgMotion] = useState<'pan' | 'zoom' | 'shimmer' | null>(null)
   const [slideThemeId, setSlideThemeId] = useState<string>('sanctuary')
   const [slideThemeColors, setSlideThemeColors] = useState<ThemeColors | null>(null)
+  const [songTextColor, setSongTextColor] = useState<string | null>(null)
+  const [songFont, setSongFont] = useState<string | null>(null)
   const [ccli, setCcli] = useState<{
     author: string | null
     copyright: string | null
@@ -47,6 +49,8 @@ function Output(): JSX.Element {
       setBgMotion((s.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null)
       setSlideThemeId(s.slideTheme ?? 'sanctuary')
       setSlideThemeColors(s.slideThemeColors ?? null)
+      setSongTextColor(s.songTextColor ?? null)
+      setSongFont(s.songFont ?? null)
       setFontScale(s.fontScale ?? 6)
       setCcli({
         author: s.songAuthor ?? null,
@@ -163,9 +167,9 @@ function Output(): JSX.Element {
       {!black && !logo && !countdown && (
         <>
           <LyricLayer text={layers.a} show={layers.front === 0} fontScale={fontScale}
-            fontFamily={FONT_FAMILY[theme.font]} color={colors.text} align={posAlign} />
+            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} />
           <LyricLayer text={layers.b} show={layers.front === 1} fontScale={fontScale}
-            fontFamily={FONT_FAMILY[theme.font]} color={colors.text} align={posAlign} />
+            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} />
         </>
       )}
 

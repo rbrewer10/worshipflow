@@ -68,8 +68,8 @@ export default function SlideCanvas({ song, slide, onTextChange, onFontScaleChan
     el.style.height = `${el.scrollHeight}px`
   }, [editing, editText, fontSizePxValue])
 
-  const theme = getTheme(null)
-  const fontFamily = FONT_FAMILY[theme.font]
+  const fontFamily = FONT_FAMILY[song.font ?? getTheme(null).font]
+  const textColor = song.textColor ?? '#ffffff'
   const bg = song.background && !song.background.startsWith('theme:') ? song.background : null
 
   const handleTextClick = (): void => {
@@ -169,7 +169,7 @@ export default function SlideCanvas({ song, slide, onTextChange, onFontScaleChan
                 style={{
                   fontSize: fontSizePx,
                   fontFamily,
-                  color: '#ffffff',
+                  color: textColor,
                   textShadow: '0 3px 24px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)',
                   whiteSpace: 'pre-line',
                   maxWidth: '100%'
@@ -196,7 +196,7 @@ export default function SlideCanvas({ song, slide, onTextChange, onFontScaleChan
               style={{
                 fontSize: fontSizePx,
                 fontFamily,
-                color: '#ffffff',
+                color: textColor,
                 textShadow: '0 3px 24px rgba(0,0,0,.85)',
                 whiteSpace: 'pre-line',
                 minHeight: '1.2em',

@@ -38,10 +38,13 @@ import {
   reorderServiceItems,
   getItemZoneRouting,
   setItemZoneRouting,
-  setSongBgMotion
+  setSongBgMotion,
+  setSongTextColor,
+  setSongFont
 } from './db'
 import { listBackgrounds, copyBackground, deleteBackground } from './backgroundLib'
 import { generateBackgroundImage } from './replicateApi'
+import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
 import { TABLET_PORT, TABLET_HTML } from './tabletHtml'
 import { OBS_HTML } from './obsHtml'
@@ -78,6 +81,8 @@ let liveSongId: number | null = null
 const state: { mode: Mode; index: number } = { mode: 'lyrics', index: 0 }
 let liveServiceItemId: number | null = null
 let liveFontScale = 6
+let liveSongTextColor: string | null = null
+let liveSongFont: string | null = null
 let liveBgFit: 'cover' | 'contain' = 'cover'  // whole-slide images use 'contain'
 let liveStageMessage: string | null = null
 // Zone state: manual overrides set by the operator; null = auto-route from service item routing.
@@ -220,7 +225,9 @@ function renderState(): LiveState {
     songCcli: liveSongMeta.ccli,
     ccliLicense,
     slideTheme: liveSlideTheme,
-    slideThemeColors: liveSlideThemeColors
+    slideThemeColors: liveSlideThemeColors,
+    songTextColor: liveSongTextColor,
+    songFont: liveSongFont
   }
 }
 
@@ -445,6 +452,7 @@ function doLoadText(title: string, body: string, background: string | null = nul
   if (title) lines.push(title)
   body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
   liveSong = { title: title || 'Announcement', lines: lines.length ? lines : [title], background }
+  liveSongTextColor = null; liveSongFont = null
   state.mode = 'lyrics'
   state.index = 0
 }
@@ -458,6 +466,7 @@ function doLoadCountdown(seconds: number): void {
   const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   let remaining = seconds
   liveSong = { title: 'Countdown', lines: [fmt(remaining)], background: null }
+  liveSongTextColor = null; liveSongFont = null
   state.mode = 'countdown' as Mode
   state.index = 0
   countdownTimer = setInterval(() => {
@@ -509,6 +518,7 @@ async function doLoadScripture(reference: string): Promise<void> {
       ? [result.verses[0].text]
       : result.verses.map((v) => `${v.n}  ${v.text}`)
   liveSong = { title: result.reference!, lines, background: null }
+  liveSongTextColor = null; liveSongFont = null
   state.mode = 'lyrics'
   state.index = 0
 }
@@ -539,6 +549,8 @@ async function doLoadSong(id: number): Promise<void> {
   liveBgFit = 'cover'
   liveSong = { title: full.title, lines: songLines(full), background: full.background ?? null, bgMotion: full.bgMotion ?? null }
   liveFontScale = full.fontScale ?? 6
+  liveSongTextColor = full.textColor ?? null
+  liveSongFont = full.font ?? null
   liveSongMeta = { author: full.author, copyright: full.copyright, ccli: full.ccli }
   hmsLoadedAt = Date.now()  // Start hymn timer
   verseNumber = 1
@@ -604,6 +616,7 @@ function doLoadMedia(filePath: string, title: string): void {
   clearSongMeta()
   liveBgFit = 'contain'  // a whole-slide image — fit it entirely on screen
   liveSong = { title: title || 'Media', lines: [''], background: filePath }
+  liveSongTextColor = null; liveSongFont = null
   state.mode = 'lyrics'
   state.index = 0
 }
@@ -1098,6 +1111,14 @@ ipcMain.handle('wf:songs:create', (_e, input: SongInput) => createSong(input))
 ipcMain.handle('wf:songs:update', (_e, id: number, input: SongInput) => updateSong(id, input))
 ipcMain.handle('wf:songs:delete', (_e, id: number) => deleteSong(id))
 ipcMain.handle('wf:songs:setFontScale', (_e, id: number, scale: number) => setSongFontScale(id, scale))
+ipcMain.handle('wf:songs:setTextColor', (_e: unknown, id: number, color: string | null) => {
+  setSongTextColor(id, color)
+  if (liveSongId === id) { liveSongTextColor = color; broadcast() }
+})
+ipcMain.handle('wf:songs:setFont', (_e: unknown, id: number, font: string | null) => {
+  setSongFont(id, font)
+  if (liveSongId === id) { liveSongFont = font; broadcast() }
+})
 
 // --- Service builder IPC ---
 ipcMain.handle('wf:services:list', () => listServices())
@@ -1256,9 +1277,13 @@ ipcMain.handle('wf:bg:delete', (_e: unknown, filePath: string) => {
 })
 
 ipcMain.handle('wf:bg:generate', async (_e: unknown, prompt: string) => {
-  const apiKey = getSetting('replicate_api_key')
-  if (!apiKey) throw new Error('Replicate API key not set. Add it in Settings → Integrations.')
-  return generateBackgroundImage(prompt, apiKey)
+  const provider = getSetting('ai_provider') ?? 'pollinations'
+  if (provider === 'replicate') {
+    const apiKey = getSetting('replicate_api_key')
+    if (!apiKey) throw new Error('Replicate API key not set. Switch to Free, or paste your key in the AI Generate tab, then Save.')
+    return generateBackgroundImage(prompt, apiKey)
+  }
+  return generatePollinationsImage(prompt)
 })
 
 ipcMain.handle('wf:bg:openDialog', async () => {

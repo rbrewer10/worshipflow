@@ -110,6 +110,10 @@ const wf = {
     ipcRenderer.invoke('wf:bg:openDialog'),
   songSetBgMotion: (id: number, motion: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:songs:setBgMotion', id, motion),
+  songSetTextColor: (id: number, color: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:songs:setTextColor', id, color),
+  songSetFont: (id: number, font: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:songs:setFont', id, font),
   settingGet: (key: string): Promise<string | null> => ipcRenderer.invoke('wf:setting:get', key),
   settingSet: (key: string, value: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:setting:set', key, value),

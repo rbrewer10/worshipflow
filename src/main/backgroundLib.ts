@@ -60,10 +60,28 @@ export function deleteBackground(filePath: string): void {
 export function downloadToGenerated(url: string, filename: string): Promise<string> {
   const dest = join(generatedDir(), filename)
   return new Promise((resolve, reject) => {
-    const file = createWriteStream(dest)
-    https.get(url, (res) => {
-      res.pipe(file)
-      file.on('finish', () => { file.close(); resolve(dest) })
-    }).on('error', (err) => { file.close(); reject(err) })
+    const get = (target: string, redirects: number): void => {
+      const req = https.get(target, { timeout: 120000 }, (res) => {
+        const status = res.statusCode ?? 0
+        // Follow redirects (Pollinations / CDNs may 30x).
+        if (status >= 300 && status < 400 && res.headers.location && redirects < 5) {
+          res.resume()
+          get(new URL(res.headers.location, target).toString(), redirects + 1)
+          return
+        }
+        if (status !== 200) {
+          res.resume()
+          reject(new Error(`Image download failed (HTTP ${status})`))
+          return
+        }
+        const file = createWriteStream(dest)
+        res.pipe(file)
+        file.on('finish', () => { file.close(); resolve(dest) })
+        file.on('error', (err) => { file.close(); reject(err) })
+      })
+      req.on('timeout', () => req.destroy(new Error('Image download timed out')))
+      req.on('error', reject)
+    }
+    get(url, 0)
   })
 }

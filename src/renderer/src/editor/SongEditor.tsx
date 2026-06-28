@@ -49,7 +49,9 @@ export default function SongEditor({ songId, onSaved }: {
       arrangement: updated.arrangement ?? null,
       fontScale: updated.fontScale,
       linesPerSlide: updated.linesPerSlide,
-      bgMotion: updated.bgMotion
+      bgMotion: updated.bgMotion,
+      textColor: updated.textColor,
+      font: updated.font
     }
     await window.wf.songUpdate(songId, input)
     setSaving(false)
@@ -129,6 +131,26 @@ export default function SongEditor({ songId, onSaved }: {
     await window.wf.songSetFontScale(songId, scale)
   }
 
+  const handleTextColorChange = async (color: string): Promise<void> => {
+    if (!song) return
+    setSong({ ...song, textColor: color })
+    await window.wf.songSetTextColor(songId, color)
+  }
+
+  const handleFontChange = async (font: SongFull['font']): Promise<void> => {
+    if (!song) return
+    setSong({ ...song, font })
+    await window.wf.songSetFont(songId, font)
+  }
+
+  const colorSwatches: { hex: string; label: string }[] = [
+    { hex: '#ffffff', label: 'White' },
+    { hex: '#111111', label: 'Black' },
+    { hex: '#f5d76e', label: 'Gold' },
+    { hex: '#fff5e6', label: 'Cream' }
+  ]
+  const activeColor = song.textColor ?? '#ffffff'
+
   const canDelete = song.sections.length > 1 && !!activeSlide
 
   return (
@@ -201,6 +223,43 @@ export default function SongEditor({ songId, onSaved }: {
 
         {/* Center: big centered WYSIWYG canvas */}
         <div className="flex min-w-0 flex-1 flex-col">
+          {/* Text toolbar: font + color */}
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/[0.07] bg-[#161618] px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-400">Font</span>
+              <select
+                value={song.font ?? 'modern'}
+                onChange={(e) => handleFontChange(e.target.value as SongFull['font'])}
+                className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-white"
+              >
+                <option value="modern">Modern</option>
+                <option value="classic">Classic</option>
+                <option value="bold">Bold</option>
+                <option value="elegant">Elegant</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-400">Text</span>
+              <input
+                type="color"
+                value={activeColor}
+                onChange={(e) => handleTextColorChange(e.target.value)}
+                className="h-7 w-9 cursor-pointer rounded bg-transparent"
+              />
+              {colorSwatches.map((sw) => (
+                <button
+                  key={sw.hex}
+                  type="button"
+                  title={sw.label}
+                  onClick={() => handleTextColorChange(sw.hex)}
+                  className={`h-5 w-5 rounded-full border border-white/20 transition ${
+                    activeColor.toLowerCase() === sw.hex.toLowerCase() ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-[#161618]' : ''
+                  }`}
+                  style={{ background: sw.hex }}
+                />
+              ))}
+            </div>
+          </div>
           <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden p-4">
             <SlideCanvas
               song={song}
