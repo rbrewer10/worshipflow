@@ -1,11 +1,12 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
 import { join, basename, dirname } from 'path'
 import { createServer } from 'http'
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, writeFileSync, statSync, createReadStream } from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneState, ZoneRouting } from '../shared/types'
+import { ZONE_ROUTING_DEFAULTS } from '../shared/types'
 import { DEFAULT_THEME_ID } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -34,11 +35,18 @@ import {
   setServiceTheme,
   setServiceItemStyle,
   setServiceItemPayload,
-  reorderServiceItems
+  reorderServiceItems,
+  getItemZoneRouting,
+  setItemZoneRouting,
+  setSongBgMotion
 } from './db'
+import { listBackgrounds, copyBackground, deleteBackground } from './backgroundLib'
+import { generateBackgroundImage } from './replicateApi'
 import { lookupScripture } from './scripture'
 import { TABLET_PORT, TABLET_HTML } from './tabletHtml'
 import { OBS_HTML } from './obsHtml'
+import { ZONE_HTML } from './zoneHtml'
+import { MULTIVIEW_HTML } from './multiviewHtml'
 import { parsePptx, parsePptxService } from './pptx'
 import {
   connectObs,
@@ -61,6 +69,7 @@ protocol.registerSchemesAsPrivileged([
 
 let operatorWin: BrowserWindow | null = null
 let stageWin: BrowserWindow | null = null
+let multiviewWin: BrowserWindow | null = null
 const outputWins = new Map<string, BrowserWindow>()
 
 // Canonical live state.
@@ -71,11 +80,15 @@ let liveServiceItemId: number | null = null
 let liveFontScale = 6
 let liveBgFit: 'cover' | 'contain' = 'cover'  // whole-slide images use 'contain'
 let liveStageMessage: string | null = null
+// Zone state: manual overrides set by the operator; null = auto-route from service item routing.
+const zoneOverrides: Map<ZoneId, ZoneState['mode']> = new Map()
 // CCLI copyright info for the live song (for on-screen footer + usage log).
 let liveSongMeta: { author: string | null; copyright: string | null; ccli: string | null } = {
   author: null, copyright: null, ccli: null
 }
 let ccliLicense: string | null = null  // church CCLI license number (loaded from settings)
+let logoPath: string | null = null     // church logo image path for logo zones
+let logoBg: string | null = null       // motion background (video/image) for logo zones
 const loggedSongIds = new Set<number>()  // songs already counted this service (CCLI: once per service)
 let liveSlideTheme: string = DEFAULT_THEME_ID  // effective projector slide theme (broadcast)
 let liveSlideThemeColors: ThemeColors | null = null
@@ -210,6 +223,104 @@ function renderState(): LiveState {
   }
 }
 
+function computeZoneStates(): Record<ZoneId, ZoneState> {
+  const live = renderState()
+  // Get routing for the active item (or defaults by type).
+  let routing: ZoneRouting | null = null
+  if (liveServiceItemId != null) {
+    const item = activeServiceItems.find((it) => it.id === liveServiceItemId)
+    if (item) {
+      const stored = getItemZoneRouting(item.id)
+      if (stored) {
+        routing = JSON.parse(stored) as ZoneRouting
+      } else {
+        routing = ZONE_ROUTING_DEFAULTS[item.type]
+      }
+    }
+  }
+
+  const result = {} as Record<ZoneId, ZoneState>
+  const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
+  for (const zoneId of ZONE_IDS) {
+    // Manual override takes precedence over auto-routing.
+    const override = zoneOverrides.get(zoneId)
+    const idleDefault: ZoneMode = (zoneId === 1 || zoneId === 2) ? 'logo' : 'off'
+    const routedMode = override ?? (routing ? routing[zoneId] : idleDefault)
+    const mode = routedMode ?? 'off'
+
+    const base: ZoneState = {
+      mode,
+      line: '',
+      next: '',
+      title: '',
+      index: live.index,
+      total: live.total,
+      background: null,
+      themeColors: null,
+      fontScale: live.fontScale,
+      secondsLeft: 0,
+      stageMessage: live.stageMessage,
+      imagePath: null,
+      bgColor: null,
+      bgOverlay: null,
+      textAlign: null,
+      textPosition: null,
+    }
+
+    // Populate fields based on mode.
+    if (mode === 'lyrics' || mode === 'text') {
+      base.line = live.line
+      base.next = live.next
+      base.title = live.songTitle
+      base.background = live.background
+      base.themeColors = live.slideThemeColors ?? null
+      // For text-type items, pull per-item style overrides from payload
+      if (liveServiceItemId != null) {
+        const liveItem = activeServiceItems.find((it) => it.id === liveServiceItemId && it.type === 'text')
+        if (liveItem) {
+          const pl = liveItem.payload
+          if (pl.bgOverlay != null) base.bgOverlay = pl.bgOverlay as number
+          if (pl.textAlign != null) base.textAlign = pl.textAlign as string
+          if (pl.textPosition != null) base.textPosition = pl.textPosition as string
+          if (pl.bgColor != null && !base.background) base.bgColor = pl.bgColor as string
+          if (pl.fontScale != null) base.fontScale = pl.fontScale as number
+        }
+      }
+    } else if (mode === 'stage') {
+      // Stage always shows lyrics content with next preview.
+      base.line = live.line
+      base.next = live.next
+      base.title = live.songTitle
+      // No background on stage monitor.
+    } else if (mode === 'countdown') {
+      // Parse countdown from the live line ("M:SS" format).
+      const parts = live.line.split(':')
+      const mins = parseInt(parts[0] ?? '0', 10)
+      const secs = parseInt(parts[1] ?? '0', 10)
+      base.secondsLeft = (isNaN(mins) ? 0 : mins) * 60 + (isNaN(secs) ? 0 : secs)
+      base.title = live.songTitle
+    } else if (mode === 'image') {
+      const item = activeServiceItems.find((it) => it.id === liveServiceItemId)
+      base.imagePath = item ? ((item.payload.path as string) ?? null) : null
+    } else if (mode === 'logo') {
+      base.imagePath = logoPath
+      base.background = logoBg
+    }
+
+    result[zoneId] = base
+  }
+  return result
+}
+
+function zoneBroadcast(): void {
+  if (tabletClients.size === 0) return
+  const states = computeZoneStates()
+  const payload = JSON.stringify({ type: 'zones', states })
+  for (const client of tabletClients) {
+    if ((client as WsSocket).readyState === 1) (client as WsSocket).send(payload)
+  }
+}
+
 function describeDisplays(): DisplayInfo[] {
   const primaryId = screen.getPrimaryDisplay().id
   return screen.getAllDisplays().map((d) => ({
@@ -260,6 +371,7 @@ function broadcast(): void {
   }
   writeRecovery({ mode: state.mode, index: state.index })
   tabletBroadcast(payload)
+  zoneBroadcast()
   maybeAutoSwitchScene()
 }
 
@@ -539,14 +651,73 @@ async function handleTabletLoadItem(itemId: number): Promise<void> {
 // --- Tablet HTTP + WebSocket server ---
 function startTabletServer(): void {
   const server = createServer((req, res) => {
-    const isObs = (req.url ?? '').split('?')[0].replace(/\/+$/, '') === '/obs'
-    res.writeHead(200, {
+    const path = (req.url ?? '').split('?')[0].replace(/\/+$/, '')
+    const zoneMatch = path.match(/^\/zone\/([1-4])$/)
+    const isObs = path === '/obs'
+    const zoneId = zoneMatch ? parseInt(zoneMatch[1], 10) as ZoneId : null
+    const htmlHeaders = {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store, no-cache, must-revalidate',
       'Pragma': 'no-cache',
-      'Expires': '0'
-    })
-    res.end(isObs ? OBS_HTML : TABLET_HTML)
+      'Expires': '0',
+    }
+    if (zoneId && ZONE_HTML[zoneId]) {
+      res.writeHead(200, htmlHeaders)
+      res.end(ZONE_HTML[zoneId])
+    } else if (path === '/multiview') {
+      res.writeHead(200, htmlHeaders)
+      res.end(MULTIVIEW_HTML)
+    } else if (isObs) {
+      res.writeHead(200, htmlHeaders)
+      res.end(OBS_HTML)
+    } else if (path === '/file') {
+      // Serve local media files (images, videos) to Pi browsers and multiview iframes.
+      const qs = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
+      const filePath = qs.get('path') ?? ''
+      if (!filePath) { res.writeHead(400); res.end(); return }
+      const ext = (filePath.split('.').pop() ?? '').toLowerCase()
+      const MIME: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', avif: 'image/avif',
+        mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/mp4',
+      }
+      const mime = MIME[ext] ?? 'application/octet-stream'
+      const safeEnd = (): void => { if (!res.writableEnded) res.end() }
+      try {
+        const stat = statSync(filePath)
+        const rangeHeader = req.headers['range']
+        if (rangeHeader && mime.startsWith('video/')) {
+          const [startStr, endStr] = rangeHeader.replace(/bytes=/, '').split('-')
+          const start = parseInt(startStr, 10)
+          const end = endStr ? parseInt(endStr, 10) : stat.size - 1
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': end - start + 1,
+            'Content-Type': mime,
+            'Cache-Control': 'public, max-age=3600',
+          })
+          const stream = createReadStream(filePath, { start, end })
+          stream.on('error', safeEnd)
+          stream.pipe(res, { end: true })
+        } else {
+          const buf = readFileSync(filePath)
+          res.writeHead(200, {
+            'Content-Type': mime,
+            'Content-Length': buf.length,
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'public, max-age=3600',
+          })
+          res.end(buf)
+        }
+      } catch {
+        if (!res.headersSent) res.writeHead(404)
+        safeEnd()
+      }
+    } else {
+      res.writeHead(200, htmlHeaders)
+      res.end(TABLET_HTML)
+    }
   })
 
   const wss = new WebSocketServer({ server })
@@ -560,6 +731,8 @@ function startTabletServer(): void {
       notes: liveItemNotes,
       items: activeServiceItems.map((it) => ({ id: it.id, type: it.type, title: it.title }))
     }))
+    // Send zone states so zone pages render immediately on connect.
+    ws.send(JSON.stringify({ type: 'zones', states: computeZoneStates() }))
 
     ws.on('message', (data) => {
       try {
@@ -580,6 +753,13 @@ function startTabletServer(): void {
     ws.on('error', () => tabletClients.delete(ws))
   })
 
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[tablet] port ${TABLET_PORT} already in use — close other WorshipFlow instances and restart`)
+    } else {
+      console.error('[tablet] server error:', err)
+    }
+  })
   server.listen(TABLET_PORT, () => {
     console.log(`[tablet] server: http://${getLocalIp()}:${TABLET_PORT}`)
   })
@@ -607,6 +787,28 @@ function createStageWindow(): void {
   })
   stageWin.on('closed', () => { stageWin = null })
   loadRoute(stageWin, '/stage')
+}
+
+function createMultiviewWindow(): void {
+  if (multiviewWin && !multiviewWin.isDestroyed()) { multiviewWin.focus(); return }
+  const primary = screen.getPrimaryDisplay()
+  const externals = screen.getAllDisplays().filter((d) => d.id !== primary.id)
+  // Prefer the second external display; fall back to a windowed view on the primary.
+  const target = externals.length > 0 ? externals[0] : null
+  multiviewWin = new BrowserWindow({
+    x: target ? target.bounds.x : primary.bounds.x + 100,
+    y: target ? target.bounds.y : primary.bounds.y + 100,
+    width: target ? target.bounds.width : 1280,
+    height: target ? target.bounds.height : 720,
+    frame: true,
+    fullscreen: false,
+    title: 'WorshipFlow — Zone Multiview',
+    backgroundColor: '#0c0c10',
+    autoHideMenuBar: true,
+    webPreferences: { sandbox: true },
+  })
+  multiviewWin.loadURL(`http://127.0.0.1:${TABLET_PORT}/multiview`)
+  multiviewWin.on('closed', () => { multiviewWin = null })
 }
 
 function loadRoute(win: BrowserWindow, route: string, query?: Record<string, string>): void {
@@ -744,6 +946,7 @@ ipcMain.handle('wf:live:loadMedia', (_e, filePath: string, title: string) => {
 ipcMain.handle('wf:getState', (): LiveState => renderState())
 
 ipcMain.handle('wf:stage:open', () => { createStageWindow() })
+ipcMain.handle('wf:multiview:open', () => { createMultiviewWindow() })
 
 ipcMain.handle('wf:live:setItemId', (_e, id: number | null) => {
   liveServiceItemId = id
@@ -766,6 +969,16 @@ ipcMain.handle('wf:live:saveFontScale', () => {
 ipcMain.handle('wf:live:setStageMessage', (_e, msg: string | null) => {
   liveStageMessage = msg || null
   broadcast()
+})
+
+// --- Logo IPCs ---
+ipcMain.handle('wf:logo:get', () => ({ logoPath, logoBg }))
+ipcMain.handle('wf:logo:set', (_e, path: string | null, bg: string | null) => {
+  logoPath = path || null
+  logoBg = bg || null
+  setSetting('logo_path', logoPath)
+  setSetting('logo_bg', logoBg)
+  zoneBroadcast()
 })
 
 // --- CCLI IPCs ---
@@ -910,6 +1123,42 @@ ipcMain.handle('wf:services:reorder', (_e, serviceId: number, orderedIds: number
   reorderServiceItems(serviceId, orderedIds)
 )
 
+// ── Zone routing IPC ──────────────────────────────────────────────────────────
+ipcMain.handle('wf:zone:getRouting', (_e, itemId: number): ZoneRouting | null => {
+  const raw = getItemZoneRouting(itemId)
+  return raw ? (JSON.parse(raw) as ZoneRouting) : null
+})
+
+ipcMain.handle('wf:zone:setRouting', (_e, itemId: number, routing: ZoneRouting | null): void => {
+  setItemZoneRouting(itemId, routing ? JSON.stringify(routing) : null)
+  // Update item in activeServiceItems cache so zone states re-compute correctly.
+  const idx = activeServiceItems.findIndex((it) => it.id === itemId)
+  if (idx >= 0) activeServiceItems[idx] = { ...activeServiceItems[idx], zoneRouting: routing }
+  broadcast()
+})
+
+ipcMain.handle('wf:zone:setOverride', (_e, zoneId: ZoneId, mode: ZoneState['mode'] | null): void => {
+  if (mode == null) {
+    zoneOverrides.delete(zoneId)
+  } else {
+    zoneOverrides.set(zoneId, mode)
+  }
+  zoneBroadcast()
+})
+
+ipcMain.handle('wf:zone:clearOverrides', (): void => {
+  zoneOverrides.clear()
+  zoneBroadcast()
+})
+
+ipcMain.handle('wf:zone:getStates', (): Record<ZoneId, ZoneState> => {
+  return computeZoneStates()
+})
+
+ipcMain.handle('wf:zone:getIp', (): string => {
+  return getLocalIp()
+})
+
 ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {
   const svc = getService(serviceId)
   if (!svc) return { canceled: true }
@@ -993,6 +1242,42 @@ ipcMain.handle('wf:scripture:lookup', (_e, reference: string) => lookupScripture
 ipcMain.handle('wf:songs:setBackground', (_e, id: number, path: string | null) =>
   setSongBackground(id, path)
 )
+
+// Background library
+ipcMain.handle('wf:bg:list', () => listBackgrounds())
+
+ipcMain.handle('wf:bg:upload', async (_e: unknown, srcPath: string) => {
+  return copyBackground(srcPath)
+})
+
+ipcMain.handle('wf:bg:delete', (_e: unknown, filePath: string) => {
+  deleteBackground(filePath)
+})
+
+ipcMain.handle('wf:bg:generate', async (_e: unknown, prompt: string) => {
+  const apiKey = getSetting('replicate_api_key')
+  if (!apiKey) throw new Error('Replicate API key not set. Add it in Settings → Integrations.')
+  return generateBackgroundImage(prompt, apiKey)
+})
+
+ipcMain.handle('wf:bg:openDialog', async () => {
+  if (!operatorWin) return { canceled: true, filePaths: [] }
+  return dialog.showOpenDialog(operatorWin, {
+    title: 'Select background image or video',
+    filters: [
+      { name: 'Media', extensions: ['mp4', 'webm', 'mov', 'jpg', 'jpeg', 'png', 'webp', 'gif'] }
+    ],
+    properties: ['openFile']
+  })
+})
+
+ipcMain.handle('wf:songs:setBgMotion', (_e: unknown, id: number, motion: string | null) => {
+  setSongBgMotion(id, motion)
+})
+
+// Settings getter/setter (used by Settings tab for API keys etc.)
+ipcMain.handle('wf:setting:get', (_e: unknown, key: string) => getSetting(key))
+ipcMain.handle('wf:setting:set', (_e: unknown, key: string, value: string | null) => setSetting(key, value))
 ipcMain.handle('wf:dialog:openFile', async () => {
   const opts = {
     title: 'Choose media file',
@@ -1092,6 +1377,8 @@ app.whenReady().then(async () => {
 
   await initDb()
   ccliLicense = getSetting('ccli_license')
+  logoPath = getSetting('logo_path')
+  logoBg = getSetting('logo_bg')
   restoreRecovery()
   startTabletServer()
   createOperator()

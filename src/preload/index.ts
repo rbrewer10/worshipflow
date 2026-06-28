@@ -17,7 +17,10 @@ import type {
   SongUsage,
   ParsedPptxSong,
   ThemeColors,
-  ItemStyle
+  ItemStyle,
+  ZoneId,
+  ZoneState,
+  ZoneRouting
 } from '../shared/types'
 
 const wf = {
@@ -67,11 +70,6 @@ const wf = {
     ipcRenderer.invoke('wf:service:importImages'),
   serviceImportPptx: (): Promise<{ id: number; name: string; count: number } | null> =>
     ipcRenderer.invoke('wf:service:importPptx'),
-  serviceExport: (serviceId: number): Promise<{ canceled: boolean }> =>
-    ipcRenderer.invoke('wf:services:export', serviceId),
-  serviceImportFile: (): Promise<{ canceled: boolean; serviceId: number | null }> =>
-    ipcRenderer.invoke('wf:services:import'),
-
   // Scripture
   scriptureLookup: (reference: string): Promise<ScriptureResult> =>
     ipcRenderer.invoke('wf:scripture:lookup', reference),
@@ -101,6 +99,20 @@ const wf = {
     ipcRenderer.invoke('wf:songs:setFontScale', id, scale),
   dialogOpenFile: (): Promise<{ canceled: boolean; filePaths: string[] }> =>
     ipcRenderer.invoke('wf:dialog:openFile'),
+
+  // Background library
+  bgList: (): Promise<{ filename: string; path: string; kind: 'upload' | 'generated'; isVideo: boolean }[]> =>
+    ipcRenderer.invoke('wf:bg:list'),
+  bgUpload: (srcPath: string): Promise<string> => ipcRenderer.invoke('wf:bg:upload', srcPath),
+  bgDelete: (filePath: string): Promise<void> => ipcRenderer.invoke('wf:bg:delete', filePath),
+  bgGenerate: (prompt: string): Promise<string> => ipcRenderer.invoke('wf:bg:generate', prompt),
+  bgOpenDialog: (): Promise<{ canceled: boolean; filePaths: string[] }> =>
+    ipcRenderer.invoke('wf:bg:openDialog'),
+  songSetBgMotion: (id: number, motion: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:songs:setBgMotion', id, motion),
+  settingGet: (key: string): Promise<string | null> => ipcRenderer.invoke('wf:setting:get', key),
+  settingSet: (key: string, value: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:setting:set', key, value),
 
   // Tablet remote
   getTabletUrl: (): Promise<string> =>
@@ -144,12 +156,40 @@ const wf = {
   obsSetAutoSwitch: (enabled: boolean, map: Record<SceneContext, string>): Promise<void> =>
     ipcRenderer.invoke('wf:obs:setAutoSwitch', enabled, map),
 
+  // Logo settings
+  logoGet: (): Promise<{ logoPath: string | null; logoBg: string | null }> =>
+    ipcRenderer.invoke('wf:logo:get'),
+  logoSet: (path: string | null, bg: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:logo:set', path, bg),
+
   // CCLI
   ccliGetLicense: (): Promise<string | null> => ipcRenderer.invoke('wf:ccli:getLicense'),
   ccliSetLicense: (license: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:ccli:setLicense', license),
   ccliListUsage: (): Promise<SongUsage[]> => ipcRenderer.invoke('wf:ccli:listUsage'),
-  ccliClearUsage: (): Promise<void> => ipcRenderer.invoke('wf:ccli:clearUsage')
+  ccliClearUsage: (): Promise<void> => ipcRenderer.invoke('wf:ccli:clearUsage'),
+
+  // Zone display system
+  zoneGetRouting: (itemId: number): Promise<ZoneRouting | null> =>
+    ipcRenderer.invoke('wf:zone:getRouting', itemId),
+  zoneSetRouting: (itemId: number, routing: ZoneRouting | null): Promise<void> =>
+    ipcRenderer.invoke('wf:zone:setRouting', itemId, routing),
+  zoneSetOverride: (zoneId: ZoneId, mode: ZoneState['mode'] | null): Promise<void> =>
+    ipcRenderer.invoke('wf:zone:setOverride', zoneId, mode),
+  zoneClearOverrides: (): Promise<void> =>
+    ipcRenderer.invoke('wf:zone:clearOverrides'),
+  zoneGetStates: (): Promise<Record<ZoneId, ZoneState>> =>
+    ipcRenderer.invoke('wf:zone:getStates'),
+  zoneGetIp: (): Promise<string> =>
+    ipcRenderer.invoke('wf:zone:getIp'),
+  multiviewOpen: (): Promise<void> =>
+    ipcRenderer.invoke('wf:multiview:open'),
+
+  // Service export/import
+  serviceExport: (serviceId: number): Promise<{ canceled: boolean }> =>
+    ipcRenderer.invoke('wf:services:export', serviceId),
+  serviceImportFile: (): Promise<{ canceled: boolean; serviceId: number | null }> =>
+    ipcRenderer.invoke('wf:services:import')
 }
 
 try {
