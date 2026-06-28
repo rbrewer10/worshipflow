@@ -91,6 +91,7 @@ export interface SongFull extends SongSummary {
   arrangement: number[] | null
   fontScale: number | null
   linesPerSlide: number | null
+  bgMotion: 'pan' | 'zoom' | 'shimmer' | null
 }
 
 export interface SongInput {
@@ -104,6 +105,7 @@ export interface SongInput {
   arrangement?: number[] | null
   fontScale?: number | null
   linesPerSlide?: number | null
+  bgMotion?: 'pan' | 'zoom' | 'shimmer' | null
 }
 
 // A song parsed from a PowerPoint (.pptx) file, pending import.
@@ -148,6 +150,7 @@ export interface ServiceItem {
   title: string
   notes: string | null
   style: ItemStyle | null
+  zoneRouting: ZoneRouting | null
 }
 
 export interface ServiceFull extends ServiceSummary {
@@ -160,6 +163,54 @@ export interface NewServiceItem {
   type: ServiceItemType
   ref_id?: number | null
   payload?: Record<string, unknown>
+}
+
+// --- Multi-zone display system ---
+export type ZoneId = 1 | 2 | 3 | 4
+export type ZoneMode = 'lyrics' | 'stage' | 'black' | 'logo' | 'countdown' | 'text' | 'image' | 'off'
+
+export interface ZoneState {
+  mode: ZoneMode
+  // lyrics / text content
+  line: string
+  next: string
+  title: string
+  index: number
+  total: number
+  background: string | null
+  themeColors: { primary: string; secondary: string; text: string } | null
+  fontScale: number
+  // countdown
+  secondsLeft: number
+  // stage extras
+  stageMessage: string | null
+  // image
+  imagePath: string | null
+  // text slide custom style
+  bgColor: string | null        // solid hex bg color (when no background file)
+  bgOverlay: number | null      // 0-1 opacity of readability overlay
+  textAlign: string | null      // 'left' | 'center' | 'right'
+  textPosition: string | null   // 'top' | 'center' | 'bottom'
+}
+
+// Per-service-item zone routing: what each zone shows when this item is live.
+export type ZoneRouting = Record<ZoneId, ZoneMode>
+
+export const ZONE_ROUTING_DEFAULTS: Record<ServiceItemType, ZoneRouting> = {
+  song:      { 1: 'logo',      2: 'logo',      3: 'lyrics',    4: 'stage' },
+  scripture: { 1: 'text',      2: 'text',      3: 'text',      4: 'stage' },
+  text:      { 1: 'text',      2: 'text',      3: 'text',      4: 'stage' },
+  countdown: { 1: 'countdown', 2: 'countdown', 3: 'countdown', 4: 'stage' },
+  image:     { 1: 'image',     2: 'image',     3: 'image',     4: 'stage' },
+  welcome:   { 1: 'countdown', 2: 'countdown', 3: 'countdown', 4: 'stage' },
+  ticker:    { 1: 'text',      2: 'text',      3: 'text',      4: 'stage' },
+}
+
+export const ZONE_NAMES: Record<ZoneId, string> = {
+  1: 'Back Left',
+  2: 'Back Right',
+  3: 'Lyrics TVs',
+  4: 'Stage Monitors',
 }
 
 // --- Scripture / KJV ---

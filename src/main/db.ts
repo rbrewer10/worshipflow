@@ -13,7 +13,8 @@ import type {
   NewServiceItem,
   SongUsage,
   ThemeColors,
-  ItemStyle
+  ItemStyle,
+  ZoneRouting
 } from '../shared/types'
 
 let db: Database
@@ -86,10 +87,12 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE song ADD COLUMN lines_per_slide INTEGER') } catch { /* already exists */ }
   try { db.run('ALTER TABLE song ADD COLUMN copyright TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE song ADD COLUMN publisher TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE song ADD COLUMN bg_motion TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN notes TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN style TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE service_item ADD COLUMN zone_routing TEXT') } catch { /* already exists */ }
   persist()
 }
 
@@ -116,7 +119,7 @@ export function listSongs(search = ''): SongSummary[] {
 
 export function getSong(id: number): SongFull | null {
   const head = db.prepare(
-    'SELECT id, title, author, ccli, copyright, publisher, background, arrangement, font_scale, lines_per_slide FROM song WHERE id = ?'
+    'SELECT id, title, author, ccli, copyright, publisher, background, arrangement, font_scale, lines_per_slide, bg_motion FROM song WHERE id = ?'
   )
   head.bind([id])
   if (!head.step()) {
@@ -134,6 +137,7 @@ export function getSong(id: number): SongFull | null {
     arrangement: string | null
     font_scale: number | null
     lines_per_slide: number | null
+    bg_motion: string | null
   }
   head.free()
 
@@ -157,6 +161,7 @@ export function getSong(id: number): SongFull | null {
     arrangement,
     fontScale: row.font_scale ?? null,
     linesPerSlide: row.lines_per_slide ?? null,
+    bgMotion: (row.bg_motion as SongFull['bgMotion']) ?? null,
     sections
   }
 }
@@ -248,6 +253,11 @@ export function setSongFontScale(id: number, scale: number): void {
   persist()
 }
 
+export function setSongBgMotion(id: number, motion: string | null): void {
+  db.run('UPDATE song SET bg_motion = ? WHERE id = ?', [motion, id])
+  persist()
+}
+
 // --- Services ---
 
 function songTitle(id: number): string | null {
@@ -320,7 +330,7 @@ export function getService(id: number): ServiceFull | null {
   }
 
   const stmt = db.prepare(
-    'SELECT id, ordinal, type, ref_id, payload_json, notes, style FROM service_item WHERE service_id = ? ORDER BY ordinal'
+    'SELECT id, ordinal, type, ref_id, payload_json, notes, style, zone_routing FROM service_item WHERE service_id = ? ORDER BY ordinal'
   )
   stmt.bind([id])
   const items: ServiceItem[] = []
@@ -333,6 +343,7 @@ export function getService(id: number): ServiceFull | null {
       payload_json: string | null
       notes: string | null
       style: string | null
+      zone_routing: string | null
     }
     const payload = r.payload_json ? JSON.parse(r.payload_json) : {}
     items.push({
@@ -343,7 +354,8 @@ export function getService(id: number): ServiceFull | null {
       payload,
       title: itemTitle(r.type, r.ref_id, payload),
       notes: r.notes ?? null,
-      style: r.style ? (JSON.parse(r.style) as ItemStyle) : null
+      style: r.style ? (JSON.parse(r.style) as ItemStyle) : null,
+      zoneRouting: r.zone_routing ? (JSON.parse(r.zone_routing) as ZoneRouting) : null
     })
   }
   stmt.free()
@@ -421,6 +433,17 @@ export function setServiceItemStyle(itemId: number, style: ItemStyle | null): vo
 
 export function setServiceItemPayload(itemId: number, payload: Record<string, unknown>): void {
   db.run('UPDATE service_item SET payload_json = ? WHERE id = ?', [JSON.stringify(payload ?? {}), itemId])
+  persist()
+}
+
+export function getItemZoneRouting(itemId: number): string | null {
+  const rows = db.exec('SELECT zone_routing FROM service_item WHERE id = ?', [itemId])
+  if (!rows.length || !rows[0].values.length) return null
+  return (rows[0].values[0][0] as string | null) ?? null
+}
+
+export function setItemZoneRouting(itemId: number, routing: string | null): void {
+  db.run('UPDATE service_item SET zone_routing = ? WHERE id = ?', [routing, itemId])
   persist()
 }
 
