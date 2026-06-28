@@ -18,11 +18,12 @@ export interface SlideCanvasProps {
   song: SongFull
   slide: EditorSlide | null
   onTextChange: (sectionOrdinal: number, lineStart: number, lineCount: number, newText: string) => void
+  onFontScaleChange?: (size: number) => void
 }
 
 const FONT_SIZES = [3, 4, 5, 6, 7, 8, 9, 10]
 
-export default function SlideCanvas({ song, slide, onTextChange }: SlideCanvasProps): JSX.Element {
+export default function SlideCanvas({ song, slide, onTextChange, onFontScaleChange }: SlideCanvasProps): JSX.Element {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState('')
   const [showToolbar, setShowToolbar] = useState(false)
@@ -89,7 +90,7 @@ export default function SlideCanvas({ song, slide, onTextChange }: SlideCanvasPr
               key={s}
               onMouseDown={(e) => {
                 e.preventDefault()
-                window.wf.songSetFontScale(song.id, s)
+                onFontScaleChange?.(s)
               }}
               className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
                 (song.fontScale ?? 6) === s ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'

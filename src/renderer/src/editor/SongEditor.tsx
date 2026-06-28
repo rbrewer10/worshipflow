@@ -77,6 +77,13 @@ export default function SongEditor({ songId, onSaved }: {
     await window.wf.songSetBgMotion(songId, motion)
   }
 
+  const handleFontScaleChange = async (scale: number): Promise<void> => {
+    if (!song) return
+    const updated = { ...song, fontScale: scale }
+    setSong(updated)
+    await window.wf.songSetFontScale(songId, scale)
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {/* Compact metadata bar */}
@@ -110,6 +117,7 @@ export default function SongEditor({ songId, onSaved }: {
             song={song}
             slide={activeSlide}
             onTextChange={handleTextChange}
+            onFontScaleChange={handleFontScaleChange}
           />
           <p className="text-center text-[10px] text-slate-600">
             Click lyrics to edit • {slides.length} slide{slides.length !== 1 ? 's' : ''} total
