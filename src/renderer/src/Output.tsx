@@ -29,6 +29,7 @@ function Output(): JSX.Element {
   const [fontScale, setFontScale] = useState(6)
   const [tickerText, setTickerText] = useState('')
   const [bgFit, setBgFit] = useState<'cover' | 'contain'>('cover')
+  const [bgMotion, setBgMotion] = useState<'pan' | 'zoom' | 'shimmer' | null>(null)
   const [slideThemeId, setSlideThemeId] = useState<string>('sanctuary')
   const [slideThemeColors, setSlideThemeColors] = useState<ThemeColors | null>(null)
   const [ccli, setCcli] = useState<{
@@ -43,6 +44,7 @@ function Output(): JSX.Element {
       setMode(s.mode)
       setBgSrc(s.background ?? null)
       setBgFit(s.bgFit ?? 'cover')
+      setBgMotion((s.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null)
       setSlideThemeId(s.slideTheme ?? 'sanctuary')
       setSlideThemeColors(s.slideThemeColors ?? null)
       setFontScale(s.fontScale ?? 6)
@@ -97,7 +99,8 @@ function Output(): JSX.Element {
   const logo = mode === 'logo'
   const countdown = mode === 'countdown'
   const bgVisibility = black ? 'hidden' : 'visible'
-  const showVideo = bgSrc !== null && bgReady
+  const isThemeBg = bgSrc?.startsWith('theme:') ?? false
+  const showVideo = bgSrc !== null && !isThemeBg && bgReady
   const theme = getTheme(slideThemeId)
   const colors = resolveColors(theme, slideThemeColors)
   const posAlign = theme.position === 'top' ? 'flex-start' : theme.position === 'bottom' ? 'flex-end' : 'center'
@@ -112,7 +115,7 @@ function Output(): JSX.Element {
       )}
 
       {/* Per-song background — video or image, fades in when ready */}
-      {bgSrc && (
+      {bgSrc && !isThemeBg && (
         isVideo(bgSrc) ? (
           <video
             key={bgSrc}
@@ -127,13 +130,31 @@ function Output(): JSX.Element {
             onError={() => setBgReady(false)}
           />
         ) : (
-          <img
+          <div
             key={bgSrc}
-            className="absolute inset-0 h-full w-full transition-opacity duration-700"
-            style={{ opacity: showVideo ? 1 : 0, visibility: bgVisibility, objectFit: bgFit }}
-            src={toAssetUrl(bgSrc)}
+            className={[
+              'absolute inset-0 transition-opacity duration-700',
+              bgMotion === 'pan' ? 'wf-kb-pan' : '',
+              bgMotion === 'zoom' ? 'wf-kb-zoom' : '',
+              bgMotion === 'shimmer' ? 'wf-kb-shimmer-overlay' : '',
+            ].join(' ').trim()}
+            style={{
+              opacity: showVideo ? 1 : 0,
+              visibility: bgVisibility,
+              backgroundImage: `url(${toAssetUrl(bgSrc)})`,
+              backgroundSize: bgFit === 'contain' ? 'contain' : 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+            }}
             onLoad={() => setBgReady(true)}
-            onError={() => setBgReady(false)}
+            ref={(el) => {
+              if (el) {
+                const img = new Image()
+                img.onload = () => setBgReady(true)
+                img.onerror = () => setBgReady(false)
+                img.src = toAssetUrl(bgSrc)
+              }
+            }}
           />
         )
       )}

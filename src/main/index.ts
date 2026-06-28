@@ -73,7 +73,7 @@ let multiviewWin: BrowserWindow | null = null
 const outputWins = new Map<string, BrowserWindow>()
 
 // Canonical live state.
-let liveSong: { title: string; lines: string[]; background?: string | null } = DEMO_SONG
+let liveSong: { title: string; lines: string[]; background?: string | null; bgMotion?: string | null } = DEMO_SONG
 let liveSongId: number | null = null
 const state: { mode: Mode; index: number } = { mode: 'lyrics', index: 0 }
 let liveServiceItemId: number | null = null
@@ -205,6 +205,7 @@ function renderState(): LiveState {
     total: lines.length,
     songTitle: liveSong.title,
     background: liveSong.background ?? null,
+    bgMotion: (liveSong.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null,
     bgFit: liveBgFit,
     liveServiceItemId,
     fontScale: liveFontScale,
@@ -536,7 +537,7 @@ async function doLoadSong(id: number): Promise<void> {
   liveSongId = id
   liveScriptureRef = null
   liveBgFit = 'cover'
-  liveSong = { title: full.title, lines: songLines(full), background: full.background ?? null }
+  liveSong = { title: full.title, lines: songLines(full), background: full.background ?? null, bgMotion: full.bgMotion ?? null }
   liveFontScale = full.fontScale ?? 6
   liveSongMeta = { author: full.author, copyright: full.copyright, ccli: full.ccli }
   hmsLoadedAt = Date.now()  // Start hymn timer

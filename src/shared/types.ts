@@ -27,6 +27,7 @@ export interface LiveState {
   songTitle: string
   background: string | null
   bgFit?: 'cover' | 'contain'  // 'contain' fits whole-slide images; 'cover' fills behind lyrics
+  bgMotion?: 'pan' | 'zoom' | 'shimmer' | null
   liveServiceItemId: number | null
   fontScale: number   // vw units for lyric text size, default 6
   stageMessage: string | null
