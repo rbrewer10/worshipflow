@@ -19,23 +19,22 @@ body,
    ════════════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Modern Church Theme (Default) */
-  --wf-primary: #8b5cf6;
-  --wf-primary-dark: #6d28d9;
-  --wf-secondary: #06b6d4;
-  --wf-secondary-dark: #0891b2;
+  --wf-primary: #2563eb;
+  --wf-primary-dark: #1d4ed8;
+  --wf-secondary: #0891b2;
+  --wf-secondary-dark: #0e7490;
   --wf-accent: #f59e0b;
   --wf-accent-light: #fbbf24;
-  --wf-bg-primary: #0f172a;
-  --wf-bg-secondary: #1e293b;
-  --wf-bg-tertiary: #334155;
-  --wf-text-primary: #f1f5f9;
-  --wf-text-secondary: #cbd5e1;
-  --wf-border: rgba(148, 163, 184, 0.15);
-  --wf-glass-bg: rgba(15, 23, 42, 0.7);
-  --wf-success: #10b981;
-  --wf-warning: #f59e0b;
-  --wf-error: #ef4444;
+  --wf-bg-primary: #ffffff;
+  --wf-bg-secondary: #f8fafc;
+  --wf-bg-tertiary: #e2e8f0;
+  --wf-text-primary: #0f172a;
+  --wf-text-secondary: #475569;
+  --wf-border: rgba(0, 0, 0, 0.1);
+  --wf-glass-bg: rgba(255, 255, 255, 0.95);
+  --wf-success: #059669;
+  --wf-warning: #d97706;
+  --wf-error: #dc2626;
 }
 
 /* Minimalist Professional - Clean LIGHT steel-blue (high contrast for older eyes) */
@@ -103,8 +102,8 @@ html[data-theme="dark-premium"] {
    ════════════════════════════════════════════════════════════════════════════════ */
 
 body {
-  background-color: #2b2b30;  /* matte grey app base */
-  color: var(--wf-text-primary);
+  background-color: #f8fafc;
+  color: #0f172a;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -257,22 +256,20 @@ button, a, input, select, textarea {
 @layer components {
   input, textarea, select {
     @apply rounded-lg border px-4 py-2.5 text-sm font-medium;
-    background: rgba(0, 0, 0, 0.3);
-    border-color: var(--wf-border);
-    color: var(--wf-text-primary);
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #0f172a;
     transition: all 200ms;
   }
 
-  /* Native dropdown options: always dark + readable so popups never render
-     invisible (white-on-light) in any theme. */
   option {
-    background-color: #1e293b;
-    color: #ffffff;
+    background-color: #ffffff;
+    color: #0f172a;
   }
 
   input::placeholder, textarea::placeholder {
-    color: var(--wf-text-secondary);
-    opacity: 0.6;
+    color: #9ca3af;
+    opacity: 1;
   }
 
   input:focus, textarea:focus, select:focus {
@@ -376,6 +373,69 @@ button, a, input, select, textarea {
 @keyframes themeDrift { 0%{background-position:0% 0%} 50%{background-position:100% 100%} 100%{background-position:0% 0%} }
 .tb-blob{position:absolute;border-radius:50%;filter:blur(40px);opacity:.65}
 
+/* Extended motion theme keyframes */
+@keyframes themeFire {
+  0%,100% { background-position: 50% 100%; background-size: 150% 200%; }
+  50% { background-position: 50% 0%; background-size: 170% 220%; }
+}
+@keyframes themeStarfield {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-33.33%); }
+}
+@keyframes themeWaterfall {
+  0% { background-position: 50% 0%; }
+  100% { background-position: 50% 100%; }
+}
+@keyframes themeEmber {
+  0% { transform: translateY(0) translateX(0) scale(1); opacity: 0.8; }
+  100% { transform: translateY(-110vh) translateX(var(--dx,0)) scale(0.3); opacity: 0; }
+}
+@keyframes themeShimmer {
+  0% { transform: translateX(-100%) skewX(-20deg); }
+  100% { transform: translateX(300%) skewX(-20deg); }
+}
+@keyframes themeCosmic {
+  0%,100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes themeCrossGlow {
+  0%,100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.06); }
+}
+@keyframes themeMist {
+  0% { transform: translateX(0) scaleY(1); opacity: 0.5; }
+  50% { transform: translateX(3vw) scaleY(1.1); opacity: 0.7; }
+  100% { transform: translateX(0) scaleY(1); opacity: 0.5; }
+}
+@keyframes themeNeon {
+  0%,100% { opacity: 0.6; filter: blur(8px); }
+  50% { opacity: 1; filter: blur(4px); }
+}
+@keyframes themeSunrise {
+  0% { background-position: 50% 100%; }
+  50% { background-position: 50% 30%; }
+  100% { background-position: 50% 100%; }
+}
+
+/* Ken Burns effect for AI-generated / uploaded image backgrounds */
+@keyframes kenBurnsPan { 0% { transform: scale(1.15) translateX(0); } 100% { transform: scale(1.15) translateX(-5%); } }
+@keyframes kenBurnsZoom { 0% { transform: scale(1); } 100% { transform: scale(1.18); } }
+@keyframes kenBurnsShimmer {
+  0%,100% { opacity: 0; transform: translateX(-100%) rotate(30deg); }
+  40%,60% { opacity: 0.18; }
+  50% { transform: translateX(200%) rotate(30deg); opacity: 0.18; }
+}
+.wf-kb-pan { animation: kenBurnsPan 20s linear infinite alternate; }
+.wf-kb-zoom { animation: kenBurnsZoom 16s ease-in-out infinite alternate; }
+.wf-kb-shimmer-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(60deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+  width: 200%;
+  animation: kenBurnsShimmer 6s ease-in-out infinite;
+}
+
 /* Smooth scrolling ticker (announcement marquee on the output screen). */
 @keyframes ticker-scroll {
   from { transform: translateX(0); }
@@ -399,59 +459,6 @@ button, a, input, select, textarea {
     opacity: 1;
   }
 }
-
-/* ════════════════════════════════════════════════════════════════════════════════
-   READABILITY LAYER — high contrast for older eyes (applies to ALL themes)
-   The app's panels/labels use faint dark-only utility classes; these overrides
-   strengthen them everywhere at once so every box and word stands out clearly.
-   ════════════════════════════════════════════════════════════════════════════════ */
-
-/* Muted label/body text — the biggest readability killer. Brighten substantially. */
-body .text-slate-600 { color: #93a4ba !important; }
-body .text-slate-500 { color: #aab8ca !important; }
-body .text-slate-400 { color: #cdd8e4 !important; }
-body .text-slate-300 { color: #e3e9f1 !important; }
-
-/* Panel backgrounds — faint white overlays become clearly visible cards. */
-body .bg-white\/\[0\.02\] { background-color: rgba(255,255,255,0.06) !important; }
-body .bg-white\/\[0\.03\] { background-color: rgba(255,255,255,0.07) !important; }
-body .bg-white\/\[0\.04\] { background-color: rgba(255,255,255,0.08) !important; }
-body .bg-white\/\[0\.05\] { background-color: rgba(255,255,255,0.09) !important; }
-body .bg-white\/\[0\.06\] { background-color: rgba(255,255,255,0.11) !important; }
-
-/* Nested/input wells — give them a darker base so they read as distinct fields. */
-body .bg-black\/20 { background-color: rgba(0,0,0,0.38) !important; }
-body .bg-black\/30 { background-color: rgba(0,0,0,0.42) !important; }
-body .bg-black\/40 { background-color: rgba(0,0,0,0.50) !important; }
-
-/* Borders — faint hairlines become defined edges that separate every box. */
-body .border-white\/10 { border-color: rgba(255,255,255,0.22) !important; }
-
-/* ── Minimalist = genuine LIGHT theme: flip the dark-only utilities to light ── */
-html[data-theme="minimalist"] body,
-html[data-theme="minimalist"] .text-slate-300,
-html[data-theme="minimalist"] .text-slate-400,
-html[data-theme="minimalist"] .text-slate-500,
-html[data-theme="minimalist"] .text-slate-600 { color: #1e293b !important; }
-html[data-theme="minimalist"] .text-slate-500 { color: #475569 !important; }
-html[data-theme="minimalist"] .text-slate-600 { color: #64748b !important; }
-html[data-theme="minimalist"] .text-white,
-html[data-theme="minimalist"] .text-slate-100 { color: #0f172a !important; }
-
-html[data-theme="minimalist"] .bg-white\/\[0\.02\],
-html[data-theme="minimalist"] .bg-white\/\[0\.03\],
-html[data-theme="minimalist"] .bg-white\/\[0\.04\],
-html[data-theme="minimalist"] .bg-white\/\[0\.05\],
-html[data-theme="minimalist"] .bg-white\/\[0\.06\] { background-color: #ffffff !important; }
-
-html[data-theme="minimalist"] .bg-black\/20,
-html[data-theme="minimalist"] .bg-black\/30,
-html[data-theme="minimalist"] .bg-black\/40 { background-color: #eef2f8 !important; }
-
-html[data-theme="minimalist"] .border-white\/10 { border-color: #c3cedd !important; }
-
-/* Keep the projector preview/output boxes dark with light text in every theme. */
-html[data-theme="minimalist"] .bg-black { color: #ffffff !important; }
 
 /* Scroll bar styling */
 ::-webkit-scrollbar {
