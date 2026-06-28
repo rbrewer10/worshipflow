@@ -10,7 +10,11 @@ export const FONT_FAMILY: Record<FontKey, string> = {
   elegant: "'Cormorant Garamond', Georgia, serif"
 }
 
-export type MotionEffect = 'aurora' | 'bokeh' | 'rays' | 'drift'
+export type MotionEffect =
+  | 'aurora' | 'bokeh' | 'rays' | 'drift'
+  | 'fire' | 'starfield' | 'waterfall' | 'embers'
+  | 'shimmer' | 'cosmic' | 'cross-glow' | 'mist'
+  | 'neon' | 'sunrise'
 export type TextPosition = 'top' | 'middle' | 'bottom'
 
 export interface ThemeColors {
@@ -50,7 +54,27 @@ export const THEMES: SlideTheme[] = [
   { id: 'rays', name: 'Light rays', kind: 'motion', effect: 'rays', font: 'bold', position: 'middle',
     defaults: { primary: '#101820', secondary: '#ffffff', text: '#ffffff' } },
   { id: 'drift', name: 'Soft drift', kind: 'motion', effect: 'drift', font: 'classic', position: 'middle',
-    defaults: { primary: '#26215c', secondary: '#04342c', text: '#ffffff' } }
+    defaults: { primary: '#26215c', secondary: '#04342c', text: '#ffffff' } },
+  { id: 'fire', name: 'Holy Fire', kind: 'motion', effect: 'fire', font: 'bold', position: 'middle',
+    defaults: { primary: '#1a0500', secondary: '#ff4500', text: '#fff8f0' } },
+  { id: 'starfield', name: 'Starfield', kind: 'motion', effect: 'starfield', font: 'elegant', position: 'middle',
+    defaults: { primary: '#000814', secondary: '#ffffff', text: '#ffffff' } },
+  { id: 'waterfall', name: 'Living Water', kind: 'motion', effect: 'waterfall', font: 'classic', position: 'middle',
+    defaults: { primary: '#001a33', secondary: '#0077b6', text: '#e8f4fd' } },
+  { id: 'embers', name: 'Embers', kind: 'motion', effect: 'embers', font: 'bold', position: 'bottom',
+    defaults: { primary: '#0d0500', secondary: '#cc3700', text: '#fff5e6' } },
+  { id: 'shimmer', name: 'Golden Shimmer', kind: 'motion', effect: 'shimmer', font: 'elegant', position: 'middle',
+    defaults: { primary: '#1a1200', secondary: '#d4af37', text: '#fffacd' } },
+  { id: 'cosmic', name: 'Cosmic', kind: 'motion', effect: 'cosmic', font: 'modern', position: 'middle',
+    defaults: { primary: '#0a0020', secondary: '#6a0dad', text: '#ffffff' } },
+  { id: 'cross-glow', name: 'Cross Glow', kind: 'motion', effect: 'cross-glow', font: 'classic', position: 'bottom',
+    defaults: { primary: '#060a14', secondary: '#4a90e2', text: '#ffffff' } },
+  { id: 'mist', name: 'Morning Mist', kind: 'motion', effect: 'mist', font: 'elegant', position: 'middle',
+    defaults: { primary: '#1a2030', secondary: '#a8c8e8', text: '#ffffff' } },
+  { id: 'neon', name: 'Neon Praise', kind: 'motion', effect: 'neon', font: 'bold', position: 'middle',
+    defaults: { primary: '#05001a', secondary: '#ff00ff', text: '#ffffff' } },
+  { id: 'sunrise', name: 'Sunrise', kind: 'motion', effect: 'sunrise', font: 'classic', position: 'middle',
+    defaults: { primary: '#1a0a00', secondary: '#ff8c00', text: '#fff5e6' } }
 ]
 
 export const DEFAULT_THEME_ID = 'sanctuary'
