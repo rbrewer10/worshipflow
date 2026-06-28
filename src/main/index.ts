@@ -1279,6 +1279,33 @@ ipcMain.handle('wf:songs:setBgMotion', (_e: unknown, id: number, motion: string 
 // Settings getter/setter (used by Settings tab for API keys etc.)
 ipcMain.handle('wf:setting:get', (_e: unknown, key: string) => getSetting(key))
 ipcMain.handle('wf:setting:set', (_e: unknown, key: string, value: string | null) => setSetting(key, value))
+
+// Pop-out song editor window
+let editorWin: BrowserWindow | null = null
+ipcMain.handle('wf:editor:open', (_e: unknown, songId: number) => {
+  if (editorWin && !editorWin.isDestroyed()) {
+    editorWin.focus()
+    loadRoute(editorWin, '/editor', { songId: String(songId) })
+    return
+  }
+  editorWin = new BrowserWindow({
+    width: 1600,
+    height: 1000,
+    minWidth: 1100,
+    minHeight: 700,
+    title: 'WorshipFlow — Song Editor',
+    backgroundColor: '#0b0b0f',
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: { preload: PRELOAD, sandbox: false }
+  })
+  editorWin.on('closed', () => { editorWin = null })
+  loadRoute(editorWin, '/editor', { songId: String(songId) })
+  editorWin.once('ready-to-show', () => {
+    editorWin?.maximize()
+    editorWin?.show()
+  })
+})
 ipcMain.handle('wf:dialog:openFile', async () => {
   const opts = {
     title: 'Choose media file',

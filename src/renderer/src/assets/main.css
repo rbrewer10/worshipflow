@@ -399,8 +399,8 @@ button, a, input, select, textarea {
   50% { background-position: 100% 50%; }
 }
 @keyframes themeCrossGlow {
-  0%,100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.06); }
+  0%,100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 0.95; transform: scale(1.07); }
 }
 @keyframes themeMist {
   0% { transform: translateX(0) scaleY(1); opacity: 0.5; }

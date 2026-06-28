@@ -71,11 +71,24 @@ function SongLibrary(): JSX.Element {
           </div>
         </div>
       )}
-      <div className="flex h-full min-h-0 gap-4 p-4">
+      <div className="flex h-full min-h-0 gap-4 p-4 text-white">
       {/* Library list */}
       <div className="flex w-96 flex-col rounded-xl border border-white/[0.07] bg-[#15151a] p-3">
         <CcliPanel />
         <PptxImport onImported={() => refresh()} />
+        <button
+          onClick={async () => {
+            const id = await window.wf.songCreate({
+              title: 'New Song',
+              sections: [{ kind: 'verse', ordinal: 0, lyrics: '' }]
+            })
+            refresh()
+            setEditorId(id)
+          }}
+          className="mb-2 w-full rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+        >
+          + New Song
+        </button>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}

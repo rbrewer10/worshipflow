@@ -2,8 +2,8 @@
 // Top-level editor: SlideStrip + SlideCanvas + BackgroundPanel
 // Replaces the right-side form panel in SongLibrary.
 
-import { useState, useEffect, useCallback } from 'react'
-import type { SongFull, SongInput } from '../../../shared/types'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import type { SongFull, SongInput, SongSection } from '../../../shared/types'
 import { computeEditorSlides, applySlideEdit } from './slideCompute'
 import SlideStrip from './SlideStrip'
 import SlideCanvas from './SlideCanvas'
@@ -16,6 +16,9 @@ export default function SongEditor({ songId, onSaved }: {
   const [song, setSong] = useState<SongFull | null>(null)
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const titleRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     const s = await window.wf.songGet(songId)
@@ -61,6 +64,48 @@ export default function SongEditor({ songId, onSaved }: {
     await saveSong(updated)
   }
 
+  // --- Inline title rename ---
+  const startTitleEdit = (): void => {
+    setTitleDraft(song.title)
+    setEditingTitle(true)
+    setTimeout(() => { titleRef.current?.focus(); titleRef.current?.select() }, 0)
+  }
+
+  const commitTitle = async (): Promise<void> => {
+    setEditingTitle(false)
+    const next = titleDraft.trim()
+    if (!next || next === song.title) return
+    const updated = { ...song, title: next }
+    setSong(updated)
+    await saveSong(updated)
+  }
+
+  // --- Add a new empty slide (section) ---
+  const handleAddSlide = async (): Promise<void> => {
+    if (!song) return
+    const maxOrdinal = song.sections.reduce((m, s) => Math.max(m, s.ordinal), 0)
+    const newSection: SongSection = { kind: 'verse', ordinal: maxOrdinal + 1, lyrics: '' }
+    const updated = { ...song, sections: [...song.sections, newSection] }
+    setSong(updated)
+    await saveSong(updated)
+    // Select the new slide (last one in the recomputed list).
+    const newSlides = computeEditorSlides(updated)
+    setActiveSlideIndex(Math.max(0, newSlides.length - 1))
+  }
+
+  // --- Delete the section that owns the active slide ---
+  const handleDeleteSlide = async (): Promise<void> => {
+    if (!song || !activeSlide) return
+    // Guard: never delete the last remaining section.
+    if (song.sections.length <= 1) return
+    const updatedSections = song.sections.filter((s) => s.ordinal !== activeSlide.sectionOrdinal)
+    const updated = { ...song, sections: updatedSections }
+    setSong(updated)
+    await saveSong(updated)
+    const newSlides = computeEditorSlides(updated)
+    setActiveSlideIndex((i) => Math.min(i, Math.max(0, newSlides.length - 1)))
+  }
+
   const handleApplyBackground = async (bgPath: string): Promise<void> => {
     if (!song) return
     // bgPath can be empty string meaning "clear background"
@@ -84,21 +129,63 @@ export default function SongEditor({ songId, onSaved }: {
     await window.wf.songSetFontScale(songId, scale)
   }
 
+  const canDelete = song.sections.length > 1 && !!activeSlide
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {/* Compact metadata bar */}
-      <div className="flex items-center gap-3 rounded-lg border border-white/[0.07] bg-[#1a1a1d] px-3 py-2">
+      {/* Header bar */}
+      <div className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-[#18181c] px-4 py-2.5">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">{song.title}</p>
-          {song.author && <p className="truncate text-xs text-slate-500">{song.author}</p>}
+          {editingTitle ? (
+            <input
+              ref={titleRef}
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitTitle()
+                if (e.key === 'Escape') setEditingTitle(false)
+              }}
+              className="w-full rounded-md border border-indigo-400/50 bg-[#0f0f12] px-2 py-1 text-base font-semibold text-white outline-none ring-2 ring-indigo-500/30"
+            />
+          ) : (
+            <button
+              onClick={startTitleEdit}
+              title="Click to rename"
+              className="group flex max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-white/5"
+            >
+              <span className="truncate text-base font-semibold text-white">{song.title}</span>
+              <span className="text-xs text-slate-500 opacity-0 transition-opacity group-hover:opacity-100">✎</span>
+            </button>
+          )}
+          {song.author && <p className="truncate px-1 text-xs text-slate-500">{song.author}</p>}
         </div>
-        {saving && <span className="text-xs text-slate-500 animate-pulse">Saving…</span>}
+
+        {saving && <span className="animate-pulse text-xs text-slate-500">Saving…</span>}
+
         <button
-          onClick={() => onSaved?.()}
-          className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-white/10 hover:text-slate-300"
+          onClick={handleDeleteSlide}
+          disabled={!canDelete}
+          className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300 disabled:cursor-not-allowed disabled:text-slate-600 disabled:hover:bg-transparent"
+          title={canDelete ? 'Delete current slide' : 'Cannot delete the last slide'}
         >
-          ← Back
+          🗑 Delete slide
         </button>
+        <button
+          onClick={() => window.wf.editorOpen(songId)}
+          className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+          title="Open editor in its own window"
+        >
+          ⧉ Pop out
+        </button>
+        {onSaved && (
+          <button
+            onClick={() => onSaved()}
+            className="rounded-lg px-2.5 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+          >
+            ← Back
+          </button>
+        )}
       </div>
 
       {/* Editor body: strip + canvas + background panel */}
@@ -109,16 +196,19 @@ export default function SongEditor({ songId, onSaved }: {
           slides={slides}
           activeIndex={activeSlideIndex}
           onSelect={setActiveSlideIndex}
+          onAddSlide={handleAddSlide}
         />
 
-        {/* Center: WYSIWYG canvas */}
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <SlideCanvas
-            song={song}
-            slide={activeSlide}
-            onTextChange={handleTextChange}
-            onFontScaleChange={handleFontScaleChange}
-          />
+        {/* Center: big centered WYSIWYG canvas */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden p-4">
+            <SlideCanvas
+              song={song}
+              slide={activeSlide}
+              onTextChange={handleTextChange}
+              onFontScaleChange={handleFontScaleChange}
+            />
+          </div>
           <p className="text-center text-[10px] text-slate-600">
             Click lyrics to edit • {slides.length} slide{slides.length !== 1 ? 's' : ''} total
           </p>

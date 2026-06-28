@@ -23,19 +23,19 @@ function ScriptureLookup(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col p-4">
+    <div className="flex h-full min-h-0 flex-col p-4 text-white">
       <div className="mb-3 flex gap-2">
         <input
           value={ref}
           onChange={(e) => setRef(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && lookup()}
           placeholder='Type a reference — e.g. "John 3:16", "Psalm 23", "Romans 8:28-30"'
-          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+          className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-slate-400 outline-none focus:border-blue-500"
         />
         <button
           onClick={() => lookup()}
           disabled={!ref.trim() || loading}
-          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold hover:bg-blue-500 disabled:opacity-40"
+          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? 'Looking…' : 'Look up'}
         </button>

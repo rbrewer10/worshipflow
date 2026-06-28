@@ -56,6 +56,13 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
       >
         ✝ Stage
       </button>
+      <button
+        onClick={() => window.wf.multiviewOpen()}
+        title="Open all 4 zones on second monitor"
+        className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+      >
+        ▣ Zones
+      </button>
     </header>
   )
 }

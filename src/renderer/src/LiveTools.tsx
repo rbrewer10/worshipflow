@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { AppInfo, LiveState } from '../../shared/types'
 import ObsPanel from './ObsPanel'
+import ZonePanel from './ZonePanel'
+import { useService } from './ServiceContext'
 
 const STAGE_PRESETS = [
   '5 minutes left', '2 minutes left', 'Time to wrap up', 'Slow down',
@@ -10,6 +12,7 @@ const STAGE_PRESETS = [
 // The Live tab's right-hand control panel: stage message, scripture, font,
 // auto-advance, OBS, and a collapsible "More" with the rarely-used controls.
 function LiveTools(): JSX.Element {
+  const { activeService } = useService()
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [live, setLive] = useState<LiveState | null>(null)
   const [scriptureRef, setScriptureRef] = useState('')
@@ -42,6 +45,8 @@ function LiveTools(): JSX.Element {
   useEffect(() => { if (live?.songTitle) window.wf.getInfo().then(setInfo) }, [live?.songTitle])
   useEffect(() => { localStorage.setItem('wf-stage-presets', JSON.stringify(presets)) }, [presets])
   useEffect(() => { if (!live?.stageMessage) setStageMsg('') }, [live?.stageMessage])
+
+  const liveItem = activeService?.items.find((it) => it.id === live?.liveServiceItemId) ?? null
 
   const hmsElapsedSecs = live?.hmsLoadedAt ? Math.floor((Date.now() - live.hmsLoadedAt) / 1000) : 0
   const autoAdvanceRunning = live?.autoAdvanceMs != null && live.autoAdvanceMs > 0
@@ -246,6 +251,11 @@ function LiveTools(): JSX.Element {
           </div>
         </div>
       )}
+
+      {/* Zone display system */}
+      <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
+        <ZonePanel liveItem={liveItem} />
+      </section>
     </aside>
   )
 }

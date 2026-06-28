@@ -36,45 +36,45 @@ export interface SlideTheme {
 
 export const THEMES: SlideTheme[] = [
   { id: 'sanctuary', name: 'Sanctuary', kind: 'static', font: 'classic', position: 'middle', gradient: true,
-    defaults: { primary: '#0f1f3d', secondary: '#1d2a4a', text: '#ffffff' } },
-  { id: 'midnight', name: 'Midnight', kind: 'static', font: 'bold', position: 'middle', gradient: false,
-    defaults: { primary: '#0a0a0a', secondary: '#1a1a1a', text: '#ffffff' } },
-  { id: 'minimal', name: 'Minimal', kind: 'static', font: 'modern', position: 'middle', gradient: false,
-    defaults: { primary: '#2c2c2a', secondary: '#2c2c2a', text: '#ffffff' } },
+    defaults: { primary: '#3b2f8f', secondary: '#7c3aed', text: '#ffffff' } },
+  { id: 'midnight', name: 'Midnight', kind: 'static', font: 'bold', position: 'middle', gradient: true,
+    defaults: { primary: '#1e293b', secondary: '#334155', text: '#ffffff' } },
+  { id: 'minimal', name: 'Minimal', kind: 'static', font: 'modern', position: 'middle', gradient: true,
+    defaults: { primary: '#334155', secondary: '#475569', text: '#ffffff' } },
   { id: 'warm', name: 'Warm', kind: 'static', font: 'classic', position: 'middle', gradient: true,
-    defaults: { primary: '#4a1b0c', secondary: '#854f0b', text: '#fff5e6' } },
+    defaults: { primary: '#9a3412', secondary: '#ea8c1c', text: '#fff7ed' } },
   { id: 'garden', name: 'Garden', kind: 'static', font: 'modern', position: 'middle', gradient: true,
-    defaults: { primary: '#04342c', secondary: '#0f6e56', text: '#ffffff' } },
+    defaults: { primary: '#065f46', secondary: '#10b981', text: '#ffffff' } },
   { id: 'pure', name: 'Pure', kind: 'static', font: 'modern', position: 'middle', gradient: false,
     defaults: { primary: '#f5f5f0', secondary: '#e8e8e0', text: '#1a1a1a' } },
   { id: 'aurora', name: 'Aurora', kind: 'motion', effect: 'aurora', font: 'elegant', position: 'middle',
-    defaults: { primary: '#1d2a4a', secondary: '#3b1d5a', text: '#ffffff' } },
+    defaults: { primary: '#0d4f4a', secondary: '#7c3aed', text: '#ffffff' } },
   { id: 'bokeh', name: 'Bokeh lights', kind: 'motion', effect: 'bokeh', font: 'modern', position: 'middle',
-    defaults: { primary: '#0d1b2a', secondary: '#185fa5', text: '#ffffff' } },
+    defaults: { primary: '#0f2a4a', secondary: '#2f86d6', text: '#ffffff' } },
   { id: 'rays', name: 'Light rays', kind: 'motion', effect: 'rays', font: 'bold', position: 'middle',
-    defaults: { primary: '#101820', secondary: '#ffffff', text: '#ffffff' } },
+    defaults: { primary: '#1e3a5f', secondary: '#bfe3ff', text: '#ffffff' } },
   { id: 'drift', name: 'Soft drift', kind: 'motion', effect: 'drift', font: 'classic', position: 'middle',
-    defaults: { primary: '#26215c', secondary: '#04342c', text: '#ffffff' } },
+    defaults: { primary: '#3a2f7a', secondary: '#0f6e56', text: '#ffffff' } },
   { id: 'fire', name: 'Holy Fire', kind: 'motion', effect: 'fire', font: 'bold', position: 'middle',
-    defaults: { primary: '#1a0500', secondary: '#ff4500', text: '#fff8f0' } },
+    defaults: { primary: '#7a1505', secondary: '#ff6b1a', text: '#fff8f0' } },
   { id: 'starfield', name: 'Starfield', kind: 'motion', effect: 'starfield', font: 'elegant', position: 'middle',
-    defaults: { primary: '#000814', secondary: '#ffffff', text: '#ffffff' } },
+    defaults: { primary: '#0a1633', secondary: '#5b8dff', text: '#ffffff' } },
   { id: 'waterfall', name: 'Living Water', kind: 'motion', effect: 'waterfall', font: 'classic', position: 'middle',
-    defaults: { primary: '#001a33', secondary: '#0077b6', text: '#e8f4fd' } },
+    defaults: { primary: '#024d72', secondary: '#1ca7c4', text: '#e8f7ff' } },
   { id: 'embers', name: 'Embers', kind: 'motion', effect: 'embers', font: 'bold', position: 'bottom',
-    defaults: { primary: '#0d0500', secondary: '#cc3700', text: '#fff5e6' } },
+    defaults: { primary: '#5c1605', secondary: '#f15a1c', text: '#fff5e6' } },
   { id: 'shimmer', name: 'Golden Shimmer', kind: 'motion', effect: 'shimmer', font: 'elegant', position: 'middle',
-    defaults: { primary: '#1a1200', secondary: '#d4af37', text: '#fffacd' } },
+    defaults: { primary: '#6b4e0f', secondary: '#f0c64b', text: '#fffaf0' } },
   { id: 'cosmic', name: 'Cosmic', kind: 'motion', effect: 'cosmic', font: 'modern', position: 'middle',
-    defaults: { primary: '#0a0020', secondary: '#6a0dad', text: '#ffffff' } },
+    defaults: { primary: '#2e0d5c', secondary: '#9333ea', text: '#ffffff' } },
   { id: 'cross-glow', name: 'Cross Glow', kind: 'motion', effect: 'cross-glow', font: 'classic', position: 'bottom',
-    defaults: { primary: '#060a14', secondary: '#4a90e2', text: '#ffffff' } },
+    defaults: { primary: '#13294f', secondary: '#5aa6f0', text: '#ffffff' } },
   { id: 'mist', name: 'Morning Mist', kind: 'motion', effect: 'mist', font: 'elegant', position: 'middle',
-    defaults: { primary: '#1a2030', secondary: '#a8c8e8', text: '#ffffff' } },
+    defaults: { primary: '#3a4a66', secondary: '#9ec5e8', text: '#ffffff' } },
   { id: 'neon', name: 'Neon Praise', kind: 'motion', effect: 'neon', font: 'bold', position: 'middle',
-    defaults: { primary: '#05001a', secondary: '#ff00ff', text: '#ffffff' } },
+    defaults: { primary: '#3a0a5c', secondary: '#ff2bd6', text: '#ffffff' } },
   { id: 'sunrise', name: 'Sunrise', kind: 'motion', effect: 'sunrise', font: 'classic', position: 'middle',
-    defaults: { primary: '#1a0a00', secondary: '#ff8c00', text: '#fff5e6' } }
+    defaults: { primary: '#b3471a', secondary: '#ffb24d', text: '#fff7ed' } }
 ]
 
 export const DEFAULT_THEME_ID = 'sanctuary'
@@ -100,6 +100,6 @@ export function staticBackgroundCss(
   colors: { primary: string; secondary: string }
 ): string {
   return theme.gradient
-    ? `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`
+    ? `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`
     : colors.primary
 }

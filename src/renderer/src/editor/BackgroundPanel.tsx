@@ -16,12 +16,18 @@ interface BgEntry {
   isVideo: boolean
 }
 
-const MOTION_OPTIONS: { label: string; value: SongFull['bgMotion'] }[] = [
-  { label: 'Pan', value: 'pan' },
-  { label: 'Zoom', value: 'zoom' },
-  { label: 'Shimmer', value: 'shimmer' },
-  { label: 'None', value: null },
+const MOTION_OPTIONS: { label: string; value: SongFull['bgMotion']; icon: string }[] = [
+  { label: 'Pan', value: 'pan', icon: '↔' },
+  { label: 'Zoom', value: 'zoom', icon: '⤢' },
+  { label: 'Shimmer', value: 'shimmer', icon: '✦' },
+  { label: 'None', value: null, icon: '–' },
 ]
+
+const TAB_LABELS: Record<'uploads' | 'presets' | 'ai', string> = {
+  uploads: 'My Uploads',
+  presets: 'Presets',
+  ai: 'AI Generate',
+}
 
 export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
   song: SongFull
@@ -50,7 +56,6 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
   }
 
   async function handleUploadFile(file: File): Promise<void> {
-    // We need the file path — in Electron, File objects from drag/drop or input have a .path property
     const path = (file as File & { path?: string }).path
     if (!path) return
     try {
@@ -98,7 +103,6 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
     onApply(`theme:${pick.id}`)
   }
 
-  // Drag and drop handlers
   function onDragOver(e: React.DragEvent): void {
     e.preventDefault()
     setDragging(true)
@@ -111,27 +115,39 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
     if (file) handleUploadFile(file)
   }
 
+  const motionThemes = THEMES.filter((t) => t.kind === 'motion')
+  const noneActive = !song.background
+
   return (
     <div className="flex h-full flex-col bg-[#161618] text-white">
-      {/* Tab strip */}
-      <div className="flex shrink-0 border-b border-white/10">
-        {(['uploads', 'presets', 'ai'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2.5 text-xs font-semibold capitalize transition-colors ${
-              tab === t ? 'border-b-2 border-blue-500 text-white' : 'text-white/40 hover:text-white/70'
-            }`}
-          >
-            {t === 'uploads' ? 'My Uploads' : t === 'presets' ? 'Presets' : 'AI Generate'}
-          </button>
-        ))}
+
+      {/* ── Segmented tab strip ── */}
+      <div className="shrink-0 px-3 pt-3 pb-0">
+        <div className="flex rounded-lg bg-white/[0.06] p-0.5">
+          {(['uploads', 'presets', 'ai'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={[
+                'flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-all duration-150',
+                tab === t
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200',
+              ].join(' ')}
+            >
+              {TAB_LABELS[t]}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3">
-        {/* My Uploads tab */}
+      {/* ── Scrollable body ── */}
+      <div className="flex-1 overflow-y-auto px-3 pb-4 pt-3">
+
+        {/* ════════ MY UPLOADS ════════ */}
         {tab === 'uploads' && (
           <div className="flex flex-col gap-3">
+
             {/* Drag-drop zone */}
             <div
               ref={dropRef}
@@ -139,16 +155,21 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
               onDragLeave={onDragLeave}
               onDrop={onDrop}
               onClick={handleBrowse}
-              className={`cursor-pointer rounded-lg border-2 border-dashed p-4 text-center text-xs transition-colors ${
-                dragging ? 'border-blue-400 bg-blue-500/10 text-blue-300' : 'border-white/20 text-white/40 hover:border-white/40 hover:text-white/60'
-              }`}
+              className={[
+                'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-7 text-center transition-all',
+                dragging
+                  ? 'border-indigo-400 bg-indigo-500/10 text-indigo-300'
+                  : 'border-white/10 text-slate-400 hover:border-white/25 hover:bg-white/[0.03] hover:text-slate-300',
+              ].join(' ')}
             >
-              Drop image/video here or click to browse
+              <span className="text-xl leading-none">📁</span>
+              <span className="text-xs font-medium">Drop image or video here</span>
+              <span className="text-[10px] text-slate-500">or click to browse</span>
             </div>
 
-            {/* Uploaded thumbnails grid */}
+            {/* Thumbnails grid */}
             {uploads.length === 0 ? (
-              <p className="py-6 text-center text-xs text-white/30">No uploads yet</p>
+              <p className="py-8 text-center text-xs text-slate-600">No uploads yet</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 {uploads.map((u) => {
@@ -156,11 +177,14 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                   return (
                     <div
                       key={u.path}
-                      className={`group relative cursor-pointer overflow-hidden rounded border-2 transition-all ${
-                        active ? 'border-blue-500' : 'border-transparent hover:border-white/30'
-                      }`}
-                      style={{ aspectRatio: '16/9' }}
                       onClick={() => onApply(u.path)}
+                      className={[
+                        'group relative cursor-pointer overflow-hidden rounded-lg transition-all duration-150',
+                        active
+                          ? 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#161618]'
+                          : 'ring-1 ring-white/10 hover:ring-white/25 hover:scale-[1.02]',
+                      ].join(' ')}
+                      style={{ aspectRatio: '16/9' }}
                     >
                       {u.isVideo ? (
                         <video src={toAssetUrl(u.path)} className="h-full w-full object-cover" muted />
@@ -170,9 +194,18 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                           style={{ backgroundImage: `url(${toAssetUrl(u.path)})` }}
                         />
                       )}
+
+                      {/* Active badge */}
+                      {active && (
+                        <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white shadow">
+                          ✓
+                        </div>
+                      )}
+
+                      {/* Delete button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(u.path) }}
-                        className="absolute right-1 top-1 hidden rounded bg-red-600/80 p-0.5 text-xs group-hover:flex"
+                        className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-red-600/90 text-[10px] text-white shadow group-hover:flex hover:bg-red-500"
                         title="Remove"
                       >
                         ✕
@@ -185,30 +218,79 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
           </div>
         )}
 
-        {/* Presets tab */}
+        {/* ════════ PRESETS ════════ */}
         {tab === 'presets' && (
           <div className="flex flex-col gap-3">
+
+            {/* Random button */}
             <button
               onClick={handleRandomPreset}
-              className="w-full rounded-lg bg-purple-700 py-2 text-sm font-semibold hover:bg-purple-600"
+              className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-500/20 hover:shadow-lg active:scale-[0.98]"
             >
-              🎲 Random Preset
+              <span className="text-base leading-none group-hover:animate-spin" style={{ display: 'inline-block' }}>🎲</span>
+              Random Preset
             </button>
+
+            {/* "None / Clear" card */}
             <div className="grid grid-cols-2 gap-2">
-              {THEMES.filter((t) => t.kind === 'motion').map((t) => {
+              <button
+                onClick={() => onApply('')}
+                className={[
+                  'relative flex items-center justify-center overflow-hidden rounded-xl border transition-all duration-150',
+                  noneActive
+                    ? 'border-indigo-500 ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#161618]'
+                    : 'border-white/10 hover:border-white/25 hover:scale-[1.02]',
+                ].join(' ')}
+                style={{ aspectRatio: '16/9' }}
+              >
+                {/* Checkerboard pattern via SVG data URI */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage:
+                      'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\'%3E%3Crect width=\'8\' height=\'8\' fill=\'%23222\'/%3E%3Crect x=\'8\' y=\'8\' width=\'8\' height=\'8\' fill=\'%23222\'/%3E%3Crect x=\'8\' width=\'8\' height=\'8\' fill=\'%23181818\'/%3E%3Crect y=\'8\' width=\'8\' height=\'8\' fill=\'%23181818\'/%3E%3C/svg%3E")',
+                  }}
+                />
+                <span className="relative z-10 text-[10px] font-semibold text-slate-400">None</span>
+                {noneActive && (
+                  <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white shadow">
+                    ✓
+                  </div>
+                )}
+              </button>
+
+              {/* Theme cards */}
+              {motionThemes.map((t) => {
                 const active = song.background === `theme:${t.id}`
                 return (
                   <button
                     key={t.id}
                     onClick={() => onApply(`theme:${t.id}`)}
-                    className={`rounded border-2 p-2 text-center text-xs transition-all ${
-                      active ? 'border-blue-500 bg-blue-500/10' : 'border-white/10 hover:border-white/30'
-                    }`}
+                    className={[
+                      'relative overflow-hidden rounded-xl border transition-all duration-150',
+                      active
+                        ? 'border-indigo-500 ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#161618] scale-[1.01]'
+                        : 'border-white/[0.08] hover:border-white/25 hover:scale-[1.03] hover:shadow-lg',
+                    ].join(' ')}
                     style={{
-                      background: `linear-gradient(135deg, ${t.defaults.primary}, ${t.defaults.secondary})`
+                      aspectRatio: '16/9',
+                      background: `linear-gradient(135deg, ${t.defaults.primary}, ${t.defaults.secondary})`,
                     }}
                   >
-                    <span className="font-semibold text-white drop-shadow">{t.name}</span>
+                    {/* Name label */}
+                    <span
+                      className="absolute inset-x-0 bottom-0 flex items-end justify-center pb-1.5 text-[10px] font-semibold text-white"
+                      style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}
+                    >
+                      {t.name}
+                    </span>
+
+                    {/* Active check badge */}
+                    {active && (
+                      <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white shadow">
+                        ✓
+                      </div>
+                    )}
                   </button>
                 )
               })}
@@ -216,53 +298,86 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
           </div>
         )}
 
-        {/* AI Generate tab */}
+        {/* ════════ AI GENERATE ════════ */}
         {tab === 'ai' && (
           <div className="flex flex-col gap-3">
-            <label className="text-xs text-white/50">Describe the background</label>
-            <textarea
-              className="w-full resize-none rounded border border-white/20 bg-white/5 p-2 text-xs text-white placeholder:text-white/30 focus:border-blue-400 focus:outline-none"
-              rows={3}
-              placeholder='e.g. "golden rays of light through clouds"'
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-            />
+
+            {/* Prompt label + textarea */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Describe the background
+              </label>
+              <textarea
+                className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-xs text-white placeholder:text-slate-600 transition-colors focus:border-indigo-500/70 focus:outline-none focus:ring-1 focus:ring-indigo-500/40"
+                rows={3}
+                placeholder='e.g. "golden rays of light through stained glass"'
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+              />
+            </div>
+
+            {/* Generate button */}
             <button
               onClick={handleGenerate}
               disabled={aiLoading || !aiPrompt.trim()}
-              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold disabled:opacity-50 hover:bg-blue-500"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow transition-all hover:bg-indigo-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {aiLoading ? 'Generating…' : 'Generate Background'}
+              {aiLoading ? (
+                <>
+                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  Generating…
+                </>
+              ) : (
+                <>✨ Generate Background</>
+              )}
             </button>
-            {aiError && <p className="text-xs text-red-400">{aiError}</p>}
+
+            {/* States */}
             {aiLoading && (
-              <p className="text-center text-xs text-white/40">
-                Generating with AI (~10–30 seconds)…
+              <p className="text-center text-[10px] text-slate-500">
+                AI is painting your scene — ~10–30 seconds
               </p>
             )}
+            {aiError && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-400">
+                {aiError}
+              </div>
+            )}
 
-            {/* Ken Burns motion picker */}
-            <div className="mt-2 rounded-lg border border-white/10 p-3">
-              <p className="mb-2 text-xs font-semibold text-white/60">Motion Effect</p>
+            {/* Motion Effect picker */}
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+              <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Motion Effect
+              </p>
               <div className="grid grid-cols-2 gap-1.5">
-                {MOTION_OPTIONS.map((m) => (
-                  <button
-                    key={String(m.value)}
-                    onClick={() => onBgMotionChange(m.value)}
-                    className={`rounded py-1.5 text-xs font-semibold transition-colors ${
-                      song.bgMotion === m.value
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+                {MOTION_OPTIONS.map((m) => {
+                  const active = song.bgMotion === m.value
+                  return (
+                    <button
+                      key={String(m.value)}
+                      onClick={() => onBgMotionChange(m.value)}
+                      className={[
+                        'flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all duration-100',
+                        active
+                          ? 'bg-indigo-600 text-white shadow'
+                          : 'bg-white/[0.05] text-slate-400 hover:bg-white/10 hover:text-slate-200',
+                      ].join(' ')}
+                    >
+                      <span className="text-[13px] leading-none">{m.icon}</span>
+                      {m.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
-            <p className="text-[10px] text-white/30">
-              Powered by Replicate Flux Schnell · ~$0.003/image · Set API key in Settings → Integrations
+            {/* Fine print */}
+            <p className="text-[10px] leading-relaxed text-slate-600">
+              Powered by Replicate Flux Schnell · ~$0.003 / image
+              <br />Set your API key in Settings → Integrations
             </p>
           </div>
         )}

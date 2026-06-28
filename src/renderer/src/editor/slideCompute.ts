@@ -13,12 +13,6 @@ export interface EditorSlide {
   lineCount: number       // how many lines this slide contains
 }
 
-function sectionLabel(sec: SongSection, ordinal: number): string {
-  if (sec.label) return sec.label
-  const kind = sec.kind.charAt(0).toUpperCase() + sec.kind.slice(1)
-  return ordinal > 0 ? `${kind} ${ordinal + 1}` : kind
-}
-
 export function computeEditorSlides(song: SongFull): EditorSlide[] {
   const linesPerSlide = song.linesPerSlide ?? 2
   const sections = [...song.sections].sort((a, b) => a.ordinal - b.ordinal)
@@ -28,17 +22,30 @@ export function computeEditorSlides(song: SongFull): EditorSlide[] {
     ? song.arrangement.map((i) => sections[i]).filter(Boolean)
     : sections
 
+  // Number sections sequentially per kind (Verse 1, Verse 2, Chorus, …), only
+  // appending a number when there is more than one section of that kind.
+  const kindTotals: Record<string, number> = {}
+  for (const sec of ordered) kindTotals[sec.kind] = (kindTotals[sec.kind] ?? 0) + 1
+  const kindSeen: Record<string, number> = {}
+  const labelFor = (sec: SongSection): string => {
+    if (sec.label) return sec.label
+    const kind = sec.kind.charAt(0).toUpperCase() + sec.kind.slice(1)
+    const n = (kindSeen[sec.kind] = (kindSeen[sec.kind] ?? 0) + 1)
+    return kindTotals[sec.kind] > 1 ? `${kind} ${n}` : kind
+  }
+
   const slides: EditorSlide[] = []
   let keyIdx = 0
 
   for (const sec of ordered) {
+    const label = labelFor(sec)
     const lines = sec.lyrics.split('\n')
     for (let start = 0; start < lines.length; start += linesPerSlide) {
       const chunk = lines.slice(start, start + linesPerSlide)
       slides.push({
         key: `${sec.ordinal}-${start}-${keyIdx++}`,
         sectionOrdinal: sec.ordinal,
-        sectionLabel: sectionLabel(sec, sec.ordinal),
+        sectionLabel: label,
         text: chunk.join('\n'),
         lineStart: start,
         lineCount: chunk.length

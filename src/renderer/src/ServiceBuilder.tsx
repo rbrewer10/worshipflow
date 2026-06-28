@@ -146,16 +146,16 @@ function ServiceBuilder(): JSX.Element {
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="max-w-sm rounded-xl border border-white/10 bg-slate-900 p-5 shadow-lg">
-            <h3 className="mb-2 text-lg font-semibold text-white">
+          <div className="max-w-sm rounded-xl border border-gray-200 bg-white p-5 shadow-lg">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">
               Delete {confirmDelete.type === 'service' ? 'Service' : 'Item'}?
             </h3>
-            <p className="mb-4 text-sm text-slate-400">
-              Are you sure you want to delete <span className="font-semibold text-slate-200">{confirmDelete.name}</span>? This cannot be undone.
+            <p className="mb-4 text-sm text-gray-500">
+              Are you sure you want to delete <span className="font-semibold text-gray-900">{confirmDelete.name}</span>? This cannot be undone.
             </p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold hover:bg-white/[0.12]">
+                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
                 Cancel
               </button>
               <button onClick={confirmDelete.type === 'service' ? confirmServiceDelete : confirmItemDelete}
@@ -167,45 +167,45 @@ function ServiceBuilder(): JSX.Element {
         </div>
       )}
 
-      <div className="flex h-full min-h-0 gap-4 p-4">
+      <div className="flex h-full min-h-0 gap-4 bg-gray-50 p-4">
         {/* Services list */}
-        <div className="flex w-72 flex-col rounded-xl border border-white/[0.07] bg-[#15151a] p-3">
+        <div className="flex w-72 flex-col rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
           <div className="mb-3 flex gap-2">
             <input value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && create()}
               placeholder="New service name…"
-              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+              className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500" />
             <button onClick={create} disabled={!newName.trim()}
               className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold hover:bg-blue-500 disabled:opacity-40">+</button>
           </div>
           <div className="mb-3 space-y-1.5">
             <button onClick={importImages} disabled={importing}
-              className="w-full rounded-lg border border-emerald-500/30 bg-emerald-600/15 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-600/25 disabled:opacity-50"
+              className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
               title="Export your PowerPoint slides as images first (File → Save As → PNG)">
               🖼 Import slides as images
             </button>
             <button onClick={importPptx} disabled={importing}
-              className="w-full rounded-lg border border-blue-500/30 bg-blue-600/15 px-3 py-2 text-xs font-semibold text-blue-200 hover:bg-blue-600/25 disabled:opacity-50"
+              className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
               title="Import a .pptx directly — text becomes editable, backgrounds extracted where possible">
               📑 Import .pptx (editable text)
             </button>
             <button onClick={importServiceFile}
-              className="w-full rounded-lg border border-violet-500/30 bg-violet-600/15 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-600/25"
+              className="w-full rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100"
               title="Load a .wfservice file exported from another computer">
               📂 Load saved service (.wfservice)
             </button>
-            {importing && <p className="text-center text-[11px] text-slate-500">Importing…</p>}
+            {importing && <p className="text-center text-[11px] text-gray-400">Importing…</p>}
           </div>
           <div className="min-h-0 flex-1 space-y-1 overflow-auto">
-            {services.length === 0 && <p className="px-1 py-6 text-center text-sm text-slate-500">No saved services yet.</p>}
+            {services.length === 0 && <p className="px-1 py-6 text-center text-sm text-gray-400">No saved services yet.</p>}
             {services.map((s) => (
               <div key={s.id} onClick={() => open(s.id)}
                 className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 ${
-                  openId === s.id ? 'bg-blue-500/15 ring-1 ring-blue-500/40' : 'hover:bg-white/[0.05]'
+                  openId === s.id ? 'bg-blue-50 ring-1 ring-blue-200 text-blue-700' : 'text-gray-900 hover:bg-gray-50'
                 }`}>
                 <span className="truncate text-sm font-medium">{s.name}</span>
                 <button onClick={(e) => { e.stopPropagation(); del(s.id) }}
-                  className="rounded px-2 py-0.5 text-xs text-slate-500 opacity-0 hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100">
+                  className="rounded px-2 py-0.5 text-xs text-gray-400 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100">
                   Delete
                 </button>
               </div>
@@ -214,23 +214,23 @@ function ServiceBuilder(): JSX.Element {
         </div>
 
         {/* Open service */}
-        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-4">
+        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           {!service ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
+            <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
               Select a service, or create one to start building your order of worship.
             </div>
           ) : (
             <>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">{service.name}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{service.name}</h2>
                 <div className="flex gap-2">
                   <button onClick={exportService}
-                    className="rounded-lg border border-violet-500/30 bg-violet-600/15 px-3 py-1.5 text-xs font-semibold text-violet-200 hover:bg-violet-600/25"
+                    className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
                     title="Save this service to a file you can bring to another computer">
                     💾 Save to file
                   </button>
                   <button onClick={handlePrint}
-                    className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold hover:bg-white/[0.12]"
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100"
                     title="Print service order">🖨 Print</button>
                 </div>
               </div>
