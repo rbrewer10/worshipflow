@@ -7,7 +7,7 @@ import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
 import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneState, ZoneRouting } from '../shared/types'
 import { ZONE_ROUTING_DEFAULTS } from '../shared/types'
-import { DEFAULT_THEME_ID } from '../shared/themes'
+import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
 import {
@@ -280,8 +280,13 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       base.line = live.line
       base.next = live.next
       base.title = live.songTitle
-      base.background = live.background
-      base.themeColors = live.slideThemeColors ?? null
+      // Zones can't load `theme:<id>` as a file (only the projector renders motion
+      // themes), so resolve the effective theme to colors and let the zone draw an
+      // animated gradient. Real image/video file backgrounds pass through as-is.
+      const isThemeBg = live.background?.startsWith('theme:') ?? false
+      const themeId = isThemeBg ? live.background!.slice(6) : (live.slideTheme ?? null)
+      base.background = isThemeBg ? null : live.background
+      base.themeColors = resolveColors(getTheme(themeId), live.slideThemeColors)
       // For text-type items, pull per-item style overrides from payload
       if (liveServiceItemId != null) {
         const liveItem = activeServiceItems.find((it) => it.id === liveServiceItemId && it.type === 'text')
