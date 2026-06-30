@@ -192,6 +192,8 @@ const wf = {
     ipcRenderer.invoke('wf:zone:getIp'),
   getTabletPort: (): Promise<number> =>
     ipcRenderer.invoke('wf:app:getTabletPort'),
+  restoreRecovery: (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> =>
+    ipcRenderer.invoke('wf:app:restoreRecovery'),
   multiviewOpen: (): Promise<void> =>
     ipcRenderer.invoke('wf:multiview:open'),
 

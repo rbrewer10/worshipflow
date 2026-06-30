@@ -222,29 +222,6 @@ function getLocalIp(): string {
   return '127.0.0.1'
 }
 
-async function restoreRecovery(): Promise<void> {
-  const recovered = readRecovery()
-  if (!recovered) return
-
-  // If we have a service item ID, load that item
-  if (recovered.liveServiceItemId != null) {
-    const item = activeServiceItems.find((it) => it.id === recovered.liveServiceItemId)
-    if (item) {
-      // Load the actual item that was playing
-      await handleTabletLoadItem(item.id)
-      // Restore the slide index if it's valid
-      if (recovered.slideIndex >= 0 && recovered.slideIndex < liveSong.lines.length) {
-        state.index = recovered.slideIndex
-      }
-      return  // Item load handles mode and broadcast
-    }
-  }
-
-  // Fallback: if item wasn't found or we have no item ID, restore just the mode/index
-  const m = recovered.mode as Mode
-  state.mode = (m === 'countdown' ? 'lyrics' : m) ?? 'lyrics'
-  state.index = Math.min(Math.max(recovered.slideIndex ?? 0, 0), liveSong.lines.length - 1)
-}
 
 function renderState(): LiveState {
   const lines = liveSong.lines
@@ -1286,6 +1263,34 @@ ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {
   return TABLET_PORT
 })
 
+ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => {
+  // At this point, the renderer has been created and activeServiceItems is populated
+  const recovered = readRecovery()
+  if (recovered?.liveServiceItemId) {
+    const item = activeServiceItems.find(i => i.id === recovered.liveServiceItemId)
+    if (item) {
+      // Load the actual recovered item
+      await handleTabletLoadItem(item.id)
+      // Restore slide index if valid
+      if (recovered.slideIndex >= 0 && recovered.slideIndex < liveSong.lines.length) {
+        state.index = recovered.slideIndex
+      }
+      broadcast()
+      return { ok: true, restored: true }
+    } else {
+      // Item was deleted; load first service item as fallback
+      const firstItem = activeServiceItems[0]
+      if (firstItem) {
+        await handleTabletLoadItem(firstItem.id)
+        state.index = 0
+        broadcast()
+        return { ok: true, restored: false, fallback: true }
+      }
+    }
+  }
+  return { ok: true, restored: false }
+})
+
 ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {
   const svc = getService(serviceId)
   if (!svc) return { canceled: true }
@@ -1610,7 +1615,6 @@ app.whenReady().then(async () => {
   ccliLicense = getSetting('ccli_license')
   logoPath = getSetting('logo_path')
   logoBg = getSetting('logo_bg')
-  await restoreRecovery()
   startTabletServer()
   createOperator()
   layoutOutputs()

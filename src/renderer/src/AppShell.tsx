@@ -80,6 +80,14 @@ function AppShell(): JSX.Element {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Restore recovery state after renderer is ready and activeServiceItems is populated
+  useEffect(() => {
+    window.wf.restoreRecovery().catch(err => {
+      console.error('Failed to restore recovery state:', err)
+    })
+  }, [])
+
   if (view === 'volunteer') {
     return (
       <ServiceProvider>
