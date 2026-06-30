@@ -34,12 +34,16 @@ function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element 
   const [zoneStates, setZoneStates] = useState<Record<ZoneId, ZoneState> | null>(null)
   const [routing, setRouting] = useState<ZoneRouting | null>(null)
   const [serverIp, setServerIp] = useState<string>('...')
-  const [port] = useState<number>(3456)
+  const [port, setPort] = useState<number | null>(null)
 
   // Load zone states on mount and whenever live item changes.
   useEffect(() => {
     void window.wf.zoneGetStates().then(setZoneStates)
     void window.wf.zoneGetIp().then(setServerIp)
+    void window.wf.getTabletPort().then(p => setPort(p)).catch(err => {
+      console.error('Failed to get tablet port:', err)
+      setPort(3691) // fallback
+    })
   }, [])
 
   // Load routing for the active item.
@@ -181,7 +185,7 @@ function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element 
             <div key={zoneId} className="flex items-center justify-between">
               <span className="text-[10px] text-slate-600">Zone {zoneId} — {ZONE_NAMES[zoneId]}</span>
               <span className="font-mono text-[11px] text-emerald-400">
-                http://{serverIp}:{port}/zone/{zoneId}
+                http://{serverIp}:{port ?? '...'}/zone/{zoneId}
               </span>
             </div>
           ))}

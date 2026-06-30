@@ -188,6 +188,8 @@ const wf = {
     ipcRenderer.invoke('wf:zone:getStates'),
   zoneGetIp: (): Promise<string> =>
     ipcRenderer.invoke('wf:zone:getIp'),
+  getTabletPort: (): Promise<number> =>
+    ipcRenderer.invoke('wf:app:getTabletPort'),
   multiviewOpen: (): Promise<void> =>
     ipcRenderer.invoke('wf:multiview:open'),
 
