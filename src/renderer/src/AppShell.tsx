@@ -61,6 +61,20 @@ function AppShell(): JSX.Element {
         window.wf.sendIntent('lyrics')
         return
       }
+
+      // Space or ArrowRight = next slide
+      if (key === ' ' || key === 'arrowright') {
+        e.preventDefault()
+        window.wf.sendIntent('next').catch(console.error)
+        return
+      }
+
+      // ArrowLeft = previous slide
+      if (key === 'arrowleft') {
+        e.preventDefault()
+        window.wf.sendIntent('prev').catch(console.error)
+        return
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
