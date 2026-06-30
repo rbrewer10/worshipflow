@@ -348,6 +348,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       4: clone(emptyZone)
     }),
     zoneGetIp: async (): Promise<string> => '127.0.0.1',
+    getTabletPort: async (): Promise<number> => 3691,
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),
     serviceImportFile: async (): Promise<{ canceled: boolean; serviceId: number | null }> => ({ canceled: true, serviceId: null })
