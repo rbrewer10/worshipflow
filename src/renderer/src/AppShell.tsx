@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ServiceProvider } from './ServiceContext'
 import Sidebar from './Sidebar'
 import ServiceRail from './ServiceRail'
@@ -14,6 +14,58 @@ export type View = 'home' | 'live' | 'service' | 'songs' | 'scripture' | 'volunt
 
 function AppShell(): JSX.Element {
   const [view, setView] = useState<View>('home')
+
+  // Global keyboard shortcuts for live control (available from any tab)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      // Don't intercept while typing in a field
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
+      // Ignore if modifier keys are held (avoid interfering with app shortcuts)
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+
+      const key = e.key.toLowerCase()
+
+      // B = black screen
+      if (key === 'b') {
+        e.preventDefault()
+        window.wf.sendIntent('black')
+        return
+      }
+
+      // L = logo screen
+      if (key === 'l') {
+        e.preventDefault()
+        window.wf.sendIntent('logo')
+        return
+      }
+
+      // N = next slide/item
+      if (key === 'n') {
+        e.preventDefault()
+        window.wf.sendIntent('next')
+        return
+      }
+
+      // P = previous slide/item
+      if (key === 'p') {
+        e.preventDefault()
+        window.wf.sendIntent('prev')
+        return
+      }
+
+      // S = toggle lyrics/slides display
+      if (key === 's') {
+        e.preventDefault()
+        window.wf.sendIntent('lyrics')
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
   if (view === 'volunteer') {
     return (
       <ServiceProvider>
