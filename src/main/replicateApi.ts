@@ -8,6 +8,11 @@ function httpsPost(url: string, body: object, token: string): Promise<object> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body)
     const u = new URL(url)
+    const timeout = setTimeout(() => {
+      req.abort()
+      reject(new Error('Request timeout'))
+    }, 5000)
+
     const req = https.request({
       hostname: u.hostname, path: u.pathname + u.search,
       method: 'POST',
@@ -17,11 +22,15 @@ function httpsPost(url: string, body: object, token: string): Promise<object> {
         'Content-Length': Buffer.byteLength(data)
       }
     }, (res) => {
+      clearTimeout(timeout)
       let raw = ''
       res.on('data', (c) => { raw += c })
       res.on('end', () => { try { resolve(JSON.parse(raw)) } catch (e) { reject(e) } })
     })
-    req.on('error', reject)
+    req.on('error', (err) => {
+      clearTimeout(timeout)
+      reject(err)
+    })
     req.write(data)
     req.end()
   })
@@ -30,13 +39,23 @@ function httpsPost(url: string, body: object, token: string): Promise<object> {
 function httpsGet(url: string, token: string): Promise<object> {
   return new Promise((resolve, reject) => {
     const u = new URL(url)
-    https.get({ hostname: u.hostname, path: u.pathname + u.search,
+    const timeout = setTimeout(() => {
+      req.abort()
+      reject(new Error('Request timeout'))
+    }, 5000)
+
+    const req = https.get({ hostname: u.hostname, path: u.pathname + u.search,
       headers: { 'Authorization': `Bearer ${token}` }
     }, (res) => {
+      clearTimeout(timeout)
       let raw = ''
       res.on('data', (c) => { raw += c })
       res.on('end', () => { try { resolve(JSON.parse(raw)) } catch (e) { reject(e) } })
-    }).on('error', reject)
+    })
+    req.on('error', (err) => {
+      clearTimeout(timeout)
+      reject(err)
+    })
   })
 }
 

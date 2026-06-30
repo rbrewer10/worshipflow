@@ -528,8 +528,13 @@ function doLoadCountdown(seconds: number): void {
 // to bundled offline KJV if there's no internet or the lookup fails.
 async function fetchScripture(reference: string, translation: BibleTranslation): Promise<ScriptureResult> {
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 4000)
+
     const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${translation}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeout)
+
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = (await res.json()) as { reference?: string; verses?: { verse: number; text: string }[] }
     if (!data.verses || data.verses.length === 0) throw new Error('no verses')
