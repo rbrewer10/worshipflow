@@ -324,6 +324,8 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       bgOverlay: null,
       textAlign: null,
       textPosition: null,
+      itemStyle: null,
+      itemColorOverride: null,
     }
 
     // Populate fields based on mode.
@@ -348,6 +350,14 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
           if (pl.textPosition != null) base.textPosition = pl.textPosition as string
           if (pl.bgColor != null && !base.background) base.bgColor = pl.bgColor as string
           if (pl.fontScale != null) base.fontScale = pl.fontScale as number
+        }
+      }
+      // Pass the item's style override if it exists
+      if (liveServiceItemId != null) {
+        const liveItem = activeServiceItems.find((it) => it.id === liveServiceItemId)
+        if (liveItem?.style) {
+          base.itemStyle = JSON.stringify(liveItem.style)
+          base.itemColorOverride = liveItem.style.colors ?? null
         }
       }
     } else if (mode === 'stage') {
@@ -1056,6 +1066,18 @@ ipcMain.handle('wf:live:saveFontScale', () => {
 ipcMain.handle('wf:live:setStageMessage', (_e, msg: string | null) => {
   liveStageMessage = msg || null
   broadcast()
+})
+
+ipcMain.handle('wf:live:setItemStyle', async (_e, style: ItemStyle) => {
+  if (liveServiceItemId != null) {
+    const item = activeServiceItems.find((it) => it.id === liveServiceItemId)
+    if (item && style) {
+      item.style = style
+      setServiceItemStyle(item.id, style)
+      applyItemTheme(item)
+      broadcast()
+    }
+  }
 })
 
 // --- Logo IPCs ---

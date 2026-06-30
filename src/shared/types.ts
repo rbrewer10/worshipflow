@@ -198,6 +198,9 @@ export interface ZoneState {
   bgOverlay: number | null      // 0-1 opacity of readability overlay
   textAlign: string | null      // 'left' | 'center' | 'right'
   textPosition: string | null   // 'top' | 'center' | 'bottom'
+  // per-item style overrides
+  itemStyle: string | null      // stringified ItemStyle object
+  itemColorOverride: ThemeColors | null  // direct color override from item style
 }
 
 // Per-service-item zone routing: what each zone shows when this item is live.

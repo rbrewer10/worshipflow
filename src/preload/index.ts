@@ -91,6 +91,8 @@ const wf = {
     ipcRenderer.invoke('wf:live:loadCountdown', seconds),
   liveLoadMedia: (filePath: string, title: string): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadMedia', filePath, title),
+  liveSetItemStyle: (style: ItemStyle): Promise<void> =>
+    ipcRenderer.invoke('wf:live:setItemStyle', style),
 
   // Song background + file dialog
   songSetBackground: (id: number, path: string | null): Promise<void> =>

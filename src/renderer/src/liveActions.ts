@@ -47,4 +47,10 @@ export async function sendItemLive(item: ServiceItem): Promise<void> {
     return
   }
   window.wf.liveSetItemId(item.id)
+  // Send the per-item style override to live state
+  if (item.style) {
+    window.wf.liveSetItemStyle(item.style).catch(err => {
+      console.error('Failed to set item style:', err)
+    })
+  }
 }
