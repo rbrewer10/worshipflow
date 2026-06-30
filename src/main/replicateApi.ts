@@ -9,7 +9,7 @@ function httpsPost(url: string, body: object, token: string): Promise<object> {
     const data = JSON.stringify(body)
     const u = new URL(url)
     const timeout = setTimeout(() => {
-      req.abort()
+      req.destroy(new Error('Request timeout'))
       reject(new Error('Request timeout'))
     }, 5000)
 
@@ -40,7 +40,7 @@ function httpsGet(url: string, token: string): Promise<object> {
   return new Promise((resolve, reject) => {
     const u = new URL(url)
     const timeout = setTimeout(() => {
-      req.abort()
+      req.destroy(new Error('Request timeout'))
       reject(new Error('Request timeout'))
     }, 5000)
 

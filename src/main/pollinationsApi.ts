@@ -29,5 +29,16 @@ export async function generatePollinationsImage(prompt: string): Promise<string>
     throw new Error(`Pollinations image generation failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 
-  return downloadToGenerated(url, `gen_${hash}.jpg`)
+  // Add timeout to the actual download (15s, longer than HEAD check since download is slower)
+  const downloadController = new AbortController()
+  const downloadTimeout = setTimeout(() => downloadController.abort(), 15000)
+
+  try {
+    return await downloadToGenerated(url, `gen_${hash}.jpg`, downloadController.signal)
+  } catch (err) {
+    console.error('[pollinations] image download timed out or failed:', err)
+    throw new Error(`Pollinations image download failed: ${err instanceof Error ? err.message : String(err)}`)
+  } finally {
+    clearTimeout(downloadTimeout)
+  }
 }

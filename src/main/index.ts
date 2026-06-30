@@ -546,6 +546,7 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
       verses: data.verses.map((v) => ({ n: v.verse, text: v.text.replace(/\s+/g, ' ').trim() }))
     }
   } catch (err) {
+    clearTimeout(timeout)
     console.error('[scripture] online fetch failed, falling back to KJV:', err)
     return lookupScripture(reference)
   }
