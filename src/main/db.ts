@@ -153,7 +153,13 @@ export function getSong(id: number): SongFull | null {
   while (secStmt.step()) sections.push(secStmt.getAsObject() as unknown as SongSection)
   secStmt.free()
 
-  const arrangement = row.arrangement ? (JSON.parse(row.arrangement) as number[]) : null
+  let arrangement: number[] | null = null
+  try {
+    arrangement = row.arrangement ? (JSON.parse(row.arrangement) as number[]) : null
+  } catch (err) {
+    console.error(`Failed to parse song arrangement for id=${id}:`, err)
+    arrangement = null
+  }
   return {
     id: row.id,
     title: row.title,
@@ -338,12 +344,20 @@ export function getService(id: number): ServiceFull | null {
     id: number; name: string; service_date: string | null; theme: string | null; theme_colors: string | null
   }
   head.free()
+  let themeColors: ThemeColors | null = null
+  try {
+    themeColors = row.theme_colors ? (JSON.parse(row.theme_colors) as ThemeColors) : null
+  } catch (err) {
+    console.error(`Failed to parse service theme colors for id=${id}:`, err)
+    themeColors = null
+  }
+
   const svc: ServiceSummary & { theme: string | null; themeColors: ThemeColors | null } = {
     id: row.id,
     name: row.name,
     service_date: row.service_date ?? null,
     theme: row.theme ?? null,
-    themeColors: row.theme_colors ? (JSON.parse(row.theme_colors) as ThemeColors) : null
+    themeColors
   }
 
   const stmt = db.prepare(
@@ -362,7 +376,31 @@ export function getService(id: number): ServiceFull | null {
       style: string | null
       zone_routing: string | null
     }
-    const payload = r.payload_json ? JSON.parse(r.payload_json) : {}
+
+    let payload: Record<string, unknown> = {}
+    try {
+      payload = r.payload_json ? JSON.parse(r.payload_json) : {}
+    } catch (err) {
+      console.error(`Failed to parse service item payload for id=${r.id}:`, err)
+      payload = {}
+    }
+
+    let style: ItemStyle | null = null
+    try {
+      style = r.style ? (JSON.parse(r.style) as ItemStyle) : null
+    } catch (err) {
+      console.error(`Failed to parse service item style for id=${r.id}:`, err)
+      style = null
+    }
+
+    let zoneRouting: ZoneRouting | null = null
+    try {
+      zoneRouting = r.zone_routing ? (JSON.parse(r.zone_routing) as ZoneRouting) : null
+    } catch (err) {
+      console.error(`Failed to parse zone routing for id=${r.id}:`, err)
+      zoneRouting = null
+    }
+
     items.push({
       id: r.id,
       ordinal: r.ordinal,
@@ -371,8 +409,8 @@ export function getService(id: number): ServiceFull | null {
       payload,
       title: itemTitle(r.type, r.ref_id, payload),
       notes: r.notes ?? null,
-      style: r.style ? (JSON.parse(r.style) as ItemStyle) : null,
-      zoneRouting: r.zone_routing ? (JSON.parse(r.zone_routing) as ZoneRouting) : null
+      style,
+      zoneRouting
     })
   }
   stmt.free()

@@ -55,7 +55,8 @@ function ServiceRail(): JSX.Element {
             <button
               key={it.id}
               onClick={() => handleItemClick(it)}
-              className={`flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-left transition-colors ${
+              aria-label={`Go live: ${it.title}`}
+              className={`flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-left transition-colors min-h-10 ${
                 liveId === it.id
                   ? 'bg-emerald-600/15 ring-1 ring-emerald-500/50'
                   : pendingId === it.id

@@ -174,13 +174,13 @@ button, a, input, select, textarea {
   /* Danger Button */
   .btn-danger {
     @apply px-5 py-2 rounded-lg font-semibold text-white;
-    background: linear-gradient(135deg, var(--wf-error), #ff6b9d);
-    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+    background: linear-gradient(135deg, #b91c1c, #991b1b);
+    box-shadow: 0 8px 20px rgba(139, 28, 28, 0.3);
   }
 
   .btn-danger:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 12px 30px rgba(139, 28, 28, 0.4);
   }
 
   /* Success Button */
@@ -197,7 +197,7 @@ button, a, input, select, textarea {
 
   /* Icon Button */
   .btn-icon {
-    @apply w-10 h-10 rounded-lg flex items-center justify-center;
+    @apply min-h-10 w-10 rounded-lg flex items-center justify-center;
     background: var(--wf-glass-bg);
     border: 1px solid var(--wf-border);
     color: var(--wf-text-secondary);
@@ -268,7 +268,7 @@ button, a, input, select, textarea {
   }
 
   input::placeholder, textarea::placeholder {
-    color: #9ca3af;
+    color: #6b7280;
     opacity: 1;
   }
 
@@ -314,16 +314,28 @@ button, a, input, select, textarea {
     color: white;
   }
 
+  .badge::before {
+    content: '✓ ';
+  }
+
   .badge-success {
     @apply inline-block px-3 py-1 rounded-full text-xs font-bold;
     background: var(--wf-success);
     color: white;
   }
 
+  .badge-success::before {
+    content: '✓ ';
+  }
+
   .badge-warning {
     @apply inline-block px-3 py-1 rounded-full text-xs font-bold;
     background: var(--wf-warning);
-    color: white;
+    color: #000;
+  }
+
+  .badge-warning::before {
+    content: '⚠ ';
   }
 }
 
