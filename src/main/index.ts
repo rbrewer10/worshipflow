@@ -222,13 +222,28 @@ function getLocalIp(): string {
   return '127.0.0.1'
 }
 
-function restoreRecovery(): void {
+async function restoreRecovery(): Promise<void> {
   const recovered = readRecovery()
-  if (recovered) {
-    const m = recovered.mode as Mode
-    state.mode = (m === 'countdown' ? 'lyrics' : m) ?? 'lyrics'
-    state.index = Math.min(Math.max(recovered.index ?? 0, 0), liveSong.lines.length - 1)
+  if (!recovered) return
+
+  // If we have a service item ID, load that item
+  if (recovered.liveServiceItemId != null) {
+    const item = activeServiceItems.find((it) => it.id === recovered.liveServiceItemId)
+    if (item) {
+      // Load the actual item that was playing
+      await handleTabletLoadItem(item.id)
+      // Restore the slide index if it's valid
+      if (recovered.slideIndex >= 0 && recovered.slideIndex < liveSong.lines.length) {
+        state.index = recovered.slideIndex
+      }
+      return  // Item load handles mode and broadcast
+    }
   }
+
+  // Fallback: if item wasn't found or we have no item ID, restore just the mode/index
+  const m = recovered.mode as Mode
+  state.mode = (m === 'countdown' ? 'lyrics' : m) ?? 'lyrics'
+  state.index = Math.min(Math.max(recovered.slideIndex ?? 0, 0), liveSong.lines.length - 1)
 }
 
 function renderState(): LiveState {
@@ -418,7 +433,7 @@ function broadcast(): void {
   for (const w of [operatorWin, stageWin, ...outputWins.values()]) {
     if (w && !w.isDestroyed()) w.webContents.send('wf:state', payload)
   }
-  writeRecovery({ mode: state.mode, index: state.index })
+  writeRecovery({ liveServiceItemId, slideIndex: state.index, mode: state.mode })
   tabletBroadcast(payload)
   zoneBroadcast()
   maybeAutoSwitchScene()
@@ -1573,7 +1588,7 @@ app.whenReady().then(async () => {
   ccliLicense = getSetting('ccli_license')
   logoPath = getSetting('logo_path')
   logoBg = getSetting('logo_bg')
-  restoreRecovery()
+  await restoreRecovery()
   startTabletServer()
   createOperator()
   layoutOutputs()

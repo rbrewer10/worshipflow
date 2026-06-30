@@ -1,22 +1,19 @@
-import { app } from 'electron'
-import { join } from 'path'
-import { readFileSync, writeFileSync } from 'fs'
+import Store from 'electron-store'
 
-// Crash recovery: persist the live position on every change, restore on launch.
-// Phase 1 moves real data to SQLite; this lightweight JSON snapshot stays for
-// instant position-recovery regardless of DB state.
+// Crash recovery: persist the actual service item being played, restore on launch.
+// Stores the live service item ID so we can restore the exact item after a crash,
+// not just a mystery black screen.
 export interface RecoverySnapshot {
+  liveServiceItemId: number | null
+  slideIndex: number
   mode: string
-  index: number
 }
 
-function file(): string {
-  return join(app.getPath('userData'), 'recovery.json')
-}
+const recoveryStore = new Store<{ lastState: RecoverySnapshot | null }>({ name: 'recovery' })
 
 export function readRecovery(): RecoverySnapshot | null {
   try {
-    return JSON.parse(readFileSync(file(), 'utf8')) as RecoverySnapshot
+    return recoveryStore.get('lastState') ?? null
   } catch {
     return null
   }
@@ -24,7 +21,7 @@ export function readRecovery(): RecoverySnapshot | null {
 
 export function writeRecovery(snap: RecoverySnapshot): void {
   try {
-    writeFileSync(file(), JSON.stringify(snap))
+    recoveryStore.set('lastState', snap)
   } catch {
     // Never let autosave crash the live engine.
   }
