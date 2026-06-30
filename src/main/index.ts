@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
 import { join, basename, dirname, resolve, relative } from 'path'
 import { createServer } from 'http'
-import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync } from 'fs'
+import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync } from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
@@ -1454,6 +1454,25 @@ ipcMain.handle('wf:dialog:openFile', async () => {
     : await dialog.showOpenDialog(opts)
 })
 
+// Create a timestamped backup of the database on app launch
+function createTimestampedBackup(): void {
+  const dbPath = join(app.getPath('userData'), 'worshipflow.db')
+  const bakDir = join(app.getPath('userData'), 'backups')
+
+  try {
+    if (!existsSync(bakDir)) mkdirSync(bakDir, { recursive: true })
+    const now = new Date()
+    const timestamp = now.toISOString().replace(/[:\-]/g, '').split('.')[0]
+    const backupPath = join(bakDir, `worshipflow-${timestamp}.db`)
+    if (existsSync(dbPath)) {
+      copyFileSync(dbPath, backupPath)
+      console.log(`Backup created: ${backupPath}`)
+    }
+  } catch (err) {
+    console.error('Failed to create backup:', err)
+  }
+}
+
 // Pick one or more .pptx files and parse them into song previews (not yet saved).
 ipcMain.handle('wf:songs:importPptx', async (): Promise<ParsedPptxSong[]> => {
   const opts = {
@@ -1545,6 +1564,7 @@ app.whenReady().then(async () => {
   })
 
   await initDb()
+  createTimestampedBackup()
   ccliLicense = getSetting('ccli_license')
   logoPath = getSetting('logo_path')
   logoBg = getSetting('logo_bg')

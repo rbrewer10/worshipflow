@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join, dirname } from 'path'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync } from 'fs'
 import initSqlJs, { type Database } from 'sql.js'
 import type {
   SongSummary,
@@ -100,7 +100,20 @@ export async function initDb(): Promise<void> {
 
 function persist(): void {
   if (!dbPath) return
-  writeFileSync(dbPath, Buffer.from(db.export()))
+  const tmpPath = `${dbPath}.tmp`
+  const bakPath = `${dbPath}.bak`
+
+  try {
+    writeFileSync(tmpPath, Buffer.from(db.export()))
+    if (existsSync(dbPath)) {
+      copyFileSync(dbPath, bakPath)
+    }
+    renameSync(tmpPath, dbPath)
+  } catch (err) {
+    console.error('Persist failed:', err)
+    if (existsSync(tmpPath)) unlinkSync(tmpPath)
+    throw err
+  }
 }
 
 export function listSongs(search = ''): SongSummary[] {
