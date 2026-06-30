@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
-import { join, basename, dirname } from 'path'
+import { join, basename, dirname, resolve, relative } from 'path'
 import { createServer } from 'http'
-import { readFileSync, writeFileSync, statSync, createReadStream } from 'fs'
+import { readFileSync, writeFileSync, statSync, createReadStream, existsSync } from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
@@ -63,8 +63,37 @@ import {
   obsSetScene
 } from './obs'
 
+export { TABLET_PORT }
+
 const PRELOAD = join(__dirname, '../preload/index.js')
 const startTime = Date.now()
+
+// Helper to safely resolve a path and ensure it's within allowed media roots
+function validateMediaPath(requestedPath: string): string | null {
+  const allowedRoots = [
+    join(app.getPath('userData'), 'backgrounds'),
+    join(app.getPath('userData'), 'imported-media'),
+    join(app.getPath('userData'), 'generated'),
+  ]
+
+  try {
+    const resolved = resolve(requestedPath)
+
+    // Check if resolved path is within any allowed root
+    for (const root of allowedRoots) {
+      const rel = relative(root, resolved)
+      // relative() returns ".." prefix if outside the root
+      if (!rel.startsWith('..') && existsSync(resolved)) {
+        return resolved
+      }
+    }
+
+    return null // path is outside allowed roots or doesn't exist
+  } catch (err) {
+    console.error('Invalid path:', requestedPath, err)
+    return null
+  }
+}
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'wf-asset', privileges: { bypassCSP: true, stream: true, supportFetchAPI: true } }
@@ -240,7 +269,12 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     if (item) {
       const stored = getItemZoneRouting(item.id)
       if (stored) {
-        routing = JSON.parse(stored) as ZoneRouting
+        try {
+          routing = JSON.parse(stored) as ZoneRouting
+        } catch (err) {
+          console.error(`Failed to parse zone routing for item id=${item.id}:`, err)
+          routing = ZONE_ROUTING_DEFAULTS[item.type]
+        }
       } else {
         routing = ZONE_ROUTING_DEFAULTS[item.type]
       }
@@ -693,8 +727,20 @@ function startTabletServer(): void {
       // Serve local media files (images, videos) to Pi browsers and multiview iframes.
       const qs = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
       const filePath = qs.get('path') ?? ''
-      if (!filePath) { res.writeHead(400); res.end(); return }
-      const ext = (filePath.split('.').pop() ?? '').toLowerCase()
+      if (!filePath || typeof filePath !== 'string') {
+        res.writeHead(400, { 'Content-Type': 'text/plain' })
+        res.end('Missing or invalid path parameter')
+        return
+      }
+
+      const validPath = validateMediaPath(filePath)
+      if (!validPath) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' })
+        res.end('Access denied: path is outside media directories')
+        return
+      }
+
+      const ext = (validPath.split('.').pop() ?? '').toLowerCase()
       const MIME: Record<string, string> = {
         jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
         gif: 'image/gif', webp: 'image/webp', avif: 'image/avif',
@@ -703,7 +749,7 @@ function startTabletServer(): void {
       const mime = MIME[ext] ?? 'application/octet-stream'
       const safeEnd = (): void => { if (!res.writableEnded) res.end() }
       try {
-        const stat = statSync(filePath)
+        const stat = statSync(validPath)
         const rangeHeader = req.headers['range']
         if (rangeHeader && mime.startsWith('video/')) {
           const [startStr, endStr] = rangeHeader.replace(/bytes=/, '').split('-')
@@ -716,11 +762,11 @@ function startTabletServer(): void {
             'Content-Type': mime,
             'Cache-Control': 'public, max-age=3600',
           })
-          const stream = createReadStream(filePath, { start, end })
+          const stream = createReadStream(validPath, { start, end })
           stream.on('error', safeEnd)
           stream.pipe(res, { end: true })
         } else {
-          const buf = readFileSync(filePath)
+          const buf = readFileSync(validPath)
           res.writeHead(200, {
             'Content-Type': mime,
             'Content-Length': buf.length,
@@ -1153,7 +1199,13 @@ ipcMain.handle('wf:services:reorder', (_e, serviceId: number, orderedIds: number
 // ── Zone routing IPC ──────────────────────────────────────────────────────────
 ipcMain.handle('wf:zone:getRouting', (_e, itemId: number): ZoneRouting | null => {
   const raw = getItemZoneRouting(itemId)
-  return raw ? (JSON.parse(raw) as ZoneRouting) : null
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as ZoneRouting
+  } catch (err) {
+    console.error(`Failed to parse zone routing for item id=${itemId}:`, err)
+    return null
+  }
 })
 
 ipcMain.handle('wf:zone:setRouting', (_e, itemId: number, routing: ZoneRouting | null): void => {
@@ -1186,6 +1238,10 @@ ipcMain.handle('wf:zone:getIp', (): string => {
   return getLocalIp()
 })
 
+ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {
+  return TABLET_PORT
+})
+
 ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {
   const svc = getService(serviceId)
   if (!svc) return { canceled: true }
@@ -1213,7 +1269,8 @@ ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serv
     properties: ['openFile']
   })
   if (canceled || filePaths.length === 0) return { canceled: true, serviceId: null }
-  const bundle = JSON.parse(readFileSync(filePaths[0], 'utf-8')) as {
+
+  let bundle: {
     version: number
     name: string
     service_date: string | null
@@ -1221,6 +1278,26 @@ ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serv
     themeColors: ThemeColors | null
     items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
   }
+  try {
+    bundle = JSON.parse(readFileSync(filePaths[0], 'utf-8')) as {
+      version: number
+      name: string
+      service_date: string | null
+      theme: string | null
+      themeColors: ThemeColors | null
+      items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
+    }
+  } catch (err) {
+    await dialog.showErrorBox('Import Failed', `Invalid service file: ${err instanceof Error ? err.message : String(err)}`)
+    return { canceled: false, serviceId: null }
+  }
+
+  // Validate structure
+  if (!bundle.version || !Array.isArray(bundle.items)) {
+    await dialog.showErrorBox('Import Failed', 'Invalid service file: missing version or items array')
+    return { canceled: false, serviceId: null }
+  }
+
   const serviceId = createService(bundle.name, bundle.service_date ?? undefined)
   if (bundle.theme) setServiceTheme(serviceId, bundle.theme, bundle.themeColors ?? null)
   for (const item of bundle.items) {
@@ -1450,8 +1527,15 @@ ipcMain.handle('wf:service:importPptx', async (): Promise<{ id: number; name: st
 app.whenReady().then(async () => {
   protocol.handle('wf-asset', (request) => {
     const url = new URL(request.url)
-    const filePath = url.searchParams.get('path') ?? ''
-    const fileUrl = 'file:///' + filePath.replace(/\\/g, '/')
+    const pathParam = url.searchParams.get('path')
+    if (!pathParam) {
+      return new Response('Missing path parameter', { status: 400 })
+    }
+    const validPath = validateMediaPath(pathParam)
+    if (!validPath) {
+      return new Response('Access denied: path is outside media directories', { status: 403 })
+    }
+    const fileUrl = 'file:///' + validPath.replace(/\\/g, '/')
     const headers: Record<string, string> = {}
     const range = request.headers.get('range')
     if (range) headers['range'] = range
