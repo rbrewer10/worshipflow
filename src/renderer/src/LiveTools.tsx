@@ -191,7 +191,14 @@ function LiveTools(): JSX.Element {
         )}
         <div className="flex gap-1.5">
           <input type="number" value={autoAdvanceSecs} onChange={(e) => setAutoAdvanceSecs(e.target.value)} className="w-16 rounded border border-white/10 bg-black/40 px-2 py-1 text-xs text-slate-300" />
-          <button onClick={() => window.wf.featuresStartAutoAdvance(parseFloat(autoAdvanceSecs) * 1000, autoAdvanceLoop)} className="flex-1 rounded bg-blue-600/40 px-2 py-1 text-xs font-semibold text-blue-300 hover:bg-blue-600/60">Start</button>
+          <button onClick={() => {
+            const secs = parseFloat(autoAdvanceSecs)
+            if (isNaN(secs) || secs <= 0 || secs > 3600) {
+              alert('Auto-advance must be between 1 and 3600 seconds')
+              return
+            }
+            window.wf.featuresStartAutoAdvance(secs * 1000, autoAdvanceLoop)
+          }} className="flex-1 rounded bg-blue-600/40 px-2 py-1 text-xs font-semibold text-blue-300 hover:bg-blue-600/60">Start</button>
           <button onClick={() => window.wf.featuresStopAutoAdvance()} className="flex-1 rounded bg-slate-600/40 px-2 py-1 text-xs font-semibold text-slate-300 hover:bg-slate-600/60">Stop</button>
         </div>
         <label className="mt-1.5 flex cursor-pointer items-center gap-2">

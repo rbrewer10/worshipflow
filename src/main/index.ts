@@ -181,6 +181,10 @@ function goToStart(): void {
 // one slide and re-arms itself, so it keeps going until the operator hits Stop.
 // When `loop` is set, it restarts from the beginning instead of stopping at the end.
 function armAutoAdvance(durationMs: number, loop: boolean): void {
+  if (durationMs <= 100 || durationMs > 3600000) {
+    console.error(`Invalid auto-advance duration: ${durationMs}ms`)
+    return
+  }
   if (autoAdvanceTimer) clearInterval(autoAdvanceTimer)
   autoAdvanceDuration = durationMs
   autoAdvanceLoop = loop
@@ -192,7 +196,15 @@ function armAutoAdvance(durationMs: number, loop: boolean): void {
       const dur = autoAdvanceDuration
       const lp = autoAdvanceLoop
       if (lp && atEndOfContent()) goToStart()
-      else processIntent('next')  // advances; note this calls clearAutoAdvance()
+      else if (atEndOfContent()) {
+        // At end of service and not looping — stop auto-advance to prevent runaway
+        clearAutoAdvance()
+        logServiceEvent('auto-advance stopped at end of service')
+        broadcast()
+        return
+      } else {
+        processIntent('next')  // advances (note: doesn't clear auto-advance since it's a 'next' intent)
+      }
       armAutoAdvance(dur, lp)      // …so re-arm to keep the cycle going
       return
     }
@@ -452,7 +464,10 @@ function adjacentLiveItem(dir: 1 | -1): ServiceItem | undefined {
 
 // --- Extracted intent processing (used by both IPC and WebSocket) ---
 function processIntent(type: Intent): void {
-  clearAutoAdvance()  // User action cancels auto-advance
+  // Only clear auto-advance for mode-changing intents (black/logo/lyrics), not for navigation (next/prev)
+  if (type !== 'next' && type !== 'prev') {
+    clearAutoAdvance()
+  }
   const last = liveSong.lines.length - 1
   if (type === 'next') {
     if (state.mode === 'countdown') {
