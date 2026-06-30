@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
 import { join, basename, dirname, resolve, relative } from 'path'
 import { createServer } from 'http'
-import { readFileSync, writeFileSync, statSync, createReadStream, existsSync } from 'fs'
+import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync } from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
@@ -78,13 +78,15 @@ function validateMediaPath(requestedPath: string): string | null {
 
   try {
     const resolved = resolve(requestedPath)
+    // Resolve to real path (follow symlinks, get canonical path)
+    const realPath = realpathSync(resolved)
 
-    // Check if resolved path is within any allowed root
+    // Check if REAL path is within any allowed root
     for (const root of allowedRoots) {
-      const rel = relative(root, resolved)
+      const rel = relative(root, realPath)
       // relative() returns ".." prefix if outside the root
-      if (!rel.startsWith('..') && existsSync(resolved)) {
-        return resolved
+      if (!rel.startsWith('..') && existsSync(realPath)) {
+        return realPath
       }
     }
 
