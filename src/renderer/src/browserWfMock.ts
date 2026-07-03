@@ -118,6 +118,15 @@ const services: ServiceFull[] = [
 let activeServiceId: number | null = services[0]?.id ?? null
 const stateListeners = new Set<(state: LiveState) => void>()
 
+const automationRules: AutomationRule[] = []
+
+const soundCheckChannels: Channel[] = [
+  { id: 1, name: 'Pastor Mic', yamahaChannel: 1, isMic: true, isBackingTrack: false, currentFaderDb: -18, isMuted: false },
+  { id: 2, name: 'Worship Leader Vox', yamahaChannel: 2, isMic: true, isBackingTrack: false, currentFaderDb: -14, isMuted: false },
+  { id: 3, name: 'Tracks L', yamahaChannel: 3, isMic: false, isBackingTrack: true, currentFaderDb: -12, isMuted: false },
+  { id: 4, name: 'Keys', yamahaChannel: 4, isMic: false, isBackingTrack: false, currentFaderDb: -19, isMuted: false }
+]
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
@@ -356,9 +365,16 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     serviceImportFile: async (): Promise<{ canceled: boolean; serviceId: number | null }> => ({ canceled: true, serviceId: null }),
 
     soundCheck: {
-      init: async (): Promise<Channel[]> => [],
-      getChannels: async (): Promise<Channel[]> => [],
-      setChannelClassification: noop,
+      init: async (): Promise<Channel[]> => clone(soundCheckChannels),
+      getChannels: async (): Promise<Channel[]> => clone(soundCheckChannels),
+      setChannelClassification: async (
+        channelId: number,
+        property: 'isMic' | 'isBackingTrack',
+        value: boolean
+      ): Promise<void> => {
+        const channel = soundCheckChannels.find((c) => c.id === channelId)
+        if (channel) channel[property] = value
+      },
       muteChannel: noop,
       setFader: noop,
       recallScene: noop,
@@ -369,8 +385,11 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
         durationSeconds,
         notes
       }),
-      saveAutomationRule: async (rule: AutomationRule): Promise<AutomationRule> => rule,
-      getAutomationRules: async (): Promise<AutomationRule[]> => []
+      saveAutomationRule: async (rule: AutomationRule): Promise<AutomationRule> => {
+        automationRules.push(rule)
+        return rule
+      },
+      getAutomationRules: async (): Promise<AutomationRule[]> => clone(automationRules)
     }
   }
 
