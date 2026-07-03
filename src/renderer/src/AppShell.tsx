@@ -9,8 +9,9 @@ import SongLibrary from './SongLibrary'
 import ScriptureLookup from './ScriptureLookup'
 import VolunteerView from './VolunteerView'
 import LogoSettings from './LogoSettings'
+import SoundCheckTab from './sound-check/SoundCheckTab'
 
-export type View = 'home' | 'live' | 'service' | 'songs' | 'scripture' | 'volunteer' | 'settings'
+export type View = 'home' | 'live' | 'service' | 'songs' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck'
 
 function AppShell(): JSX.Element {
   const [view, setView] = useState<View>('home')
@@ -111,6 +112,8 @@ function AppShell(): JSX.Element {
             <ServiceBuilder />
           ) : view === 'songs' ? (
             <SongLibrary />
+          ) : view === 'soundcheck' ? (
+            <SoundCheckTab />
           ) : view === 'settings' ? (
             <LogoSettings />
           ) : (
