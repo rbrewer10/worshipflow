@@ -71,6 +71,7 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }):
         {nav('scripture', '✦', 'Scripture')}
 
         <p className="mb-0.5 mt-3 px-3 pt-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">Setup</p>
+        {nav('soundcheck', '◉', 'Sound check')}
         {nav('settings', '⚙', 'Logo & background')}
       </nav>
 

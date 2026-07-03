@@ -64,12 +64,7 @@ function Waveform({ mode, accent, height, seed }: WaveformProps): JSX.Element {
           </linearGradient>
         </defs>
         <line x1={0} y1={cy} x2={W} y2={cy} stroke={accent} strokeOpacity=".25" strokeWidth={1} />
-        <g
-          className={r === 0 ? 'scp-pulse-y' : undefined}
-          style={r === 0 ? { transformOrigin: `50% ${cy}px` } : undefined}
-        >
-          {bars}
-        </g>
+        <g>{bars}</g>
         <line
           x1={(peakX + bw / 2).toFixed(1)}
           y1={cy - rowH / 2 + 2}
