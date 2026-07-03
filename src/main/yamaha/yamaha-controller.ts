@@ -12,9 +12,17 @@ const DEFAULT_REMOTE_PORT = 10000
 const DEFAULT_LOCAL_PORT = 9000
 const DISCOVERY_TIMEOUT_MS = 2000
 
+// Placeholder linear dB-to-fader mapping. Real TF-series faders top out at
+// +10 dB and use a non-linear taper; replace this mapping when the actual
+// protocol is implemented.
+const FADER_MIN_DB = -60
+const FADER_MAX_DB = 60
+
 export class YamahaController {
   private port: OSC.UDPPort | null = null
+  private pendingOpen: { port: OSC.UDPPort; abort: (err: Error) => void } | null = null
   private openPromise: Promise<void> | null = null
+  private openGeneration = 0
   private channels: Map<number, Channel> = new Map()
   private scenes: Scene[] = []
   private ip: string = ''
@@ -32,25 +40,53 @@ export class YamahaController {
   /**
    * Lazily create and open the UDP port. Resolves once the port has emitted
    * 'ready'. Subsequent callers share the same promise, so the port is only
-   * created once.
+   * created once. Rejects if no mixer IP has been established yet, or if
+   * close() is called while the socket is still binding.
    */
   private ensureOpen(): Promise<void> {
     if (this.openPromise) return this.openPromise
 
-    this.openPromise = new Promise<void>((resolve, reject) => {
+    if (!this.ip) {
+      return Promise.reject(
+        new Error('Mixer IP unknown — run autoDiscover or set IP first')
+      )
+    }
+
+    const generation = ++this.openGeneration
+
+    const promise = new Promise<void>((resolve, reject) => {
       const port = new OSC.UDPPort({
         localAddress: '0.0.0.0',
         localPort: this.localPort,
-        remoteAddress: this.ip || '192.168.1.100', // Updated on discovery
         remotePort: this.remotePort,
         metadata: true,
       })
 
       const onReady = (): void => {
         port.removeListener('error', onOpenError)
+
+        // close() (or a newer open attempt) invalidated this one while the
+        // socket was binding — discard the socket instead of resurrecting it.
+        if (generation !== this.openGeneration) {
+          try {
+            port.close()
+          } catch {
+            // already closed by close()
+          }
+          reject(new Error('Controller was closed while the port was opening'))
+          return
+        }
+
         // Keep a listener attached so later socket errors don't crash the
         // process via an unhandled 'error' event.
-        port.on('error', (err: Error) => console.error('OSC error:', err))
+        port.on('error', (err) => console.error('OSC error:', err))
+
+        // Discovery may have completed while the socket was binding, so the
+        // remote address is always applied from state here, never from the
+        // options captured at construction time.
+        port.options.remoteAddress = this.ip
+
+        this.pendingOpen = null
         this.port = port
         resolve()
       }
@@ -60,19 +96,38 @@ export class YamahaController {
         try {
           port.close()
         } catch {
-          // ignore — socket may never have bound
+          // socket may never have bound
         }
+        if (this.pendingOpen?.port === port) this.pendingOpen = null
         // Allow a retry on the next call.
-        this.openPromise = null
+        if (generation === this.openGeneration) this.openPromise = null
         reject(err)
       }
 
+      // close() calls this to settle the promise immediately: a socket torn
+      // down mid-bind may never emit 'ready' or 'error', which would leave
+      // awaiting callers hanging forever.
+      const abort = (err: Error): void => {
+        port.removeListener('ready', onReady)
+        port.removeListener('error', onOpenError)
+        // Swallow late socket errors from the aborted bind.
+        port.on('error', () => {})
+        try {
+          port.close()
+        } catch {
+          // socket may never have bound
+        }
+        reject(err)
+      }
+
+      this.pendingOpen = { port, abort }
       port.once('ready', onReady)
       port.once('error', onOpenError)
       port.open()
     })
 
-    return this.openPromise
+    this.openPromise = promise
+    return promise
   }
 
   /**
@@ -112,7 +167,7 @@ export class YamahaController {
         try {
           scanPort.close()
         } catch {
-          // ignore — socket may never have bound
+          // socket may never have bound
         }
       }
 
@@ -138,15 +193,12 @@ export class YamahaController {
         )
       }, DISCOVERY_TIMEOUT_MS)
 
-      scanPort.on('error', (err: Error) => fail(err))
+      scanPort.on('error', (err) => fail(err))
 
       // With metadata: true the third arg carries the sender's rinfo.
-      scanPort.on(
-        'message',
-        (_msg: OSC.OSCMessage, _timeTag: unknown, info?: OSC.RemoteInfo) => {
-          if (info?.address) succeed(info.address)
-        }
-      )
+      scanPort.on('message', (_msg, _timeTag, info) => {
+        if (info?.address) succeed(info.address)
+      })
 
       scanPort.once('ready', () => {
         try {
@@ -174,11 +226,11 @@ export class YamahaController {
       channels.push({
         id: i,
         name: `Channel ${i}`,
-        yamaha_channel: i,
-        is_mic: false,
-        is_backing_track: false,
-        current_fader_db: 0,
-        is_muted: false,
+        yamahaChannel: i,
+        isMic: false,
+        isBackingTrack: false,
+        currentFaderDb: 0,
+        isMuted: false,
       })
     }
 
@@ -186,51 +238,67 @@ export class YamahaController {
     return channels
   }
 
+  private getLoadedChannel(channelId: number): Channel {
+    if (this.channels.size === 0) {
+      throw new Error('Channels not loaded — call fetchChannels() first')
+    }
+    const channel = this.channels.get(channelId)
+    if (!channel) throw new Error(`Channel ${channelId} not found`)
+    return channel
+  }
+
   /**
    * Send mute command to channel
    */
-  async muteChannel(channel_id: number, mute: boolean): Promise<void> {
-    const channel = this.channels.get(channel_id)
-    if (!channel) throw new Error(`Channel ${channel_id} not found`)
+  async muteChannel(channelId: number, mute: boolean): Promise<void> {
+    const channel = this.getLoadedChannel(channelId)
 
     await this.ensureOpen()
 
-    // Send OSC: /ch/{yamaha_channel}/mute {0 or 1}
-    const osc_addr = `/ch/${channel.yamaha_channel}/mute`
-    const osc_value = mute ? 1 : 0
-    this.port!.send({ address: osc_addr, args: [{ type: 'i', value: osc_value }] })
+    this.port!.send({
+      address: `/ch/${channel.yamahaChannel}/mute`,
+      args: [{ type: 'i', value: mute ? 1 : 0 }],
+    })
 
-    channel.is_muted = mute
+    channel.isMuted = mute
   }
 
   /**
    * Recall a saved scene by name
    */
-  async recallScene(scene_name: string): Promise<void> {
+  async recallScene(sceneName: string): Promise<void> {
     await this.ensureOpen()
 
-    // Send OSC: /scene/{scene_name}
-    const osc_addr = `/scene`
-    this.port!.send({ address: osc_addr, args: [{ type: 's', value: scene_name }] })
+    // '/scene' address is a placeholder — real TF scene recall address TBD.
+    this.port!.send({
+      address: `/scene`,
+      args: [{ type: 's', value: sceneName }],
+    })
   }
 
   /**
    * Adjust fader for a channel
    */
-  async setFader(channel_id: number, db: number): Promise<void> {
-    const channel = this.channels.get(channel_id)
-    if (!channel) throw new Error(`Channel ${channel_id} not found`)
+  async setFader(channelId: number, db: number): Promise<void> {
+    if (!Number.isFinite(db)) {
+      throw new Error(`Invalid fader value: ${db} dB (must be a finite number)`)
+    }
+
+    const channel = this.getLoadedChannel(channelId)
 
     await this.ensureOpen()
 
-    // Convert dB to 0-1 range
-    const fader_value = Math.max(0, Math.min(1, (db + 60) / 120))
+    const faderValue = Math.max(
+      0,
+      Math.min(1, (db - FADER_MIN_DB) / (FADER_MAX_DB - FADER_MIN_DB))
+    )
 
-    // Send OSC: /ch/{yamaha_channel}/fader {0.0-1.0}
-    const osc_addr = `/ch/${channel.yamaha_channel}/fader`
-    this.port!.send({ address: osc_addr, args: [{ type: 'f', value: fader_value }] })
+    this.port!.send({
+      address: `/ch/${channel.yamahaChannel}/fader`,
+      args: [{ type: 'f', value: faderValue }],
+    })
 
-    channel.current_fader_db = db
+    channel.currentFaderDb = db
   }
 
   getChannels(): Channel[] {
@@ -238,17 +306,30 @@ export class YamahaController {
   }
 
   /**
-   * Close the UDP port if it was ever opened. Safe to call at app shutdown.
+   * Close the UDP port, including one whose open is still in flight.
+   * Safe to call at app shutdown or repeatedly.
    */
   close(): void {
+    // Invalidate any in-flight open attempt so a straggling 'ready' event
+    // discards its socket instead of resurrecting it (see ensureOpen).
+    this.openGeneration++
+    this.openPromise = null
+
+    if (this.pendingOpen) {
+      const pending = this.pendingOpen
+      this.pendingOpen = null
+      pending.abort(
+        new Error('Controller was closed while the port was opening')
+      )
+    }
+
     if (this.port) {
       try {
         this.port.close()
       } catch {
-        // ignore — already closed
+        // already closed
       }
       this.port = null
     }
-    this.openPromise = null
   }
 }

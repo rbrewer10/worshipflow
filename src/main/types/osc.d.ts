@@ -35,6 +35,22 @@ declare module 'osc' {
       open(): void
       close(): void
       send(msg: OSCMessage, address?: string, port?: number): void
+
+      on(event: 'ready', listener: () => void): this
+      on(event: 'error', listener: (err: Error) => void): this
+      on(
+        event: 'message',
+        listener: (msg: OSCMessage, timeTag: unknown, info: RemoteInfo) => void
+      ): this
+      on(event: string | symbol, listener: (...args: any[]) => void): this
+
+      once(event: 'ready', listener: () => void): this
+      once(event: 'error', listener: (err: Error) => void): this
+      once(
+        event: 'message',
+        listener: (msg: OSCMessage, timeTag: unknown, info: RemoteInfo) => void
+      ): this
+      once(event: string | symbol, listener: (...args: any[]) => void): this
     }
   }
 
