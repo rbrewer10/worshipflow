@@ -1,4 +1,6 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
+import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
+import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative } from 'path'
 import { createServer } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync } from 'fs'
@@ -1603,6 +1605,10 @@ app.whenReady().then(async () => {
     if (range) headers['range'] = range
     return net.fetch(fileUrl, { headers })
   })
+
+  const soundCheckState = new SoundCheckState()
+  await soundCheckState.initialize()
+  registerSoundCheckHandlers(soundCheckState)
 
   await initDb()
   createTimestampedBackup()
