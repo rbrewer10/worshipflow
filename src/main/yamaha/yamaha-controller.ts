@@ -241,7 +241,13 @@ export class YamahaController {
     return channels
   }
 
-  private getLoadedChannel(channelId: number): Channel {
+  /**
+   * Look up a channel by id, distinguishing "channels were never fetched"
+   * from "this id doesn't exist" so callers can surface the right error.
+   * Public so IPC handlers (e.g. setChannelClassification) can reuse this
+   * lookup instead of re-deriving a weaker version of it via getChannels().
+   */
+  getLoadedChannel(channelId: number): Channel {
     if (this.channels.size === 0) {
       throw new Error('Channels not loaded — call fetchChannels() first')
     }
@@ -304,6 +310,8 @@ export class YamahaController {
     channel.currentFaderDb = db
   }
 
+  // Returns live references into the internal Map, not copies — callers
+  // (sound-check-ipc) rely on this to mutate channel state in place.
   getChannels(): Channel[] {
     return Array.from(this.channels.values())
   }

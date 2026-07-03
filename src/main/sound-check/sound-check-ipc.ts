@@ -22,15 +22,13 @@ export function registerSoundCheckHandlers(state: SoundCheckState): void {
   ipcMain.handle(
     'wf:sound-check:setChannelClassification',
     (_e, channelId: number, property: 'isMic' | 'isBackingTrack', value: boolean) => {
-      // Mutate the object returned by getChannels() in place: it's the same
-      // reference stored in YamahaController's internal channel Map (see
-      // YamahaController.getChannels), not a copy — mutating it here is what
-      // makes the change visible everywhere else that reads channel state,
-      // without this class keeping a second, driftable channel map.
-      const channel = state.yamaha.getChannels().find((c) => c.id === channelId)
-      if (!channel) {
-        throw new Error(`Channel ${channelId} not found`)
-      }
+      // getLoadedChannel returns the same object reference stored in
+      // YamahaController's internal channel Map, not a copy — mutating it
+      // here is what makes the change visible everywhere else that reads
+      // channel state, without this class keeping a second, driftable
+      // channel map. It also distinguishes "channels never loaded" from
+      // "bad channel id" with a clearer error than a plain .find() would.
+      const channel = state.yamaha.getLoadedChannel(channelId)
       channel[property] = value
     }
   )
