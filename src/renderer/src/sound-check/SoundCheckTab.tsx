@@ -7,7 +7,7 @@
 // toggle a single flat button bar (rather than e.g. nesting Engineer behind a modal)
 // so Task 7 can slot a gate in without restructuring this component.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Channel } from '../../../main/types/sound-check-types'
 import VolunteerCheck from './VolunteerCheck'
 import EngineerDashboard from './EngineerDashboard'
@@ -30,13 +30,36 @@ function SoundCheckTab(): JSX.Element {
   const [mode, setMode] = useState<ViewMode>('setup')
   const [connection, setConnection] = useState<ConnectionState>({ status: 'connecting' })
   const [manualIp, setManualIp] = useState('')
+  // Tracks an in-flight connect() call independent of connection.status: once status
+  // flips to 'connecting' the render swaps away from ConnectionErrorState entirely, so
+  // this flag's only real job is disabling the retry form for the brief window between
+  // a click and that re-render (e.g. a physical double-click on the submit button).
+  const [isConnecting, setIsConnecting] = useState(false)
+
+  // Guards setState-after-unmount for the in-flight init()/getChannels() calls below.
+  // Flipped to false in the cleanup effect; checked before every setConnection call
+  // whose promise may resolve after this component is gone.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   const connect = useCallback((ip?: string) => {
+    setIsConnecting(true)
     setConnection({ status: 'connecting' })
     window.wf.soundCheck
       .init(ip || undefined)
-      .then((channels) => setConnection({ status: 'connected', channels }))
+      .then((channels) => {
+        if (!mountedRef.current) return
+        setIsConnecting(false)
+        setConnection({ status: 'connected', channels })
+      })
       .catch((err: unknown) => {
+        if (!mountedRef.current) return
+        setIsConnecting(false)
         const message = err instanceof Error ? err.message : String(err)
         setConnection({ status: 'error', message })
       })
@@ -51,8 +74,12 @@ function SoundCheckTab(): JSX.Element {
   const refreshChannels = useCallback(() => {
     window.wf.soundCheck
       .getChannels()
-      .then((channels) => setConnection({ status: 'connected', channels }))
+      .then((channels) => {
+        if (!mountedRef.current) return
+        setConnection({ status: 'connected', channels })
+      })
       .catch((err: unknown) => {
+        if (!mountedRef.current) return
         const message = err instanceof Error ? err.message : String(err)
         setConnection({ status: 'error', message })
       })
@@ -110,6 +137,7 @@ function SoundCheckTab(): JSX.Element {
             manualIp={manualIp}
             setManualIp={setManualIp}
             onRetry={() => connect(manualIp)}
+            retrying={isConnecting}
           />
         ) : role === 'volunteer' ? (
           <VolunteerCheck mode={mode} channels={connection.channels} onChannelsChanged={refreshChannels} />
@@ -134,12 +162,14 @@ function ConnectionErrorState({
   message,
   manualIp,
   setManualIp,
-  onRetry
+  onRetry,
+  retrying
 }: {
   message: string
   manualIp: string
   setManualIp: (v: string) => void
   onRetry: () => void
+  retrying: boolean
 }): JSX.Element {
   return (
     <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 px-4 text-center">
@@ -156,17 +186,18 @@ function ConnectionErrorState({
       >
         <input
           type="text"
-          inputMode="numeric"
           placeholder="192.168.1.100"
           value={manualIp}
           onChange={(e) => setManualIp(e.target.value)}
-          className="w-[160px] rounded-lg border border-[#2c3849] bg-[#1a2230] px-3 py-2 text-sm text-[#dbe3ee] placeholder:text-[#5d6d82] focus:border-sky-400 focus:outline-none"
+          disabled={retrying}
+          className="w-[160px] rounded-lg border border-[#2c3849] bg-[#1a2230] px-3 py-2 text-sm text-[#dbe3ee] placeholder:text-[#5d6d82] focus:border-sky-400 focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"
-          className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-[#03131c] hover:bg-sky-400"
+          disabled={retrying}
+          className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-[#03131c] hover:bg-sky-400 disabled:opacity-60"
         >
-          Connect
+          {retrying ? 'Connecting…' : 'Connect'}
         </button>
       </form>
       <p className="text-xs text-[#5d6d82]">

@@ -147,10 +147,18 @@ function AutomationRulesPanel(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     window.wf.soundCheck
       .getAutomationRules()
-      .then(setRules)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .then((r) => {
+        if (!cancelled) setRules(r)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return (

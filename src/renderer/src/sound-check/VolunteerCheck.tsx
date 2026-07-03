@@ -85,10 +85,12 @@ function classificationOf(ch: Channel): ChipKind {
 
 function ChannelChip({
   channel,
-  onClassify
+  onClassify,
+  pending
 }: {
   channel: Channel
   onClassify: (property: 'isMic' | 'isBackingTrack', value: boolean) => void
+  pending: boolean
 }): JSX.Element {
   const kind = classificationOf(channel)
   const pill: Record<ChipKind, JSX.Element> = {
@@ -115,8 +117,9 @@ function ChannelChip({
       <div className="ml-1 flex gap-1">
         <button
           type="button"
+          disabled={pending}
           onClick={() => onClassify('isMic', !channel.isMic)}
-          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold disabled:opacity-50 ${
             channel.isMic ? 'bg-sky-500 text-[#03131c]' : 'bg-[#1a2230] text-[#8fa0b5] hover:text-sky-300'
           }`}
         >
@@ -124,8 +127,9 @@ function ChannelChip({
         </button>
         <button
           type="button"
+          disabled={pending}
           onClick={() => onClassify('isBackingTrack', !channel.isBackingTrack)}
-          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold disabled:opacity-50 ${
             channel.isBackingTrack
               ? 'bg-purple-500 text-[#03131c]'
               : 'bg-[#1a2230] text-[#8fa0b5] hover:text-purple-300'
@@ -148,15 +152,28 @@ function SetupView({
   const [recording, setRecording] = useState(false)
   const [recorded, setRecorded] = useState<{ durationSeconds: number } | null>(null)
   const [recordError, setRecordError] = useState<string | null>(null)
+  const [classifyError, setClassifyError] = useState<string | null>(null)
+  // Channel ids with an in-flight setChannelClassification() call. Guards against
+  // rapid double-clicks on one chip, or clicking Mic then Track before the first
+  // call resolves, queuing concurrent calls to the same channel with no ordering
+  // guarantee. Both chip buttons disable while their channel id is in this set.
+  const [pendingChannelIds, setPendingChannelIds] = useState<Set<number>>(new Set())
 
   const handleClassify = (channelId: number, property: 'isMic' | 'isBackingTrack', value: boolean): void => {
+    setPendingChannelIds((prev) => new Set(prev).add(channelId))
+    setClassifyError(null)
     window.wf.soundCheck
       .setChannelClassification(channelId, property, value)
       .then(onChannelsChanged)
       .catch((err: unknown) => {
-        // Classification failures are non-fatal to the flow but shouldn't be
-        // silently swallowed — surface via the same error slot as recording.
-        setRecordError(err instanceof Error ? err.message : String(err))
+        setClassifyError(err instanceof Error ? err.message : String(err))
+      })
+      .finally(() => {
+        setPendingChannelIds((prev) => {
+          const next = new Set(prev)
+          next.delete(channelId)
+          return next
+        })
       })
   }
 
@@ -202,10 +219,12 @@ function SetupView({
             <ChannelChip
               key={c.id}
               channel={c}
+              pending={pendingChannelIds.has(c.id)}
               onClassify={(property, value) => handleClassify(c.id, property, value)}
             />
           ))}
         </div>
+        {classifyError && <p className="mt-2 text-[12.5px] text-red-300">{classifyError}</p>}
       </SetupRow>
       <SetupRow state={recorded ? 'done' : 'todo'} n={3} title="Record a reference mix">
         <p className="m-0 text-[13.5px] leading-normal text-[#93a3b8]">
