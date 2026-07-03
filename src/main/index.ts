@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, re
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneState, ZoneRouting } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting } from '../shared/types'
 import { ZONE_ROUTING_DEFAULTS } from '../shared/types'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
@@ -534,10 +534,9 @@ function doLoadCountdown(seconds: number): void {
 // Fetch a non-KJV translation from the free bible-api.com (no key). Falls back
 // to bundled offline KJV if there's no internet or the lookup fails.
 async function fetchScripture(reference: string, translation: BibleTranslation): Promise<ScriptureResult> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 4000)
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 4000)
-
     const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${translation}`
     const res = await fetch(url, { signal: controller.signal })
     clearTimeout(timeout)

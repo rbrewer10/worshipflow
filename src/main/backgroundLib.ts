@@ -57,11 +57,11 @@ export function deleteBackground(filePath: string): void {
   if (existsSync(filePath)) unlinkSync(filePath)
 }
 
-export function downloadToGenerated(url: string, filename: string): Promise<string> {
+export function downloadToGenerated(url: string, filename: string, signal?: AbortSignal): Promise<string> {
   const dest = join(generatedDir(), filename)
   return new Promise((resolve, reject) => {
     const get = (target: string, redirects: number): void => {
-      const req = https.get(target, { timeout: 120000 }, (res) => {
+      const req = https.get(target, { timeout: 120000, signal }, (res) => {
         const status = res.statusCode ?? 0
         // Follow redirects (Pollinations / CDNs may 30x).
         if (status >= 300 && status < 400 && res.headers.location && redirects < 5) {

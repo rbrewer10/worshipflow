@@ -65,14 +65,14 @@ function AppShell(): JSX.Element {
       // Space or ArrowRight = next slide
       if (key === ' ' || key === 'arrowright') {
         e.preventDefault()
-        window.wf.sendIntent('next').catch(console.error)
+        window.wf.sendIntent('next')
         return
       }
 
       // ArrowLeft = previous slide
       if (key === 'arrowleft') {
         e.preventDefault()
-        window.wf.sendIntent('prev').catch(console.error)
+        window.wf.sendIntent('prev')
         return
       }
     }
