@@ -68,6 +68,9 @@ export class YamahaController {
         // close() (or a newer open attempt) invalidated this one while the
         // socket was binding — discard the socket instead of resurrecting it.
         if (generation !== this.openGeneration) {
+          // Swallow any late socket error on this discarded port so it can't
+          // become an unhandled 'error' event.
+          port.on('error', () => {})
           try {
             port.close()
           } catch {

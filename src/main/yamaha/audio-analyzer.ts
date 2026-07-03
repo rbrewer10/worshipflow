@@ -1,199 +1,344 @@
 import FFT from 'fft.js'
-import { Heuristic } from '../types/sound-check-types'
+import type { AudioFrame, Heuristic, SpectralProfile } from '../types/sound-check-types'
 
-export interface AudioFrame {
-  timestamp: Date
-  left: Float32Array
-  right: Float32Array
-}
+/**
+ * Real-time analysis of the audience-mic audio feed.
+ *
+ * Detects feedback, clipping, dropouts, and bad volume from incoming stereo
+ * frames, and computes a spectral "fingerprint" (band energy distribution +
+ * dynamic range) used to compare the current mix against a recorded
+ * reference mix.
+ *
+ * Frame contract: analyzeFrame expects frames of exactly FFT_SIZE (2048)
+ * samples per channel at 48kHz. Shorter frames are zero-padded and longer
+ * frames truncated before the FFT.
+ */
 
-export interface SpectralProfile {
-  low: number // energy 0-500Hz
-  mid: number // energy 500-2kHz
-  high: number // energy 2-5kHz
-  presence: number // energy 5-20kHz
-  dynamic_range: number // dB from min to max
-}
+export const FFT_SIZE = 2048
+const SAMPLE_RATE = 48000
+const HZ_PER_BIN = SAMPLE_RATE / FFT_SIZE // 23.4375 Hz per bin
+// fft.js realTransform fills bins 0..N/2-1 of the half spectrum; the Nyquist
+// bin (24kHz) is excluded, which is above every band we care about.
+const NUM_BINS = FFT_SIZE / 2
+const MAX_FRAMES_STORED = 100
+
+// Clipping: alert when more than 1% of sample positions exceed +/-0.95.
+const CLIP_SAMPLE_THRESHOLD = 0.95
+const CLIP_RATIO_THRESHOLD = 0.01
+
+// Feedback: a sustained, narrow, prominent tone. All three must hold:
+// (a) the peak bin exceeds FEEDBACK_PROMINENCE_RATIO times the mean bin
+//     magnitude, (b) fewer than FEEDBACK_MAX_BANDWIDTH_BINS bins near the
+//     peak are above half its magnitude, and (c) the same peak bin (within
+//     +/-FEEDBACK_BIN_TOLERANCE) persists for FEEDBACK_SUSTAIN_FRAMES
+//     consecutive analyzeFrame calls.
+const FEEDBACK_PROMINENCE_RATIO = 8
+const FEEDBACK_MAX_BANDWIDTH_BINS = 20
+const FEEDBACK_BANDWIDTH_SEARCH_BINS = 100
+const FEEDBACK_SUSTAIN_FRAMES = 5
+const FEEDBACK_BIN_TOLERANCE = 1
+// Peaks quieter than this (normalized magnitude, ~-46dBFS) are never
+// feedback; it also keeps the prominence ratio meaningful near silence.
+const FEEDBACK_MIN_PEAK_MAGNITUDE = 0.005
+
+// Dropout: SUDDEN silence — the current frame is near-silent while the
+// rolling average of the previous few frames still carried signal.
+const DROPOUT_SILENCE_DB = -70
+const DROPOUT_PRIOR_LEVEL_DB = -50
+const RMS_HISTORY_FRAMES = 5
+
+// Plain volume warnings (RMS dB of the current frame).
+const VOLUME_LOW_DB = -50
+const VOLUME_HIGH_DB = -3
+
+// Spectral profile band edges (Hz). Bin ranges are derived from these via
+// binFrequency = binIndex * SAMPLE_RATE / FFT_SIZE.
+const LOW_BAND_MAX_HZ = 500
+const MID_BAND_MAX_HZ = 2000
+const HIGH_BAND_MAX_HZ = 5000
+const PRESENCE_BAND_MAX_HZ = 20000
 
 export class AudioAnalyzer {
   private fft: FFT
-  private sample_rate: number = 48000
-  private last_frames: AudioFrame[] = []
-  private max_frames_stored: number = 100
+  private lastFrames: AudioFrame[] = []
+  // RMS (dB) of recent frames, most recent last; excludes the current frame
+  // while it is being analyzed. Used for dropout detection.
+  private rmsHistory: number[] = []
+  // Feedback candidate tracked across frames: the persistent peak bin and
+  // how many consecutive frames it has held.
+  private feedbackCandidateBin = -1
+  private feedbackCandidateFrames = 0
+  // Precomputed Hann window and reusable FFT buffers.
+  private hannWindow: Float32Array
+  private magnitudeScale: number
+  private fftInput: number[]
+  private fftOutput: number[]
 
   constructor() {
-    this.fft = new FFT(2048)
+    this.fft = new FFT(FFT_SIZE)
+    this.fftInput = new Array(FFT_SIZE).fill(0)
+    this.fftOutput = this.fft.createComplexArray()
+
+    this.hannWindow = new Float32Array(FFT_SIZE)
+    let windowSum = 0
+    for (let i = 0; i < FFT_SIZE; i++) {
+      this.hannWindow[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (FFT_SIZE - 1)))
+      windowSum += this.hannWindow[i]
+    }
+    // Normalization: raw bin magnitudes are divided by N/2 (the FFT gain for
+    // a real sine) and by the Hann window's coherent gain (windowSum/N,
+    // ~0.5), so a full-scale bin-centered sine yields a peak magnitude ~1.0.
+    const coherentGain = windowSum / FFT_SIZE
+    this.magnitudeScale = 1 / ((FFT_SIZE / 2) * coherentGain)
   }
 
   /**
-   * Analyze a frame of audio and return heuristic alerts
+   * Analyze one frame of audio and return heuristic alerts.
+   * Expects 2048-sample frames (see frame contract above).
    */
   analyzeFrame(frame: AudioFrame): Heuristic[] {
-    this.last_frames.push(frame)
-    if (this.last_frames.length > this.max_frames_stored) {
-      this.last_frames.shift()
+    this.lastFrames.push(frame)
+    if (this.lastFrames.length > MAX_FRAMES_STORED) {
+      this.lastFrames.shift()
     }
+
+    const mono = this.toMono(frame)
+    const rmsDb = this.computeRmsDb(mono)
+    const spectrum = this.computeMagnitudeSpectrum(mono)
 
     const alerts: Heuristic[] = []
 
-    // Check for clipping
     const clipping = this.detectClipping(frame)
     if (clipping) alerts.push(clipping)
 
-    // Check for feedback (sustained frequency spike)
-    const feedback = this.detectFeedback(frame)
+    const feedback = this.detectFeedback(spectrum)
     if (feedback) alerts.push(feedback)
 
-    // Check for dropouts
-    const dropout = this.detectDropout(frame)
-    if (dropout) alerts.push(dropout)
+    // Dropout means the signal vanished: near-silence now, but the previous
+    // few frames averaged well above the silence floor. A dropout suppresses
+    // the plain volume warning for the same frame.
+    const previousAvgDb = this.averageRecentRmsDb()
+    const isDropout =
+      rmsDb < DROPOUT_SILENCE_DB &&
+      previousAvgDb !== null &&
+      previousAvgDb > DROPOUT_PRIOR_LEVEL_DB
+    if (isDropout) {
+      alerts.push({
+        type: 'dropout',
+        severity: 'warning',
+        message: `⚠️ Sudden silence detected (${rmsDb.toFixed(0)}dB)`,
+        value: rmsDb,
+      })
+    } else {
+      const volume = this.checkVolume(rmsDb)
+      if (volume) alerts.push(volume)
+    }
 
-    // Check overall volume
-    const volume = this.checkVolume(frame)
-    if (volume) alerts.push(volume)
+    this.rmsHistory.push(rmsDb)
+    if (this.rmsHistory.length > RMS_HISTORY_FRAMES) {
+      this.rmsHistory.shift()
+    }
 
     return alerts
   }
 
-  private detectClipping(frame: AudioFrame): Heuristic | null {
-    const threshold = 0.95
-    let clipped_samples = 0
+  /**
+   * Compute the spectral profile of the buffered frames for reference-mix
+   * fingerprinting. Uses Welch-style averaging: the windowed power spectrum
+   * of every buffered frame is averaged, then band energies are expressed as
+   * fractions of the total spectral energy (level-independent, sum ~1).
+   */
+  computeSpectralProfile(): SpectralProfile {
+    if (this.lastFrames.length === 0) {
+      return { low: 0, mid: 0, high: 0, presence: 0, dynamicRange: 0 }
+    }
 
+    const avgPower = new Float64Array(NUM_BINS)
+    for (const frame of this.lastFrames) {
+      const magnitudes = this.computeMagnitudeSpectrum(this.toMono(frame))
+      for (let i = 0; i < NUM_BINS; i++) {
+        avgPower[i] += magnitudes[i] * magnitudes[i]
+      }
+    }
+    for (let i = 0; i < NUM_BINS; i++) {
+      avgPower[i] /= this.lastFrames.length
+    }
+
+    let low = 0
+    let mid = 0
+    let high = 0
+    let presence = 0
+    let total = 0
+    for (let i = 0; i < NUM_BINS; i++) {
+      const frequency = i * HZ_PER_BIN
+      const power = avgPower[i]
+      total += power
+      if (frequency < LOW_BAND_MAX_HZ) low += power
+      else if (frequency < MID_BAND_MAX_HZ) mid += power
+      else if (frequency < HIGH_BAND_MAX_HZ) high += power
+      else if (frequency < PRESENCE_BAND_MAX_HZ) presence += power
+    }
+    if (total > 0) {
+      low /= total
+      mid /= total
+      high /= total
+      presence /= total
+    }
+
+    const rmsValues = this.lastFrames.map((f) => this.computeRmsDb(this.toMono(f)))
+    const dynamicRange = Math.max(...rmsValues) - Math.min(...rmsValues)
+
+    return { low, mid, high, presence, dynamicRange }
+  }
+
+  private detectClipping(frame: AudioFrame): Heuristic | null {
+    let clippedSamples = 0
     for (let i = 0; i < frame.left.length; i++) {
-      if (Math.abs(frame.left[i]) > threshold || Math.abs(frame.right[i]) > threshold) {
-        clipped_samples++
+      if (
+        Math.abs(frame.left[i]) > CLIP_SAMPLE_THRESHOLD ||
+        (i < frame.right.length && Math.abs(frame.right[i]) > CLIP_SAMPLE_THRESHOLD)
+      ) {
+        clippedSamples++
       }
     }
 
-    const clip_ratio = clipped_samples / frame.left.length
-    if (clip_ratio > 0.01) {
+    const clipRatio = clippedSamples / frame.left.length
+    if (clipRatio > CLIP_RATIO_THRESHOLD) {
       return {
         type: 'clipping',
         severity: 'error',
-        message: `🔴 Clipping detected (${(clip_ratio * 100).toFixed(1)}% of samples)`,
-        value: clip_ratio,
+        message: `🔴 Clipping detected (${(clipRatio * 100).toFixed(1)}% of samples)`,
+        value: clipRatio,
       }
     }
     return null
   }
 
-  private detectFeedback(frame: AudioFrame): Heuristic | null {
-    const spectrum = this.computeSpectrum(frame.left)
-
-    let max_bin = 0
-    let max_energy = 0
+  private detectFeedback(spectrum: Float32Array): Heuristic | null {
+    let peakBin = 0
+    let peakMagnitude = 0
+    let magnitudeSum = 0
     for (let i = 0; i < spectrum.length; i++) {
-      if (spectrum[i] > max_energy) {
-        max_energy = spectrum[i]
-        max_bin = i
+      magnitudeSum += spectrum[i]
+      if (spectrum[i] > peakMagnitude) {
+        peakMagnitude = spectrum[i]
+        peakBin = i
       }
     }
+    const meanMagnitude = magnitudeSum / spectrum.length
 
-    const bandwidth = this.measureBandwidth(spectrum, max_bin)
-    if (bandwidth < 20 && max_energy > 0.5) {
-      const freq = (max_bin * this.sample_rate) / 2048
+    const prominent =
+      peakMagnitude > FEEDBACK_MIN_PEAK_MAGNITUDE &&
+      peakMagnitude > FEEDBACK_PROMINENCE_RATIO * meanMagnitude
+    const narrow =
+      prominent && this.measureBandwidth(spectrum, peakBin) < FEEDBACK_MAX_BANDWIDTH_BINS
+
+    if (!prominent || !narrow) {
+      this.feedbackCandidateBin = -1
+      this.feedbackCandidateFrames = 0
+      return null
+    }
+
+    if (
+      this.feedbackCandidateBin >= 0 &&
+      Math.abs(peakBin - this.feedbackCandidateBin) <= FEEDBACK_BIN_TOLERANCE
+    ) {
+      this.feedbackCandidateFrames++
+    } else {
+      this.feedbackCandidateFrames = 1
+    }
+    this.feedbackCandidateBin = peakBin
+
+    if (this.feedbackCandidateFrames >= FEEDBACK_SUSTAIN_FRAMES) {
+      const frequency = peakBin * HZ_PER_BIN
       return {
         type: 'feedback',
         severity: 'error',
-        message: `⚠️ Feedback detected at ${freq.toFixed(0)}Hz`,
-        value: freq,
+        message: `⚠️ Feedback detected at ${frequency.toFixed(0)}Hz`,
+        value: frequency,
       }
     }
     return null
   }
 
-  private detectDropout(frame: AudioFrame): Heuristic | null {
-    const rms = this.computeRMS(frame.left)
-    const threshold = -80
-    if (rms < threshold) {
+  private checkVolume(rmsDb: number): Heuristic | null {
+    if (rmsDb < VOLUME_LOW_DB) {
       return {
-        type: 'dropout',
+        type: 'volume',
         severity: 'warning',
-        message: `⚠️ Sudden silence detected (${rms.toFixed(0)}dB)`,
-        value: rms,
+        message: `🔉 Volume is very low (${rmsDb.toFixed(0)}dB)`,
+        value: rmsDb,
+      }
+    }
+    if (rmsDb > VOLUME_HIGH_DB) {
+      return {
+        type: 'volume',
+        severity: 'warning',
+        message: `🔊 Volume is very high (${rmsDb.toFixed(0)}dB), risking clipping`,
+        value: rmsDb,
       }
     }
     return null
   }
 
-  private checkVolume(frame: AudioFrame): Heuristic | null {
-    const rms = this.computeRMS(frame.left)
-    if (rms < -50) {
-      return {
-        type: 'volume',
-        severity: 'warning',
-        message: `🔉 Volume is very low (${rms.toFixed(0)}dB)`,
-        value: rms,
-      }
-    }
-    if (rms > -3) {
-      return {
-        type: 'volume',
-        severity: 'warning',
-        message: `🔊 Volume is very high (${rms.toFixed(0)}dB), risking clipping`,
-        value: rms,
-      }
-    }
-    return null
+  /** Average RMS (dB) of the recent frames before the current one. */
+  private averageRecentRmsDb(): number | null {
+    if (this.rmsHistory.length === 0) return null
+    const sum = this.rmsHistory.reduce((a, b) => a + b, 0)
+    return sum / this.rmsHistory.length
   }
 
   /**
-   * Compute spectral profile for reference mix fingerprinting
+   * Windowed, normalized magnitude spectrum of one frame.
+   * Input is truncated or zero-padded to FFT_SIZE, Hann-windowed, then
+   * transformed; bin i of the result covers frequency i * HZ_PER_BIN.
    */
-  computeSpectralProfile(): SpectralProfile {
-    if (this.last_frames.length === 0) {
-      return { low: 0, mid: 0, high: 0, presence: 0, dynamic_range: 0 }
+  private computeMagnitudeSpectrum(samples: Float32Array): Float32Array {
+    const copyLength = Math.min(samples.length, FFT_SIZE)
+    for (let i = 0; i < copyLength; i++) {
+      this.fftInput[i] = samples[i] * this.hannWindow[i]
+    }
+    for (let i = copyLength; i < FFT_SIZE; i++) {
+      this.fftInput[i] = 0
     }
 
-    let combined = new Float32Array(this.last_frames.length * 2048)
-    for (let i = 0; i < this.last_frames.length; i++) {
-      const frame = this.last_frames[i]
-      combined.set(frame.left, i * 2048)
+    this.fft.realTransform(this.fftOutput, this.fftInput)
+
+    const magnitudes = new Float32Array(NUM_BINS)
+    for (let i = 0; i < NUM_BINS; i++) {
+      magnitudes[i] =
+        Math.hypot(this.fftOutput[2 * i], this.fftOutput[2 * i + 1]) * this.magnitudeScale
     }
-
-    const spectrum = this.computeSpectrum(combined)
-
-    const low = spectrum.slice(0, 21).reduce((a, b) => a + b, 0)
-    const mid = spectrum.slice(21, 85).reduce((a, b) => a + b, 0)
-    const high = spectrum.slice(85, 213).reduce((a, b) => a + b, 0)
-    const presence = spectrum.slice(213, 1024).reduce((a, b) => a + b, 0)
-
-    const rms_values = this.last_frames.map(f => this.computeRMS(f.left))
-    const dynamic_range = Math.max(...rms_values) - Math.min(...rms_values)
-
-    return {
-      low: low / spectrum.length,
-      mid: mid / spectrum.length,
-      high: high / spectrum.length,
-      presence: presence / spectrum.length,
-      dynamic_range,
-    }
+    return magnitudes
   }
 
-  private computeSpectrum(samples: Float32Array): Float32Array {
-    const fft_input = new Array(2048)
-    for (let i = 0; i < 2048; i++) {
-      fft_input[i] = samples[i % samples.length]
+  /** Mono mix of a stereo frame (average of the two channels). */
+  private toMono(frame: AudioFrame): Float32Array {
+    const mono = new Float32Array(frame.left.length)
+    for (let i = 0; i < mono.length; i++) {
+      const right = i < frame.right.length ? frame.right[i] : frame.left[i]
+      mono[i] = (frame.left[i] + right) / 2
     }
-    this.fft.realTransform(fft_input, samples)
-    return new Float32Array(fft_input)
+    return mono
   }
 
-  private computeRMS(samples: Float32Array): number {
+  private computeRmsDb(samples: Float32Array): number {
     let sum = 0
     for (let i = 0; i < samples.length; i++) {
       sum += samples[i] * samples[i]
     }
-    const rms_linear = Math.sqrt(sum / samples.length)
-    const rms_db = 20 * Math.log10(rms_linear + 1e-10)
-    return rms_db
+    const rmsLinear = Math.sqrt(sum / samples.length)
+    return 20 * Math.log10(rmsLinear + 1e-10)
   }
 
-  private measureBandwidth(spectrum: Float32Array, peak_bin: number): number {
-    const peak_energy = spectrum[peak_bin]
+  /** Number of bins near the peak whose magnitude exceeds half the peak's. */
+  private measureBandwidth(spectrum: Float32Array, peakBin: number): number {
+    const peakMagnitude = spectrum[peakBin]
+    const start = Math.max(0, peakBin - FEEDBACK_BANDWIDTH_SEARCH_BINS)
+    const end = Math.min(spectrum.length, peakBin + FEEDBACK_BANDWIDTH_SEARCH_BINS)
     let count = 0
-    for (let i = Math.max(0, peak_bin - 100); i < Math.min(spectrum.length, peak_bin + 100); i++) {
-      if (spectrum[i] > peak_energy * 0.5) count++
+    for (let i = start; i < end; i++) {
+      if (spectrum[i] > peakMagnitude * 0.5) count++
     }
     return count
   }
