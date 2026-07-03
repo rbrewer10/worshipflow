@@ -63,9 +63,11 @@ const DROPOUT_SILENCE_DB = -70
 const DROPOUT_PRIOR_LEVEL_DB = -50
 const RMS_HISTORY_FRAMES = 5
 
-// Plain volume warnings (RMS dB of the current frame).
-const VOLUME_LOW_DB = -50
-const VOLUME_HIGH_DB = -3
+// Plain volume warnings (RMS dB of the current frame). Exported so
+// RecommendationEngine can mirror this exact logic when turning a volume
+// Heuristic into a suggested action, instead of duplicating the numbers.
+export const VOLUME_LOW_DB = -50
+export const VOLUME_HIGH_DB = -3
 
 // Spectral profile band edges (Hz). Bin ranges are derived from these via
 // binFrequency = binIndex * SAMPLE_RATE / FFT_SIZE.
