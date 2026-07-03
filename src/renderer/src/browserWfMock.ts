@@ -23,6 +23,7 @@ import type {
   ZoneRouting,
   ZoneState
 } from '../../shared/types'
+import type { Channel, AutomationRule, ReferenceMix } from '../../main/types/sound-check-types'
 
 const demoLines = [
   'Amazing grace, how sweet the sound',
@@ -352,7 +353,25 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     restoreRecovery: async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => ({ ok: true, restored: false }),
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),
-    serviceImportFile: async (): Promise<{ canceled: boolean; serviceId: number | null }> => ({ canceled: true, serviceId: null })
+    serviceImportFile: async (): Promise<{ canceled: boolean; serviceId: number | null }> => ({ canceled: true, serviceId: null }),
+
+    soundCheck: {
+      init: async (): Promise<Channel[]> => [],
+      getChannels: async (): Promise<Channel[]> => [],
+      setChannelClassification: noop,
+      muteChannel: noop,
+      setFader: noop,
+      recallScene: noop,
+      recordReferenceMix: async (durationSeconds: number, notes: string): Promise<ReferenceMix> => ({
+        id: 'browser-preview',
+        spectralProfile: { low: 0, mid: 0, high: 0, presence: 0, dynamicRange: 0 },
+        recordedAt: new Date(),
+        durationSeconds,
+        notes
+      }),
+      saveAutomationRule: async (rule: AutomationRule): Promise<AutomationRule> => rule,
+      getAutomationRules: async (): Promise<AutomationRule[]> => []
+    }
   }
 
   target.wf = new Proxy(api, {

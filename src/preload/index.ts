@@ -22,6 +22,7 @@ import type {
   ZoneState,
   ZoneRouting
 } from '../shared/types'
+import type { Channel, AutomationRule, ReferenceMix } from '../main/types/sound-check-types'
 
 const wf = {
   version: '0.0.1',
@@ -199,7 +200,31 @@ const wf = {
   serviceExport: (serviceId: number): Promise<{ canceled: boolean }> =>
     ipcRenderer.invoke('wf:services:export', serviceId),
   serviceImportFile: (): Promise<{ canceled: boolean; serviceId: number | null }> =>
-    ipcRenderer.invoke('wf:services:import')
+    ipcRenderer.invoke('wf:services:import'),
+
+  // Sound check
+  soundCheck: {
+    init: (manualIp?: string): Promise<Channel[]> => ipcRenderer.invoke('wf:sound-check:init', manualIp),
+    getChannels: (): Promise<Channel[]> => ipcRenderer.invoke('wf:sound-check:getChannels'),
+    setChannelClassification: (
+      channelId: number,
+      property: 'isMic' | 'isBackingTrack',
+      value: boolean
+    ): Promise<void> =>
+      ipcRenderer.invoke('wf:sound-check:setChannelClassification', channelId, property, value),
+    muteChannel: (channelId: number, mute: boolean): Promise<void> =>
+      ipcRenderer.invoke('wf:sound-check:muteChannel', channelId, mute),
+    setFader: (channelId: number, db: number): Promise<void> =>
+      ipcRenderer.invoke('wf:sound-check:setFader', channelId, db),
+    recallScene: (sceneName: string): Promise<void> =>
+      ipcRenderer.invoke('wf:sound-check:recallScene', sceneName),
+    recordReferenceMix: (durationSeconds: number, notes: string): Promise<ReferenceMix> =>
+      ipcRenderer.invoke('wf:sound-check:recordReferenceMix', durationSeconds, notes),
+    saveAutomationRule: (rule: AutomationRule): Promise<AutomationRule> =>
+      ipcRenderer.invoke('wf:sound-check:saveAutomationRule', rule),
+    getAutomationRules: (): Promise<AutomationRule[]> =>
+      ipcRenderer.invoke('wf:sound-check:getAutomationRules')
+  }
 }
 
 try {
