@@ -12,6 +12,22 @@ import type { AudioFrame, Heuristic, SpectralProfile } from '../types/sound-chec
  * Frame contract: analyzeFrame expects frames of exactly FFT_SIZE (2048)
  * samples per channel at 48kHz. Shorter frames are zero-padded and longer
  * frames truncated before the FFT.
+ *
+ * Mono summing: RMS (dropout/volume), the per-frame spectrum feeding
+ * feedback detection, and the Welch spectral profile / dynamic-range calc
+ * all analyze toMono(frame) — the average of the left/right capsules of the
+ * stereo audience mic — rather than a single channel. This approximates
+ * what the room actually hears and cancels noise unique to one capsule.
+ * Clipping is the one exception: it still checks left/right independently
+ * so a clip on either channel is still caught.
+ * CALIBRATION NOTE: averaging two mic channels can shift measured RMS by up
+ * to ~3dB depending on inter-channel correlation/phase, and can smear or
+ * partially cancel a narrow feedback tone if the two capsules pick it up
+ * with a phase difference. All dB thresholds below (VOLUME_LOW_DB,
+ * VOLUME_HIGH_DB, DROPOUT_SILENCE_DB, DROPOUT_PRIOR_LEVEL_DB,
+ * FEEDBACK_MIN_PEAK_MAGNITUDE) are therefore provisional and were not tuned
+ * against real dual-capsule hardware audio — re-validate them once real
+ * mixer audio is available.
  */
 
 export const FFT_SIZE = 2048
@@ -68,7 +84,10 @@ export class AudioAnalyzer {
   // how many consecutive frames it has held.
   private feedbackCandidateBin = -1
   private feedbackCandidateFrames = 0
-  // Precomputed Hann window and reusable FFT buffers.
+  // Precomputed Hann window and reusable FFT buffers. fftInput/fftOutput are
+  // shared mutable instance state reused across calls to avoid per-frame
+  // allocation; they are NOT safe for concurrent/re-entrant use — analyzeFrame
+  // and computeSpectralProfile must be invoked serially, never interleaved.
   private hannWindow: Float32Array
   private magnitudeScale: number
   private fftInput: number[]
@@ -185,8 +204,17 @@ export class AudioAnalyzer {
       presence /= total
     }
 
-    const rmsValues = this.lastFrames.map((f) => this.computeRmsDb(this.toMono(f)))
-    const dynamicRange = Math.max(...rmsValues) - Math.min(...rmsValues)
+    // Manual min/max loop instead of Math.max(...rmsValues) / Math.min(...) —
+    // a spread over lastFrames is safe today (MAX_FRAMES_STORED = 100) but
+    // would risk a call-stack blowup if that constant is ever raised.
+    let maxRmsDb = -Infinity
+    let minRmsDb = Infinity
+    for (const f of this.lastFrames) {
+      const rmsDb = this.computeRmsDb(this.toMono(f))
+      if (rmsDb > maxRmsDb) maxRmsDb = rmsDb
+      if (rmsDb < minRmsDb) minRmsDb = rmsDb
+    }
+    const dynamicRange = maxRmsDb - minRmsDb
 
     return { low, mid, high, presence, dynamicRange }
   }
@@ -312,7 +340,12 @@ export class AudioAnalyzer {
     return magnitudes
   }
 
-  /** Mono mix of a stereo frame (average of the two channels). */
+  /**
+   * Mono mix of a stereo frame (average of the two channels). See the
+   * "Mono summing" note in the class doc-comment: this is a deliberate
+   * approximation of room-perceived level and a deliberate change from the
+   * previous left-only calibration, not an oversight.
+   */
   private toMono(frame: AudioFrame): Float32Array {
     const mono = new Float32Array(frame.left.length)
     for (let i = 0; i < mono.length; i++) {
