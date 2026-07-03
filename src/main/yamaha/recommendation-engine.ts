@@ -21,6 +21,12 @@ const DYNAMIC_RANGE_REGRESSION_DB = 5
 // Avoids divide-by-zero when a reference band's fraction is ~0; small enough
 // not to distort the ratio for any realistic (non-zero) reference band.
 const RATIO_EPSILON = 1e-6
+// Below this reference fraction, the band is treated as "no meaningful
+// reference energy" and skipped entirely rather than compared: with a
+// near-zero denominator, even a tiny absolute change in the current band
+// produces a huge percent-delta (e.g. "boosted 10000000%"), which is noise,
+// not a real signal worth showing an operator.
+const MIN_REFERENCE_BAND_FRACTION = 1e-3
 
 type BandName = 'low' | 'mid' | 'high' | 'presence'
 
@@ -86,6 +92,8 @@ export class RecommendationEngine {
 
     for (const info of BAND_INFO) {
       const referenceValue = reference[info.band]
+      if (referenceValue < MIN_REFERENCE_BAND_FRACTION) continue
+
       const currentValue = current[info.band]
       const deltaPct = ((currentValue - referenceValue) / (referenceValue + RATIO_EPSILON)) * 100
 
