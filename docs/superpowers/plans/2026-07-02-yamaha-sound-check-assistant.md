@@ -1134,6 +1134,56 @@ This plan covers the core Sound Check Assistant implementation:
 
 ---
 
+## UI direction decided (2026-07-03)
+
+Four visual directions were prototyped as a live-switchable preview inside the app
+(`src/renderer/src/sound-check/preview/`, reachable via Sidebar → Setup → Sound check).
+The user compared all four running in the real app shell and chose a **role split**
+instead of a single design:
+
+- **Volunteer role** → Variant C ("Guided Checklist"): one big step at a time,
+  plain-English coaching copy, large touch targets. This is what a Sunday-morning
+  volunteer sees.
+- **Engineer role** → Variant D ("Mission Control"): summary tiles, delta-vs-reference
+  meter grid, severity-striped recommendation feed. This is what the app's owner/mixer
+  operator sees.
+
+Both roles get Setup and Live sub-views (the existing Setup/Live toggle).
+
+**Engineer role scope, expanded beyond original Task 6:**
+- Manual channel control (mute/fader) directly from the Engineer tab, not just
+  read-only recommendations.
+- An automation-rule editor in the Engineer tab (the `AutomationRule` model from
+  Task 1 already supports `service_item_type` → `scene_name_to_recall` /
+  `fader_adjustments`; this task exposes it as UI instead of requiring a separate
+  settings screen). This effectively pulls forward part of the "Auto Mode" scope
+  originally deferred to Task 8.
+
+**Role selection mechanism:** WorshipFlow has no user-account/login system (confirmed
+by searching `src/main` and `src/renderer/src` — nothing beyond a flat settings table).
+Building real accounts was explicitly rejected as out of scope. Instead: a lightweight
+local PIN/name gate — entering a PIN (stored via the existing `getSetting`/`setSetting`
+mechanism, not a real auth system) unlocks the Engineer view; no PIN set means Engineer
+is unlocked by default (fail-open, since this is a soft gate against volunteers
+accidentally landing in the dashboard, not a security boundary). Volunteer view has
+no gate.
+
+**Implementation follow-up (superseding original Task 6):**
+- Task 6 becomes: build the real (non-preview) Sound Check tab using Variant C for
+  Volunteer and Variant D for Engineer, wired to live IPC data from Tasks 3–5 instead
+  of the preview's hardcoded demo data.
+- New Task 7: PIN/name gate for Engineer role (setting storage + unlock UI + role
+  persisted per-device via `localStorage` or the settings table, "remember last choice"
+  was the fallback behavior requested if no PIN is set).
+- New Task 8: Engineer-view manual channel control (mute/fader) using the Task 1
+  YamahaController IPC methods already exposed in Task 5's preload bridge.
+- New Task 9: Engineer-view automation rule editor (CRUD UI over
+  `saveAutomationRule`/`getAutomationRules` from Task 4).
+- Variants A and B (Presenter Flat, Console) are retained as design references in
+  `src/renderer/src/sound-check/preview/` but are not part of the shipped UI.
+
+---
+
 ## Plan complete and saved to `docs/superpowers/plans/2026-07-02-yamaha-sound-check-assistant.md`.
 
 **Two execution options:**
