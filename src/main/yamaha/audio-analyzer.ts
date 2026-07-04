@@ -82,6 +82,8 @@ export class AudioAnalyzer {
   // RMS (dB) of recent frames, most recent last; excludes the current frame
   // while it is being analyzed. Used for dropout detection.
   private rmsHistory: number[] = []
+  // Current heuristics state, updated as frames arrive. Used by live dashboard.
+  private currentHeuristics: Heuristic[] = []
   // Feedback candidate tracked across frames: the persistent peak bin and
   // how many consecutive frames it has held.
   private feedbackCandidateBin = -1
@@ -160,6 +162,7 @@ export class AudioAnalyzer {
       this.rmsHistory.shift()
     }
 
+    this.currentHeuristics = alerts
     return alerts
   }
 
@@ -376,5 +379,15 @@ export class AudioAnalyzer {
       if (spectrum[i] > peakMagnitude * 0.5) count++
     }
     return count
+  }
+
+  /** Public interface for live audio capture: push a frame and analyze it. */
+  pushAudioFrame(frame: AudioFrame): void {
+    this.analyzeFrame(frame)
+  }
+
+  /** Get current heuristics (live alerts from the most recent frame). */
+  getHeuristics(): Heuristic[] {
+    return this.currentHeuristics
   }
 }

@@ -65,4 +65,22 @@ export function registerSoundCheckHandlers(state: SoundCheckState): void {
   ipcMain.handle('wf:sound-check:deleteAutomationRule', (_e, id: string) => {
     state.deleteAutomationRule(id)
   })
+
+  ipcMain.handle('wf:sound-check:startAudioCapture', async (_e, deviceId?: string) => {
+    await state.audioCapture.start(deviceId)
+    return { success: true }
+  })
+
+  ipcMain.handle('wf:sound-check:stopAudioCapture', () => {
+    state.audioCapture.stop()
+    return { success: true }
+  })
+
+  ipcMain.handle('wf:sound-check:isAudioCapturing', () => {
+    return state.audioCapture.isActive()
+  })
+
+  ipcMain.handle('wf:sound-check:getLiveHeuristics', () => {
+    return state.getLiveHeuristics()
+  })
 }

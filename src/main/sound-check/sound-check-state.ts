@@ -1,7 +1,8 @@
 import { YamahaController } from '../yamaha/yamaha-controller'
 import { AudioAnalyzer } from '../yamaha/audio-analyzer'
 import { RecommendationEngine } from '../yamaha/recommendation-engine'
-import type { AutomationRule, ReferenceMix, SpectralProfile } from '../types/sound-check-types'
+import { AudioCapture } from '../audio-capture'
+import type { AutomationRule, ReferenceMix, SpectralProfile, Recommendation } from '../types/sound-check-types'
 
 /**
  * In-memory session state for the Sound Check Assistant, plus the three
@@ -16,15 +17,32 @@ export class SoundCheckState {
   readonly yamaha: YamahaController
   readonly analyzer: AudioAnalyzer
   readonly engine: RecommendationEngine
+  readonly audioCapture: AudioCapture
 
   automationRules: AutomationRule[] = []
   referenceMixes: ReferenceMix[] = []
   currentReferenceMixId: string | null = null
 
+  // Live heuristics state (updated as audio frames arrive)
+  private liveHeuristics: Recommendation[] = []
+  private liveHeuristicsListeners: Set<(heuristics: Recommendation[]) => void> = new Set()
+
   constructor() {
     this.yamaha = new YamahaController()
     this.analyzer = new AudioAnalyzer()
     this.engine = new RecommendationEngine()
+    this.audioCapture = new AudioCapture()
+
+    // Wire audio capture → analyzer → recommendations
+    this.audioCapture.on('frame', (frame) => {
+      this.analyzer.pushAudioFrame(frame)
+      const heuristics = this.analyzer.getHeuristics()
+      this.updateLiveHeuristics(heuristics)
+    })
+
+    this.audioCapture.on('error', (err) => {
+      console.error('[AudioCapture error]', err)
+    })
   }
 
   /**
@@ -102,5 +120,25 @@ export class SoundCheckState {
     this.engine.setReferenceProfile(profile)
 
     return referenceMix
+  }
+
+  /** Subscribe to live heuristics updates (one-way push from main to renderer). */
+  subscribeLiveHeuristics(callback: (heuristics: Recommendation[]) => void): () => void {
+    this.liveHeuristicsListeners.add(callback)
+    // Return unsubscribe function
+    return () => this.liveHeuristicsListeners.delete(callback)
+  }
+
+  /** Internal: update live heuristics and notify all listeners. */
+  private updateLiveHeuristics(heuristics: Recommendation[]): void {
+    this.liveHeuristics = heuristics
+    for (const listener of this.liveHeuristicsListeners) {
+      listener(heuristics)
+    }
+  }
+
+  /** Get current live heuristics (snapshot). */
+  getLiveHeuristics(): Recommendation[] {
+    return this.liveHeuristics
   }
 }

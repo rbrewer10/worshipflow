@@ -22,7 +22,7 @@ import type {
   ZoneState,
   ZoneRouting
 } from '../shared/types'
-import type { Channel, AutomationRule, ReferenceMix } from '../main/types/sound-check-types'
+import type { Channel, AutomationRule, ReferenceMix, Recommendation } from '../main/types/sound-check-types'
 
 const wf = {
   version: '0.0.1',
@@ -225,7 +225,15 @@ const wf = {
     getAutomationRules: (): Promise<AutomationRule[]> =>
       ipcRenderer.invoke('wf:sound-check:getAutomationRules'),
     deleteAutomationRule: (id: string): Promise<void> =>
-      ipcRenderer.invoke('wf:sound-check:deleteAutomationRule', id)
+      ipcRenderer.invoke('wf:sound-check:deleteAutomationRule', id),
+    startAudioCapture: (deviceId?: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('wf:sound-check:startAudioCapture', deviceId),
+    stopAudioCapture: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('wf:sound-check:stopAudioCapture'),
+    isAudioCapturing: (): Promise<boolean> =>
+      ipcRenderer.invoke('wf:sound-check:isAudioCapturing'),
+    getLiveHeuristics: (): Promise<Recommendation[]> =>
+      ipcRenderer.invoke('wf:sound-check:getLiveHeuristics')
   }
 }
 

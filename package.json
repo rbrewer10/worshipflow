@@ -21,6 +21,7 @@
     "electron-store": "^8.1.0",
     "fft.js": "^4.0.4",
     "jszip": "^3.10.1",
+    "mic": "^2.1.2",
     "obs-websocket-js": "^5.0.8",
     "osc": "^2.4.5",
     "sql.js": "^1.14.1",
