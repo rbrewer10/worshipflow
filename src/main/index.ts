@@ -78,6 +78,14 @@ const startTime = Date.now()
 // before whenReady and before any getPath('userData') use.
 app.setPath('userData', join(app.getPath('appData'), 'worshipflow'))
 
+// Windows taskbar identity + icon. setAppUserModelId gives the app a stable identity so
+// Windows groups/pins it as "WorshipFlow Pro" rather than a generic Electron entry. The
+// per-window `icon` (below) is what actually shows in the taskbar and title bar; guard on
+// existsSync so a missing build/icon.ico falls back to Electron's default instead of erroring.
+app.setAppUserModelId('com.snowhillchurch.worshipflow-pro')
+const iconFile = join(app.getAppPath(), 'build', 'icon.ico')
+const APP_ICON = existsSync(iconFile) ? iconFile : undefined
+
 // Helper to safely resolve a path and ensure it's within allowed media roots
 function validateMediaPath(requestedPath: string): string | null {
   const allowedRoots = [
@@ -867,6 +875,7 @@ function createStageWindow(): void {
     frame: !target,
     fullscreen: !!target,
     title: 'WorshipFlow Pro — Stage',
+    icon: APP_ICON,
     backgroundColor: '#060912',
     autoHideMenuBar: true,
     webPreferences: { preload: PRELOAD, sandbox: false }
@@ -892,6 +901,7 @@ function createMultiviewWindow(): void {
     frame: true,
     fullscreen: false,
     title: 'WorshipFlow Pro — Zone Multiview',
+    icon: APP_ICON,
     backgroundColor: '#0c0c10',
     autoHideMenuBar: true,
     webPreferences: { sandbox: true },
@@ -928,6 +938,7 @@ function createOperator(): void {
     height: 760,
     show: false,
     title: 'WorshipFlow Pro — Operator',
+    icon: APP_ICON,
     backgroundColor: '#0b0f17',
     autoHideMenuBar: true,
     webPreferences: { preload: PRELOAD, sandbox: false }
@@ -953,6 +964,7 @@ function createOutput(label: string, opts: OutputOpts): void {
     alwaysOnTop: opts.alwaysOnTop ?? false,
     backgroundColor: '#000000',
     title: `WorshipFlow Pro Output ${opts.id}`,
+    icon: APP_ICON,
     webPreferences: { preload: PRELOAD, sandbox: false }
   })
   win.webContents.on('did-finish-load', () => {
@@ -1454,6 +1466,7 @@ ipcMain.handle('wf:editor:open', (_e: unknown, songId: number) => {
     minWidth: 1100,
     minHeight: 700,
     title: 'WorshipFlow Pro — Song Editor',
+    icon: APP_ICON,
     backgroundColor: '#0b0b0f',
     autoHideMenuBar: true,
     show: false,
@@ -1479,6 +1492,7 @@ ipcMain.handle('wf:service:open', (_e: unknown, serviceId: number) => {
     minWidth: 1100,
     minHeight: 700,
     title: 'WorshipFlow Pro — Service Builder',
+    icon: APP_ICON,
     backgroundColor: '#0b0b0f',
     autoHideMenuBar: true,
     show: false,
