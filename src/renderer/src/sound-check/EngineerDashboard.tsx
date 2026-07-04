@@ -322,15 +322,16 @@ function RecommendationsPanel(): JSX.Element {
   )
 }
 
-function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () => void }): JSX.Element {
+function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () => Promise<void> }): JSX.Element {
   // Channel ids with an in-flight muteChannel()/setFader() call. Same guard pattern as
   // VolunteerCheck's classification chips: add id before the IPC call, remove in
   // .finally(), disable that channel's mute + fader while pending. ALWAYS build a new Set
   // per setState (never mutate in place) or React won't re-render.
   const [pendingChannelIds, setPendingChannelIds] = useState<Set<number>>(new Set())
   // Per-channel live fader draft (keyed by channel id). Present only while a channel is
-  // being dragged; the slider shows the draft, and commit clears it so the slider snaps
-  // back to following the canonical prop. Keyed so a refresh or another channel's
+  // being dragged/committed; the slider shows the draft. Commit awaits the canonical
+  // refresh before dropping the draft, so the displayed value goes draft -> equal
+  // canonical value with no snap-back flash. Keyed so a refresh or another channel's
   // activity never clobbers the channel being dragged.
   const [draftFaders, setDraftFaders] = useState<Record<number, number>>({})
   const [controlError, setControlError] = useState<string | null>(null)
@@ -351,7 +352,7 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
       .muteChannel(channel.id, !channel.isMuted)
       .then(onRefresh)
       .catch((err: unknown) => {
-        setControlError(err instanceof Error ? err.message : String(err))
+        setControlError(`${channel.name}: ${err instanceof Error ? err.message : String(err)}`)
       })
       .finally(() => clearPending(channel.id))
   }
@@ -360,26 +361,28 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
     setDraftFaders((prev) => ({ ...prev, [channelId]: db }))
 
   // Commit on release. No-op if there's no draft (e.g. blur without a preceding drag).
-  const handleFaderCommit = (channelId: number): void => {
+  // Awaits the canonical refresh BEFORE dropping the draft: until the refreshed prop
+  // carries the committed value, the draft keeps the slider on that same value, so there
+  // is no window where it falls back to the stale pre-commit position.
+  const handleFaderCommit = async (channelId: number): Promise<void> => {
     const db = draftFaders[channelId]
     if (db === undefined) return
+    const channelName = channels.find((c) => c.id === channelId)?.name ?? `Channel ${channelId}`
     markPending(channelId)
     setControlError(null)
-    window.wf.soundCheck
-      .setFader(channelId, db)
-      .then(onRefresh)
-      .catch((err: unknown) => {
-        setControlError(err instanceof Error ? err.message : String(err))
+    try {
+      await window.wf.soundCheck.setFader(channelId, db)
+      await onRefresh()
+    } catch (err: unknown) {
+      setControlError(`${channelName}: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      clearPending(channelId)
+      setDraftFaders((prev) => {
+        const next = { ...prev }
+        delete next[channelId]
+        return next
       })
-      .finally(() => {
-        clearPending(channelId)
-        // Drop this channel's draft so the slider follows the refreshed canonical prop.
-        setDraftFaders((prev) => {
-          const next = { ...prev }
-          delete next[channelId]
-          return next
-        })
-      })
+    }
   }
 
   return (
@@ -421,7 +424,7 @@ function EngineerDashboard({
 }: {
   mode: ViewMode
   channels: Channel[]
-  onRefresh: () => void
+  onRefresh: () => Promise<void>
 }): JSX.Element {
   return (
     <div className="min-h-full bg-[#0a0d14] p-3.5 text-xs text-[#c7cfdd]">

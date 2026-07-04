@@ -150,8 +150,10 @@ function SoundCheckTab(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const refreshChannels = useCallback(() => {
-    window.wf.soundCheck
+  // Returns the in-flight promise so callers (e.g. the Engineer fader commit) can await
+  // the canonical channel refresh before dropping their local draft state.
+  const refreshChannels = useCallback((): Promise<void> => {
+    return window.wf.soundCheck
       .getChannels()
       .then((channels) => {
         if (!mountedRef.current) return
