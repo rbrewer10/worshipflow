@@ -22,7 +22,7 @@ import type {
   ZoneState,
   ZoneRouting
 } from '../shared/types'
-import type { Channel, AutomationRule, ReferenceMix, Recommendation } from '../main/types/sound-check-types'
+import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 
 const wf = {
   version: '0.0.1',
@@ -232,7 +232,7 @@ const wf = {
       ipcRenderer.invoke('wf:sound-check:stopAudioCapture'),
     isAudioCapturing: (): Promise<boolean> =>
       ipcRenderer.invoke('wf:sound-check:isAudioCapturing'),
-    getLiveHeuristics: (): Promise<Recommendation[]> =>
+    getLiveHeuristics: (): Promise<Heuristic[]> =>
       ipcRenderer.invoke('wf:sound-check:getLiveHeuristics')
   }
 }

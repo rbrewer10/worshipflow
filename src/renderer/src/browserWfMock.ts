@@ -23,7 +23,7 @@ import type {
   ZoneRouting,
   ZoneState
 } from '../../shared/types'
-import type { Channel, AutomationRule, ReferenceMix, Recommendation } from '../../main/types/sound-check-types'
+import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
 
 const demoLines = [
   'Amazing grace, how sweet the sound',
@@ -415,7 +415,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       startAudioCapture: async (): Promise<{ success: boolean }> => ({ success: true }),
       stopAudioCapture: async (): Promise<{ success: boolean }> => ({ success: true }),
       isAudioCapturing: async (): Promise<boolean> => false,
-      getLiveHeuristics: async (): Promise<Recommendation[]> => []
+      getLiveHeuristics: async (): Promise<Heuristic[]> => []
     }
   }
 

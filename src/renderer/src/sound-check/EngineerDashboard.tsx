@@ -20,7 +20,7 @@
 
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import type { AutomationRule, Channel } from '../../../main/types/sound-check-types'
+import type { AutomationRule, Channel, Heuristic } from '../../../main/types/sound-check-types'
 import type { ViewMode } from './SoundCheckTab'
 
 // Fader UI range. Mirrors the YamahaController's PLACEHOLDER usable range: it maps
@@ -693,13 +693,59 @@ function MeterRow({
   )
 }
 
-function RecommendationsPanel(): JSX.Element {
+function RecommendationsPanel({
+  heuristics,
+  isCapturing
+}: {
+  heuristics: Heuristic[]
+  isCapturing: boolean
+}): JSX.Element {
+  const severityIcon: Record<string, string> = {
+    info: 'ℹ️',
+    warning: '⚠️',
+    error: '❌'
+  }
+
+  const severityColor: Record<string, string> = {
+    info: 'text-[#5eb4ff]',
+    warning: 'text-[#ffc043]',
+    error: 'text-[#ff5c5c]'
+  }
+
   return (
-    <Panel title="Live recommendations" right="NOT CONNECTED" className="w-[340px] flex-shrink-0">
-      <div className="rounded-[7px] border border-dashed border-[#232d3b] bg-[#0c101a] px-3 py-4 text-[11.5px] leading-relaxed text-[#6b7690]">
-        Live audio analysis isn&rsquo;t connected yet — this will show real-time recommendations once the mixer
-        audio feed is wired up. Nothing here is fabricated.
-      </div>
+    <Panel
+      title="Live recommendations"
+      right={isCapturing ? 'CAPTURING' : 'NOT CONNECTED'}
+      className="w-[340px] flex-shrink-0"
+    >
+      {!isCapturing ? (
+        <div className="rounded-[7px] border border-dashed border-[#232d3b] bg-[#0c101a] px-3 py-4 text-[11.5px] leading-relaxed text-[#6b7690]">
+          Start audio capture to see real-time recommendations from the live mix. Nothing here is fabricated.
+        </div>
+      ) : heuristics.length === 0 ? (
+        <div className="rounded-[7px] border border-dashed border-[#232d3b] bg-[#0c101a] px-3 py-4 text-[11.5px] leading-relaxed text-[#6b7690]">
+          Listening for audio issues… No issues detected yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {heuristics.map((h, i) => (
+            <div
+              key={i}
+              className="rounded-[6px] border border-[#1d2434] bg-[#0c101a] px-3 py-2 text-[10.5px] leading-relaxed"
+            >
+              <div className={`font-semibold ${severityColor[h.severity] || 'text-[#8b96ad]'}`}>
+                {severityIcon[h.severity] || '•'} {h.type}
+              </div>
+              <div className="mt-1 text-[#6b7690]">{h.message}</div>
+              {h.value !== undefined && (
+                <div className="mt-1 font-mono text-[9px] text-[#5a6480]">
+                  {typeof h.value === 'number' ? h.value.toFixed(1) : String(h.value)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </Panel>
   )
 }
@@ -717,6 +763,51 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
   // activity never clobbers the channel being dragged.
   const [draftFaders, setDraftFaders] = useState<Record<number, number>>({})
   const [controlError, setControlError] = useState<string | null>(null)
+
+  // Live audio capture state
+  const [isCapturing, setIsCapturing] = useState(false)
+  const [liveHeuristics, setLiveHeuristics] = useState<Heuristic[]>([])
+  const [captureError, setCaptureError] = useState<string | null>(null)
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const mountedRef = useRef(true)
+
+  // Start/stop audio capture
+  const toggleAudioCapture = async (): Promise<void> => {
+    try {
+      if (isCapturing) {
+        await window.wf.soundCheck.stopAudioCapture()
+        if (mountedRef.current) setIsCapturing(false)
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+      } else {
+        await window.wf.soundCheck.startAudioCapture()
+        if (mountedRef.current) setIsCapturing(true)
+        // Poll live heuristics every 100ms
+        pollIntervalRef.current = setInterval(async () => {
+          try {
+            const heuristics = await window.wf.soundCheck.getLiveHeuristics()
+            if (mountedRef.current) setLiveHeuristics(heuristics)
+          } catch (err) {
+            console.error('[getLiveHeuristics]', err)
+          }
+        }, 100)
+      }
+      if (mountedRef.current) setCaptureError(null)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (mountedRef.current) setCaptureError(msg)
+    }
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+      if (isCapturing) {
+        window.wf.soundCheck.stopAudioCapture().catch((err) => console.error('[stopAudioCapture]', err))
+      }
+    }
+  }, [isCapturing])
 
   const markPending = (channelId: number): void =>
     setPendingChannelIds((prev) => new Set(prev).add(channelId))
@@ -793,7 +884,17 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
           )}
           {controlError && <p className="m-0 mt-2 text-[11.5px] text-red-300">{controlError}</p>}
         </Panel>
-        <RecommendationsPanel />
+        <div className="flex flex-col gap-2.5">
+          <button
+            onClick={toggleAudioCapture}
+            disabled={!!captureError}
+            className="rounded-[6px] border border-[#2a3a4f] bg-[#1c2535] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#8fd3ff] hover:bg-[#2a3a50] disabled:opacity-50"
+          >
+            {isCapturing ? '⏹ Stop Capture' : '▶ Start Capture'}
+          </button>
+          {captureError && <p className="m-0 text-[10px] text-red-300">{captureError}</p>}
+          <RecommendationsPanel heuristics={liveHeuristics} isCapturing={isCapturing} />
+        </div>
       </div>
     </>
   )
