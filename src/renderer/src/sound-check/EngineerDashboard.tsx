@@ -173,6 +173,11 @@ const DELTA_MIN_DB = -24
 const DELTA_MAX_DB = 24
 const DELTA_STEP_DB = 0.5
 
+// The number input's min/max are only advisory (a user can type/paste out-of-range
+// values), so clamp on save too — a nonsense delta like +1000 dB must never reach a
+// stored rule that could drive real mixer output.
+const clampDelta = (n: number): number => Math.min(DELTA_MAX_DB, Math.max(DELTA_MIN_DB, n))
+
 // Editable draft of a fader adjustment. channelId is nullable while the row is
 // being filled in (the "pick a channel" placeholder); deltaDb is a string so the
 // number input can be transiently empty/partial without fighting the user. Both are
@@ -234,7 +239,9 @@ function RuleForm({
   const trimmedScene = draft.sceneNameToRecall.trim()
   const faderErrors = draft.faderAdjustments.map((a) => {
     if (a.channelId === null) return 'pick a channel'
-    if (!Number.isFinite(Number(a.deltaDb)) || a.deltaDb.trim() === '') return 'invalid dB'
+    const n = Number(a.deltaDb)
+    if (!Number.isFinite(n) || a.deltaDb.trim() === '') return 'invalid dB'
+    if (n < DELTA_MIN_DB || n > DELTA_MAX_DB) return `dB must be ${DELTA_MIN_DB} to ${DELTA_MAX_DB}`
     return null
   })
   const hasFaderError = faderErrors.some((e) => e !== null)
@@ -444,7 +451,7 @@ function AutomationRulesPanel({ channels }: { channels: Channel[] }): JSX.Elemen
     const scene = draft.sceneNameToRecall.trim()
     const faderAdjustments = draft.faderAdjustments
       .filter((a) => a.channelId !== null)
-      .map((a) => ({ channelId: a.channelId as number, deltaDb: Number(a.deltaDb) }))
+      .map((a) => ({ channelId: a.channelId as number, deltaDb: clampDelta(Number(a.deltaDb)) }))
     // crypto.randomUUID is available in the renderer's secure context (Electron and
     // localhost both qualify). Reuse the existing id when editing so the upsert
     // replaces in place; mint a fresh id for a new rule.
