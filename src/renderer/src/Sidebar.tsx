@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AppInfo } from '../../shared/types'
 import type { View } from './AppShell'
+import BrandMark from './BrandMark'
 
 function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }): JSX.Element {
   const [outputs, setOutputs] = useState(0)
@@ -29,8 +30,8 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }):
   return (
     <aside className="flex w-44 flex-shrink-0 flex-col border-r border-white/[0.07] bg-[#141418]">
       <div className="flex items-center gap-2 border-b border-white/[0.07] px-3 py-3">
-        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-emerald-500 text-sm font-bold text-emerald-950">✝</div>
-        <span className="text-sm font-medium text-white">WorshipFlow</span>
+        <BrandMark size={28} className="flex-shrink-0" />
+        <span className="text-sm font-medium text-white">WorshipFlow <span className="font-normal text-white/55">Pro</span></span>
       </div>
 
       <div className="border-b border-white/[0.07] p-2">

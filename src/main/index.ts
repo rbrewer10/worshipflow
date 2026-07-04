@@ -70,6 +70,14 @@ export { TABLET_PORT }
 const PRELOAD = join(__dirname, '../preload/index.js')
 const startTime = Date.now()
 
+// The product is branded "WorshipFlow Pro" (package.json productName + window titles),
+// but the Electron userData folder MUST stay "worshipflow" — that's where the existing
+// songs/services database, settings, and media already live. Electron derives userData
+// from the app name, so without pinning it here the rename would silently repoint to a
+// fresh "WorshipFlow Pro" folder and orphan all existing data. Runs at module load,
+// before whenReady and before any getPath('userData') use.
+app.setPath('userData', join(app.getPath('appData'), 'worshipflow'))
+
 // Helper to safely resolve a path and ensure it's within allowed media roots
 function validateMediaPath(requestedPath: string): string | null {
   const allowedRoots = [
@@ -858,7 +866,7 @@ function createStageWindow(): void {
     height: target ? target.bounds.height : 540,
     frame: !target,
     fullscreen: !!target,
-    title: 'WorshipFlow — Stage',
+    title: 'WorshipFlow Pro — Stage',
     backgroundColor: '#060912',
     autoHideMenuBar: true,
     webPreferences: { preload: PRELOAD, sandbox: false }
@@ -883,7 +891,7 @@ function createMultiviewWindow(): void {
     height: target ? target.bounds.height : 720,
     frame: true,
     fullscreen: false,
-    title: 'WorshipFlow — Zone Multiview',
+    title: 'WorshipFlow Pro — Zone Multiview',
     backgroundColor: '#0c0c10',
     autoHideMenuBar: true,
     webPreferences: { sandbox: true },
@@ -919,7 +927,7 @@ function createOperator(): void {
     width: 1100,
     height: 760,
     show: false,
-    title: 'WorshipFlow — Operator',
+    title: 'WorshipFlow Pro — Operator',
     backgroundColor: '#0b0f17',
     autoHideMenuBar: true,
     webPreferences: { preload: PRELOAD, sandbox: false }
@@ -944,7 +952,7 @@ function createOutput(label: string, opts: OutputOpts): void {
     frame: false, fullscreen: opts.fullscreen,
     alwaysOnTop: opts.alwaysOnTop ?? false,
     backgroundColor: '#000000',
-    title: `WorshipFlow Output ${opts.id}`,
+    title: `WorshipFlow Pro Output ${opts.id}`,
     webPreferences: { preload: PRELOAD, sandbox: false }
   })
   win.webContents.on('did-finish-load', () => {
@@ -1445,7 +1453,7 @@ ipcMain.handle('wf:editor:open', (_e: unknown, songId: number) => {
     height: 1000,
     minWidth: 1100,
     minHeight: 700,
-    title: 'WorshipFlow — Song Editor',
+    title: 'WorshipFlow Pro — Song Editor',
     backgroundColor: '#0b0b0f',
     autoHideMenuBar: true,
     show: false,
@@ -1470,7 +1478,7 @@ ipcMain.handle('wf:service:open', (_e: unknown, serviceId: number) => {
     height: 1000,
     minWidth: 1100,
     minHeight: 700,
-    title: 'WorshipFlow — Service Builder',
+    title: 'WorshipFlow Pro — Service Builder',
     backgroundColor: '#0b0b0f',
     autoHideMenuBar: true,
     show: false,
