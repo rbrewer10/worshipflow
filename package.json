@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "description": "WorshipFlow Pro — church worship presentation & sound check software for Snow Hill Church",
   "main": "./out/main/index.js",
-  "author": "Snow Hill Church",
+  "author": "Ryan Brewer",
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
