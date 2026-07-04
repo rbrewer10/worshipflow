@@ -383,8 +383,14 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
         const channel = soundCheckChannels.find((c) => c.id === channelId)
         if (channel) channel[property] = value
       },
-      muteChannel: noop,
-      setFader: noop,
+      muteChannel: async (channelId: number, mute: boolean): Promise<void> => {
+        const channel = soundCheckChannels.find((c) => c.id === channelId)
+        if (channel) channel.isMuted = mute
+      },
+      setFader: async (channelId: number, db: number): Promise<void> => {
+        const channel = soundCheckChannels.find((c) => c.id === channelId)
+        if (channel) channel.currentFaderDb = db
+      },
       recallScene: noop,
       recordReferenceMix: async (durationSeconds: number, notes: string): Promise<ReferenceMix> => ({
         id: 'browser-preview',

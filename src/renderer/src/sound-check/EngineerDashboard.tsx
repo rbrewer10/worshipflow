@@ -8,8 +8,10 @@
 //    anywhere in main/preload). The meter grid below shows each channel's real,
 //    static currentFaderDb/isMuted from getChannels(), refreshed manually — not an
 //    animated live feed. The recommendations panel is an honest empty state.
-//  - No manual mute/fader controls here — that's Task 8. Fader/mute cells are
-//    present for layout parity with the mockup but inert (no onClick handlers).
+//  - Manual mute/fader controls ARE live here (Task 8): each MeterRow has a mute
+//    toggle and an interactive fader slider wired to muteChannel/setFader, which
+//    reconcile against canonical state via onRefresh. The fader reflects the SET
+//    position, not a live audio level — see the "no live meters" boundary above.
 //  - Automation rules are display-only (read via getAutomationRules) — CRUD is
 //    Task 9.
 
@@ -17,6 +19,14 @@ import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import type { AutomationRule, Channel } from '../../../main/types/sound-check-types'
 import type { ViewMode } from './SoundCheckTab'
+
+// Fader UI range. Mirrors the YamahaController's PLACEHOLDER usable range: it maps
+// -60..+60 dB linearly onto the 0..1 OSC value. Real TF-Rack faders are -inf..+10 dB
+// with a non-linear taper — to be revisited at hardware calibration. Kept as renderer-
+// local constants (renderer may only import TYPES from main, not runtime values).
+const FADER_MIN_DB = -60
+const FADER_MAX_DB = 60
+const FADER_STEP_DB = 0.5
 
 type Edge = 'ok' | 'err' | 'acc' | 'warn'
 const EDGE: Record<Edge, string> = {
@@ -218,9 +228,32 @@ function SetupView({ channels }: { channels: Channel[] }): JSX.Element {
   )
 }
 
-function MeterRow({ c }: { c: Channel }): JSX.Element {
+// Interactive fader + mute row (Task 8). The slider position reflects the channel's
+// SET fader dB (draft while dragging, else canonical currentFaderDb) — NOT a live audio
+// meter. IPC is committed on release, never per onChange, to avoid flooding the mixer.
+function MeterRow({
+  c,
+  pending,
+  draftDb,
+  onMuteToggle,
+  onFaderDraft,
+  onFaderCommit
+}: {
+  c: Channel
+  pending: boolean
+  // Live draft dB during a drag; undefined => follow canonical currentFaderDb.
+  draftDb: number | undefined
+  onMuteToggle: () => void
+  onFaderDraft: (db: number) => void
+  onFaderCommit: () => void
+}): JSX.Element {
+  const displayDb = draftDb ?? c.currentFaderDb
+  const fillPct = Math.max(
+    0,
+    Math.min(100, ((displayDb - FADER_MIN_DB) / (FADER_MAX_DB - FADER_MIN_DB)) * 100)
+  )
   return (
-    <div className="grid grid-cols-[150px_34px_1fr_70px] items-center gap-[9px] border-b border-[#141926] py-[4.5px] last:border-b-0">
+    <div className="grid grid-cols-[130px_28px_58px_1fr_58px] items-center gap-[9px] border-b border-[#141926] py-[4.5px] last:border-b-0">
       <span
         className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold ${
           c.isMuted ? 'text-[#4a5570] line-through decoration-[#333e58]' : 'text-[#d7deea]'
@@ -229,19 +262,50 @@ function MeterRow({ c }: { c: Channel }): JSX.Element {
         {c.name}
       </span>
       <span className="font-mono text-[9.5px] text-[#4a5570]">{String(c.yamahaChannel).padStart(2, '0')}</span>
-      {/* Static fader position — not a live meter. Fill reflects currentFaderDb only;
-          no animation, no polling. Manual control lands in Task 8. */}
-      <span className="relative h-2.5 overflow-hidden rounded-[3px] border border-[#161c2b] bg-[#0a0e16]">
-        <span
-          className="absolute bottom-0 left-0 top-0 rounded-[2px]"
-          style={{
-            width: `${Math.max(0, Math.min(100, ((c.currentFaderDb + 60) / 120) * 100)).toFixed(0)}%`,
-            background: 'linear-gradient(90deg,#1d8f5a,#2fd97b 62%,#ffc043 82%,#ff5c5c 96%)'
-          }}
+      <button
+        type="button"
+        disabled={pending}
+        onClick={onMuteToggle}
+        aria-pressed={c.isMuted}
+        className={`rounded-[4px] px-1.5 py-[3px] text-[9px] font-extrabold uppercase tracking-widest disabled:opacity-50 ${
+          c.isMuted
+            ? 'bg-[#ff5c5c]/[0.16] text-[#ff8f8f] shadow-[inset_0_0_0_1px_rgba(255,92,92,.4)]'
+            : 'bg-[#141926] text-[#5a6480] hover:text-[#aeb9cc]'
+        }`}
+      >
+        Mute
+      </button>
+      {/* Slim range slider over a gradient fill track — same visual language as the old
+          static bar, but the fill now tracks the draft-or-canonical dB and the native
+          input handles the drag. Commit fires only on release (pointer/key up, blur). */}
+      <span className="relative flex h-2.5 items-center">
+        <span className="absolute inset-0 overflow-hidden rounded-[3px] border border-[#161c2b] bg-[#0a0e16]">
+          <span
+            className="absolute bottom-0 left-0 top-0 rounded-[2px]"
+            style={{
+              width: `${fillPct.toFixed(1)}%`,
+              background: 'linear-gradient(90deg,#1d8f5a,#2fd97b 62%,#ffc043 82%,#ff5c5c 96%)',
+              opacity: c.isMuted ? 0.4 : 1
+            }}
+          />
+        </span>
+        <input
+          type="range"
+          min={FADER_MIN_DB}
+          max={FADER_MAX_DB}
+          step={FADER_STEP_DB}
+          value={displayDb}
+          disabled={pending}
+          aria-label={`${c.name} fader (dB)`}
+          onChange={(e) => onFaderDraft(Number(e.target.value))}
+          onPointerUp={onFaderCommit}
+          onKeyUp={onFaderCommit}
+          onBlur={onFaderCommit}
+          className="relative m-0 h-2.5 w-full cursor-pointer appearance-none bg-transparent disabled:cursor-default disabled:opacity-50 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-1.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-[2px] [&::-webkit-slider-thumb]:bg-[#eef2f8] [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(0,0,0,.5)]"
         />
       </span>
       <span className="text-right font-mono text-[11px] tabular-nums text-[#aeb9cc]">
-        {c.isMuted ? 'MUTE' : `${c.currentFaderDb.toFixed(1)} dB`}
+        {c.isMuted ? 'MUTE' : `${displayDb.toFixed(1)} dB`}
       </span>
     </div>
   )
@@ -258,7 +322,66 @@ function RecommendationsPanel(): JSX.Element {
   )
 }
 
-function LiveView({ channels }: { channels: Channel[] }): JSX.Element {
+function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () => void }): JSX.Element {
+  // Channel ids with an in-flight muteChannel()/setFader() call. Same guard pattern as
+  // VolunteerCheck's classification chips: add id before the IPC call, remove in
+  // .finally(), disable that channel's mute + fader while pending. ALWAYS build a new Set
+  // per setState (never mutate in place) or React won't re-render.
+  const [pendingChannelIds, setPendingChannelIds] = useState<Set<number>>(new Set())
+  // Per-channel live fader draft (keyed by channel id). Present only while a channel is
+  // being dragged; the slider shows the draft, and commit clears it so the slider snaps
+  // back to following the canonical prop. Keyed so a refresh or another channel's
+  // activity never clobbers the channel being dragged.
+  const [draftFaders, setDraftFaders] = useState<Record<number, number>>({})
+  const [controlError, setControlError] = useState<string | null>(null)
+
+  const markPending = (channelId: number): void =>
+    setPendingChannelIds((prev) => new Set(prev).add(channelId))
+  const clearPending = (channelId: number): void =>
+    setPendingChannelIds((prev) => {
+      const next = new Set(prev)
+      next.delete(channelId)
+      return next
+    })
+
+  const handleMuteToggle = (channel: Channel): void => {
+    markPending(channel.id)
+    setControlError(null)
+    window.wf.soundCheck
+      .muteChannel(channel.id, !channel.isMuted)
+      .then(onRefresh)
+      .catch((err: unknown) => {
+        setControlError(err instanceof Error ? err.message : String(err))
+      })
+      .finally(() => clearPending(channel.id))
+  }
+
+  const handleFaderDraft = (channelId: number, db: number): void =>
+    setDraftFaders((prev) => ({ ...prev, [channelId]: db }))
+
+  // Commit on release. No-op if there's no draft (e.g. blur without a preceding drag).
+  const handleFaderCommit = (channelId: number): void => {
+    const db = draftFaders[channelId]
+    if (db === undefined) return
+    markPending(channelId)
+    setControlError(null)
+    window.wf.soundCheck
+      .setFader(channelId, db)
+      .then(onRefresh)
+      .catch((err: unknown) => {
+        setControlError(err instanceof Error ? err.message : String(err))
+      })
+      .finally(() => {
+        clearPending(channelId)
+        // Drop this channel's draft so the slider follows the refreshed canonical prop.
+        setDraftFaders((prev) => {
+          const next = { ...prev }
+          delete next[channelId]
+          return next
+        })
+      })
+  }
+
   return (
     <>
       <div className="mb-3 grid grid-cols-3 gap-2.5">
@@ -267,12 +390,23 @@ function LiveView({ channels }: { channels: Channel[] }): JSX.Element {
         <Tile edge="warn" k="Reference match" v="—" s="No live audio feed to compare against" />
       </div>
       <div className="flex items-start gap-2.5">
-        <Panel title="Channel meters" right="STATIC · dB" className="min-w-0 flex-1">
+        <Panel title="Channel controls" right="SET · dB" className="min-w-0 flex-1">
           {channels.length === 0 ? (
             <p className="m-0 py-2 text-[11.5px] text-[#5a6480]">No channels loaded.</p>
           ) : (
-            channels.map((c) => <MeterRow key={c.id} c={c} />)
+            channels.map((c) => (
+              <MeterRow
+                key={c.id}
+                c={c}
+                pending={pendingChannelIds.has(c.id)}
+                draftDb={draftFaders[c.id]}
+                onMuteToggle={() => handleMuteToggle(c)}
+                onFaderDraft={(db) => handleFaderDraft(c.id, db)}
+                onFaderCommit={() => handleFaderCommit(c.id)}
+              />
+            ))
           )}
+          {controlError && <p className="m-0 mt-2 text-[11.5px] text-red-300">{controlError}</p>}
         </Panel>
         <RecommendationsPanel />
       </div>
@@ -292,7 +426,7 @@ function EngineerDashboard({
   return (
     <div className="min-h-full bg-[#0a0d14] p-3.5 text-xs text-[#c7cfdd]">
       <Head mode={mode} onRefresh={onRefresh} />
-      {mode === 'setup' ? <SetupView channels={channels} /> : <LiveView channels={channels} />}
+      {mode === 'setup' ? <SetupView channels={channels} /> : <LiveView channels={channels} onRefresh={onRefresh} />}
     </div>
   )
 }
