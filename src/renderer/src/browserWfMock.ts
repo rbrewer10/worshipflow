@@ -120,6 +120,11 @@ const stateListeners = new Set<(state: LiveState) => void>()
 
 const automationRules: AutomationRule[] = []
 
+// In-memory stand-in for the DB's flat setting table so settingGet/settingSet
+// round-trip in browser-preview mode (matches automationRules/soundCheckChannels
+// module-level state). Passing null to settingSet deletes, mirroring setSetting.
+const settings = new Map<string, string>()
+
 const soundCheckChannels: Channel[] = [
   { id: 1, name: 'Pastor Mic', yamahaChannel: 1, isMic: true, isBackingTrack: false, currentFaderDb: -18, isMuted: false },
   { id: 2, name: 'Worship Leader Vox', yamahaChannel: 2, isMic: true, isBackingTrack: false, currentFaderDb: -14, isMuted: false },
@@ -310,8 +315,11 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     songSetBgMotion: noop,
     songSetTextColor: noop,
     songSetFont: noop,
-    settingGet: async (): Promise<string | null> => null,
-    settingSet: noop,
+    settingGet: async (key: string): Promise<string | null> => settings.get(key) ?? null,
+    settingSet: async (key: string, value: string | null): Promise<void> => {
+      if (value === null) settings.delete(key)
+      else settings.set(key, value)
+    },
     editorOpen: noop,
     serviceOpen: noop,
 

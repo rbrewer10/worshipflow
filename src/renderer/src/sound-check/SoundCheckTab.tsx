@@ -3,17 +3,36 @@
 // preview (see ./preview/SoundCheckPreviewTab.tsx) but drives real channel state here
 // and passes it down to the two role views.
 //
-// No PIN gate yet — Task 7 adds a lock in front of the Engineer toggle. Keeping the
-// toggle a single flat button bar (rather than e.g. nesting Engineer behind a modal)
-// so Task 7 can slot a gate in without restructuring this component.
+// Task 7: a soft PIN gate sits in front of the Engineer toggle. It's a lightweight
+// local passcode (fail-open when none is set), NOT authentication — see EngineerGate.tsx
+// for the plaintext-soft-gate rationale. Gate STATE (isUnlocked, pin status) lives here
+// since this component owns the role toggle; the PIN-entry screen and manage-passcode
+// form live in EngineerGate.tsx to keep this file focused.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Channel } from '../../../main/types/sound-check-types'
 import VolunteerCheck from './VolunteerCheck'
 import EngineerDashboard from './EngineerDashboard'
+import { ENGINEER_PIN_KEY, EngineerPinPrompt, ManagePasscodePanel } from './EngineerGate'
 
 type Role = 'volunteer' | 'engineer'
 export type ViewMode = 'setup' | 'live'
+
+// Per-device "reopen to the role you last used" persistence. Not security-relevant.
+const ROLE_STORAGE_KEY = 'soundCheckRole'
+
+function readStoredRole(): Role {
+  try {
+    return localStorage.getItem(ROLE_STORAGE_KEY) === 'engineer' ? 'engineer' : 'volunteer'
+  } catch {
+    return 'volunteer'
+  }
+}
+
+// Async PIN read is in-flight until this resolves. While 'loading' we must NOT flash
+// the dashboard if the persisted role is engineer — we render a gate/loading state
+// until the stored PIN status is known.
+type PinStatus = 'loading' | 'unset' | 'set'
 
 const ROLES: { id: Role; label: string; hint: string }[] = [
   { id: 'volunteer', label: 'Volunteer', hint: 'Guided step-by-step check' },
@@ -26,8 +45,66 @@ type ConnectionState =
   | { status: 'error'; message: string }
 
 function SoundCheckTab(): JSX.Element {
-  const [role, setRole] = useState<Role>('volunteer')
+  const [role, setRole] = useState<Role>(readStoredRole)
   const [mode, setMode] = useState<ViewMode>('setup')
+
+  // Soft-gate state. `pinStatus` mirrors whether a non-empty PIN is stored; `storedPin`
+  // holds the value for the plain-string-equality unlock check (soft gate — see
+  // EngineerGate.tsx). `engineerUnlocked` is session-scoped: it resets on full remount /
+  // app restart, so a restart re-prompts (correct soft-gate behavior). Toggling
+  // Volunteer<->Engineer within a session never re-prompts once unlocked.
+  const [pinStatus, setPinStatus] = useState<PinStatus>('loading')
+  const [storedPin, setStoredPin] = useState<string>('')
+  const [engineerUnlocked, setEngineerUnlocked] = useState(false)
+  const [managingPin, setManagingPin] = useState(false)
+
+  // Persist last-selected role per-device.
+  useEffect(() => {
+    try {
+      localStorage.setItem(ROLE_STORAGE_KEY, role)
+    } catch {
+      // localStorage may be unavailable (e.g. private mode); role persistence is a
+      // nicety, not load-bearing, so ignore.
+    }
+  }, [role])
+
+  // Load PIN status once on mount. Fail-open: null/empty stored value => 'unset'
+  // (Engineer not gated). A non-empty value => 'set' (gate active until unlocked).
+  const loadPinStatus = useCallback((): void => {
+    window.wf
+      .settingGet(ENGINEER_PIN_KEY)
+      .then((value) => {
+        const pin = value ?? ''
+        setStoredPin(pin)
+        setPinStatus(pin.trim() === '' ? 'unset' : 'set')
+      })
+      .catch(() => {
+        // If the read fails, fail open rather than locking the user out of a soft gate.
+        setStoredPin('')
+        setPinStatus('unset')
+      })
+  }, [])
+
+  useEffect(() => {
+    loadPinStatus()
+  }, [loadPinStatus])
+
+  const savePin = useCallback(async (pin: string): Promise<void> => {
+    await window.wf.settingSet(ENGINEER_PIN_KEY, pin)
+    setStoredPin(pin)
+    setPinStatus('set')
+    // Setting a PIN while already in the Engineer view (the fail-open first-run case)
+    // must NOT immediately lock the owner out — keep them unlocked for the session.
+    setEngineerUnlocked(true)
+  }, [])
+
+  const removePin = useCallback(async (): Promise<void> => {
+    // null deletes the setting (setSetting DELETEs on null), reverting to fail-open.
+    await window.wf.settingSet(ENGINEER_PIN_KEY, null)
+    setStoredPin('')
+    setPinStatus('unset')
+  }, [])
+
   const [connection, setConnection] = useState<ConnectionState>({ status: 'connecting' })
   const [manualIp, setManualIp] = useState('')
   // Tracks an in-flight connect() call independent of connection.status: once status
@@ -85,6 +162,13 @@ function SoundCheckTab(): JSX.Element {
       })
   }, [])
 
+  // Engineer view is reachable when there's no PIN (fail-open) or the session is
+  // unlocked. While pinStatus is still 'loading' this is false, so we hold on a
+  // loading state instead of flashing the dashboard for a persisted engineer role.
+  const engineerAccessible = role === 'engineer' && (pinStatus === 'unset' || engineerUnlocked)
+  // The manage-passcode control only makes sense once inside the unlocked Engineer view.
+  const canManagePin = engineerAccessible
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#0e0e11]">
       {/* Persistent switcher bar */}
@@ -96,7 +180,12 @@ function SoundCheckTab(): JSX.Element {
           {ROLES.map((r) => (
             <button
               key={r.id}
-              onClick={() => setRole(r.id)}
+              onClick={() => {
+                setRole(r.id)
+                // Leaving the Engineer view closes any open passcode panel so it
+                // doesn't linger under a role where the control is hidden.
+                if (r.id !== 'engineer') setManagingPin(false)
+              }}
               aria-pressed={role === r.id}
               title={r.hint}
               className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
@@ -109,6 +198,20 @@ function SoundCheckTab(): JSX.Element {
             </button>
           ))}
         </div>
+        {canManagePin && (
+          <button
+            type="button"
+            onClick={() => setManagingPin((v) => !v)}
+            aria-pressed={managingPin}
+            className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+              managingPin
+                ? 'bg-white/[0.09] text-white'
+                : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
+            }`}
+          >
+            {pinStatus === 'set' ? 'Passcode ✓' : 'Set passcode'}
+          </button>
+        )}
         <div className="ml-auto flex gap-1 rounded-lg border border-white/[0.07] bg-white/[0.04] p-0.5">
           {(['setup', 'live'] as ViewMode[]).map((m) => (
             <button
@@ -127,9 +230,29 @@ function SoundCheckTab(): JSX.Element {
         </div>
       </div>
 
-      {/* Selected role's UI fills the tab */}
+      {/* Manage-passcode panel — only in the unlocked Engineer view */}
+      {canManagePin && managingPin && (
+        <div className="border-b border-white/[0.07] bg-[#0e0e11] px-3 py-2">
+          <ManagePasscodePanel
+            hasPin={pinStatus === 'set'}
+            onSave={savePin}
+            onRemove={removePin}
+            onClose={() => setManagingPin(false)}
+          />
+        </div>
+      )}
+
+      {/* Selected role's UI fills the tab. The Engineer branch is gated: a set PIN and
+          an un-unlocked session render the PIN prompt (or a brief loading state while
+          the PIN status resolves) instead of the dashboard. Volunteer is never gated. */}
       <div className="min-h-0 flex-1 overflow-auto">
-        {connection.status === 'connecting' ? (
+        {role === 'engineer' && !engineerAccessible ? (
+          pinStatus === 'loading' ? (
+            <ConnectingState />
+          ) : (
+            <EngineerPinPrompt storedPin={storedPin} onUnlock={() => setEngineerUnlocked(true)} />
+          )
+        ) : connection.status === 'connecting' ? (
           <ConnectingState />
         ) : connection.status === 'error' ? (
           <ConnectionErrorState
