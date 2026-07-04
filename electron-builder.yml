@@ -1,0 +1,49 @@
+appId: com.snowhillchurch.worshipflow-pro
+productName: WorshipFlow Pro
+copyright: Snow Hill Church
+
+directories:
+  output: dist-installer
+  buildResources: build
+
+# We have no native modules we actually use — sql.js is WebAssembly (arch-independent)
+# and osc/ws/jszip are pure JS. Skipping the rebuild avoids electron-builder trying to
+# compile the unused optional serialport native binding (which has no build toolchain here).
+npmRebuild: false
+
+asar: true
+# sql.js reads sql-wasm.wasm from disk at runtime via require.resolve; it must be a real
+# file, not packed inside app.asar, or the database can't open.
+asarUnpack:
+  - '**/node_modules/sql.js/dist/sql-wasm.wasm'
+
+# Everything under out/ (the electron-vite build) plus production node_modules is included
+# by default; these exclusions keep source, tooling, and the unused serialport binding out.
+files:
+  - '!src/**'
+  - '!scripts/**'
+  - '!docs/**'
+  - '!electron.vite.config.*'
+  - '!tsconfig*.json'
+  - '!**/*.tsbuildinfo'
+  - '!*.md'
+  - '!launch-worshipflow.vbs'
+  - '!gen-bg.html'
+  - '!**/node_modules/@serialport/**'
+  - '!**/node_modules/serialport/**'
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: WorshipFlow Pro
+  uninstallDisplayName: WorshipFlow Pro
