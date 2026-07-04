@@ -223,7 +223,9 @@ const wf = {
     saveAutomationRule: (rule: AutomationRule): Promise<AutomationRule> =>
       ipcRenderer.invoke('wf:sound-check:saveAutomationRule', rule),
     getAutomationRules: (): Promise<AutomationRule[]> =>
-      ipcRenderer.invoke('wf:sound-check:getAutomationRules')
+      ipcRenderer.invoke('wf:sound-check:getAutomationRules'),
+    deleteAutomationRule: (id: string): Promise<void> =>
+      ipcRenderer.invoke('wf:sound-check:deleteAutomationRule', id)
   }
 }
 

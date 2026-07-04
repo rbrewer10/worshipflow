@@ -38,12 +38,28 @@ export class SoundCheckState {
   }
 
   /**
-   * Save an automation rule for later playback during a service.
+   * Upsert an automation rule for later playback during a service. If a rule
+   * with the same id already exists it is replaced in place (preserving array
+   * order, so the list doesn't reshuffle on edit); otherwise it is appended.
    * TODO: persist to SQLite — rules are in-memory only for now and are lost
    * on app restart.
    */
   saveAutomationRule(rule: AutomationRule): void {
-    this.automationRules.push(rule)
+    const index = this.automationRules.findIndex((r) => r.id === rule.id)
+    if (index >= 0) this.automationRules[index] = rule
+    else this.automationRules.push(rule)
+  }
+
+  /**
+   * Delete an automation rule by id. Idempotent: an unknown id is a no-op
+   * rather than an error — callers (the IPC delete handler) don't need to
+   * distinguish "already gone" from "never existed", and treating it as an
+   * error would only surface spurious failures on a double-click.
+   * TODO: persist to SQLite — see saveAutomationRule.
+   */
+  deleteAutomationRule(id: string): void {
+    const index = this.automationRules.findIndex((r) => r.id === id)
+    if (index >= 0) this.automationRules.splice(index, 1)
   }
 
   /** Automation rules that apply to a given service item type and are enabled. */

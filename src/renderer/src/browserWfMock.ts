@@ -400,10 +400,18 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
         notes
       }),
       saveAutomationRule: async (rule: AutomationRule): Promise<AutomationRule> => {
-        automationRules.push(rule)
+        // Upsert by id (mirrors SoundCheckState.saveAutomationRule) so edits
+        // round-trip in browser-preview instead of appending duplicates.
+        const i = automationRules.findIndex((r) => r.id === rule.id)
+        if (i >= 0) automationRules[i] = rule
+        else automationRules.push(rule)
         return rule
       },
-      getAutomationRules: async (): Promise<AutomationRule[]> => clone(automationRules)
+      getAutomationRules: async (): Promise<AutomationRule[]> => clone(automationRules),
+      deleteAutomationRule: async (id: string): Promise<void> => {
+        const i = automationRules.findIndex((r) => r.id === id)
+        if (i >= 0) automationRules.splice(i, 1)
+      }
     }
   }
 

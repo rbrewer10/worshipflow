@@ -61,4 +61,8 @@ export function registerSoundCheckHandlers(state: SoundCheckState): void {
   ipcMain.handle('wf:sound-check:getAutomationRules', () => {
     return state.automationRules
   })
+
+  ipcMain.handle('wf:sound-check:deleteAutomationRule', (_e, id: string) => {
+    state.deleteAutomationRule(id)
+  })
 }
