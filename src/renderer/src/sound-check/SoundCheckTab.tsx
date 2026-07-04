@@ -74,11 +74,13 @@ function SoundCheckTab(): JSX.Element {
     window.wf
       .settingGet(ENGINEER_PIN_KEY)
       .then((value) => {
+        if (!mountedRef.current) return
         const pin = value ?? ''
         setStoredPin(pin)
         setPinStatus(pin.trim() === '' ? 'unset' : 'set')
       })
       .catch(() => {
+        if (!mountedRef.current) return
         // If the read fails, fail open rather than locking the user out of a soft gate.
         setStoredPin('')
         setPinStatus('unset')

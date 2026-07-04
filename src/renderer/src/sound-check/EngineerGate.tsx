@@ -149,7 +149,7 @@ export function ManagePasscodePanel({
         <input
           type="password"
           inputMode="numeric"
-          placeholder={hasPin ? 'New passcode' : 'New passcode'}
+          placeholder={hasPin ? 'New passcode' : 'Choose a passcode'}
           value={value}
           disabled={busy}
           onChange={(e) => {
