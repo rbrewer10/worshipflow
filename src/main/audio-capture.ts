@@ -3,6 +3,92 @@ import type { AudioFrame, Heuristic } from './types/sound-check-types'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mic: (opts?: unknown) => { start(): void; stop(): void; getAudioStream(): NodeJS.ReadableStream } = require('mic')
 
+const TARGET_SAMPLE_RATE = 48000 // AudioAnalyzer expects 48kHz frames
+const FFT_FRAME_SIZE = 2048 // AudioAnalyzer expects exactly 2048 samples per frame
+
+// Buffers raw audio samples and emits fixed-size resampled frames.
+// Input: variable-size chunks at micSampleRate (typically 44.1kHz, stereo, 16-bit)
+// Output: exactly FFT_FRAME_SIZE frames at TARGET_SAMPLE_RATE
+class FrameBuffer {
+  private leftBuffer: number[] = []
+  private rightBuffer: number[] = []
+  private micSampleRate: number
+  private resampleRatio: number
+  private sampleIndex = 0 // Track position in resampling for phase continuity
+
+  constructor(micSampleRate: number) {
+    this.micSampleRate = micSampleRate
+    this.resampleRatio = TARGET_SAMPLE_RATE / micSampleRate // e.g., 48000/44100 ≈ 1.0884
+  }
+
+  // Add a frame of interleaved stereo samples (L, R, L, R, ...) in 16-bit signed int range
+  addSamples(left: Float32Array, right: Float32Array): AudioFrame[] {
+    this.leftBuffer.push(...left)
+    this.rightBuffer.push(...right)
+
+    const frames: AudioFrame[] = []
+
+    // Emit frames while we have enough input samples to produce a resampled output frame
+    while (this.canEmitFrame()) {
+      const frame = this.emitFrame()
+      if (frame) frames.push(frame)
+    }
+
+    return frames
+  }
+
+  private canEmitFrame(): boolean {
+    // How many input samples do we need to produce FFT_FRAME_SIZE output samples?
+    const inputSamplesNeeded = (this.sampleIndex + FFT_FRAME_SIZE) / this.resampleRatio
+    return this.leftBuffer.length >= Math.ceil(inputSamplesNeeded)
+  }
+
+  private emitFrame(): AudioFrame | null {
+    const left = new Float32Array(FFT_FRAME_SIZE)
+    const right = new Float32Array(FFT_FRAME_SIZE)
+
+    // Resample from micSampleRate to TARGET_SAMPLE_RATE using linear interpolation
+    for (let i = 0; i < FFT_FRAME_SIZE; i++) {
+      const inputPos = (this.sampleIndex + i) / this.resampleRatio
+      const inputIdx = Math.floor(inputPos)
+      const frac = inputPos - inputIdx
+
+      // Linear interpolation between inputIdx and inputIdx+1
+      if (inputIdx < this.leftBuffer.length - 1) {
+        left[i] =
+          this.leftBuffer[inputIdx] * (1 - frac) + this.leftBuffer[inputIdx + 1] * frac
+        right[i] =
+          this.rightBuffer[inputIdx] * (1 - frac) + this.rightBuffer[inputIdx + 1] * frac
+      } else if (inputIdx < this.leftBuffer.length) {
+        // Boundary: only one sample available
+        left[i] = this.leftBuffer[inputIdx]
+        right[i] = this.rightBuffer[inputIdx]
+      } else {
+        // Shouldn't happen if canEmitFrame() is correct, but failsafe to zero
+        left[i] = 0
+        right[i] = 0
+      }
+    }
+
+    this.sampleIndex += FFT_FRAME_SIZE
+    this.purgeOldSamples()
+
+    return { timestamp: new Date(), left, right }
+  }
+
+  private purgeOldSamples(): void {
+    // Remove samples we've already consumed (with safety margin for interpolation)
+    const inputIdx = Math.floor(this.sampleIndex / this.resampleRatio)
+    if (inputIdx > 1) {
+      const safeIdx = inputIdx - 1
+      this.leftBuffer.splice(0, safeIdx)
+      this.rightBuffer.splice(0, safeIdx)
+      // Adjust sampleIndex to account for removed samples
+      this.sampleIndex -= safeIdx * this.resampleRatio
+    }
+  }
+}
+
 // Captures live audio from the Yamaha TF-Rack USB device and pushes frames
 // to an observer. The caller is responsible for feeding frames into AudioAnalyzer
 // and handling the audio data pipeline.
@@ -10,9 +96,10 @@ export class AudioCapture extends EventEmitter {
   private micInstance: unknown | null = null
   private audioStream: NodeJS.ReadableStream | null = null
   private isCapturing = false
-  private sampleRate = 44100
+  private micSampleRate = 44100 // Input: mic device sample rate
   private channels = 2
   private bitDepth = 16
+  private frameBuffer: FrameBuffer | null = null
 
   constructor() {
     super()
@@ -23,7 +110,7 @@ export class AudioCapture extends EventEmitter {
 
     try {
       const options = {
-        rate: this.sampleRate,
+        rate: this.micSampleRate,
         channels: this.channels,
         bitwidth: this.bitDepth,
         encoding: 'signed-integer',
@@ -36,9 +123,12 @@ export class AudioCapture extends EventEmitter {
 
       if (!this.audioStream) throw new Error('Failed to get audio stream')
 
+      this.frameBuffer = new FrameBuffer(this.micSampleRate)
+
       this.audioStream.on('data', (chunk: Buffer) => {
-        const frame = this.bufferToAudioFrame(chunk)
-        this.emit('frame', frame)
+        const { left, right } = this.bufferToAudioFrame(chunk)
+        const frames = this.frameBuffer!.addSamples(left, right)
+        frames.forEach((frame) => this.emit('frame', frame))
       })
 
       this.audioStream.on('error', (err: Error) => {
@@ -72,8 +162,8 @@ export class AudioCapture extends EventEmitter {
     }
   }
 
-  // Convert raw audio buffer to AudioFrame (stereo L/R channels, float32)
-  private bufferToAudioFrame(buffer: Buffer): AudioFrame {
+  // Convert raw audio buffer to stereo float32 samples (FrameBuffer handles framing)
+  private bufferToAudioFrame(buffer: Buffer): { left: Float32Array; right: Float32Array } {
     const sampleCount = buffer.length / (this.bitDepth / 8) / this.channels
     const left = new Float32Array(sampleCount)
     const right = new Float32Array(sampleCount)
@@ -94,7 +184,7 @@ export class AudioCapture extends EventEmitter {
       right[i] = rightSample / max16
     }
 
-    return { timestamp: new Date(), left, right }
+    return { left, right }
   }
 
   isActive(): boolean {
