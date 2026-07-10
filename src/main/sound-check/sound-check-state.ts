@@ -3,6 +3,13 @@ import { AudioAnalyzer } from '../yamaha/audio-analyzer'
 import { RecommendationEngine } from '../yamaha/recommendation-engine'
 import { AudioCapture } from '../audio-capture'
 import type { AutomationRule, ReferenceMix, SpectralProfile, Recommendation } from '../types/sound-check-types'
+import {
+  loadAutomationRules,
+  saveAutomationRule as dbSaveAutomationRule,
+  deleteAutomationRule as dbDeleteAutomationRule,
+  loadReferenceMixes,
+  saveReferenceMix as dbSaveReferenceMix
+} from '../db'
 
 /**
  * In-memory session state for the Sound Check Assistant, plus the three
@@ -46,26 +53,54 @@ export class SoundCheckState {
   }
 
   /**
-   * Reserved for future persistence loading (automation rules / reference
-   * mixes from SQLite). No persistence exists yet, so this is currently a
-   * no-op — kept as an async hook so callers don't need to change when
-   * loading is added.
+   * Load persisted automation rules and reference mixes from SQLite.
+   * This is called once at app startup to restore user-configured rules
+   * and reference profiles from the previous session.
    */
   async initialize(): Promise<void> {
-    // Intentionally empty: see doc comment above.
+    try {
+      const storedRules = loadAutomationRules()
+      this.automationRules = storedRules.map((r) => ({
+        id: r.id,
+        serviceItemType: r.service_item_type as AutomationRule['serviceItemType'],
+        enabled: r.enabled,
+        ...(r.scene_name_to_recall && { sceneNameToRecall: r.scene_name_to_recall }),
+        ...(r.fader_adjustments && { faderAdjustments: r.fader_adjustments })
+      }))
+
+      const storedMixes = loadReferenceMixes()
+      this.referenceMixes = storedMixes.map((m) => ({
+        id: m.id,
+        spectralProfile: m.spectral_profile,
+        recordedAt: new Date(m.recorded_at),
+        durationSeconds: m.duration_seconds,
+        notes: m.notes || ''
+      }))
+    } catch (err) {
+      console.error('[SoundCheckState] Failed to load persisted data:', err)
+      // Silently continue with empty in-memory state if load fails
+    }
   }
 
   /**
    * Upsert an automation rule for later playback during a service. If a rule
    * with the same id already exists it is replaced in place (preserving array
    * order, so the list doesn't reshuffle on edit); otherwise it is appended.
-   * TODO: persist to SQLite — rules are in-memory only for now and are lost
-   * on app restart.
+   * Persisted to SQLite for recovery across app restarts.
    */
   saveAutomationRule(rule: AutomationRule): void {
     const index = this.automationRules.findIndex((r) => r.id === rule.id)
     if (index >= 0) this.automationRules[index] = rule
     else this.automationRules.push(rule)
+
+    // Persist to SQLite
+    dbSaveAutomationRule({
+      id: rule.id,
+      serviceItemType: rule.serviceItemType,
+      enabled: rule.enabled,
+      sceneNameToRecall: rule.sceneNameToRecall,
+      faderAdjustments: rule.faderAdjustments
+    })
   }
 
   /**
@@ -73,11 +108,14 @@ export class SoundCheckState {
    * rather than an error — callers (the IPC delete handler) don't need to
    * distinguish "already gone" from "never existed", and treating it as an
    * error would only surface spurious failures on a double-click.
-   * TODO: persist to SQLite — see saveAutomationRule.
+   * Persisted to SQLite for recovery across app restarts.
    */
   deleteAutomationRule(id: string): void {
     const index = this.automationRules.findIndex((r) => r.id === id)
     if (index >= 0) this.automationRules.splice(index, 1)
+
+    // Persist deletion to SQLite
+    dbDeleteAutomationRule(id)
   }
 
   /** Automation rules that apply to a given service item type and are enabled. */
@@ -99,8 +137,7 @@ export class SoundCheckState {
    * Real audio-duration tracking is deferred until that capture pipeline
    * exists.
    *
-   * TODO: persist to SQLite — reference mixes are in-memory only for now and
-   * are lost on app restart.
+   * Persisted to SQLite for recovery across app restarts.
    */
   saveReferenceMix(
     profile: SpectralProfile,
@@ -118,6 +155,15 @@ export class SoundCheckState {
     this.referenceMixes.push(referenceMix)
     this.currentReferenceMixId = referenceMix.id
     this.engine.setReferenceProfile(profile)
+
+    // Persist to SQLite
+    dbSaveReferenceMix({
+      id: referenceMix.id,
+      spectralProfile: profile,
+      recordedAt: referenceMix.recordedAt,
+      durationSeconds,
+      notes
+    })
 
     return referenceMix
   }

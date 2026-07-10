@@ -70,6 +70,22 @@ CREATE TABLE IF NOT EXISTS service_item (
   ref_id INTEGER,
   payload_json TEXT
 );
+CREATE TABLE IF NOT EXISTS sound_check_automation_rule (
+  id TEXT PRIMARY KEY,
+  service_item_type TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT 1,
+  scene_name_to_recall TEXT,
+  fader_adjustments_json TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sound_check_reference_mix (
+  id TEXT PRIMARY KEY,
+  spectral_profile_json TEXT NOT NULL,
+  recorded_at INTEGER NOT NULL,
+  duration_seconds REAL NOT NULL,
+  notes TEXT,
+  created_at INTEGER NOT NULL
+);
 `
 
 export async function initDb(): Promise<void> {
@@ -592,5 +608,114 @@ export function listSongUsage(): SongUsage[] {
 
 export function clearSongUsage(): void {
   db.run('DELETE FROM song_usage')
+  persist()
+}
+
+// Sound Check: Automation Rules (SQLite persistence)
+export interface StoredAutomationRule {
+  id: string
+  service_item_type: string
+  enabled: boolean
+  scene_name_to_recall?: string
+  fader_adjustments?: Array<{ channelId: number; deltaDb: number }>
+  created_at: number
+}
+
+export function loadAutomationRules(): StoredAutomationRule[] {
+  const stmt = db.prepare('SELECT * FROM sound_check_automation_rule ORDER BY created_at DESC')
+  const rows: StoredAutomationRule[] = []
+  while (stmt.step()) {
+    const r = stmt.getAsObject() as any
+    rows.push({
+      id: r.id,
+      service_item_type: r.service_item_type,
+      enabled: !!r.enabled,
+      ...(r.scene_name_to_recall && { scene_name_to_recall: r.scene_name_to_recall }),
+      ...(r.fader_adjustments_json && { fader_adjustments: JSON.parse(r.fader_adjustments_json) }),
+      created_at: r.created_at
+    })
+  }
+  stmt.free()
+  return rows
+}
+
+export function saveAutomationRule(rule: {
+  id: string
+  serviceItemType: string
+  enabled: boolean
+  sceneNameToRecall?: string
+  faderAdjustments?: Array<{ channelId: number; deltaDb: number }>
+}): void {
+  const now = Date.now()
+  db.run(
+    `INSERT OR REPLACE INTO sound_check_automation_rule
+     (id, service_item_type, enabled, scene_name_to_recall, fader_adjustments_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      rule.id,
+      rule.serviceItemType,
+      rule.enabled ? 1 : 0,
+      rule.sceneNameToRecall || null,
+      rule.faderAdjustments ? JSON.stringify(rule.faderAdjustments) : null,
+      now
+    ]
+  )
+  persist()
+}
+
+export function deleteAutomationRule(id: string): void {
+  db.run('DELETE FROM sound_check_automation_rule WHERE id = ?', [id])
+  persist()
+}
+
+// Sound Check: Reference Mixes (SQLite persistence)
+export interface StoredReferenceMix {
+  id: string
+  spectral_profile: { low: number; mid: number; high: number; presence: number; dynamicRange: number }
+  recorded_at: number
+  duration_seconds: number
+  notes?: string
+  created_at: number
+}
+
+export function loadReferenceMixes(): StoredReferenceMix[] {
+  const stmt = db.prepare('SELECT * FROM sound_check_reference_mix ORDER BY recorded_at DESC')
+  const rows: StoredReferenceMix[] = []
+  while (stmt.step()) {
+    const r = stmt.getAsObject() as any
+    rows.push({
+      id: r.id,
+      spectral_profile: JSON.parse(r.spectral_profile_json),
+      recorded_at: r.recorded_at,
+      duration_seconds: r.duration_seconds,
+      ...(r.notes && { notes: r.notes }),
+      created_at: r.created_at
+    })
+  }
+  stmt.free()
+  return rows
+}
+
+export function saveReferenceMix(mix: {
+  id: string
+  spectralProfile: { low: number; mid: number; high: number; presence: number; dynamicRange: number }
+  recordedAt: Date
+  durationSeconds: number
+  notes?: string
+}): void {
+  const now = Date.now()
+  db.run(
+    `INSERT OR REPLACE INTO sound_check_reference_mix
+     (id, spectral_profile_json, recorded_at, duration_seconds, notes, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      mix.id,
+      JSON.stringify(mix.spectralProfile),
+      mix.recordedAt.getTime(),
+      mix.durationSeconds,
+      mix.notes || null,
+      now
+    ]
+  )
   persist()
 }
