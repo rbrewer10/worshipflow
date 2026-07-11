@@ -15,11 +15,11 @@
 //  - Automation rules have a full CRUD editor (Task 9): AutomationRulesPanel lists
 //    rules with Edit/Delete and an inline add/edit form (serviceItemType, enabled,
 //    optional scene recall, and an add/remove list of channel + deltaDb fader
-//    adjustments). Rules remain IN-MEMORY only (lost on app restart) — SQLite
-//    persistence is a separate deferred task (see the TODOs in sound-check-state.ts).
+//    adjustments). Rules are persisted to SQLite and survive app restarts.
 
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
+import { CircleStop, CircleX, Info, Play, Plus, TriangleAlert, X } from 'lucide-react'
 import type { AutomationRule, Channel, Heuristic } from '../../../main/types/sound-check-types'
 import type { ViewMode } from './SoundCheckTab'
 
@@ -31,26 +31,29 @@ const FADER_MIN_DB = -60
 const FADER_MAX_DB = 60
 const FADER_STEP_DB = 0.5
 
+// Status edge colors carry real meaning (ok/err/acc/warn) and are preserved — darkened
+// slightly from the original dark-theme hues so they still read clearly as a left-edge
+// accent stripe against the light panel background.
 type Edge = 'ok' | 'err' | 'acc' | 'warn'
 const EDGE: Record<Edge, string> = {
-  ok: 'shadow-[inset_3px_0_0_#2fd97b]',
-  err: 'shadow-[inset_3px_0_0_#ff5c5c]',
-  acc: 'shadow-[inset_3px_0_0_#5eb4ff]',
-  warn: 'shadow-[inset_3px_0_0_#ffc043]'
+  ok: 'shadow-[inset_3px_0_0_#16a34a]',
+  err: 'shadow-[inset_3px_0_0_#dc2626]',
+  acc: 'shadow-[inset_3px_0_0_#2563eb]',
+  warn: 'shadow-[inset_3px_0_0_#d97706]'
 }
 
 function Tile({ edge, k, v, s }: { edge: Edge; k: string; v: ReactNode; s: string }): JSX.Element {
   return (
-    <div className={`relative overflow-hidden rounded-[10px] border border-[#1d2434] bg-[#0f131c] px-[13px] py-[11px] ${EDGE[edge]}`}>
-      <p className="mb-[7px] mt-0 text-[9px] font-extrabold uppercase tracking-[.18em] text-[#5a6480]">{k}</p>
-      <p className="m-0 text-[19px] font-bold tracking-tight tabular-nums text-[#eef2f8]">{v}</p>
-      <p className="mb-0 mt-[3px] text-[11px] tabular-nums text-[#6b7690]">{s}</p>
+    <div className={`relative overflow-hidden rounded-[10px] border border-slate-200 bg-white px-[13px] py-[11px] ${EDGE[edge]}`}>
+      <p className="mb-[7px] mt-0 text-[9px] font-extrabold uppercase tracking-[.18em] text-slate-500">{k}</p>
+      <p className="m-0 text-[19px] font-bold tracking-tight tabular-nums text-slate-900">{v}</p>
+      <p className="mb-0 mt-[3px] text-[11px] tabular-nums text-slate-500">{s}</p>
     </div>
   )
 }
 
 function Unit({ children }: { children: ReactNode }): JSX.Element {
-  return <span className="text-xs font-semibold text-[#6b7690]">{children}</span>
+  return <span className="text-xs font-semibold text-slate-500">{children}</span>
 }
 
 function Panel({
@@ -65,10 +68,10 @@ function Panel({
   className?: string
 }): JSX.Element {
   return (
-    <div className={`rounded-[10px] border border-[#1d2434] bg-[#0f131c] px-[13px] py-[11px] ${className ?? ''}`}>
-      <p className="mb-[9px] mt-0 flex items-center text-[9px] font-extrabold uppercase tracking-[.18em] text-[#5a6480]">
+    <div className={`rounded-[10px] border border-slate-200 bg-white px-[13px] py-[11px] ${className ?? ''}`}>
+      <p className="mb-[9px] mt-0 flex items-center text-[9px] font-extrabold uppercase tracking-[.18em] text-slate-500">
         {title}
-        {right !== undefined && <span className="ml-auto font-semibold tracking-[.08em] text-[#3f4a63]">{right}</span>}
+        {right !== undefined && <span className="ml-auto font-semibold tracking-[.08em] text-slate-400">{right}</span>}
       </p>
       {children}
     </div>
@@ -77,21 +80,23 @@ function Panel({
 
 function Kv({ label, value }: { label: string; value: ReactNode }): JSX.Element {
   return (
-    <div className="flex justify-between border-b border-[#141926] py-[5px] text-[11.5px] text-[#8b96ad] last:border-b-0">
+    <div className="flex justify-between border-b border-slate-100 py-[5px] text-[11.5px] text-slate-600 last:border-b-0">
       <span>{label}</span>
-      <b className="font-semibold tabular-nums text-[#d7deea]">{value}</b>
+      <b className="font-semibold tabular-nums text-slate-900">{value}</b>
     </div>
   )
 }
 
+// Mic/Track classification pills carry real meaning (matches VolunteerCheck's chip
+// colors: emerald for mic, purple for track) — hues chosen to stay legible on white.
 function Pill({ kind, children }: { kind: 'mic' | 'trk' | 'none'; children: ReactNode }): JSX.Element {
   if (kind === 'none') {
-    return <span className="text-[#ffc043]">{children}</span>
+    return <span className="text-amber-600">{children}</span>
   }
   return (
     <span
       className={`rounded px-[7px] py-0.5 text-[9px] font-extrabold uppercase tracking-widest ${
-        kind === 'mic' ? 'bg-[#5eb4ff]/[0.12] text-[#8fd3ff]' : 'bg-[#c084fc]/[0.12] text-[#d8b4fe]'
+        kind === 'mic' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-purple-500/15 text-purple-700'
       }`}
     >
       {children}
@@ -104,7 +109,7 @@ function Head({ mode, onRefresh }: { mode: ViewMode; onRefresh: () => void }): J
     <span
       key={label}
       className={`rounded-[5px] px-3 py-1 text-[10.5px] font-bold uppercase tracking-widest ${
-        on ? 'bg-[#1c2740] text-[#8fd3ff] shadow-[inset_0_0_0_1px_rgba(94,180,255,.35)]' : 'text-[#6b7690]'
+        on ? 'bg-emerald-500/15 text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.35)]' : 'text-slate-500'
       }`}
     >
       {label}
@@ -112,15 +117,15 @@ function Head({ mode, onRefresh }: { mode: ViewMode; onRefresh: () => void }): J
   )
   return (
     <div className="mb-3 flex items-center gap-3.5">
-      <h2 className="m-0 text-[13px] font-bold uppercase tracking-[.14em] text-[#eef2f8]">Sound Check</h2>
-      <div className="flex gap-0.5 rounded-[7px] border border-[#1d2434] bg-[#10141d] p-0.5">
+      <h2 className="m-0 text-[13px] font-bold uppercase tracking-[.14em] text-slate-900">Sound Check</h2>
+      <div className="flex gap-0.5 rounded-[7px] border border-slate-200 bg-[#f4f6f9] p-0.5">
         {m('Setup', mode === 'setup')}
         {m('Sound Check', mode === 'live')}
       </div>
       <button
         type="button"
         onClick={onRefresh}
-        className="ml-auto rounded-[6px] border border-[#1d2434] bg-[#10141d] px-2.5 py-1 text-[10.5px] font-semibold text-[#8fd3ff] hover:bg-[#1c2740]"
+        className="ml-auto rounded-[6px] border border-slate-200 bg-[#f4f6f9] px-2.5 py-1 text-[10.5px] font-semibold text-emerald-700 hover:bg-emerald-500/10"
       >
         Refresh channels
       </button>
@@ -138,7 +143,7 @@ function ClassificationPanel({ channels }: { channels: Channel[] }): JSX.Element
   return (
     <Panel title="Channel classification" right={`CH 01–${String(channels.length).padStart(2, '0')}`}>
       {channels.length === 0 ? (
-        <p className="m-0 py-2 text-[11.5px] text-[#5a6480]">No channels loaded.</p>
+        <p className="m-0 py-2 text-[11.5px] text-slate-500">No channels loaded.</p>
       ) : (
         channels.map((c) => {
           const kind = channelKind(c)
@@ -214,10 +219,10 @@ function draftFromRule(rule: AutomationRule): RuleDraft {
   }
 }
 
-// Field styling shared across the form's inputs/selects — matches the panel's dark
+// Field styling shared across the form's inputs/selects — matches the panel's light
 // palette. Extracted so the several controls stay visually consistent.
 const FIELD_CLASS =
-  'w-full rounded-[5px] border border-[#1d2434] bg-[#0a0e16] px-2 py-1 text-[11.5px] text-[#d7deea] outline-none focus:border-[#2f5480]'
+  'w-full rounded-[5px] border border-slate-200 bg-white px-2 py-1 text-[11.5px] text-slate-900 outline-none focus:border-emerald-500'
 
 function RuleForm({
   draft,
@@ -259,9 +264,9 @@ function RuleForm({
     })
 
   return (
-    <div className="mb-2 rounded-[8px] border border-[#232d3b] bg-[#0c101a] p-2.5">
+    <div className="mb-2 rounded-[8px] border border-slate-200 bg-[#f4f6f9] p-2.5">
       <label className="mb-2 block">
-        <span className="mb-1 block text-[9px] font-extrabold uppercase tracking-[.16em] text-[#5a6480]">
+        <span className="mb-1 block text-[9px] font-extrabold uppercase tracking-[.16em] text-slate-500">
           When a service item of type
         </span>
         <select
@@ -280,7 +285,7 @@ function RuleForm({
         </select>
       </label>
 
-      <label className="mb-2 flex cursor-pointer items-center gap-2 text-[11.5px] text-[#aeb9cc]">
+      <label className="mb-2 flex cursor-pointer items-center gap-2 text-[11.5px] text-slate-700">
         <input
           type="checkbox"
           checked={draft.enabled}
@@ -291,7 +296,7 @@ function RuleForm({
       </label>
 
       <label className="mb-2 block">
-        <span className="mb-1 block text-[9px] font-extrabold uppercase tracking-[.16em] text-[#5a6480]">
+        <span className="mb-1 block text-[9px] font-extrabold uppercase tracking-[.16em] text-slate-500">
           Recall scene (optional)
         </span>
         <input
@@ -306,7 +311,7 @@ function RuleForm({
 
       <div className="mb-2">
         <div className="mb-1 flex items-center">
-          <span className="text-[9px] font-extrabold uppercase tracking-[.16em] text-[#5a6480]">
+          <span className="text-[9px] font-extrabold uppercase tracking-[.16em] text-slate-500">
             Fader adjustments
           </span>
           <button
@@ -320,17 +325,17 @@ function RuleForm({
                 ]
               })
             }
-            className="ml-auto rounded-[4px] border border-[#1d2434] bg-[#10141d] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#8fd3ff] hover:bg-[#1c2740] disabled:opacity-40"
+            className="ml-auto inline-flex items-center justify-center gap-1 rounded-[4px] border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-40"
           >
-            + Add
+            <Plus size={11} /> Add
           </button>
         </div>
         {channels.length === 0 ? (
-          <p className="m-0 text-[10.5px] leading-relaxed text-[#5a6480]">
+          <p className="m-0 text-[10.5px] leading-relaxed text-slate-500">
             Fader adjustments need a connected mixer. Scene-only rules can still be created.
           </p>
         ) : draft.faderAdjustments.length === 0 ? (
-          <p className="m-0 text-[10.5px] text-[#5a6480]">None. Scene recall only.</p>
+          <p className="m-0 text-[10.5px] text-slate-500">None. Scene recall only.</p>
         ) : (
           draft.faderAdjustments.map((a, i) => (
             <div key={i} className="mb-1 flex items-center gap-1.5">
@@ -367,9 +372,9 @@ function RuleForm({
                   set({ faderAdjustments: draft.faderAdjustments.filter((_, j) => j !== i) })
                 }
                 aria-label="remove fader adjustment"
-                className="flex-shrink-0 rounded-[4px] bg-[#141926] px-2 py-1 text-[11px] text-[#8b96ad] hover:text-[#ff8f8f]"
+                className="inline-flex flex-shrink-0 items-center justify-center rounded-[4px] bg-slate-100 px-2 py-1 text-slate-500 hover:text-red-600"
               >
-                ✕
+                <X size={13} />
               </button>
             </div>
           ))
@@ -377,14 +382,14 @@ function RuleForm({
       </div>
 
       {validationError && (
-        <p className="m-0 mb-2 text-[11px] text-[#ffc043]">{validationError}</p>
+        <p className="m-0 mb-2 text-[11px] text-amber-600">{validationError}</p>
       )}
       <div className="flex gap-1.5">
         <button
           type="button"
           disabled={pending || validationError !== null}
           onClick={onSave}
-          className="rounded-[5px] bg-[#1c2740] px-3 py-1 text-[10.5px] font-bold uppercase tracking-widest text-[#8fd3ff] shadow-[inset_0_0_0_1px_rgba(94,180,255,.35)] hover:bg-[#243456] disabled:opacity-40"
+          className="rounded-[5px] bg-emerald-500/15 px-3 py-1 text-[10.5px] font-bold uppercase tracking-widest text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.35)] hover:bg-emerald-500/25 disabled:opacity-40"
         >
           {pending ? 'Saving…' : 'Save'}
         </button>
@@ -392,7 +397,7 @@ function RuleForm({
           type="button"
           disabled={pending}
           onClick={onCancel}
-          className="rounded-[5px] border border-[#1d2434] bg-[#10141d] px-3 py-1 text-[10.5px] font-semibold text-[#8b96ad] hover:text-[#aeb9cc] disabled:opacity-40"
+          className="rounded-[5px] border border-slate-200 bg-white px-3 py-1 text-[10.5px] font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-40"
         >
           Cancel
         </button>
@@ -500,21 +505,21 @@ function AutomationRulesPanel({ channels }: { channels: Channel[] }): JSX.Elemen
 
   return (
     <Panel title="Automation rules" right={rules ? `${rules.length} rule${rules.length === 1 ? '' : 's'}` : undefined}>
-      {error && <p className="m-0 mb-2 text-[11.5px] text-red-300">{error}</p>}
+      {error && <p className="m-0 mb-2 text-[11.5px] text-red-600">{error}</p>}
 
       {rules === null ? (
-        <p className="m-0 py-2 text-[11.5px] text-[#5a6480]">Loading…</p>
+        <p className="m-0 py-2 text-[11.5px] text-slate-500">Loading…</p>
       ) : rules.length === 0 && !draft ? (
-        <p className="m-0 py-2 text-[11.5px] text-[#5a6480]">No automation rules yet.</p>
+        <p className="m-0 py-2 text-[11.5px] text-slate-500">No automation rules yet.</p>
       ) : (
         rules.map((rule) => (
           <div
             key={rule.id}
-            className="flex items-center gap-2 border-b border-[#141926] py-[5px] last:border-b-0"
+            className="flex items-center gap-2 border-b border-slate-100 py-[5px] last:border-b-0"
           >
             <span className="min-w-0 flex-1 text-[11.5px]">
-              <b className="font-semibold text-[#d7deea]">{rule.serviceItemType.toUpperCase()}</b>{' '}
-              <span className={rule.enabled ? 'text-[#8b96ad]' : 'text-[#4a5570]'}>
+              <b className="font-semibold text-slate-900">{rule.serviceItemType.toUpperCase()}</b>{' '}
+              <span className={rule.enabled ? 'text-slate-600' : 'text-slate-400'}>
                 {rule.sceneNameToRecall ? `scene "${rule.sceneNameToRecall}"` : 'no scene'}
                 {rule.faderAdjustments && rule.faderAdjustments.length > 0
                   ? ` · ${rule.faderAdjustments.length} fader adj.`
@@ -529,7 +534,7 @@ function AutomationRulesPanel({ channels }: { channels: Channel[] }): JSX.Elemen
                 setConfirmDeleteId(null)
                 setDraft(draftFromRule(rule))
               }}
-              className="flex-shrink-0 rounded-[4px] bg-[#141926] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#8fd3ff] hover:text-[#bfe2ff] disabled:opacity-40"
+              className="flex-shrink-0 rounded-[4px] bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-emerald-700 hover:text-emerald-800 disabled:opacity-40"
             >
               Edit
             </button>
@@ -538,7 +543,7 @@ function AutomationRulesPanel({ channels }: { channels: Channel[] }): JSX.Elemen
                 type="button"
                 disabled={pending}
                 onClick={() => handleDelete(rule.id)}
-                className="flex-shrink-0 rounded-[4px] bg-[#ff5c5c]/[0.16] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#ff8f8f] shadow-[inset_0_0_0_1px_rgba(255,92,92,.4)] disabled:opacity-40"
+                className="flex-shrink-0 rounded-[4px] bg-red-500/[0.14] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-red-700 shadow-[inset_0_0_0_1px_rgba(220,38,38,.35)] disabled:opacity-40"
               >
                 Confirm
               </button>
@@ -547,7 +552,7 @@ function AutomationRulesPanel({ channels }: { channels: Channel[] }): JSX.Elemen
                 type="button"
                 disabled={pending}
                 onClick={() => setConfirmDeleteId(rule.id)}
-                className="flex-shrink-0 rounded-[4px] bg-[#141926] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#8b96ad] hover:text-[#ff8f8f] disabled:opacity-40"
+                className="flex-shrink-0 rounded-[4px] bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:text-red-600 disabled:opacity-40"
               >
                 Delete
               </button>
@@ -575,9 +580,9 @@ function AutomationRulesPanel({ channels }: { channels: Channel[] }): JSX.Elemen
             setConfirmDeleteId(null)
             setDraft(emptyDraft())
           }}
-          className="mt-2 rounded-[5px] border border-[#1d2434] bg-[#10141d] px-3 py-1 text-[10.5px] font-semibold text-[#8fd3ff] hover:bg-[#1c2740] disabled:opacity-40"
+          className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 py-1 text-[10.5px] font-semibold text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-40"
         >
-          + Add rule
+          <Plus size={13} /> Add rule
         </button>
       )}
     </Panel>
@@ -635,15 +640,15 @@ function MeterRow({
     Math.min(100, ((displayDb - FADER_MIN_DB) / (FADER_MAX_DB - FADER_MIN_DB)) * 100)
   )
   return (
-    <div className="grid grid-cols-[130px_28px_58px_1fr_58px] items-center gap-[9px] border-b border-[#141926] py-[4.5px] last:border-b-0">
+    <div className="grid grid-cols-[130px_28px_58px_1fr_58px] items-center gap-[9px] border-b border-slate-100 py-[4.5px] last:border-b-0">
       <span
         className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold ${
-          c.isMuted ? 'text-[#4a5570] line-through decoration-[#333e58]' : 'text-[#d7deea]'
+          c.isMuted ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'
         }`}
       >
         {c.name}
       </span>
-      <span className="font-mono text-[9.5px] text-[#4a5570]">{String(c.yamahaChannel).padStart(2, '0')}</span>
+      <span className="font-mono text-[9.5px] text-slate-400">{String(c.yamahaChannel).padStart(2, '0')}</span>
       <button
         type="button"
         disabled={pending}
@@ -651,15 +656,17 @@ function MeterRow({
         aria-pressed={c.isMuted}
         className={`rounded-[4px] px-1.5 py-[3px] text-[9px] font-extrabold uppercase tracking-widest disabled:opacity-50 ${
           c.isMuted
-            ? 'bg-[#ff5c5c]/[0.16] text-[#ff8f8f] shadow-[inset_0_0_0_1px_rgba(255,92,92,.4)]'
-            : 'bg-[#141926] text-[#5a6480] hover:text-[#aeb9cc]'
+            ? 'bg-red-500/[0.14] text-red-700 shadow-[inset_0_0_0_1px_rgba(220,38,38,.35)]'
+            : 'bg-slate-100 text-slate-500 hover:text-slate-800'
         }`}
       >
         Mute
       </button>
       {/* Slim range slider over a gradient fill track — same visual language as the old
           static bar, but the fill now tracks the draft-or-canonical dB and the native
-          input handles the drag. Commit fires only on release (pointer/key up, blur). */}
+          input handles the drag. Commit fires only on release (pointer/key up, blur).
+          Track kept dark intentionally: the fill is a real green→amber→red level meter,
+          like a hardware fader scale, and reads best against a dark meter-style track. */}
       <span className="relative flex h-2.5 items-center">
         <span className="absolute inset-0 overflow-hidden rounded-[3px] border border-[#161c2b] bg-[#0a0e16]">
           <span
@@ -686,7 +693,7 @@ function MeterRow({
           className="relative m-0 h-2.5 w-full cursor-pointer appearance-none bg-transparent disabled:cursor-default disabled:opacity-50 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-1.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-[2px] [&::-webkit-slider-thumb]:bg-[#eef2f8] [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(0,0,0,.5)]"
         />
       </span>
-      <span className="text-right font-mono text-[11px] tabular-nums text-[#aeb9cc]">
+      <span className="text-right font-mono text-[11px] tabular-nums text-slate-700">
         {c.isMuted ? 'MUTE' : `${displayDb.toFixed(1)} dB`}
       </span>
     </div>
@@ -700,16 +707,19 @@ function RecommendationsPanel({
   heuristics: Heuristic[]
   isCapturing: boolean
 }): JSX.Element {
-  const severityIcon: Record<string, string> = {
-    info: 'ℹ️',
-    warning: '⚠️',
-    error: '❌'
+  const severityIcon: Record<string, JSX.Element> = {
+    info: <Info size={12} className="shrink-0" />,
+    warning: <TriangleAlert size={12} className="shrink-0" />,
+    error: <CircleX size={12} className="shrink-0" />
   }
 
+  // Severity colors carry real meaning and are preserved, darkened for light-background
+  // legibility (the original sky/amber/red were tuned for a dark backdrop and would
+  // wash out on white).
   const severityColor: Record<string, string> = {
-    info: 'text-[#5eb4ff]',
-    warning: 'text-[#ffc043]',
-    error: 'text-[#ff5c5c]'
+    info: 'text-blue-700',
+    warning: 'text-amber-600',
+    error: 'text-red-600'
   }
 
   return (
@@ -719,11 +729,11 @@ function RecommendationsPanel({
       className="w-[340px] flex-shrink-0"
     >
       {!isCapturing ? (
-        <div className="rounded-[7px] border border-dashed border-[#232d3b] bg-[#0c101a] px-3 py-4 text-[11.5px] leading-relaxed text-[#6b7690]">
+        <div className="rounded-[7px] border border-dashed border-slate-200 bg-[#f4f6f9] px-3 py-4 text-[11.5px] leading-relaxed text-slate-500">
           Start audio capture to see real-time recommendations from the live mix. Nothing here is fabricated.
         </div>
       ) : heuristics.length === 0 ? (
-        <div className="rounded-[7px] border border-dashed border-[#232d3b] bg-[#0c101a] px-3 py-4 text-[11.5px] leading-relaxed text-[#6b7690]">
+        <div className="rounded-[7px] border border-dashed border-slate-200 bg-[#f4f6f9] px-3 py-4 text-[11.5px] leading-relaxed text-slate-500">
           Listening for audio issues… No issues detected yet.
         </div>
       ) : (
@@ -731,14 +741,14 @@ function RecommendationsPanel({
           {heuristics.map((h, i) => (
             <div
               key={i}
-              className="rounded-[6px] border border-[#1d2434] bg-[#0c101a] px-3 py-2 text-[10.5px] leading-relaxed"
+              className="rounded-[6px] border border-slate-200 bg-[#f4f6f9] px-3 py-2 text-[10.5px] leading-relaxed"
             >
-              <div className={`font-semibold ${severityColor[h.severity] || 'text-[#8b96ad]'}`}>
-                {severityIcon[h.severity] || '•'} {h.type}
+              <div className={`flex items-center gap-1 font-semibold ${severityColor[h.severity] || 'text-slate-600'}`}>
+                {severityIcon[h.severity] ?? <span>•</span>} {h.type}
               </div>
-              <div className="mt-1 text-[#6b7690]">{h.message}</div>
+              <div className="mt-1 text-slate-500">{h.message}</div>
               {h.value !== undefined && (
-                <div className="mt-1 font-mono text-[9px] text-[#5a6480]">
+                <div className="mt-1 font-mono text-[9px] text-slate-400">
                   {typeof h.value === 'number' ? h.value.toFixed(1) : String(h.value)}
                 </div>
               )}
@@ -787,14 +797,16 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
             const heuristics = await window.wf.soundCheck.getLiveHeuristics()
             if (mountedRef.current) setLiveHeuristics(heuristics)
           } catch (err) {
-            console.error('[getLiveHeuristics]', err)
+            console.error('[LiveView] Failed to poll live heuristics:', err)
           }
         }, 100)
       }
       if (mountedRef.current) setCaptureError(null)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (mountedRef.current) setCaptureError(msg)
+      const context = isCapturing ? 'stop audio capture' : 'start audio capture'
+      console.error(`[LiveView] Failed to ${context}:`, err)
+      if (mountedRef.current) setCaptureError(`Failed to ${context}: ${msg}`)
     }
   }
 
@@ -804,7 +816,9 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
       mountedRef.current = false
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
       if (isCapturing) {
-        window.wf.soundCheck.stopAudioCapture().catch((err) => console.error('[stopAudioCapture]', err))
+        window.wf.soundCheck
+          .stopAudioCapture()
+          .catch((err) => console.error('[LiveView] Failed to stop audio on unmount:', err))
       }
     }
   }, [isCapturing])
@@ -868,7 +882,7 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
       <div className="flex items-start gap-2.5">
         <Panel title="Channel controls" right="SET · dB" className="min-w-0 flex-1">
           {channels.length === 0 ? (
-            <p className="m-0 py-2 text-[11.5px] text-[#5a6480]">No channels loaded.</p>
+            <p className="m-0 py-2 text-[11.5px] text-slate-500">No channels loaded.</p>
           ) : (
             channels.map((c) => (
               <MeterRow
@@ -882,17 +896,18 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
               />
             ))
           )}
-          {controlError && <p className="m-0 mt-2 text-[11.5px] text-red-300">{controlError}</p>}
+          {controlError && <p className="m-0 mt-2 text-[11.5px] text-red-600">{controlError}</p>}
         </Panel>
         <div className="flex flex-col gap-2.5">
           <button
             onClick={toggleAudioCapture}
             disabled={!!captureError}
-            className="rounded-[6px] border border-[#2a3a4f] bg-[#1c2535] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#8fd3ff] hover:bg-[#2a3a50] disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 rounded-[6px] border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-50"
           >
-            {isCapturing ? '⏹ Stop Capture' : '▶ Start Capture'}
+            {isCapturing ? <CircleStop size={13} /> : <Play size={13} />}
+            {isCapturing ? 'Stop Capture' : 'Start Capture'}
           </button>
-          {captureError && <p className="m-0 text-[10px] text-red-300">{captureError}</p>}
+          {captureError && <p className="m-0 text-[10px] text-red-600">{captureError}</p>}
           <RecommendationsPanel heuristics={liveHeuristics} isCapturing={isCapturing} />
         </div>
       </div>
@@ -910,7 +925,7 @@ function EngineerDashboard({
   onRefresh: () => Promise<void>
 }): JSX.Element {
   return (
-    <div className="min-h-full bg-[#0a0d14] p-3.5 text-xs text-[#c7cfdd]">
+    <div className="min-h-full bg-[#e9ecf1] p-3.5 text-xs text-slate-700">
       <Head mode={mode} onRefresh={onRefresh} />
       {mode === 'setup' ? <SetupView channels={channels} /> : <LiveView channels={channels} onRefresh={onRefresh} />}
     </div>

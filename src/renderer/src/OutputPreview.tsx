@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MonitorOff, Image as ImageIcon, Play } from 'lucide-react'
 import type { LiveState } from '../../shared/types'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
 
@@ -21,9 +22,9 @@ function OutputPreview(): JSX.Element {
 
   return (
     <div className="p-2">
-      <div className="mb-1 text-[10px] font-medium text-blue-400">Main Audience Output</div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Main Audience Output</div>
       <div
-        className="flex aspect-video w-full items-center justify-center overflow-hidden rounded border border-white/10 px-2 text-center"
+        className="flex aspect-video w-full items-center justify-center overflow-hidden rounded border border-slate-200 px-2 text-center"
         style={{ background: bg }}
       >
         <span
@@ -33,10 +34,10 @@ function OutputPreview(): JSX.Element {
           {text}
         </span>
       </div>
-      <div className="mt-1.5 flex justify-center gap-4 text-slate-400">
-        <button onClick={() => window.wf.sendIntent('black')} title="Black" className="hover:text-white">■</button>
-        <button onClick={() => window.wf.sendIntent('logo')} title="Logo" className="hover:text-white">✝</button>
-        <button onClick={() => window.wf.sendIntent('lyrics')} title="Clear / lyrics" className="hover:text-white">▦</button>
+      <div className="mt-1.5 flex justify-center gap-4 text-slate-600">
+        <button onClick={() => window.wf.sendIntent('black')} title="Black" className="hover:text-slate-900"><MonitorOff size={14} /></button>
+        <button onClick={() => window.wf.sendIntent('logo')} title="Logo" className="hover:text-slate-900"><ImageIcon size={14} /></button>
+        <button onClick={() => window.wf.sendIntent('lyrics')} title="Clear / lyrics" className="hover:text-slate-900"><Play size={14} /></button>
       </div>
     </div>
   )

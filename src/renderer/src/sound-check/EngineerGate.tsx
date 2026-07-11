@@ -35,8 +35,8 @@ export function EngineerPinPrompt({
 
   return (
     <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 px-4 text-center">
-      <div className="w-full max-w-[360px] rounded-2xl border border-white/[0.07] bg-[#141418] px-6 py-6">
-        <p className="mb-1 text-[13px] font-semibold text-slate-200">Engineer view is locked</p>
+      <div className="w-full max-w-[360px] rounded-2xl border border-slate-200 bg-[#f4f6f9] px-6 py-6">
+        <p className="mb-1 text-[13px] font-semibold text-slate-900">Engineer view is locked</p>
         <p className="m-0 mb-4 text-[12px] leading-relaxed text-slate-500">
           Enter the passcode to open the mixer dashboard.
         </p>
@@ -57,16 +57,16 @@ export function EngineerPinPrompt({
               setEntry(e.target.value)
               if (error) setError(null)
             }}
-            className="w-full rounded-lg border border-[#2c3849] bg-[#1a2230] px-3 py-2 text-center text-sm tracking-widest text-[#dbe3ee] placeholder:tracking-normal placeholder:text-[#5d6d82] focus:border-emerald-400 focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-sm tracking-widest text-slate-900 placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
           />
           <button
             type="submit"
-            className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#03131c] hover:bg-emerald-400"
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
           >
             Unlock
           </button>
         </form>
-        {error && <p className="mt-2 text-[12px] font-medium text-red-300">{error}</p>}
+        {error && <p className="mt-2 text-[12px] font-medium text-red-600">{error}</p>}
       </div>
     </div>
   )
@@ -125,15 +125,15 @@ export function ManagePasscodePanel({
   }
 
   return (
-    <div className="w-full max-w-[360px] rounded-xl border border-white/[0.07] bg-[#141418] p-3">
+    <div className="w-full max-w-[360px] rounded-xl border border-slate-200 bg-white p-3">
       <div className="mb-2 flex items-center">
-        <p className="m-0 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+        <p className="m-0 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
           {hasPin ? 'Change passcode' : 'Set passcode'}
         </p>
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto rounded px-1.5 text-[13px] leading-none text-slate-500 hover:text-slate-200"
+          className="ml-auto rounded px-1.5 text-[13px] leading-none text-slate-500 hover:text-slate-900"
           aria-label="Close passcode settings"
         >
           ×
@@ -156,12 +156,12 @@ export function ManagePasscodePanel({
             setValue(e.target.value)
             if (error) setError(null)
           }}
-          className="min-w-0 flex-1 rounded-lg border border-[#2c3849] bg-[#1a2230] px-3 py-1.5 text-[13px] tracking-widest text-[#dbe3ee] placeholder:tracking-normal placeholder:text-[#5d6d82] focus:border-emerald-400 focus:outline-none disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] tracking-widest text-slate-900 placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={busy}
-          className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[13px] font-semibold text-[#03131c] hover:bg-emerald-400 disabled:opacity-60"
+          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
         >
           Save
         </button>
@@ -171,12 +171,12 @@ export function ManagePasscodePanel({
           type="button"
           onClick={() => void remove()}
           disabled={busy}
-          className="mt-2 text-[12px] font-medium text-red-300 hover:text-red-200 disabled:opacity-60"
+          className="mt-2 text-[12px] font-medium text-red-600 hover:text-red-700 disabled:opacity-60"
         >
           Remove passcode (unlocks Engineer for everyone)
         </button>
       )}
-      {error && <p className="mt-2 text-[12px] font-medium text-red-300">{error}</p>}
+      {error && <p className="mt-2 text-[12px] font-medium text-red-600">{error}</p>}
     </div>
   )
 }

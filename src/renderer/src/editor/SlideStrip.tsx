@@ -1,4 +1,5 @@
 // src/renderer/src/editor/SlideStrip.tsx
+import { Plus } from 'lucide-react'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../../shared/themes'
 import type { SongFull } from '../../../shared/types'
 import type { EditorSlide } from './slideCompute'
@@ -34,16 +35,16 @@ export default function SlideStrip({ song, slides, activeIndex, onSelect, onAddS
   const addButton = onAddSlide && (
     <button
       onClick={onAddSlide}
-      className="flex w-36 shrink-0 items-center justify-center gap-1 rounded-lg border border-dashed border-white/15 py-2.5 text-xs font-semibold text-slate-400 transition-colors hover:border-indigo-400/60 hover:bg-indigo-500/10 hover:text-indigo-300"
+      className="flex w-36 shrink-0 items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:border-emerald-400/60 hover:bg-emerald-500/10 hover:text-emerald-700"
     >
-      + Add Slide
+      <Plus size={13} /> Add Slide
     </button>
   )
 
   return (
     <div className="flex w-40 shrink-0 flex-col gap-2.5 overflow-y-auto py-1 pr-1">
       {slides.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-white/10 p-3 text-center text-xs text-white/30">
+        <div className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400">
           No slides yet
         </div>
       ) : (
@@ -51,15 +52,15 @@ export default function SlideStrip({ song, slides, activeIndex, onSelect, onAddS
           const active = i === activeIndex
           return (
             <div key={slide.key} className="w-36 shrink-0">
-              <p className={`mb-1 truncate px-0.5 text-[10px] font-semibold uppercase tracking-wide ${active ? 'text-indigo-300' : 'text-slate-500'}`}>
+              <p className={`mb-1 truncate px-0.5 text-[10px] font-semibold uppercase tracking-wide ${active ? 'text-emerald-700' : 'text-slate-500'}`}>
                 {slide.sectionLabel}
               </p>
               <button
                 onClick={() => onSelect(i)}
                 className={`group relative w-full overflow-hidden rounded-lg text-left transition-all ${
                   active
-                    ? 'ring-2 ring-indigo-400'
-                    : 'opacity-70 ring-1 ring-white/10 hover:opacity-100'
+                    ? 'ring-2 ring-emerald-400'
+                    : 'opacity-70 ring-1 ring-slate-200 hover:opacity-100'
                 }`}
                 style={{ aspectRatio: '16/9', background: bgStyle }}
               >

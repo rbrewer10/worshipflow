@@ -10,6 +10,8 @@ function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
 }
 
+const isVideoFile = (p: string): boolean => /\.(mp4|webm|mov|m4v|avi|mkv)$/i.test(p)
+
 export interface ServiceSlidePreviewProps {
   item: ServiceItem
   serviceTheme: string | null
@@ -167,8 +169,20 @@ export default function ServiceSlidePreview({
     // (aspect-ratio can collapse to 0 height in that context).
     <div className={`relative w-full${className ? ` ${className}` : ''}`} style={{ paddingBottom: '56.25%' }}>
       <div className="absolute inset-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
-        {/* Background layer */}
-        {bgFile ? (
+        {/* Background layer — CSS background-image can only ever show a still
+            image, so a video file needs an actual <video> element or it
+            silently fails to render (showing nothing behind it). */}
+        {bgFile && isVideoFile(bgFile) ? (
+          <video
+            key={bgFile}
+            className="absolute inset-0 h-full w-full object-cover"
+            src={toAssetUrl(bgFile)}
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
+        ) : bgFile ? (
           <div
             className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${toAssetUrl(bgFile)})` }}

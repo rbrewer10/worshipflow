@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BarChart3, Download } from 'lucide-react'
 import type { SongUsage } from '../../shared/types'
 
 function fmtDate(ts: number): string {
@@ -55,23 +56,23 @@ function CcliPanel(): JSX.Element {
   }
 
   return (
-    <div className="mb-3 rounded-lg border border-white/[0.07] bg-[#1a1a1d] p-2">
+    <div className="mb-3 rounded-lg border border-slate-200 bg-[#f4f6f9] p-2">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">© CCLI</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">© CCLI</span>
         <button
           onClick={openReport}
-          className="rounded px-2 py-0.5 text-[11px] font-semibold text-purple-300 hover:text-purple-200"
+          className="inline-flex items-center justify-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
         >
-          📊 Usage Report
+          <BarChart3 size={13} /> Usage Report
         </button>
       </div>
       <div className="flex items-center gap-2">
-        <span className="shrink-0 text-xs text-slate-400">License #</span>
+        <span className="shrink-0 text-xs text-slate-600">License #</span>
         <input
           value={license}
           onChange={(e) => saveLicense(e.target.value)}
           placeholder="e.g. 1234567"
-          className="min-w-0 flex-1 rounded border border-white/10 bg-black/40 px-2 py-1 text-xs text-slate-200 outline-none focus:border-blue-500"
+          className="min-w-0 flex-1 rounded border border-slate-200 bg-slate-100 px-2 py-1 text-xs text-slate-900 outline-none focus:border-emerald-500"
         />
       </div>
       <div className="mt-1 text-[10px] text-slate-500">Shown on the projector footer for song slides.</div>
@@ -80,27 +81,27 @@ function CcliPanel(): JSX.Element {
       {showReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => setShowReport(false)}>
           <div
-            className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-4 shadow-2xl"
+            className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-200">CCLI Song Usage ({usage.length})</h3>
+              <h3 className="text-sm font-bold text-slate-900">CCLI Song Usage ({usage.length})</h3>
               <div className="flex gap-2">
                 <button
                   onClick={exportCsv}
                   disabled={usage.length === 0}
-                  className="rounded bg-emerald-600/70 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-600 disabled:opacity-40"
+                  className="inline-flex items-center justify-center gap-1.5 rounded bg-emerald-600/70 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-600 disabled:opacity-40"
                 >
-                  ⬇ Export CSV
+                  <Download size={13} /> Export CSV
                 </button>
                 <button
                   onClick={() => setConfirmClear(true)}
                   disabled={usage.length === 0}
-                  className="rounded bg-red-600/40 px-3 py-1 text-xs font-bold text-red-200 hover:bg-red-600/60 disabled:opacity-40"
+                  className="rounded bg-red-600/40 px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-600/60 disabled:opacity-40"
                 >
                   Clear
                 </button>
-                <button onClick={() => setShowReport(false)} className="rounded bg-white/10 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/20">
+                <button onClick={() => setShowReport(false)} className="rounded bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">
                   Close
                 </button>
               </div>
@@ -110,7 +111,7 @@ function CcliPanel(): JSX.Element {
                 <p className="py-8 text-center text-sm text-slate-500">No songs used yet. Songs are logged automatically when they go live.</p>
               ) : (
                 <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-[#1a1a1d] text-slate-500">
+                  <thead className="sticky top-0 bg-[#f4f6f9] text-slate-500">
                     <tr>
                       <th className="py-1 pr-3 font-semibold">When</th>
                       <th className="py-1 pr-3 font-semibold">Title</th>
@@ -120,11 +121,11 @@ function CcliPanel(): JSX.Element {
                   </thead>
                   <tbody>
                     {usage.map((u) => (
-                      <tr key={u.id} className="border-t border-white/5">
+                      <tr key={u.id} className="border-t border-slate-200">
                         <td className="py-1 pr-3 text-slate-500">{fmtDate(u.usedAt)}</td>
-                        <td className="py-1 pr-3 text-slate-200">{u.title}</td>
-                        <td className="py-1 pr-3 text-slate-400">{u.author || '—'}</td>
-                        <td className="py-1 text-slate-400">{u.ccli || '—'}</td>
+                        <td className="py-1 pr-3 text-slate-900">{u.title}</td>
+                        <td className="py-1 pr-3 text-slate-600">{u.author || '—'}</td>
+                        <td className="py-1 text-slate-600">{u.ccli || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -133,10 +134,10 @@ function CcliPanel(): JSX.Element {
             </div>
             {confirmClear && (
               <div className="mt-3 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 p-2">
-                <span className="text-xs text-red-200">Clear the entire usage log? This cannot be undone.</span>
+                <span className="text-xs text-red-600">Clear the entire usage log? This cannot be undone.</span>
                 <div className="flex gap-2">
                   <button onClick={clearLog} className="rounded bg-red-600 px-3 py-1 text-xs font-bold text-white">Yes, clear</button>
-                  <button onClick={() => setConfirmClear(false)} className="rounded bg-white/10 px-3 py-1 text-xs text-slate-300">Cancel</button>
+                  <button onClick={() => setConfirmClear(false)} className="rounded bg-slate-100 px-3 py-1 text-xs text-slate-700 hover:bg-slate-200">Cancel</button>
                 </div>
               </div>
             )}

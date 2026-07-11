@@ -3,6 +3,7 @@
 // Replaces the right-side form panel in SongLibrary.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Pencil, Trash2, ExternalLink, ArrowLeft } from 'lucide-react'
 import type { SongFull, SongInput, SongSection } from '../../../shared/types'
 import { computeEditorSlides, applySlideEdit } from './slideCompute'
 import SlideStrip from './SlideStrip'
@@ -156,7 +157,7 @@ export default function SongEditor({ songId, onSaved }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {/* Header bar */}
-      <div className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-[#18181c] px-4 py-2.5">
+      <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-[#f4f6f9] px-4 py-2.5">
         <div className="min-w-0 flex-1">
           {editingTitle ? (
             <input
@@ -168,16 +169,16 @@ export default function SongEditor({ songId, onSaved }: {
                 if (e.key === 'Enter') commitTitle()
                 if (e.key === 'Escape') setEditingTitle(false)
               }}
-              className="w-full rounded-md border border-indigo-400/50 bg-[#0f0f12] px-2 py-1 text-base font-semibold text-white outline-none ring-2 ring-indigo-500/30"
+              className="w-full rounded-md border border-emerald-400/50 bg-white px-2 py-1 text-base font-semibold text-slate-900 outline-none ring-2 ring-emerald-500/30"
             />
           ) : (
             <button
               onClick={startTitleEdit}
               title="Click to rename"
-              className="group flex max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-white/5"
+              className="group flex max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-slate-100"
             >
-              <span className="truncate text-base font-semibold text-white">{song.title}</span>
-              <span className="text-xs text-slate-500 opacity-0 transition-opacity group-hover:opacity-100">✎</span>
+              <span className="truncate text-base font-semibold text-slate-900">{song.title}</span>
+              <span className="text-slate-500 opacity-0 transition-opacity group-hover:opacity-100"><Pencil size={12} /></span>
             </button>
           )}
           {song.author && <p className="truncate px-1 text-xs text-slate-500">{song.author}</p>}
@@ -188,24 +189,24 @@ export default function SongEditor({ songId, onSaved }: {
         <button
           onClick={handleDeleteSlide}
           disabled={!canDelete}
-          className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300 disabled:cursor-not-allowed disabled:text-slate-600 disabled:hover:bg-transparent"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-500/10 hover:text-rose-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent"
           title={canDelete ? 'Delete current slide' : 'Cannot delete the last slide'}
         >
-          🗑 Delete slide
+          <Trash2 size={13} /> Delete slide
         </button>
         <button
           onClick={() => window.wf.editorOpen(songId)}
-          className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/10 hover:text-emerald-800"
           title="Open editor in its own window"
         >
-          ⧉ Pop out
+          <ExternalLink size={13} /> Pop out
         </button>
         {onSaved && (
           <button
             onClick={() => onSaved()}
-            className="rounded-lg px-2.5 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900"
           >
-            ← Back
+            <ArrowLeft size={13} /> Back
           </button>
         )}
       </div>
@@ -224,13 +225,13 @@ export default function SongEditor({ songId, onSaved }: {
         {/* Center: big centered WYSIWYG canvas */}
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Text toolbar: font + color */}
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/[0.07] bg-[#161618] px-3 py-2">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-[#f4f6f9] px-3 py-2">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400">Font</span>
+              <span className="text-xs text-slate-600">Font</span>
               <select
                 value={song.font ?? 'modern'}
                 onChange={(e) => handleFontChange(e.target.value as SongFull['font'])}
-                className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-white"
+                className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-xs text-slate-900"
               >
                 <option value="modern">Modern</option>
                 <option value="classic">Classic</option>
@@ -239,7 +240,7 @@ export default function SongEditor({ songId, onSaved }: {
               </select>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400">Text</span>
+              <span className="text-xs text-slate-600">Text</span>
               <input
                 type="color"
                 value={activeColor}
@@ -252,8 +253,8 @@ export default function SongEditor({ songId, onSaved }: {
                   type="button"
                   title={sw.label}
                   onClick={() => handleTextColorChange(sw.hex)}
-                  className={`h-5 w-5 rounded-full border border-white/20 transition ${
-                    activeColor.toLowerCase() === sw.hex.toLowerCase() ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-[#161618]' : ''
+                  className={`h-5 w-5 rounded-full border border-slate-200 transition ${
+                    activeColor.toLowerCase() === sw.hex.toLowerCase() ? 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-[#f4f6f9]' : ''
                   }`}
                   style={{ background: sw.hex }}
                 />
@@ -268,7 +269,7 @@ export default function SongEditor({ songId, onSaved }: {
               onFontScaleChange={handleFontScaleChange}
             />
           </div>
-          <p className="text-center text-[10px] text-slate-600">
+          <p className="text-center text-[10px] text-slate-400">
             Click lyrics to edit • {slides.length} slide{slides.length !== 1 ? 's' : ''} total
           </p>
         </div>

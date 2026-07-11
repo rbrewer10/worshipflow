@@ -23,19 +23,19 @@ function ScriptureLookup(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col p-4 text-white">
+    <div className="flex h-full min-h-0 flex-col p-4 text-slate-900">
       <div className="mb-3 flex gap-2">
         <input
           value={ref}
           onChange={(e) => setRef(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && lookup()}
           placeholder='Type a reference — e.g. "John 3:16", "Psalm 23", "Romans 8:28-30"'
-          className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-slate-400 outline-none focus:border-blue-500"
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-emerald-500"
         />
         <button
           onClick={() => lookup()}
           disabled={!ref.trim() || loading}
-          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? 'Looking…' : 'Look up'}
         </button>
@@ -46,29 +46,29 @@ function ScriptureLookup(): JSX.Element {
           <button
             key={q}
             onClick={() => lookup(q)}
-            className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-slate-300 hover:bg-white/[0.1]"
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
           >
             {q}
           </button>
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-5">
+      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-[#f4f6f9] p-5">
         {!result && (
           <p className="py-10 text-center text-sm text-slate-500">
             Look up any passage in the King James Version.
           </p>
         )}
         {result && !result.ok && (
-          <p className="py-10 text-center text-sm text-amber-400">{result.error}</p>
+          <p className="py-10 text-center text-sm text-amber-700">{result.error}</p>
         )}
         {result && result.ok && (
           <>
-            <h2 className="mb-4 text-lg font-semibold text-white">{result.reference}</h2>
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">{result.reference}</h2>
             <div className="space-y-2 leading-relaxed">
               {result.verses!.map((v) => (
-                <p key={v.n} className="text-slate-200">
-                  <sup className="mr-1 font-mono text-xs text-blue-400">{v.n}</sup>
+                <p key={v.n} className="text-slate-900">
+                  <sup className="mr-1 font-mono text-xs text-emerald-700">{v.n}</sup>
                   {v.text}
                 </p>
               ))}

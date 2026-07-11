@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronDown, ChevronUp, Palette } from 'lucide-react'
 import { getTheme } from '../../shared/themes'
 import type { ThemeColors } from '../../shared/types'
 import ThemeChooser from './ThemeChooser'
@@ -28,13 +29,13 @@ function ThemePicker({ serviceId, themeId, colors, onChange }: {
   }
 
   return (
-    <div className="mb-3 rounded-lg border border-white/[0.07] bg-[#1a1a1d] p-2">
+    <div className="mb-3 rounded-lg border border-slate-200 bg-[#f4f6f9] p-2">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between text-xs font-semibold text-slate-300"
+        className="flex w-full items-center justify-between text-xs font-semibold text-slate-700"
       >
-        <span>🎨 Theme — {active.name}</span>
-        <span className="text-slate-500">{open ? '▲' : '▼'}</span>
+        <span className="inline-flex items-center gap-1.5"><Palette size={13} /> Theme — {active.name}</span>
+        <span className="text-slate-500">{open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
       </button>
       {open && (
         <div className="mt-2">

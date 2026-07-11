@@ -11,20 +11,32 @@ function isVideo(p: string): boolean {
   return /\.(mp4|webm|mov|avi|mkv)$/i.test(p)
 }
 
-// A "dumb" fullscreen output. Subscribes to broadcast state and renders it:
-// motion background + crossfading lyric layers, or logo / black. Holds no
-// authority — the main process tells it what to show.
-function Output(): JSX.Element {
-  const id = new URLSearchParams(window.location.search).get('id')
+// The live "render model" — everything needed to draw the audience screen. Built
+// by useLiveModel() from the broadcast state and consumed by AudienceStage. Kept
+// as one object so the fullscreen Output window and the embedded LiveMirror render
+// from an identical source of truth and can never visually drift apart.
+export interface AudienceModel {
+  mode: Mode
+  layers: { front: 0 | 1; a: string; b: string }
+  bgSrc: string | null
+  clockLine: string
+  fontScale: number
+  tickerText: string
+  bgFit: 'cover' | 'contain'
+  bgMotion: 'pan' | 'zoom' | 'shimmer' | null
+  slideThemeId: string
+  slideThemeColors: ThemeColors | null
+  songTextColor: string | null
+  songFont: string | null
+  ccli: { author: string | null; copyright: string | null; ccli: string | null; license: string | null }
+}
+
+// Subscribes to the main-process live broadcast and returns the current render
+// model. Any window that shows the audience content uses this.
+export function useLiveModel(): AudienceModel {
   const [mode, setMode] = useState<Mode>('lyrics')
-  const [layers, setLayers] = useState<{ front: 0 | 1; a: string; b: string }>({
-    front: 0,
-    a: '',
-    b: ''
-  })
-  const [fps, setFps] = useState(0)
+  const [layers, setLayers] = useState<{ front: 0 | 1; a: string; b: string }>({ front: 0, a: '', b: '' })
   const [bgSrc, setBgSrc] = useState<string | null>(null)
-  const [bgReady, setBgReady] = useState(false)
   const [clockLine, setClockLine] = useState('')
   const [fontScale, setFontScale] = useState(6)
   const [tickerText, setTickerText] = useState('')
@@ -78,26 +90,26 @@ function Output(): JSX.Element {
     return off
   }, [])
 
+  return {
+    mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
+    slideThemeId, slideThemeColors, songTextColor, songFont, ccli
+  }
+}
+
+// The audience picture itself — motion background + crossfading lyric layers, or
+// logo / black / countdown / ticker. Sizes everything in container-query units
+// (cqw/cqh) and declares itself a size container, so it renders identically whether
+// it fills a whole output window or a small preview card. Holds no authority — the
+// model tells it what to show.
+export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element {
+  const {
+    mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
+    slideThemeId, slideThemeColors, songTextColor, songFont, ccli
+  } = model
+  const [bgReady, setBgReady] = useState(false)
+
   // Reset ready-state when source changes so gradient shows while new video loads.
   useEffect(() => { setBgReady(false) }, [bgSrc])
-
-  // On-screen FPS meter (smoothness measurement).
-  useEffect(() => {
-    let raf = 0
-    let frames = 0
-    let last = performance.now()
-    const loop = (now: number): void => {
-      frames++
-      if (now - last >= 500) {
-        setFps(Math.round((frames * 1000) / (now - last)))
-        frames = 0
-        last = now
-      }
-      raf = requestAnimationFrame(loop)
-    }
-    raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
-  }, [])
 
   const black = mode === 'black'
   const logo = mode === 'logo'
@@ -111,7 +123,7 @@ function Output(): JSX.Element {
   const posAlign = theme.position === 'top' ? 'flex-start' : theme.position === 'bottom' ? 'flex-end' : 'center'
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black" style={{ cursor: 'none' }}>
+    <div className="relative h-full w-full overflow-hidden bg-black" style={{ containerType: 'size' }}>
       {/* Theme background — shown when no per-item background is active and not black */}
       {!black && !showVideo && (
         theme.kind === 'static'
@@ -175,9 +187,9 @@ function Output(): JSX.Element {
 
       {/* CCLI copyright footer — shown on song slides when copyright info exists */}
       {!black && !logo && !countdown && (ccli.author || ccli.copyright || ccli.ccli) && (
-        <div className="absolute bottom-0 left-0 right-0 px-[3vw] pb-[1.5vh] text-center">
+        <div className="absolute bottom-0 left-0 right-0 px-[3cqw] pb-[1.5cqh] text-center">
           <div
-            className="mx-auto text-[1.1vw] font-medium leading-snug text-white/75"
+            className="mx-auto text-[1.1cqw] font-medium leading-snug text-white/75"
             style={{ textShadow: '0 2px 6px rgba(0,0,0,.95)' }}
           >
             {[
@@ -194,11 +206,11 @@ function Output(): JSX.Element {
 
       {countdown && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="mb-6 text-[2.5vw] font-semibold uppercase tracking-[0.35em] text-blue-200">
+          <div className="mb-[1.5cqh] text-[2.5cqw] font-semibold uppercase tracking-[0.35em] text-emerald-200">
             Service begins in
           </div>
           <div
-            className="font-mono text-[20vw] font-black leading-none tabular-nums text-white"
+            className="font-mono text-[20cqw] font-black leading-none tabular-nums text-white"
             style={{ textShadow: '0 4px 40px rgba(0,0,0,.9)' }}
           >
             {clockLine}
@@ -209,12 +221,12 @@ function Output(): JSX.Element {
       {tickerText && !black && !logo && !countdown && (
         <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t-4 border-amber-500 bg-gradient-to-r from-amber-900/85 via-amber-800/85 to-amber-900/85">
           <div
-            className="wf-ticker-track py-3 text-3xl font-bold text-amber-100"
+            className="wf-ticker-track py-[1cqh] text-[1.6cqw] font-bold text-amber-100"
             style={{ animationDuration: `${Math.max(12, tickerText.length * 0.35)}s` }}
           >
             {/* Two identical copies → seamless loop at translateX(-50%). */}
-            <span className="px-12">📢 {tickerText}</span>
-            <span className="px-12">📢 {tickerText}</span>
+            <span className="px-[3cqw]">{tickerText}</span>
+            <span className="px-[3cqw]">{tickerText}</span>
           </div>
         </div>
       )}
@@ -224,18 +236,50 @@ function Output(): JSX.Element {
           className="absolute inset-0 flex flex-col items-center justify-center"
           style={{ background: 'radial-gradient(circle at 50% 40%, #0b2350, #050a1a)' }}
         >
-          <div className="text-[9vw] font-extrabold tracking-wide text-white">✝ SNOW HILL</div>
-          <div className="mt-2 text-[2.2vw] uppercase tracking-[0.4em] text-blue-200">
+          <div className="text-[9cqw] font-extrabold tracking-wide text-white">✝ SNOW HILL</div>
+          <div className="mt-[0.5cqh] text-[2.2cqw] uppercase tracking-[0.4em] text-blue-200">
             Worship Service
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// A "dumb" fullscreen output window. Subscribes to broadcast state and renders it,
+// plus operator-only diagnostics badges (FPS meter + output id).
+function Output(): JSX.Element {
+  const id = new URLSearchParams(window.location.search).get('id')
+  const model = useLiveModel()
+  const [fps, setFps] = useState(0)
+
+  // On-screen FPS meter (smoothness measurement).
+  useEffect(() => {
+    let raf = 0
+    let frames = 0
+    let last = performance.now()
+    const loop = (now: number): void => {
+      frames++
+      if (now - last >= 500) {
+        setFps(Math.round((frames * 1000) / (now - last)))
+        frames = 0
+        last = now
+      }
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  return (
+    <div className="relative h-screen w-screen overflow-hidden bg-black" style={{ cursor: 'none' }}>
+      <AudienceStage model={model} />
 
       <div className="absolute right-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-emerald-400">
         {fps} fps
       </div>
       {id && (
-        <div className="absolute left-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-blue-200">
+        <div className="absolute left-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-emerald-400">
           OUT {id}
         </div>
       )}
@@ -243,18 +287,27 @@ function Output(): JSX.Element {
   )
 }
 
+// A live, scaled-down mirror of the audience screen for embedding in operator UI
+// (e.g. Volunteer sound-check mode). Shares AudienceStage — so it shows exactly
+// what the congregation sees — sized to whatever container it's placed in. Give it
+// a parent with a definite size (e.g. `aspect-[16/9] w-full`).
+export function LiveMirror(): JSX.Element {
+  const model = useLiveModel()
+  return <AudienceStage model={model} />
+}
+
 function LyricLayer({ text, show, fontScale, fontFamily, color, align }: {
   text: string; show: boolean; fontScale: number; fontFamily: string; color: string; align: string
 }): JSX.Element {
   return (
     <div
-      className="absolute inset-0 flex justify-center px-[8vw] py-[6vh] text-center transition-opacity duration-500"
+      className="absolute inset-0 flex justify-center px-[8cqw] py-[6cqh] text-center transition-opacity duration-500"
       style={{ opacity: show ? 1 : 0, alignItems: align }}
     >
       <span
         className="font-bold leading-tight"
         style={{
-          fontSize: `${fontScale}vw`,
+          fontSize: `${fontScale}cqw`,
           fontFamily,
           color,
           textShadow: '0 3px 24px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)',
@@ -285,8 +338,8 @@ function MotionBackground({ effect, colors }: {
   if (effect === 'rays') {
     return (
       <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
-        <div className="absolute inset-y-0" style={{ width: '6vw', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent)', animation: 'themeRay 6s linear infinite' }} />
-        <div className="absolute inset-y-0" style={{ width: '3.5vw', left: '20vw', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent)', animation: 'themeRay 8s linear infinite' }} />
+        <div className="absolute inset-y-0" style={{ width: '6cqw', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent)', animation: 'themeRay 6s linear infinite' }} />
+        <div className="absolute inset-y-0" style={{ width: '3.5cqw', left: '20cqw', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent)', animation: 'themeRay 8s linear infinite' }} />
       </div>
     )
   }
@@ -375,9 +428,9 @@ function MotionBackground({ effect, colors }: {
   // bokeh (default fallback)
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: colors.primary }}>
-      <div className="tb-blob" style={{ width: '16vw', height: '16vw', background: colors.secondary, top: '12%', left: '14%', animation: 'themeFloatA 7s ease-in-out infinite' }} />
-      <div className="tb-blob" style={{ width: '12vw', height: '12vw', background: colors.secondary, bottom: '14%', right: '18%', animation: 'themeFloatB 8s ease-in-out infinite' }} />
-      <div className="tb-blob" style={{ width: '9vw', height: '9vw', background: colors.secondary, top: '40%', right: '40%', animation: 'themeFloatA 6s ease-in-out infinite' }} />
+      <div className="tb-blob" style={{ width: '16cqw', height: '16cqw', background: colors.secondary, top: '12%', left: '14%', animation: 'themeFloatA 7s ease-in-out infinite' }} />
+      <div className="tb-blob" style={{ width: '12cqw', height: '12cqw', background: colors.secondary, bottom: '14%', right: '18%', animation: 'themeFloatB 8s ease-in-out infinite' }} />
+      <div className="tb-blob" style={{ width: '9cqw', height: '9cqw', background: colors.secondary, top: '40%', right: '40%', animation: 'themeFloatA 6s ease-in-out infinite' }} />
     </div>
   )
 }

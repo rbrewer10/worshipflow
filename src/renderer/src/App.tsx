@@ -15,7 +15,7 @@ function App(): JSX.Element {
   if (hash.startsWith('#/editor')) {
     const songId = parseInt(new URLSearchParams(window.location.search).get('songId') ?? '0', 10)
     return (
-      <div className="flex h-screen flex-col bg-[#0b0b0f] p-4 text-white">
+      <div className="flex h-screen flex-col bg-[#e9ecf1] p-4 text-slate-900">
         <SongEditor songId={songId} />
       </div>
     )
@@ -23,7 +23,7 @@ function App(): JSX.Element {
   if (hash.startsWith('#/service')) {
     const serviceId = parseInt(new URLSearchParams(window.location.search).get('serviceId') ?? '0', 10)
     return (
-      <div className="flex h-screen flex-col bg-[#0b0b0f] p-3 text-white">
+      <div className="flex h-screen flex-col bg-[#e9ecf1] p-3 text-slate-900">
         <ServiceEditor serviceId={serviceId} />
       </div>
     )

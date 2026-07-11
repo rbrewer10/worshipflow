@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Check, Church, Film, Image as ImageIcon, Sparkles } from 'lucide-react'
 
 function LogoSettings(): JSX.Element {
   const [logoPath, setLogoPath] = useState<string | null>(null)
@@ -66,7 +67,7 @@ function LogoSettings(): JSX.Element {
               <div className="font-semibold text-gray-900">Church Logo</div>
               <div className="text-xs text-gray-400 mt-0.5">Displayed on logo screens between songs</div>
             </div>
-            {saved && <span className="text-xs font-semibold text-emerald-600">✓ Saved</span>}
+            {saved && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><Check size={13} /> Saved</span>}
           </div>
 
           {/* Logo preview */}
@@ -80,23 +81,23 @@ function LogoSettings(): JSX.Element {
               />
             ) : (
               <div className="text-center">
-                <div className="text-6xl font-black text-white/20">✝</div>
+                <Church size={64} className="mx-auto text-white/20" />
                 <div className="mt-2 text-xs text-white/25">Default cross symbol</div>
               </div>
             )}
           </div>
 
           {logoPath && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
-              <span className="text-blue-500">🖼</span>
-              <span className="min-w-0 flex-1 truncate text-xs text-blue-700">{logoName}</span>
+            <div className="mb-3 flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+              <ImageIcon size={14} className="shrink-0 text-gray-500" />
+              <span className="min-w-0 flex-1 truncate text-xs text-gray-600">{logoName}</span>
             </div>
           )}
 
           <div className="flex gap-2">
             <button
               onClick={pickLogo}
-              className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+              className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
             >
               {logoPath ? 'Change logo…' : 'Choose logo image…'}
             </button>
@@ -125,7 +126,7 @@ function LogoSettings(): JSX.Element {
             {logoBg ? (
               isVideoBg ? (
                 <div className="flex flex-col items-center gap-2">
-                  <div className="text-3xl">🎬</div>
+                  <Film size={32} className="text-white/60" />
                   <div className="text-xs font-semibold text-white/60">{bgName}</div>
                   <div className="text-[10px] text-white/30">Video plays on zone screens</div>
                 </div>
@@ -139,23 +140,23 @@ function LogoSettings(): JSX.Element {
               )
             ) : (
               <div className="text-center">
-                <div className="text-4xl">✨</div>
+                <Sparkles size={36} className="mx-auto text-white/40" />
                 <div className="mt-2 text-xs text-white/25">Animated gradient (auto)</div>
               </div>
             )}
           </div>
 
           {logoBg && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg bg-violet-50 border border-violet-100 px-3 py-2">
-              <span>{isVideoBg ? '🎬' : '🖼'}</span>
-              <span className="min-w-0 flex-1 truncate text-xs text-violet-700">{bgName}</span>
+            <div className="mb-3 flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+              {isVideoBg ? <Film size={14} className="shrink-0 text-gray-500" /> : <ImageIcon size={14} className="shrink-0 text-gray-500" />}
+              <span className="min-w-0 flex-1 truncate text-xs text-gray-600">{bgName}</span>
             </div>
           )}
 
           <div className="flex gap-2">
             <button
               onClick={pickBg}
-              className="flex-1 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
+              className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
             >
               {logoBg ? 'Change background…' : 'Choose background…'}
             </button>

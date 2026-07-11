@@ -102,14 +102,14 @@ html[data-theme="dark-premium"] {
    ════════════════════════════════════════════════════════════════════════════════ */
 
 body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #e9ecf1;
+  color: #16202e;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Flat fallback surface (operator chrome should not animate). */
 .wf-fallback {
-  background: #15151a;
+  background: #e9ecf1;
 }
 
 /* Targeted transitions only — no global transition:all which causes shimmer on structural elements */
@@ -117,225 +117,256 @@ button, a, input, select, textarea {
   transition: background-color 100ms ease, color 100ms ease, border-color 100ms ease, opacity 100ms ease;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* ════════════════════════════════════════════════════════════════════════════════
-   MODERN BUTTON STYLES
+   UNIFIED BUTTON STYLES (Dark Theme)
    ════════════════════════════════════════════════════════════════════════════════ */
 
 @layer components {
-  /* Primary Gradient Button */
-  .btn-primary {
-    @apply px-6 py-3 rounded-xl font-semibold text-white text-center cursor-pointer;
-    background: linear-gradient(135deg, var(--wf-primary), var(--wf-secondary));
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    position: relative;
-    overflow: hidden;
-    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Base button: white surface, dark text (light theme) */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all;
+    border: 1px solid #cdd5df;
+    background-color: #ffffff;
+    color: #334155;
   }
 
-  .btn-primary::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 500ms;
+  .btn:hover {
+    background-color: #f1f4f7;
+    border-color: #b8c2ce;
+  }
+
+  .btn:active {
+    background-color: #e7ebf0;
+  }
+
+  /* Primary: Emerald (Live/Active/Go) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all text-white;
+    background-color: #059669;
+    border: 1px solid #10b981;
   }
 
   .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
-  }
-
-  .btn-primary:hover::before {
-    left: 100%;
+    background-color: #047857;
+    border-color: #10b981;
   }
 
   .btn-primary:active {
-    transform: translateY(0);
+    background-color: #065f46;
   }
 
-  /* Secondary Button */
+  /* Secondary: elevated neutral (supporting actions — one accent rule: emerald only) */
   .btn-secondary {
-    @apply px-5 py-2 rounded-lg font-semibold border-2 transition-all;
-    background: var(--wf-glass-bg);
-    border-color: var(--wf-secondary);
-    color: var(--wf-secondary);
-    backdrop-filter: blur(10px);
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all;
+    background-color: #e2e8f0;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
   }
 
   .btn-secondary:hover {
-    background: var(--wf-secondary);
-    color: var(--wf-bg-primary);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    background-color: #d5dde6;
+    border-color: #b8c2ce;
   }
 
-  /* Danger Button */
+  /* Danger: Red (Delete/Destructive) */
   .btn-danger {
-    @apply px-5 py-2 rounded-lg font-semibold text-white;
-    background: linear-gradient(135deg, #b91c1c, #991b1b);
-    box-shadow: 0 8px 20px rgba(139, 28, 28, 0.3);
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all text-white;
+    background-color: #dc2626;
+    border: 1px solid #ef4444;
   }
 
   .btn-danger:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(139, 28, 28, 0.4);
+    background-color: #b91c1c;
+    border-color: #fca5a5;
   }
 
-  /* Success Button */
-  .btn-success {
-    @apply px-5 py-2 rounded-lg font-semibold text-white;
-    background: linear-gradient(135deg, var(--wf-success), #00d084);
-    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  /* Warning: Amber (Stage messages, timers) */
+  .btn-warning {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all text-black;
+    background-color: #f59e0b;
+    border: 1px solid #fbbf24;
   }
 
-  .btn-success:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(16, 185, 129, 0.4);
+  .btn-warning:hover {
+    background-color: #d97706;
+    border-color: #fcd34d;
   }
 
-  /* Icon Button */
+  /* Icon button: compact, minimal */
   .btn-icon {
-    @apply min-h-10 w-10 rounded-lg flex items-center justify-center;
-    background: var(--wf-glass-bg);
-    border: 1px solid var(--wf-border);
-    color: var(--wf-text-secondary);
-    cursor: pointer;
+    @apply w-10 h-10 rounded-lg flex items-center justify-center font-semibold cursor-pointer transition-all;
+    background-color: #ffffff;
+    border: 1px solid #cdd5df;
+    color: #475569;
   }
 
   .btn-icon:hover {
-    background: var(--wf-bg-tertiary);
-    color: var(--wf-primary);
-    transform: scale(1.05);
+    background-color: #f1f4f7;
+    border-color: #b8c2ce;
+    color: #1e293b;
+  }
+
+  /* Pill: compact, rounded full */
+  .btn-pill {
+    @apply inline-flex items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-medium cursor-pointer transition-all;
+    background-color: #eef1f5;
+    border: 1px solid #d3dae2;
+    color: #475569;
+  }
+
+  .btn-pill:hover {
+    background-color: #e2e7ee;
   }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════
-   MODERN CARD STYLES
+   UNIFIED CARD/PANEL STYLES (Dark Theme)
    ════════════════════════════════════════════════════════════════════════════════ */
 
 @layer components {
+  /* Base card: white panel on light page */
   .card {
-    @apply rounded-2xl border p-4 backdrop-blur-xl;
-    background: var(--wf-glass-bg);
-    border-color: var(--wf-border);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    @apply rounded-lg border p-3 transition-all;
+    background-color: #ffffff;
+    border-color: #dfe4ea;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   }
 
   .card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
-    border-color: var(--wf-secondary);
+    background-color: #f9fafb;
+    border-color: #d3dae2;
   }
 
+  /* Card with more padding */
   .card-lg {
-    @apply card p-6;
+    @apply rounded-lg border p-4 transition-all;
+    background-color: #ffffff;
+    border-color: #dfe4ea;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   }
 
+  /* Interactive card (clickable) */
   .card-interactive {
-    @apply card cursor-pointer;
+    @apply rounded-lg border p-3 cursor-pointer transition-all;
+    background-color: #ffffff;
+    border-color: #dfe4ea;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   }
 
   .card-interactive:hover {
-    border-color: var(--wf-primary);
+    background-color: #f9fafb;
+    border-color: #10b981;
   }
 
+  /* Active/selected card */
   .card-active {
-    @apply card;
-    border-color: var(--wf-primary);
-    box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+    @apply rounded-lg border p-3 transition-all;
+    background-color: #ecfdf5;
+    border-color: #10b981;
+  }
+
+  /* Surface: panel background for sections */
+  .surface {
+    @apply rounded-lg border p-3;
+    background-color: #f4f6f9;
+    border-color: #e2e7ee;
   }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════
-   MODERN INPUT STYLES
+   UNIFIED INPUT STYLES (Dark Theme)
    ════════════════════════════════════════════════════════════════════════════════ */
 
 @layer components {
   input, textarea, select {
-    @apply rounded-lg border px-4 py-2.5 text-sm font-medium;
-    background: #ffffff;
-    border-color: #d1d5db;
-    color: #0f172a;
-    transition: all 200ms;
-  }
-
-  option {
+    @apply rounded-lg border px-3 py-2 text-sm font-medium transition-all;
     background-color: #ffffff;
-    color: #0f172a;
+    border-color: #cdd5df;
+    color: #16202e;
   }
 
   input::placeholder, textarea::placeholder {
-    color: #6b7280;
-    opacity: 1;
+    color: #94a3b8;
   }
 
   input:focus, textarea:focus, select:focus {
     outline: none;
-    border-color: var(--wf-primary);
+    background-color: #ffffff;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  }
+
+  option {
+    background-color: #ffffff;
+    color: #16202e;
   }
 
   /* Input with validation */
   input.valid {
-    border-color: var(--wf-success);
+    border-color: #10b981;
   }
 
   input.error {
-    border-color: var(--wf-error);
+    border-color: #ef4444;
   }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════
-   SECTION HEADERS & TYPOGRAPHY
+   UNIFIED SECTION HEADERS & TYPOGRAPHY (Dark Theme)
    ════════════════════════════════════════════════════════════════════════════════ */
 
 @layer components {
+  /* Section header: small, caps, emerald accent */
+  .section-header {
+    @apply text-xs font-semibold uppercase tracking-widest mb-2;
+    color: #64748b;
+    letter-spacing: 0.1em;
+  }
+
+  .section-header.active {
+    color: #047857;
+  }
+
+  /* Title: large, prominent */
   .section-title {
-    @apply text-xl font-bold mb-1;
-    color: var(--wf-text-primary);
-    background: linear-gradient(135deg, var(--wf-primary), var(--wf-secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    @apply text-lg font-bold mb-2;
+    color: #16202e;
   }
 
+  /* Subtitle: secondary text */
   .section-subtitle {
-    @apply text-sm font-medium mb-4;
-    color: var(--wf-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    @apply text-sm font-medium;
+    color: #64748b;
   }
 
+  /* Badge: small status indicator */
   .badge {
-    @apply inline-block px-3 py-1 rounded-full text-xs font-bold;
-    background: linear-gradient(135deg, var(--wf-primary), var(--wf-secondary));
-    color: white;
-  }
-
-  .badge::before {
-    content: '✓ ';
+    @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #047857;
   }
 
   .badge-success {
-    @apply inline-block px-3 py-1 rounded-full text-xs font-bold;
-    background: var(--wf-success);
-    color: white;
-  }
-
-  .badge-success::before {
-    content: '✓ ';
+    @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #047857;
   }
 
   .badge-warning {
-    @apply inline-block px-3 py-1 rounded-full text-xs font-bold;
-    background: var(--wf-warning);
-    color: #000;
+    @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    background-color: rgba(245, 158, 11, 0.18);
+    color: #b45309;
   }
 
-  .badge-warning::before {
-    content: '⚠ ';
+  .badge-danger {
+    @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #b91c1c;
   }
 }
 

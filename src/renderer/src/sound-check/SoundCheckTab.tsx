@@ -174,13 +174,13 @@ function SoundCheckTab(): JSX.Element {
   const canManagePin = engineerAccessible
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#0e0e11]">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#e9ecf1]">
       {/* Persistent switcher bar */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/[0.07] bg-[#141418] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-[#f4f6f9] px-3 py-2">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
           Sound check
         </span>
-        <div className="flex flex-wrap gap-1 rounded-lg border border-white/[0.07] bg-white/[0.04] p-0.5">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-slate-200 bg-white p-0.5">
           {ROLES.map((r) => (
             <button
               key={r.id}
@@ -194,8 +194,8 @@ function SoundCheckTab(): JSX.Element {
               title={r.hint}
               className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
                 role === r.id
-                  ? 'bg-emerald-500/20 font-semibold text-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,.4)]'
-                  : 'font-medium text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
+                  ? 'bg-emerald-500/15 font-semibold text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.4)]'
+                  : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
               {r.label}
@@ -209,14 +209,14 @@ function SoundCheckTab(): JSX.Element {
             aria-pressed={managingPin}
             className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
               managingPin
-                ? 'bg-white/[0.09] text-white'
-                : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
+                ? 'bg-slate-200 text-slate-900'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
             {pinStatus === 'set' ? 'Passcode ✓' : 'Set passcode'}
           </button>
         )}
-        <div className="ml-auto flex gap-1 rounded-lg border border-white/[0.07] bg-white/[0.04] p-0.5">
+        <div className="ml-auto flex gap-1 rounded-lg border border-slate-200 bg-white p-0.5">
           {(['setup', 'live'] as ViewMode[]).map((m) => (
             <button
               key={m}
@@ -224,8 +224,8 @@ function SoundCheckTab(): JSX.Element {
               aria-pressed={mode === m}
               className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
                 mode === m
-                  ? 'bg-white/[0.09] font-semibold text-white'
-                  : 'font-medium text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
+                  ? 'bg-slate-200 font-semibold text-slate-900'
+                  : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
               {m === 'setup' ? 'Setup' : 'Live'}
@@ -236,7 +236,7 @@ function SoundCheckTab(): JSX.Element {
 
       {/* Manage-passcode panel — only in the unlocked Engineer view */}
       {canManagePin && managingPin && (
-        <div className="border-b border-white/[0.07] bg-[#0e0e11] px-3 py-2">
+        <div className="border-b border-slate-200 bg-[#e9ecf1] px-3 py-2">
           <ManagePasscodePanel
             hasPin={pinStatus === 'set'}
             onSave={savePin}
@@ -279,8 +279,8 @@ function SoundCheckTab(): JSX.Element {
 function ConnectingState(): JSX.Element {
   return (
     <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-3 px-4 text-center">
-      <span className="h-8 w-8 animate-spin rounded-full border-2 border-sky-400/30 border-t-sky-400" />
-      <p className="text-sm text-[#93a3b8]">Looking for the Yamaha TF-Rack on the network…</p>
+      <span className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />
+      <p className="text-sm text-slate-600">Looking for the Yamaha TF-Rack on the network…</p>
     </div>
   )
 }
@@ -300,9 +300,9 @@ function ConnectionErrorState({
 }): JSX.Element {
   return (
     <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 px-4 text-center">
-      <div className="max-w-[440px] rounded-2xl border border-red-400/30 bg-red-400/[0.06] px-6 py-5">
-        <p className="mb-1 text-sm font-semibold text-red-300">Couldn&rsquo;t connect to the mixer</p>
-        <p className="m-0 text-[13px] leading-relaxed text-[#c3d0e0]">{message}</p>
+      <div className="max-w-[440px] rounded-2xl border border-red-300 bg-red-50 px-6 py-5">
+        <p className="mb-1 text-sm font-semibold text-red-700">Couldn&rsquo;t connect to the mixer</p>
+        <p className="m-0 text-[13px] leading-relaxed text-slate-700">{message}</p>
       </div>
       <form
         className="flex items-center gap-2"
@@ -317,17 +317,17 @@ function ConnectionErrorState({
           value={manualIp}
           onChange={(e) => setManualIp(e.target.value)}
           disabled={retrying}
-          className="w-[160px] rounded-lg border border-[#2c3849] bg-[#1a2230] px-3 py-2 text-sm text-[#dbe3ee] placeholder:text-[#5d6d82] focus:border-sky-400 focus:outline-none disabled:opacity-60"
+          className="w-[160px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={retrying}
-          className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-[#03131c] hover:bg-sky-400 disabled:opacity-60"
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
         >
           {retrying ? 'Connecting…' : 'Connect'}
         </button>
       </form>
-      <p className="text-xs text-[#5d6d82]">
+      <p className="text-xs text-slate-500">
         Or leave the field blank and press Connect to retry auto-discovery.
       </p>
     </div>

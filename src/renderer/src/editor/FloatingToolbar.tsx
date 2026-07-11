@@ -11,10 +11,10 @@ export default function FloatingToolbar({ style, song, onFontScaleChange }: {
   const current = song.fontScale ?? 6
   return (
     <div
-      className="flex items-center gap-1 rounded-lg border border-white/20 bg-black/80 px-2 py-1 shadow-xl backdrop-blur"
+      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 px-2 py-1 shadow-xl backdrop-blur"
       style={style}
     >
-      <span className="mr-1 text-[10px] text-white/50">Size</span>
+      <span className="mr-1 text-[10px] text-slate-500">Size</span>
       {FONT_SIZES.map((s) => (
         <button
           key={s}
@@ -23,7 +23,7 @@ export default function FloatingToolbar({ style, song, onFontScaleChange }: {
             onFontScaleChange(s)
           }}
           className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
-            current === s ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
+            current === s ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
           }`}
         >
           {s}

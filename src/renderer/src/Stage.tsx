@@ -78,7 +78,7 @@ function Stage(): JSX.Element {
       <div className="flex flex-1 flex-col items-center justify-center px-16 text-center">
         {isCountdown ? (
           <>
-            <div className="mb-4 text-xl font-semibold uppercase tracking-[0.3em] text-blue-400">
+            <div className="mb-4 text-xl font-semibold uppercase tracking-[0.3em] text-emerald-400">
               Service begins in
             </div>
             <div className="font-mono text-[18vw] font-black leading-none tabular-nums text-white">
@@ -88,7 +88,7 @@ function Stage(): JSX.Element {
         ) : (
           <div
             className={`text-[5.5vw] font-bold leading-tight ${
-              isBlack ? 'text-slate-700' : isLogo ? 'text-blue-300' : 'text-white'
+              isBlack ? 'text-slate-700' : isLogo ? 'text-emerald-300' : 'text-white'
             }`}
             style={{ whiteSpace: 'pre-line' }}
           >

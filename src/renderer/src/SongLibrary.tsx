@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Film, Image as ImageIcon, Music, Plus, X } from 'lucide-react'
 import type { SongSummary } from '../../shared/types'
 import CcliPanel from './CcliPanel'
 import SongEditor from './editor/SongEditor'
@@ -49,15 +50,15 @@ function SongLibrary(): JSX.Element {
       {/* Confirmation Dialog */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="rounded-xl border border-white/10 bg-slate-900 p-5 shadow-lg max-w-sm">
-            <h3 className="mb-2 text-lg font-semibold text-white">Delete Song?</h3>
-            <p className="mb-4 text-sm text-slate-400">
-              Are you sure you want to delete <span className="font-semibold text-slate-200">{confirmDelete.title}</span>? This cannot be undone.
+          <div className="rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg max-w-sm">
+            <h3 className="mb-2 text-lg font-semibold text-slate-900">Delete Song?</h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Are you sure you want to delete <span className="font-semibold text-slate-900">{confirmDelete.title}</span>? This cannot be undone.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold hover:bg-white/[0.12]"
+                className="flex-1 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold hover:bg-slate-200"
               >
                 Cancel
               </button>
@@ -71,9 +72,9 @@ function SongLibrary(): JSX.Element {
           </div>
         </div>
       )}
-      <div className="flex h-full min-h-0 gap-4 p-4 text-white">
+      <div className="flex h-full min-h-0 gap-4 p-4 text-slate-900">
       {/* Library list */}
-      <div className="flex w-96 flex-col rounded-xl border border-white/[0.07] bg-[#15151a] p-3">
+      <div className="flex w-96 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
         <CcliPanel />
         <PptxImport onImported={() => refresh()} />
         <button
@@ -85,81 +86,82 @@ function SongLibrary(): JSX.Element {
             refresh()
             setEditorId(id)
           }}
-          className="mb-2 w-full rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+          className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
         >
-          + New Song
+          <Plus size={15} /> New Song
         </button>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search songs by title, author, or lyrics…"
-          className="mb-3 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-blue-500"
+          className="mb-3 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none focus:border-emerald-500"
         />
         <div className="min-h-0 flex-1 space-y-1 overflow-auto">
           {songs.length === 0 && (
             <p className="px-1 py-6 text-center text-sm text-slate-500">
-              {search ? 'No matches.' : 'No songs yet — add your first one →'}
+              {search ? 'No matches.' : 'No songs yet — add your first one'}
             </p>
           )}
           {songs.map((s) => (
             <div
               key={s.id}
               className={`group flex items-center gap-2 rounded-lg px-3 py-2 ${
-                editorId === s.id ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'hover:bg-white/[0.05]'
+                editorId === s.id ? 'bg-emerald-500/10 ring-1 ring-emerald-500/30' : 'hover:bg-slate-100'
               }`}
             >
               <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setEditorId(s.id)}>
                 <div className="text-sm font-medium">{s.title}</div>
-                {s.author && <div className="text-xs text-slate-400">{s.author}</div>}
+                {s.author && <div className="text-xs text-slate-600">{s.author}</div>}
               </div>
               {s.background ? (
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => pickBg(s.id)}
-                    className="max-w-[80px] truncate rounded-md bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-400 hover:bg-violet-500/25"
+                    className="inline-flex max-w-[80px] items-center justify-center gap-1.5 truncate rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
                     title={s.background}
                   >
-                    🎬 {/\.(mp4|webm|mov|m4v)$/i.test(s.background) ? 'video' : 'image'}
+                    {/\.(mp4|webm|mov|m4v)$/i.test(s.background) ? <Film size={13} /> : <ImageIcon size={13} />}
+                    {/\.(mp4|webm|mov|m4v)$/i.test(s.background) ? 'video' : 'image'}
                   </button>
                   <button
                     onClick={() => clearBg(s.id)}
-                    className="rounded px-1 text-slate-500 hover:text-red-400"
+                    className="inline-flex items-center justify-center rounded px-1 text-slate-500 hover:text-red-600"
                     title="Remove background"
                   >
-                    ✕
+                    <X size={13} />
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => pickBg(s.id)}
-                  className="shrink-0 rounded-md border border-dashed border-slate-600 px-2 py-0.5 text-xs text-slate-500 hover:border-violet-400 hover:text-violet-400"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-700"
                   title="Add background video or image"
                 >
-                  + bg
+                  <Plus size={13} /> bg
                 </button>
               )}
               <button
                 onClick={() => setEditorId(s.id)}
-                className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-white/10 hover:text-slate-200 group-hover:opacity-100"
+                className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-slate-200 hover:text-slate-900 group-hover:opacity-100"
               >
                 Edit
               </button>
               <button
                 onClick={() => remove(s.id)}
-                className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
+                className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-red-500/20 hover:text-red-600 group-hover:opacity-100"
               >
                 Del
               </button>
             </div>
           ))}
         </div>
-        <div className="mt-2 border-t border-white/10 pt-2 text-xs text-slate-500">
+        <div className="mt-2 border-t border-slate-200 pt-2 text-xs text-slate-500">
           {songs.length} song{songs.length === 1 ? '' : 's'} in library
         </div>
       </div>
 
       {/* WYSIWYG editor or welcome state */}
-      <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-4">
+      <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-4">
         {editorId != null ? (
           <SongEditor
             key={editorId}
@@ -168,7 +170,7 @@ function SongLibrary(): JSX.Element {
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <div className="text-4xl opacity-20">🎵</div>
+            <Music size={40} className="opacity-20" />
             <p className="text-sm text-slate-500">Select a song from the list to open the slide editor</p>
           </div>
         )}
