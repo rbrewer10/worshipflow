@@ -10,11 +10,12 @@ const ICON: Record<ServiceItem['type'], string> = {
   countdown: '⏱',
   image: '🖼',
   welcome: '👋',
-  ticker: '📰'
+  ticker: '📰',
+  announcement: '📣'
 }
 
 function ServiceBuilder(): JSX.Element {
-  const { services, activeServiceId: openId, activeService: service, selectService, refreshServices } = useService()
+  const { services, activeServiceId: openId, activeService: service, selectService, refreshServices, reloadActiveService } = useService()
   const [newName, setNewName] = useState('')
   const [importing, setImporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null)
@@ -189,6 +190,7 @@ function ServiceBuilder(): JSX.Element {
           ) : (
             <ServiceEditor
               serviceId={openId}
+              onServiceChanged={reloadActiveService}
               headerActions={
                 <div className="flex gap-2">
                   <button onClick={() => window.wf.serviceOpen(openId)}

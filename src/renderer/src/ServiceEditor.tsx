@@ -7,9 +7,13 @@ import ServiceSlidePreview from './ServiceSlidePreview'
 import { sendItemLive } from './liveActions'
 import ScheduledAnnouncements from './ScheduledAnnouncements'
 
-function ServiceEditor({ serviceId, headerActions }: {
+function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   serviceId: number
   headerActions?: React.ReactNode
+  // Called after every edit that mutates this service, so a shared "active
+  // service" cache elsewhere (e.g. Live Control's ServiceContext) can refresh.
+  // Optional: the standalone pop-out service window has no such context to sync.
+  onServiceChanged?: () => void
 }): JSX.Element {
   const [service, setService] = useState<ServiceFull | null>(null)
   const [songs, setSongs] = useState<SongSummary[]>([])
@@ -19,7 +23,11 @@ function ServiceEditor({ serviceId, headerActions }: {
   const [selectedSongFull, setSelectedSongFull] = useState<SongFull | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<ServiceItem | null>(null)
 
-  const reload = (): Promise<void> => window.wf.serviceGet(serviceId).then(setService)
+  const reload = async (): Promise<void> => {
+    const s = await window.wf.serviceGet(serviceId)
+    setService(s)
+    onServiceChanged?.()
+  }
 
   useEffect(() => {
     window.wf.setActiveService(serviceId)
