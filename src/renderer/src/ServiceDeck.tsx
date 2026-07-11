@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary } from '../../shared/types'
+import type { SceneConfig } from '../../shared/zoneScenes'
+import { effectiveRouting, matchScene } from '../../shared/zoneScenes'
+import ZoneStripBadge from './ZoneStripBadge'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
@@ -50,6 +53,8 @@ function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, on
 }): JSX.Element {
   const [dragId, setDragId] = useState<number | null>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
+  useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [service])
   const items = service.items
 
   const onDrop = (targetId: number): void => {
@@ -97,8 +102,18 @@ function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, on
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-slate-900">{it.title || it.type}</div>
-                <div className="truncate text-xs text-slate-600">
-                  {it.type} · #{i + 1}{preview ? ` · ${preview}` : ''}
+                <div className="flex items-center gap-1.5 truncate text-xs text-slate-600">
+                  <span className="truncate">{it.type} · #{i + 1}{preview ? ` · ${preview}` : ''}</span>
+                  {sceneConfig && (() => {
+                    const routing = effectiveRouting(it, sceneConfig)
+                    const matched = matchScene(routing, it.type, sceneConfig)
+                    const name = matched === 'custom' ? 'Custom' : sceneConfig.scenes.find((s) => s.id === matched)?.name
+                    return (
+                      <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-slate-400">
+                        <ZoneStripBadge routing={routing} title={name} />
+                      </span>
+                    )
+                  })()}
                 </div>
               </div>
               <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
