@@ -121,9 +121,10 @@ export class AudioCapture extends EventEmitter {
       this.micInstance = micInst
       this.audioStream = micInst.getAudioStream()
 
-      if (!this.audioStream) throw new Error('Failed to get audio stream')
+      if (!this.audioStream) throw new Error('Mic module failed to return audio stream')
 
       this.frameBuffer = new FrameBuffer(this.micSampleRate)
+      console.log(`[AudioCapture] Starting capture: ${this.micSampleRate}Hz, ${this.channels}ch, ${this.bitDepth}-bit`)
 
       this.audioStream.on('data', (chunk: Buffer) => {
         const { left, right } = this.bufferToAudioFrame(chunk)
@@ -132,14 +133,18 @@ export class AudioCapture extends EventEmitter {
       })
 
       this.audioStream.on('error', (err: Error) => {
+        console.error(`[AudioCapture] Stream error: ${err.message}`)
         this.emit('error', err)
       })
 
       micInst.start()
       this.isCapturing = true
+      console.log('[AudioCapture] Capture started and streaming frames')
       this.emit('started')
     } catch (err) {
-      this.emit('error', err instanceof Error ? err : new Error(String(err)))
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[AudioCapture] Failed to start: ${msg}`)
+      this.emit('error', err instanceof Error ? err : new Error(`Audio capture start failed: ${msg}`))
     }
   }
 
@@ -156,9 +161,12 @@ export class AudioCapture extends EventEmitter {
         this.audioStream = null
       }
       this.isCapturing = false
+      console.log('[AudioCapture] Capture stopped')
       this.emit('stopped')
     } catch (err) {
-      this.emit('error', err instanceof Error ? err : new Error(String(err)))
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[AudioCapture] Failed to stop: ${msg}`)
+      this.emit('error', err instanceof Error ? err : new Error(`Audio capture stop failed: ${msg}`))
     }
   }
 

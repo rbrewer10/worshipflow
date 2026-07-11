@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { YamahaController } from '../yamaha/yamaha-controller'
 import { AudioAnalyzer } from '../yamaha/audio-analyzer'
 import { RecommendationEngine } from '../yamaha/recommendation-engine'
@@ -67,6 +68,7 @@ export class SoundCheckState {
         ...(r.scene_name_to_recall && { sceneNameToRecall: r.scene_name_to_recall }),
         ...(r.fader_adjustments && { faderAdjustments: r.fader_adjustments })
       }))
+      console.log(`[SoundCheckState] Loaded ${this.automationRules.length} automation rules from SQLite`)
 
       const storedMixes = loadReferenceMixes()
       this.referenceMixes = storedMixes.map((m) => ({
@@ -76,6 +78,7 @@ export class SoundCheckState {
         durationSeconds: m.duration_seconds,
         notes: m.notes || ''
       }))
+      console.log(`[SoundCheckState] Loaded ${this.referenceMixes.length} reference mixes from SQLite`)
     } catch (err) {
       console.error('[SoundCheckState] Failed to load persisted data:', err)
       // Silently continue with empty in-memory state if load fails
@@ -90,17 +93,23 @@ export class SoundCheckState {
    */
   saveAutomationRule(rule: AutomationRule): void {
     const index = this.automationRules.findIndex((r) => r.id === rule.id)
-    if (index >= 0) this.automationRules[index] = rule
+    const isUpdate = index >= 0
+    if (isUpdate) this.automationRules[index] = rule
     else this.automationRules.push(rule)
 
-    // Persist to SQLite
-    dbSaveAutomationRule({
-      id: rule.id,
-      serviceItemType: rule.serviceItemType,
-      enabled: rule.enabled,
-      sceneNameToRecall: rule.sceneNameToRecall,
-      faderAdjustments: rule.faderAdjustments
-    })
+    try {
+      // Persist to SQLite
+      dbSaveAutomationRule({
+        id: rule.id,
+        serviceItemType: rule.serviceItemType,
+        enabled: rule.enabled,
+        sceneNameToRecall: rule.sceneNameToRecall,
+        faderAdjustments: rule.faderAdjustments
+      })
+      console.log(`[SoundCheckState] ${isUpdate ? 'Updated' : 'Created'} automation rule: ${rule.id}`)
+    } catch (err) {
+      console.error(`[SoundCheckState] Failed to save automation rule: ${err}`)
+    }
   }
 
   /**
@@ -112,10 +121,16 @@ export class SoundCheckState {
    */
   deleteAutomationRule(id: string): void {
     const index = this.automationRules.findIndex((r) => r.id === id)
-    if (index >= 0) this.automationRules.splice(index, 1)
+    const found = index >= 0
+    if (found) this.automationRules.splice(index, 1)
 
-    // Persist deletion to SQLite
-    dbDeleteAutomationRule(id)
+    try {
+      // Persist deletion to SQLite
+      dbDeleteAutomationRule(id)
+      if (found) console.log(`[SoundCheckState] Deleted automation rule: ${id}`)
+    } catch (err) {
+      console.error(`[SoundCheckState] Failed to delete automation rule ${id}: ${err}`)
+    }
   }
 
   /** Automation rules that apply to a given service item type and are enabled. */
@@ -145,7 +160,7 @@ export class SoundCheckState {
     notes: string
   ): ReferenceMix {
     const referenceMix: ReferenceMix = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       spectralProfile: profile,
       recordedAt: new Date(),
       durationSeconds,
@@ -156,14 +171,19 @@ export class SoundCheckState {
     this.currentReferenceMixId = referenceMix.id
     this.engine.setReferenceProfile(profile)
 
-    // Persist to SQLite
-    dbSaveReferenceMix({
-      id: referenceMix.id,
-      spectralProfile: profile,
-      recordedAt: referenceMix.recordedAt,
-      durationSeconds,
-      notes
-    })
+    try {
+      // Persist to SQLite
+      dbSaveReferenceMix({
+        id: referenceMix.id,
+        spectralProfile: profile,
+        recordedAt: referenceMix.recordedAt,
+        durationSeconds,
+        notes
+      })
+      console.log(`[SoundCheckState] Saved reference mix: ${referenceMix.id} (${durationSeconds}s)`)
+    } catch (err) {
+      console.error(`[SoundCheckState] Failed to save reference mix: ${err}`)
+    }
 
     return referenceMix
   }
