@@ -6,12 +6,13 @@ import HomeView from './HomeView'
 import LiveView from './LiveView'
 import ServiceBuilder from './ServiceBuilder'
 import SongLibrary from './SongLibrary'
+import AnnouncementsLibrary from './AnnouncementsLibrary'
 import ScriptureLookup from './ScriptureLookup'
 import VolunteerView from './VolunteerView'
 import LogoSettings from './LogoSettings'
 import SoundCheckTab from './sound-check/SoundCheckTab'
 
-export type View = 'home' | 'live' | 'service' | 'songs' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck'
+export type View = 'home' | 'live' | 'service' | 'songs' | 'announcements' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck'
 
 function AppShell(): JSX.Element {
   const [view, setView] = useState<View>('home')
@@ -98,7 +99,7 @@ function AppShell(): JSX.Element {
   }
   return (
     <ServiceProvider>
-      <div className="flex h-screen flex-row overflow-hidden bg-gray-50 text-gray-900">
+      <div className="flex h-screen flex-row overflow-hidden bg-[#e9ecf1] text-slate-900">
         <Sidebar view={view} setView={setView} />
         <div className="flex min-w-0 flex-1 flex-col">
           {view === 'home' ? (
@@ -112,6 +113,8 @@ function AppShell(): JSX.Element {
             <ServiceBuilder />
           ) : view === 'songs' ? (
             <SongLibrary />
+          ) : view === 'announcements' ? (
+            <AnnouncementsLibrary />
           ) : view === 'soundcheck' ? (
             <SoundCheckTab />
           ) : view === 'settings' ? (
