@@ -263,6 +263,7 @@ const FLEX_SCRIPT = `
       if(state.background){
         if(state.background!==prevBg){
           prevBg=state.background;
+          root.style.background='#000';
           blob1.style.opacity='0';blob2.style.opacity='0';
           bgimg.style.backgroundSize='cover';bgimg.style.animation='none';
           if(isVid(state.background)){
@@ -274,17 +275,16 @@ const FLEX_SCRIPT = `
             void bgimg.offsetHeight;kbIdx=(kbIdx+1)%4;bgimg.style.animation=KB[kbIdx];
           }
         }
-      } else if(prevBg!=='__logo_grad__'){
-        prevBg='__logo_grad__';
-        bgvid.style.opacity='0';
-        bgimg.style.backgroundImage='linear-gradient(135deg,#54585f 0%,#3a3d43 100%)';
-        bgimg.style.backgroundSize='300% 300%';
-        bgimg.style.animation='none';void bgimg.offsetHeight;
-        bgimg.style.animation='gradDrift 20s ease infinite';
-        bgimg.style.opacity='1';
-        blob1.style.background='#5a5f68';blob2.style.background='#4a4e54';
-        blob1.style.opacity='0.45';blob2.style.opacity='0.35';
-        root.style.background='#000';
+      } else {
+        // No logo background set → grey charcoal painted on the ROOT element itself,
+        // applied every render. Unlike the old bgimg-layer approach it can never fall
+        // through to black regardless of prior opacity/prevBg state.
+        if(prevBg!=='__logo_grad__'){
+          prevBg='__logo_grad__';
+          bgvid.style.opacity='0';bgimg.style.opacity='0';
+          blob1.style.opacity='0';blob2.style.opacity='0';
+        }
+        root.style.background='linear-gradient(135deg,#54585f 0%,#3a3d43 100%)';
       }
       content.innerHTML=state.imagePath
         ?'<img src="'+fileUrl(state.imagePath)+'" style="max-width:55vw;max-height:45vh;object-fit:contain;filter:drop-shadow(0 0 80px rgba(0,0,0,0.7));display:block;position:relative;z-index:2">'
