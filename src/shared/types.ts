@@ -16,6 +16,9 @@ export interface ObsStatus {
   currentScene: string | null
   scenes: string[]
   error: string | null
+  streamStartedAt: number | null
+  recordStartedAt: number | null
+  reconnecting: boolean
 }
 
 export interface LiveState {
@@ -134,7 +137,7 @@ export interface SongUsage {
 }
 
 // --- Service builder ---
-export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker'
+export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement'
 
 export interface ServiceSummary {
   id: number
@@ -211,6 +214,7 @@ export const ZONE_ROUTING_DEFAULTS: Record<ServiceItemType, ZoneRouting> = {
   image:     { 1: 'image',     2: 'image',     3: 'image',     4: 'stage' },
   welcome:   { 1: 'countdown', 2: 'countdown', 3: 'countdown', 4: 'stage' },
   ticker:    { 1: 'text',      2: 'text',      3: 'text',      4: 'stage' },
+  announcement: { 1: 'text',   2: 'text',      3: 'text',      4: 'stage' },
 }
 
 export const ZONE_NAMES: Record<ZoneId, string> = {
@@ -231,4 +235,35 @@ export interface ScriptureResult {
   reference?: string
   verses?: ScriptureVerse[]
   error?: string
+}
+
+// --- Announcements library ---
+export type AnnouncementDisplay = 'slide' | 'ticker'
+export type AnnouncementFrequency = 'once' | 'recurring'
+
+export interface AnnouncementSummary {
+  id: number
+  title: string
+  display: AnnouncementDisplay
+  frequency: AnnouncementFrequency
+  startDate: string | null
+  endDate: string | null
+  active: boolean
+  expired: boolean // derived (main process) from the schedule vs today
+}
+
+export interface Announcement extends AnnouncementSummary {
+  body: string
+  background: string | null // image/video file path (slide only); null = service theme
+}
+
+export interface AnnouncementInput {
+  title: string
+  body: string
+  display: AnnouncementDisplay
+  background?: string | null
+  frequency: AnnouncementFrequency
+  startDate?: string | null
+  endDate?: string | null
+  active?: boolean
 }
