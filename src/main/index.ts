@@ -404,20 +404,11 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       const item = activeServiceItems.find((it) => it.id === liveServiceItemId)
       base.imagePath = item ? ((item.payload.path as string) ?? null) : null
     } else if (mode === 'logo') {
+      // Logo zones (Back Left/Right) stay on their own static backdrop — they do
+      // NOT follow the live song/theme background. `logoBg` is the configured logo
+      // backdrop; when unset the zone page draws its charcoal gradient.
       base.imagePath = logoPath
-      // Show the logo over the live background (song video/image, or the theme
-      // gradient) whenever real content is live; fall back to the static logo
-      // backdrop when idle or blacked out. Mirrors the 'lyrics'/'text' branch:
-      // zones can't load `theme:<id>` files, so resolve themes to colors and let
-      // the zone draw an animated gradient; file backgrounds pass through as-is.
-      if (liveServiceItemId != null && live.mode !== 'black' && live.mode !== 'logo') {
-        const isThemeBg = live.background?.startsWith('theme:') ?? false
-        const themeId = isThemeBg ? live.background!.slice(6) : (live.slideTheme ?? null)
-        base.background = isThemeBg ? null : live.background
-        base.themeColors = resolveColors(getTheme(themeId), live.slideThemeColors)
-      } else {
-        base.background = logoBg
-      }
+      base.background = logoBg
     }
 
     result[zoneId] = base

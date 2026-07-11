@@ -274,31 +274,15 @@ const FLEX_SCRIPT = `
             void bgimg.offsetHeight;kbIdx=(kbIdx+1)%4;bgimg.style.animation=KB[kbIdx];
           }
         }
-      } else if(state.themeColors){
-        var tc=state.themeColors;
-        var c1=tc.primary||'#0c1a3a',c2=tc.secondary||'#162d6e';
-        var themeKey='__theme__'+c1+'|'+c2;
-        if(prevBg!==themeKey){
-          prevBg=themeKey;
-          bgvid.style.opacity='0';
-          bgimg.style.backgroundImage='linear-gradient(135deg,'+c1+' 0%,'+c2+' 50%,'+c1+' 100%)';
-          bgimg.style.backgroundSize='300% 300%';
-          bgimg.style.animation='none';void bgimg.offsetHeight;
-          bgimg.style.animation='gradDrift 20s ease infinite';
-          bgimg.style.opacity='1';
-          blob1.style.background=c1;blob2.style.background=c2;
-          blob1.style.opacity='0.45';blob2.style.opacity='0.35';
-          root.style.background='#000';
-        }
       } else if(prevBg!=='__logo_grad__'){
         prevBg='__logo_grad__';
         bgvid.style.opacity='0';
-        bgimg.style.backgroundImage='linear-gradient(135deg,#0c1a3a 0%,#0a1628 100%)';
+        bgimg.style.backgroundImage='linear-gradient(135deg,#3a3d42 0%,#1c1e20 100%)';
         bgimg.style.backgroundSize='300% 300%';
         bgimg.style.animation='none';void bgimg.offsetHeight;
         bgimg.style.animation='gradDrift 20s ease infinite';
         bgimg.style.opacity='1';
-        blob1.style.background='#0c1a3a';blob2.style.background='#162d6e';
+        blob1.style.background='#3a3d42';blob2.style.background='#4a4e54';
         blob1.style.opacity='0.45';blob2.style.opacity='0.35';
         root.style.background='#000';
       }
