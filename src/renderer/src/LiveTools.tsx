@@ -12,7 +12,7 @@ const STAGE_PRESETS = [
 // The Live tab's right-hand control panel: stage message, scripture, font,
 // auto-advance, OBS, and a collapsible "More" with the rarely-used controls.
 function LiveTools(): JSX.Element {
-  const { activeService } = useService()
+  const { activeService, reloadActiveService } = useService()
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [live, setLive] = useState<LiveState | null>(null)
   const [scriptureRef, setScriptureRef] = useState('')
@@ -261,7 +261,7 @@ function LiveTools(): JSX.Element {
 
       {/* Zone display system */}
       <section className="rounded-xl border border-white/[0.07] bg-[#1a1a1d] p-3">
-        <ZonePanel liveItem={liveItem} />
+        <ZonePanel liveItem={liveItem} reloadActiveService={reloadActiveService} />
       </section>
     </aside>
   )

@@ -17,7 +17,7 @@ const MODE_COLORS: Record<ZoneState['mode'], string> = {
   off:       'bg-slate-200 text-slate-500',
 }
 
-function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element {
+function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | null; reloadActiveService: () => void }): JSX.Element {
   const [zoneStates, setZoneStates] = useState<Record<ZoneId, ZoneState> | null>(null)
   const [serverIp, setServerIp] = useState<string>('...')
   const [port, setPort] = useState<number | null>(null)
@@ -123,7 +123,10 @@ function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element 
         <div className="rounded-lg border border-slate-200 bg-slate-100/70 p-2.5">
           <SceneChips
             item={liveItem}
-            onChanged={() => { void window.wf.zoneGetStates().then(setZoneStates) }}
+            onChanged={() => {
+              void window.wf.zoneGetStates().then(setZoneStates)
+              reloadActiveService()
+            }}
           />
         </div>
       )}
