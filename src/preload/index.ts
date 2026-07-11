@@ -25,6 +25,7 @@ import type {
   Announcement,
   AnnouncementInput
 } from '../shared/types'
+import type { SceneConfig } from '../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 
 const wf = {
@@ -220,6 +221,8 @@ const wf = {
     ipcRenderer.invoke('wf:zone:getStates'),
   zoneGetIp: (): Promise<string> =>
     ipcRenderer.invoke('wf:zone:getIp'),
+  scenesGet: (): Promise<SceneConfig> => ipcRenderer.invoke('wf:scenes:get'),
+  scenesSet: (config: SceneConfig): Promise<void> => ipcRenderer.invoke('wf:scenes:set', config),
   getTabletPort: (): Promise<number> =>
     ipcRenderer.invoke('wf:app:getTabletPort'),
   restoreRecovery: (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> =>

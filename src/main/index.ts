@@ -9,7 +9,8 @@ import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
 import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, AnnouncementInput } from '../shared/types'
-import { ZONE_ROUTING_DEFAULTS } from '../shared/types'
+import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
+import type { SceneConfig } from '../shared/zoneScenes'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -326,21 +327,23 @@ function renderState(): LiveState {
 
 function computeZoneStates(): Record<ZoneId, ZoneState> {
   const live = renderState()
-  // Get routing for the active item (or defaults by type).
+  // Get routing for the active item (or defaults: scene palette typeDefault,
+  // falling back to the built-in ZONE_ROUTING_DEFAULTS).
   let routing: ZoneRouting | null = null
   if (liveServiceItemId != null) {
     const item = activeServiceItems.find((it) => it.id === liveServiceItemId)
     if (item) {
+      const sceneConfig = parseSceneConfig(getSetting('zone_scenes'))
       const stored = getItemZoneRouting(item.id)
       if (stored) {
         try {
           routing = JSON.parse(stored) as ZoneRouting
         } catch (err) {
           console.error(`Failed to parse zone routing for item id=${item.id}:`, err)
-          routing = ZONE_ROUTING_DEFAULTS[item.type]
+          routing = defaultRoutingFor(item.type, sceneConfig)
         }
       } else {
-        routing = ZONE_ROUTING_DEFAULTS[item.type]
+        routing = defaultRoutingFor(item.type, sceneConfig)
       }
     }
   }
@@ -1441,6 +1444,14 @@ ipcMain.handle('wf:zone:getStates', (): Record<ZoneId, ZoneState> => {
 
 ipcMain.handle('wf:zone:getIp', (): string => {
   return getLocalIp()
+})
+
+// --- Scene palette (Build Service screen scenes) ---
+ipcMain.handle('wf:scenes:get', () => parseSceneConfig(getSetting('zone_scenes')))
+ipcMain.handle('wf:scenes:set', (_e, config: SceneConfig) => {
+  if (!validateSceneConfig(config)) throw new Error('Invalid scene configuration')
+  setSetting('zone_scenes', JSON.stringify(config))
+  broadcast() // typeDefaults may have changed → zones with default routing re-resolve
 })
 
 ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {

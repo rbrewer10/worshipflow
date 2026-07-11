@@ -23,6 +23,7 @@ import type {
   ZoneRouting,
   ZoneState
 } from '../../shared/types'
+import { starterConfig } from '../../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
 
 const demoLines = [
@@ -381,6 +382,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       4: clone(emptyZone)
     }),
     zoneGetIp: async (): Promise<string> => '127.0.0.1',
+    scenesGet: async () => starterConfig(),
+    scenesSet: noop,
     getTabletPort: async (): Promise<number> => 3691,
     restoreRecovery: async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => ({ ok: true, restored: false }),
     multiviewOpen: noop,
