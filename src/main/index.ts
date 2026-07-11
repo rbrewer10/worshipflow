@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } fro
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative } from 'path'
+import { randomUUID } from 'crypto'
 import { createServer } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync } from 'fs'
 import os from 'os'
@@ -42,7 +43,13 @@ import {
   setItemZoneRouting,
   setSongBgMotion,
   setSongTextColor,
-  setSongFont
+  setSongFont,
+  listServiceTemplates,
+  saveServiceTemplate,
+  deleteServiceTemplate,
+  getBackgroundTags,
+  setBackgroundTags,
+  searchBackgroundsByTags
 } from './db'
 import { listBackgrounds, copyBackground, deleteBackground } from './backgroundLib'
 import { generateBackgroundImage } from './replicateApi'
@@ -62,10 +69,21 @@ import {
   obsStopStream,
   obsStartRecord,
   obsStopRecord,
-  obsSetScene
+  obsSetScene,
+  initObsAutoConnect
 } from './obs'
+import { logInfo, logWarn, logError, getRecentLogLines, getLogsDir } from './logger'
 
 export { TABLET_PORT }
+
+// Persistent diagnostics log: catch anything that would otherwise only hit the
+// (invisible during a live service) console, so it's retrievable afterward.
+process.on('uncaughtException', (err) => {
+  logError('[process] uncaughtException', err)
+})
+process.on('unhandledRejection', (reason) => {
+  logError('[process] unhandledRejection', reason)
+})
 
 const PRELOAD = join(__dirname, '../preload/index.js')
 const startTime = Date.now()
@@ -151,6 +169,12 @@ let serviceSlideThemeColors: ThemeColors | null = null
 
 // Tablet state — cached by wf:setActiveService so the WS server can serve them.
 const tabletClients = new Set<WsSocket>()
+// Server/heartbeat refs + the actually-bound port (may differ from TABLET_PORT if
+// that port was taken and we fell back to the next one).
+let tabletHttpServer: ReturnType<typeof createServer> | null = null
+let tabletWss: WebSocketServer | null = null
+let tabletHeartbeat: ReturnType<typeof setInterval> | null = null
+let boundTabletPort = TABLET_PORT
 let activeServiceItems: ServiceItem[] = []
 let liveItemNotes: string | null = null
 
@@ -375,7 +399,19 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       base.imagePath = item ? ((item.payload.path as string) ?? null) : null
     } else if (mode === 'logo') {
       base.imagePath = logoPath
-      base.background = logoBg
+      // Show the logo over the live background (song video/image, or the theme
+      // gradient) whenever real content is live; fall back to the static logo
+      // backdrop when idle or blacked out. Mirrors the 'lyrics'/'text' branch:
+      // zones can't load `theme:<id>` files, so resolve themes to colors and let
+      // the zone draw an animated gradient; file backgrounds pass through as-is.
+      if (liveServiceItemId != null && live.mode !== 'black' && live.mode !== 'logo') {
+        const isThemeBg = live.background?.startsWith('theme:') ?? false
+        const themeId = isThemeBg ? live.background!.slice(6) : (live.slideTheme ?? null)
+        base.background = isThemeBg ? null : live.background
+        base.themeColors = resolveColors(getTheme(themeId), live.slideThemeColors)
+      } else {
+        base.background = logoBg
+      }
     }
 
     result[zoneId] = base
@@ -574,16 +610,22 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
   }
 }
 
-async function doLoadScripture(reference: string): Promise<void> {
+// Returns false (leaving the current slide untouched) when the reference can't be
+// resolved, so callers don't mark a failed scripture "live" and strand the wrong
+// content on the projector.
+async function doLoadScripture(reference: string): Promise<boolean> {
+  const result = bibleTranslation === 'kjv'
+    ? lookupScripture(reference)
+    : await fetchScripture(reference, bibleTranslation)
+  if (!result.ok || !result.verses) {
+    logWarn(`[scripture] lookup failed for reference="${reference}" translation=${bibleTranslation}`)
+    return false
+  }
   clearCountdown()
   liveSongId = null
   liveScriptureRef = reference
   clearSongMeta()
   liveBgFit = 'cover'
-  const result = bibleTranslation === 'kjv'
-    ? lookupScripture(reference)
-    : await fetchScripture(reference, bibleTranslation)
-  if (!result.ok || !result.verses) return
   const lines =
     result.verses.length === 1
       ? [result.verses[0].text]
@@ -592,6 +634,7 @@ async function doLoadScripture(reference: string): Promise<void> {
   liveSongTextColor = null; liveSongFont = null
   state.mode = 'lyrics'
   state.index = 0
+  return true
 }
 
 // Order a song's sections (honoring arrangement) and group into slide lines.
@@ -701,7 +744,7 @@ async function handleTabletLoadItem(itemId: number): Promise<void> {
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    await doLoadScripture(ref)
+    if (!(await doLoadScripture(ref))) return  // lookup failed → don't mark it live
   } else if (item.type === 'text') {
     doLoadText(
       (item.payload.title as string) ?? '',
@@ -785,8 +828,15 @@ function startTabletServer(): void {
         const rangeHeader = req.headers['range']
         if (rangeHeader && mime.startsWith('video/')) {
           const [startStr, endStr] = rangeHeader.replace(/bytes=/, '').split('-')
-          const start = parseInt(startStr, 10)
-          const end = endStr ? parseInt(endStr, 10) : stat.size - 1
+          let start = parseInt(startStr, 10)
+          let end = endStr ? parseInt(endStr, 10) : stat.size - 1
+          // Clamp a malformed/unsatisfiable range instead of emitting NaN headers.
+          if (isNaN(start) || start < 0) start = 0
+          if (isNaN(end) || end >= stat.size) end = stat.size - 1
+          if (start > end) {
+            res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` })
+            return safeEnd()
+          }
           res.writeHead(206, {
             'Content-Range': `bytes ${start}-${end}/${stat.size}`,
             'Accept-Ranges': 'bytes',
@@ -818,9 +868,18 @@ function startTabletServer(): void {
   })
 
   const wss = new WebSocketServer({ server })
+  tabletHttpServer = server
+  tabletWss = wss
+
+  // Liveness: a tablet that drops off WiFi without a clean TCP close stays "open"
+  // and would accumulate. The heartbeat pings each client and terminates any that
+  // don't pong back before the next tick.
+  const aliveClients = new WeakSet<WsSocket>()
 
   wss.on('connection', (ws: WsSocket) => {
     tabletClients.add(ws)
+    aliveClients.add(ws)
+    ws.on('pong', () => aliveClients.add(ws))
     // Send current state immediately on connect.
     ws.send(JSON.stringify({
       type: 'state',
@@ -846,20 +905,54 @@ function startTabletServer(): void {
       } catch { /* ignore malformed messages */ }
     })
 
-    ws.on('close', () => tabletClients.delete(ws))
-    ws.on('error', () => tabletClients.delete(ws))
+    ws.on('close', () => { tabletClients.delete(ws); aliveClients.delete(ws) })
+    ws.on('error', () => { tabletClients.delete(ws); aliveClients.delete(ws) })
   })
 
+  tabletHeartbeat = setInterval(() => {
+    for (const ws of tabletClients) {
+      if (!aliveClients.has(ws)) {
+        try { ws.terminate() } catch { /* ignore */ }
+        tabletClients.delete(ws)
+        continue
+      }
+      aliveClients.delete(ws)
+      try { ws.ping() } catch { /* ignore */ }
+    }
+  }, 30000)
+
+  // If the preferred port is taken (leftover instance / second launch), fall back
+  // to the next port instead of silently failing, and surface the port actually
+  // bound so the operator's tablet/OBS URLs stay correct.
+  const MAX_PORT_ATTEMPTS = 10
+  let portAttempts = 0
   server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
-      console.warn(`[tablet] port ${TABLET_PORT} already in use — close other WorshipFlow instances and restart`)
+    if (err.code === 'EADDRINUSE' && portAttempts < MAX_PORT_ATTEMPTS) {
+      portAttempts++
+      console.warn(`[tablet] port ${boundTabletPort} in use — trying ${boundTabletPort + 1}`)
+      logWarn(`[tablet] port ${boundTabletPort} in use — trying ${boundTabletPort + 1}`)
+      boundTabletPort++
+      setTimeout(() => server.listen(boundTabletPort), 100)
     } else {
       console.error('[tablet] server error:', err)
+      logError('[tablet] server error', err)
     }
   })
-  server.listen(TABLET_PORT, () => {
-    console.log(`[tablet] server: http://${getLocalIp()}:${TABLET_PORT}`)
+  server.on('listening', () => {
+    console.log(`[tablet] server: http://${getLocalIp()}:${boundTabletPort}`)
+    logInfo(`[tablet] server: http://${getLocalIp()}:${boundTabletPort}`)
   })
+  server.listen(boundTabletPort)
+}
+
+// Close the tablet/zone server + heartbeat and drop all client sockets. Called on
+// quit so a relaunch doesn't hit EADDRINUSE on a socket the OS hasn't released.
+function stopTabletServer(): void {
+  if (tabletHeartbeat) { clearInterval(tabletHeartbeat); tabletHeartbeat = null }
+  for (const ws of tabletClients) { try { ws.terminate() } catch { /* ignore */ } }
+  tabletClients.clear()
+  if (tabletWss) { tabletWss.close(); tabletWss = null }
+  if (tabletHttpServer) { tabletHttpServer.close(); tabletHttpServer = null }
 }
 
 function createStageWindow(): void {
@@ -906,7 +999,7 @@ function createMultiviewWindow(): void {
     autoHideMenuBar: true,
     webPreferences: { sandbox: true },
   })
-  multiviewWin.loadURL(`http://127.0.0.1:${TABLET_PORT}/multiview`)
+  multiviewWin.loadURL(`http://127.0.0.1:${boundTabletPort}/multiview`)
   multiviewWin.on('closed', () => { multiviewWin = null })
 }
 
@@ -1033,7 +1126,7 @@ ipcMain.handle('wf:live:loadCountdown', (_e, seconds: number) => {
 })
 
 ipcMain.handle('wf:live:loadScripture', async (_e, reference: string) => {
-  await doLoadScripture(reference); broadcast()
+  if (await doLoadScripture(reference)) broadcast()
 })
 
 ipcMain.handle('wf:live:loadSong', async (_e, id: number) => {
@@ -1094,13 +1187,14 @@ ipcMain.handle('wf:ccli:listUsage', () => listSongUsage())
 ipcMain.handle('wf:ccli:clearUsage', () => clearSongUsage())
 
 // --- Tablet IPCs ---
-ipcMain.handle('wf:getTabletUrl', () => `http://${getLocalIp()}:${TABLET_PORT}`)
+ipcMain.handle('wf:getTabletUrl', () => `http://${getLocalIp()}:${boundTabletPort}`)
 
 ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   loggedSongIds.clear()  // new/switched service → start CCLI counting fresh
   if (serviceId == null) {
     activeServiceItems = []
     liveItemNotes = null
+    broadcast()  // push the cleared service to tablet/zones/projector
     return
   }
   const svc = getService(serviceId)
@@ -1127,10 +1221,11 @@ ipcMain.handle('wf:service:setTheme', (_e, serviceId: number, themeId: string | 
 // --- OBS IPCs ---
 // Forward OBS status changes to the operator window.
 onObsStatus((s) => {
+  if (s.error) logError(`[obs] status error: ${s.error}`)
   if (operatorWin && !operatorWin.isDestroyed()) operatorWin.webContents.send('wf:obs:status', s)
 })
 
-ipcMain.handle('wf:getObsUrl', () => `http://${getLocalIp()}:${TABLET_PORT}/obs`)
+ipcMain.handle('wf:getObsUrl', () => `http://${getLocalIp()}:${boundTabletPort}/obs`)
 ipcMain.handle('wf:obs:getStatus', () => getObsStatus())
 ipcMain.handle('wf:obs:connect', (_e, host: string, port: number, password: string) =>
   connectObs(host, port, password))
@@ -1192,6 +1287,10 @@ ipcMain.handle('wf:features:clearServiceLog', () => {
   serviceLog.length = 0
 })
 
+// --- Diagnostics log IPC (persistent rolling log — retrievable after a live service) ---
+ipcMain.handle('wf:logs:getRecent', () => getRecentLogLines(200))
+ipcMain.handle('wf:logs:openFolder', async () => { await shell.openPath(getLogsDir()) })
+
 // --- Song library IPC ---
 ipcMain.handle('wf:songs:list', (_e, search?: string) => listSongs(search ?? ''))
 ipcMain.handle('wf:songs:get', (_e, id: number) => getSong(id))
@@ -1232,6 +1331,35 @@ ipcMain.handle('wf:services:setItemPayload', (_e, itemId: number, payload: Recor
 ipcMain.handle('wf:services:reorder', (_e, serviceId: number, orderedIds: number[]) =>
   reorderServiceItems(serviceId, orderedIds)
 )
+
+// ── Service Templates IPC ─────────────────────────────────────────────────────
+ipcMain.handle('wf:templates:list', () => {
+  return listServiceTemplates()
+})
+
+ipcMain.handle('wf:templates:save', (_e, template: { id: string; name: string; description?: string; items: any[]; theme: string | null; themeColors: any | null }) => {
+  saveServiceTemplate(template)
+  return template
+})
+
+ipcMain.handle('wf:templates:delete', (_e, id: string) => {
+  deleteServiceTemplate(id)
+})
+
+ipcMain.handle('wf:templates:fromService', (_e, serviceId: number, templateName: string, description?: string) => {
+  const service = getService(serviceId)
+  if (!service) throw new Error('Service not found')
+  const id = randomUUID()
+  saveServiceTemplate({
+    id,
+    name: templateName,
+    description,
+    items: service.items,
+    theme: service.theme,
+    themeColors: service.themeColors
+  })
+  return id
+})
 
 // ── Zone routing IPC ──────────────────────────────────────────────────────────
 ipcMain.handle('wf:zone:getRouting', (_e, itemId: number): ZoneRouting | null => {
@@ -1276,7 +1404,7 @@ ipcMain.handle('wf:zone:getIp', (): string => {
 })
 
 ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {
-  return TABLET_PORT
+  return boundTabletPort
 })
 
 ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => {
@@ -1425,12 +1553,29 @@ ipcMain.handle('wf:bg:delete', (_e: unknown, filePath: string) => {
 
 ipcMain.handle('wf:bg:generate', async (_e: unknown, prompt: string) => {
   const provider = getSetting('ai_provider') ?? 'pollinations'
+
   if (provider === 'replicate') {
     const apiKey = getSetting('replicate_api_key')
-    if (!apiKey) throw new Error('Replicate API key not set. Switch to Free, or paste your key in the AI Generate tab, then Save.')
-    return generateBackgroundImage(prompt, apiKey)
+    if (!apiKey) {
+      throw new Error('Replicate API key not set. Switch to Free, or paste your key in the AI Generate tab, then Save.')
+    }
+    try {
+      console.log('[bg:generate] Using Replicate API')
+      return await generateBackgroundImage(prompt, apiKey)
+    } catch (err) {
+      console.error('[bg:generate] Replicate failed:', err)
+      throw new Error(`Replicate image generation failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
-  return generatePollinationsImage(prompt)
+
+  // Use free Pollinations with automatic retry
+  try {
+    console.log('[bg:generate] Using Pollinations (free, no key)')
+    return await generatePollinationsImage(prompt)
+  } catch (err) {
+    console.error('[bg:generate] Pollinations failed:', err)
+    throw new Error(`Image generation failed: ${err instanceof Error ? err.message : String(err)}. Try switching to Replicate if the issue persists.`)
+  }
 })
 
 ipcMain.handle('wf:bg:openDialog', async () => {
@@ -1442,6 +1587,42 @@ ipcMain.handle('wf:bg:openDialog', async () => {
     ],
     properties: ['openFile']
   })
+})
+
+// Background tags
+ipcMain.handle('wf:bg:getTags', (_e: unknown, filePath: string) => {
+  return getBackgroundTags(filePath)
+})
+
+ipcMain.handle('wf:bg:setTags', (_e: unknown, filePath: string, tags: string[]) => {
+  setBackgroundTags(filePath, tags)
+})
+
+ipcMain.handle('wf:bg:search', (_e: unknown, tags: string[]) => {
+  return searchBackgroundsByTags(tags)
+})
+
+ipcMain.handle('wf:bg:autoTag', (_e: unknown, filePath: string) => {
+  // Simple auto-tagging based on filename
+  const filename = basename(filePath).toLowerCase()
+  const tags: string[] = []
+
+  if (/worship|praise|god|jesus|holy/i.test(filename)) tags.push('worship')
+  if (/prayer|pray|intercede/i.test(filename)) tags.push('prayer')
+  if (/energy|energetic|electric|dynamic|high/i.test(filename)) tags.push('energetic')
+  if (/peace|calm|serene|quiet|still|meditat/i.test(filename)) tags.push('peaceful')
+  if (/joy|celebrate|celebrat|happy|glad/i.test(filename)) tags.push('joyful')
+  if (/dark|night|shadow|black/i.test(filename)) tags.push('dark')
+  if (/light|bright|white|glow/i.test(filename)) tags.push('bright')
+  if (/nature|green|earth|tree|outdoor/i.test(filename)) tags.push('nature')
+  if (/city|urban|abstract|geometric/i.test(filename)) tags.push('modern')
+  if (/seasonal|christmas|easter|advent/i.test(filename)) tags.push('seasonal')
+
+  // If no tags detected, add generic 'other'
+  if (tags.length === 0) tags.push('other')
+
+  setBackgroundTags(filePath, tags)
+  return tags
 })
 
 ipcMain.handle('wf:songs:setBgMotion', (_e: unknown, id: number, motion: string | null) => {
@@ -1628,19 +1809,27 @@ app.whenReady().then(async () => {
     return net.fetch(fileUrl, { headers })
   })
 
+  // Snapshot the last-good database file BEFORE initDb() runs migrations, so a bad
+  // migration can never poison the day's backup.
+  createTimestampedBackup()
+  // The database must be initialized before anything reads it — SoundCheckState
+  // loads its saved rules/reference mixes during initialize(), so initDb() has to
+  // run first or that read hits an undefined db handle and silently fails.
+  await initDb()
+  ccliLicense = getSetting('ccli_license')
+  logoPath = getSetting('logo_path')
+  logoBg = getSetting('logo_bg')
+
   const soundCheckState = new SoundCheckState()
   await soundCheckState.initialize()
   registerSoundCheckHandlers(soundCheckState)
 
-  await initDb()
-  createTimestampedBackup()
-  ccliLicense = getSetting('ccli_license')
-  logoPath = getSetting('logo_path')
-  logoBg = getSetting('logo_bg')
   startTabletServer()
   createOperator()
-  layoutOutputs()
+  // layoutOutputs() — commented for single-window dev; output windows created via IPC intent
   broadcast()
+  // Reconnect to OBS in the background if the operator connected before (non-blocking).
+  void initObsAutoConnect()
   screen.on('display-added', layoutOutputs)
   screen.on('display-removed', layoutOutputs)
   screen.on('display-metrics-changed', layoutOutputs)
@@ -1655,4 +1844,12 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   app.quit()
+})
+
+// Release the LAN server socket + timers on quit so a relaunch doesn't hit
+// EADDRINUSE and leave the tablet/zone/OBS layer silently dead.
+app.on('before-quit', () => {
+  stopTabletServer()
+  clearCountdown()
+  clearAutoAdvance()
 })
