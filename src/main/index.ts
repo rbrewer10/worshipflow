@@ -123,6 +123,16 @@ function validateMediaPath(requestedPath: string): string | null {
     // Resolve to real path (follow symlinks, get canonical path)
     const realPath = realpathSync(resolved)
 
+    // The church logo image and logo motion background are explicitly chosen by the
+    // user via Settings and can live anywhere they picked them (Downloads, a mapped
+    // drive, etc.). Allow those exact configured files regardless of folder.
+    for (const configured of [logoPath, logoBg]) {
+      if (!configured) continue
+      try {
+        if (realpathSync(resolve(configured)) === realPath) return realPath
+      } catch { /* configured file missing — fall through */ }
+    }
+
     // Check if REAL path is within any allowed root
     for (const root of allowedRoots) {
       const rel = relative(root, realPath)
