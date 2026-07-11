@@ -85,4 +85,9 @@ describe('parse/validate', () => {
     expect(validateSceneConfig(blank)).toBe(false)
     expect(validateSceneConfig(config)).toBe(true)
   })
+
+  it('validateSceneConfig rejects non-string typeDefaults values', () => {
+    const bad = { scenes: [lyricsTvsOnly], typeDefaults: { song: 123 } }
+    expect(validateSceneConfig(bad)).toBe(false)
+  })
 })

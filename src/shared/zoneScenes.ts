@@ -77,6 +77,7 @@ export function effectiveRouting(
 // Reverse-match a routing against every scene's expansion for this type.
 // Compares all four zones (so an Advanced-edited Z4 correctly reads as custom).
 export function matchScene(routing: ZoneRouting, type: ServiceItemType, config: SceneConfig): string | 'custom' {
+  // If two scenes expand identically for this type, the first in config order wins (tie-break is intentional).
   for (const scene of config.scenes) {
     const exp = expandScene(scene, type)
     if (exp[1] === routing[1] && exp[2] === routing[2] && exp[3] === routing[3] && exp[4] === routing[4]) {
@@ -93,12 +94,16 @@ export function validateSceneConfig(config: unknown): config is SceneConfig {
   const c = config as SceneConfig
   if (!Array.isArray(c.scenes) || c.scenes.length === 0) return false
   if (typeof c.typeDefaults !== 'object' || c.typeDefaults == null) return false
+  for (const value of Object.values(c.typeDefaults)) {
+    if (value !== undefined && typeof value !== 'string') return false
+  }
   const ids = new Set<string>()
   for (const s of c.scenes) {
     if (typeof s?.id !== 'string' || !s.id || ids.has(s.id)) return false
     ids.add(s.id)
     if (typeof s.name !== 'string' || !s.name.trim()) return false
     if (typeof s.zones !== 'object' || s.zones == null) return false
+    // null/missing roles are allowed — expandScene treats a missing zone as 'logo' (safe filler)
     for (const z of ['1', '2', '3'] as const) {
       const role = s.zones[z]
       if (role != null && !ROLES.includes(role)) return false
