@@ -159,6 +159,25 @@ let stageWin: BrowserWindow | null = null
 let multiviewWin: BrowserWindow | null = null
 const outputWins = new Map<string, BrowserWindow>()
 
+// Without this, launching the app while a prior instance is still running (e.g.
+// after an installer's "Launch now", a crash-relaunch, or a stray background
+// copy) spawns a second process that silently fails to bind the zone/tablet
+// WebSocket port (already held by the first) — the new window looks fine but
+// the actual zone displays keep being served by the OLD, now-orphaned instance
+// and never see anything the user does in the new one. Single-instance lock
+// makes a second launch just focus the existing window instead.
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (operatorWin) {
+      if (operatorWin.isMinimized()) operatorWin.restore()
+      operatorWin.focus()
+    }
+  })
+}
+
 // Canonical live state.
 let liveSong: { title: string; lines: string[]; background?: string | null; bgMotion?: string | null } = DEMO_SONG
 let liveSongId: number | null = null
