@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import type { ZoneId, ZoneState, ZoneRouting, ServiceItem } from '../../shared/types'
-import { ZONE_NAMES, ZONE_ROUTING_DEFAULTS } from '../../shared/types'
-import ZoneRoutingGrid, { MODE_LABELS } from './ZoneRoutingGrid'
+import type { ZoneId, ZoneState, ServiceItem } from '../../shared/types'
+import { ZONE_NAMES } from '../../shared/types'
+import { MODE_LABELS } from './ZoneRoutingGrid'
+import SceneChips from './SceneChips'
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
@@ -18,9 +19,9 @@ const MODE_COLORS: Record<ZoneState['mode'], string> = {
 
 function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element {
   const [zoneStates, setZoneStates] = useState<Record<ZoneId, ZoneState> | null>(null)
-  const [routing, setRouting] = useState<ZoneRouting | null>(null)
   const [serverIp, setServerIp] = useState<string>('...')
   const [port, setPort] = useState<number | null>(null)
+  const [overridden, setOverridden] = useState<Set<ZoneId>>(new Set())
 
   // Load zone states on mount and whenever live item changes.
   useEffect(() => {
@@ -32,17 +33,6 @@ function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element 
     })
   }, [])
 
-  // Load routing for the active item.
-  useEffect(() => {
-    if (!liveItem) { setRouting(null); return }
-    const defaults = ZONE_ROUTING_DEFAULTS[liveItem.type]
-    if (liveItem.zoneRouting) {
-      setRouting(liveItem.zoneRouting)
-    } else {
-      setRouting(defaults)
-    }
-  }, [liveItem])
-
   // Poll zone states every 2 seconds.
   useEffect(() => {
     const t = setInterval(() => {
@@ -52,28 +42,21 @@ function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element 
   }, [])
 
   const setOverride = (zoneId: ZoneId, mode: ZoneState['mode'] | null): void => {
+    setOverridden((prev) => {
+      const next = new Set(prev)
+      if (mode == null) next.delete(zoneId); else next.add(zoneId)
+      return next
+    })
     void window.wf.zoneSetOverride(zoneId, mode).then(() =>
       window.wf.zoneGetStates().then(setZoneStates)
     )
   }
 
   const clearOverrides = (): void => {
+    setOverridden(new Set())
     void window.wf.zoneClearOverrides().then(() =>
       window.wf.zoneGetStates().then(setZoneStates)
     )
-  }
-
-  const saveRouting = (newRouting: ZoneRouting): void => {
-    if (!liveItem) return
-    setRouting(newRouting)
-    void window.wf.zoneSetRouting(liveItem.id, newRouting)
-  }
-
-  const resetRouting = (): void => {
-    if (!liveItem) return
-    void window.wf.zoneSetRouting(liveItem.id, null).then(() => {
-      setRouting(ZONE_ROUTING_DEFAULTS[liveItem.type])
-    })
   }
 
   return (
@@ -101,8 +84,13 @@ function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element 
                   <span className="text-[10px] font-bold text-slate-500">Z{zoneId}</span>
                   <span className="text-xs font-medium text-slate-700">{ZONE_NAMES[zoneId]}</span>
                 </div>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${MODE_COLORS[mode]}`}>
-                  {MODE_LABELS[mode]}
+                <span className="flex items-center gap-1">
+                  {overridden.has(zoneId) && (
+                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-600">Manual</span>
+                  )}
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${MODE_COLORS[mode]}`}>
+                    {MODE_LABELS[mode]}
+                  </span>
                 </span>
               </div>
               {/* Quick mode override buttons */}
@@ -130,21 +118,13 @@ function ZonePanel({ liveItem }: { liveItem: ServiceItem | null }): JSX.Element 
         })}
       </div>
 
-      {/* Routing for active item */}
-      {liveItem && routing && (
+      {/* Scene chips for the live item (same UI as Build Service) */}
+      {liveItem && (
         <div className="rounded-lg border border-slate-200 bg-slate-100/70 p-2.5">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-600">
-              Auto-routing for: <span className="text-slate-700">{liveItem.title}</span>
-            </span>
-            <button
-              onClick={resetRouting}
-              className="text-[10px] text-slate-400 hover:text-slate-600"
-            >
-              Reset
-            </button>
-          </div>
-          <ZoneRoutingGrid routing={routing} onChange={saveRouting} />
+          <SceneChips
+            item={liveItem}
+            onChanged={() => { void window.wf.zoneGetStates().then(setZoneStates) }}
+          />
         </div>
       )}
 
