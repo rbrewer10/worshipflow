@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, re
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, AnnouncementInput } from '../shared/types'
 import { ZONE_ROUTING_DEFAULTS } from '../shared/types'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
@@ -20,6 +20,12 @@ import {
   createSong,
   updateSong,
   deleteSong,
+  listAnnouncements,
+  getAnnouncement,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+  listScheduledAnnouncements,
   setSongBackground,
   setSongFontScale,
   listServices,
@@ -678,6 +684,17 @@ async function doLoadSong(id: number): Promise<void> {
   }
 }
 
+async function doLoadAnnouncement(id: number): Promise<void> {
+  const a = getAnnouncement(id)
+  if (!a) return
+  if (a.display === 'ticker') {
+    // Title literally 'Announcement' triggers the ticker renderer (existing mechanism).
+    doLoadText('Announcement', a.body)
+  } else {
+    doLoadText(a.title, a.body, a.background ?? null)
+  }
+}
+
 // Pure: the slides an item would show, without going live (for the slide grid).
 async function computeItemSlides(item: ServiceItem): Promise<string[]> {
   if (item.type === 'song' && item.ref_id != null) {
@@ -1137,6 +1154,10 @@ ipcMain.handle('wf:live:loadMedia', (_e, filePath: string, title: string) => {
   doLoadMedia(filePath, title); broadcast()
 })
 
+ipcMain.handle('wf:live:loadAnnouncement', async (_e, id: number) => {
+  await doLoadAnnouncement(id); broadcast()
+})
+
 ipcMain.handle('wf:getState', (): LiveState => renderState())
 
 ipcMain.handle('wf:stage:open', () => { createStageWindow() })
@@ -1297,6 +1318,12 @@ ipcMain.handle('wf:songs:get', (_e, id: number) => getSong(id))
 ipcMain.handle('wf:songs:create', (_e, input: SongInput) => createSong(input))
 ipcMain.handle('wf:songs:update', (_e, id: number, input: SongInput) => updateSong(id, input))
 ipcMain.handle('wf:songs:delete', (_e, id: number) => deleteSong(id))
+ipcMain.handle('wf:announcements:list', (_e, search?: string) => listAnnouncements(search ?? ''))
+ipcMain.handle('wf:announcements:get', (_e, id: number) => getAnnouncement(id))
+ipcMain.handle('wf:announcements:create', (_e, input: AnnouncementInput) => createAnnouncement(input))
+ipcMain.handle('wf:announcements:update', (_e, id: number, input: AnnouncementInput) => updateAnnouncement(id, input))
+ipcMain.handle('wf:announcements:delete', (_e, id: number) => deleteAnnouncement(id))
+ipcMain.handle('wf:announcements:scheduled', (_e, serviceDate: string) => listScheduledAnnouncements(serviceDate))
 ipcMain.handle('wf:songs:setFontScale', (_e, id: number, scale: number) => setSongFontScale(id, scale))
 ipcMain.handle('wf:songs:setTextColor', (_e: unknown, id: number, color: string | null) => {
   setSongTextColor(id, color)

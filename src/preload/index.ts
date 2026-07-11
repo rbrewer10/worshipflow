@@ -20,12 +20,15 @@ import type {
   ItemStyle,
   ZoneId,
   ZoneState,
-  ZoneRouting
+  ZoneRouting,
+  AnnouncementSummary,
+  Announcement,
+  AnnouncementInput
 } from '../shared/types'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 
 const wf = {
-  version: '0.0.1',
+  version: '0.6.3',
   sendIntent: (type: Intent): void => ipcRenderer.send('wf:intent', type),
   onState: (cb: (s: LiveState) => void): (() => void) => {
     const handler = (_e: unknown, s: LiveState): void => cb(s)
@@ -42,6 +45,15 @@ const wf = {
   songUpdate: (id: number, input: SongInput): Promise<void> => ipcRenderer.invoke('wf:songs:update', id, input),
   songDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:songs:delete', id),
   songsImportPptx: (): Promise<ParsedPptxSong[]> => ipcRenderer.invoke('wf:songs:importPptx'),
+
+  // Announcements library
+  announcementsList: (search?: string): Promise<AnnouncementSummary[]> => ipcRenderer.invoke('wf:announcements:list', search),
+  announcementGet: (id: number): Promise<Announcement | null> => ipcRenderer.invoke('wf:announcements:get', id),
+  announcementCreate: (input: AnnouncementInput): Promise<number> => ipcRenderer.invoke('wf:announcements:create', input),
+  announcementUpdate: (id: number, input: AnnouncementInput): Promise<void> => ipcRenderer.invoke('wf:announcements:update', id, input),
+  announcementDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:announcements:delete', id),
+  announcementsScheduled: (serviceDate: string): Promise<AnnouncementSummary[]> => ipcRenderer.invoke('wf:announcements:scheduled', serviceDate),
+  liveLoadAnnouncement: (id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadAnnouncement', id),
 
   // Service builder
   servicesList: (): Promise<ServiceSummary[]> => ipcRenderer.invoke('wf:services:list'),
@@ -67,6 +79,13 @@ const wf = {
     ipcRenderer.invoke('wf:services:reorder', serviceId, orderedIds),
   serviceSlides: (serviceId: number): Promise<{ id: number; slides: string[] }[]> =>
     ipcRenderer.invoke('wf:service:slides', serviceId),
+
+  // Service templates
+  templatesList: (): Promise<any[]> => ipcRenderer.invoke('wf:templates:list'),
+  templatesSave: (template: any): Promise<any> => ipcRenderer.invoke('wf:templates:save', template),
+  templatesDelete: (id: string): Promise<void> => ipcRenderer.invoke('wf:templates:delete', id),
+  templatesFromService: (serviceId: number, name: string, description?: string): Promise<string> =>
+    ipcRenderer.invoke('wf:templates:fromService', serviceId, name, description),
   serviceImportImages: (): Promise<{ id: number; name: string; count: number } | null> =>
     ipcRenderer.invoke('wf:service:importImages'),
   serviceImportPptx: (): Promise<{ id: number; name: string; count: number } | null> =>
@@ -109,6 +128,14 @@ const wf = {
   bgGenerate: (prompt: string): Promise<string> => ipcRenderer.invoke('wf:bg:generate', prompt),
   bgOpenDialog: (): Promise<{ canceled: boolean; filePaths: string[] }> =>
     ipcRenderer.invoke('wf:bg:openDialog'),
+  bgGetTags: (filePath: string): Promise<string[]> =>
+    ipcRenderer.invoke('wf:bg:getTags', filePath),
+  bgSetTags: (filePath: string, tags: string[]): Promise<void> =>
+    ipcRenderer.invoke('wf:bg:setTags', filePath, tags),
+  bgSearch: (tags: string[]): Promise<string[]> =>
+    ipcRenderer.invoke('wf:bg:search', tags),
+  bgAutoTag: (filePath: string): Promise<string[]> =>
+    ipcRenderer.invoke('wf:bg:autoTag', filePath),
   songSetBgMotion: (id: number, motion: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:songs:setBgMotion', id, motion),
   songSetTextColor: (id: number, color: string | null): Promise<void> =>
@@ -142,6 +169,10 @@ const wf = {
     ipcRenderer.invoke('wf:features:getServiceLog'),
   featuresClearServiceLog: (): Promise<void> =>
     ipcRenderer.invoke('wf:features:clearServiceLog'),
+
+  // Diagnostics log
+  logsGetRecent: (): Promise<string[]> => ipcRenderer.invoke('wf:logs:getRecent'),
+  logsOpenFolder: (): Promise<void> => ipcRenderer.invoke('wf:logs:openFolder'),
 
   // OBS integration
   getObsUrl: (): Promise<string> => ipcRenderer.invoke('wf:getObsUrl'),
