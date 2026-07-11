@@ -1,7 +1,7 @@
 {
   "name": "worshipflow",
   "productName": "WorshipFlow Pro",
-  "version": "0.0.1",
+  "version": "0.7.0",
   "description": "WorshipFlow Pro — church worship presentation & sound check software for Snow Hill Church",
   "main": "./out/main/index.js",
   "author": "Ryan Brewer",
@@ -15,12 +15,14 @@
     "start": "electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
-    "typecheck": "npm run typecheck:node && npm run typecheck:web"
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "vitest run"
   },
   "dependencies": {
     "electron-store": "^8.1.0",
     "fft.js": "^4.0.4",
     "jszip": "^3.10.1",
+    "lucide-react": "^1.24.0",
     "mic": "^2.1.2",
     "obs-websocket-js": "^5.0.8",
     "osc": "^2.4.5",
@@ -45,6 +47,7 @@
     "react-dom": "^18.3.1",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^4.1.10"
   }
 }
