@@ -1,27 +1,21 @@
 import { useState } from 'react'
+import type { ComponentType } from 'react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary } from '../../shared/types'
 
-const TYPE_ICON: Record<ServiceItem['type'], string> = {
-  song: '🎵', scripture: '📖', text: '📝', countdown: '⏱', image: '🖼', welcome: '👋', ticker: '📰'
+type IconType = ComponentType<{ size?: number | string; className?: string }>
+
+const TYPE_ICON: Record<ServiceItem['type'], IconType> = {
+  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone
 }
 
-const TYPE_BADGE: Record<ServiceItem['type'], string> = {
-  song:       'bg-blue-500/15 text-blue-300',
-  scripture:  'bg-pink-500/15 text-pink-300',
-  text:       'bg-white/10 text-slate-400',
-  countdown:  'bg-orange-500/15 text-orange-300',
-  image:      'bg-emerald-500/15 text-emerald-300',
-  welcome:    'bg-violet-500/15 text-violet-300',
-  ticker:     'bg-white/10 text-slate-400',
-}
-
-const ADD_TYPES: { type: ServiceItem['type']; label: string; cls: string }[] = [
-  { type: 'scripture', label: '📖 Scripture', cls: 'border-pink-500/30 bg-pink-500/10 text-pink-300 hover:bg-pink-500/20' },
-  { type: 'text',      label: '📝 Text',      cls: 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10' },
-  { type: 'countdown', label: '⏱ Countdown', cls: 'border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20' },
-  { type: 'image',     label: '🖼 Image',     cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20' },
-  { type: 'welcome',   label: '👋 Welcome',   cls: 'border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20' },
-  { type: 'ticker',    label: '📰 Ticker',    cls: 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10' },
+const ADD_TYPES: { type: ServiceItem['type']; label: string; Icon: IconType }[] = [
+  { type: 'scripture', label: 'Scripture', Icon: BookOpen },
+  { type: 'text',      label: 'Text',      Icon: Type },
+  { type: 'countdown', label: 'Countdown', Icon: Timer },
+  { type: 'image',     label: 'Image/Video', Icon: ImageIcon },
+  { type: 'welcome',   label: 'Welcome',   Icon: Hand },
+  { type: 'ticker',    label: 'Ticker',    Icon: ScrollText },
 ]
 
 function itemPreview(it: ServiceItem): string {
@@ -71,13 +65,14 @@ function ServiceDeck({ service, songs, liveItemId, selectedId, onSelect, onAdd, 
       <div className="min-h-0 flex-1 overflow-auto pr-1">
         {items.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-2 text-3xl">📋</div>
+            <ListMusic size={28} className="mb-3 text-slate-400" />
             <p className="text-sm text-slate-500">Your service is empty</p>
-            <p className="mt-1 text-xs text-slate-600">Click &quot;+ Add item&quot; below to get started</p>
+            <p className="mt-1 text-xs text-slate-400">Click &quot;Add item&quot; below to get started</p>
           </div>
         )}
         {items.map((it, i) => {
           const preview = itemPreview(it)
+          const Icon = TYPE_ICON[it.type]
           return (
             <div
               key={it.id}
@@ -88,37 +83,40 @@ function ServiceDeck({ service, songs, liveItemId, selectedId, onSelect, onAdd, 
               onClick={() => onSelect(it.id)}
               className={`group mb-1.5 flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                 selectedId === it.id
-                  ? 'border-indigo-500/30 bg-indigo-500/10 ring-1 ring-indigo-500/30'
-                  : 'border-white/[0.07] bg-[#15151a] hover:bg-white/[0.05]'
+                  ? 'border-emerald-500/30 bg-emerald-500/[0.07] ring-1 ring-emerald-500/30'
+                  : 'border-slate-200 bg-white hover:bg-slate-100'
               } ${dragId === it.id ? 'opacity-40' : ''}`}
             >
               <div className="flex w-5 flex-shrink-0 flex-col items-center">
-                <span className="text-[11px] leading-none text-slate-600 group-hover:text-slate-400">⋮⋮</span>
+                <GripVertical size={13} className="text-slate-400 group-hover:text-slate-600" />
               </div>
-              <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-sm ${TYPE_BADGE[it.type]}`}>
-                {TYPE_ICON[it.type]}
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                <Icon size={15} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-white">{it.title || it.type}</div>
-                <div className="truncate text-xs text-slate-400">
+                <div className="truncate text-sm font-medium text-slate-900">{it.title || it.type}</div>
+                <div className="truncate text-xs text-slate-600">
                   {it.type} · #{i + 1}{preview ? ` · ${preview}` : ''}
                 </div>
               </div>
               <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 {liveItemId === it.id ? (
-                  <span className="text-[10px] font-bold text-emerald-400">● LIVE</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    LIVE
+                  </span>
                 ) : (
                   <>
                     <button
                       onClick={() => onGoLive(it)}
-                      className="text-xs text-slate-600 opacity-0 hover:text-emerald-400 group-hover:opacity-100"
+                      className="text-slate-400 opacity-0 hover:text-emerald-700 group-hover:opacity-100"
                       title="Go live"
-                    >▶</button>
+                    ><Play size={14} /></button>
                     <button
                       onClick={() => onDelete(it)}
-                      className="text-xs text-slate-600 opacity-0 hover:text-red-400 group-hover:opacity-100"
+                      className="text-slate-400 opacity-0 hover:text-red-600 group-hover:opacity-100"
                       title="Delete"
-                    >✕</button>
+                    ><X size={14} /></button>
                   </>
                 )}
               </div>
@@ -128,30 +126,33 @@ function ServiceDeck({ service, songs, liveItemId, selectedId, onSelect, onAdd, 
       </div>
 
       {showAdd ? (
-        <div className="mt-2 rounded-xl border border-white/[0.07] bg-[#15151a] p-4">
+        <div className="mt-2 rounded-xl border border-slate-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-semibold text-white">What do you want to add?</span>
-            <button onClick={() => setShowAdd(false)} className="text-xs text-slate-500 hover:text-slate-300">✕ Close</button>
+            <span className="text-sm font-semibold text-slate-900">What do you want to add?</span>
+            <button onClick={() => setShowAdd(false)} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+              <X size={12} /> Close
+            </button>
           </div>
           <div className="mb-3">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-400">Song from library</label>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600">Song from library</label>
             <select
               value=""
               onChange={(e) => { if (e.target.value) { onAddSong(Number(e.target.value)); setShowAdd(false) } }}
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none hover:bg-black/40"
+              className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none hover:bg-slate-200"
             >
-              <option value="">🎵 Choose a song…</option>
+              <option value="">Choose a song…</option>
               {songs.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
             </select>
           </div>
-          <div className="mb-1.5 text-xs font-semibold text-slate-400">Or add another item type</div>
+          <div className="mb-1.5 text-xs font-semibold text-slate-600">Or add another item type</div>
           <div className="grid grid-cols-3 gap-2">
             {ADD_TYPES.map((a) => (
               <button
                 key={a.type}
                 onClick={() => { onAdd(a.type); setShowAdd(false) }}
-                className={`rounded-lg border px-3 py-2.5 text-center text-xs font-semibold transition-colors ${a.cls}`}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-center text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
               >
+                <a.Icon size={13} />
                 {a.label}
               </button>
             ))}
@@ -160,9 +161,9 @@ function ServiceDeck({ service, songs, liveItemId, selectedId, onSelect, onAdd, 
       ) : (
         <button
           onClick={() => setShowAdd(true)}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-500/40 py-3 text-sm font-semibold text-indigo-400 transition-colors hover:border-indigo-500/60 hover:bg-indigo-500/5"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-500/50 hover:text-emerald-700"
         >
-          + Add item
+          <Plus size={15} /> Add item
         </button>
       )}
     </div>

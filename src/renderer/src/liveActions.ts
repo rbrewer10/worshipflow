@@ -2,6 +2,15 @@ import type { ServiceItem } from '../../shared/types'
 
 // Shared live-load helpers used by both LiveView and the service deck builder.
 
+// Resolves the background file an item's slide thumbnail should show. Text-item
+// backgrounds live on the item itself; song backgrounds live on the referenced
+// song record, so callers must supply a songId -> background lookup for those.
+export function itemThumbBackground(item: ServiceItem, songBg: Record<number, string | null>): string | null {
+  if (item.type === 'text') return (item.payload?.background as string | undefined) ?? null
+  if (item.type === 'song' && item.ref_id != null) return songBg[item.ref_id] ?? null
+  return null
+}
+
 export function canGoLive(item: ServiceItem): boolean {
   return (
     (item.type === 'song' && item.ref_id != null) ||
@@ -10,7 +19,8 @@ export function canGoLive(item: ServiceItem): boolean {
     (item.type === 'countdown' && (item.payload.seconds as number) > 0) ||
     (item.type === 'image' && !!(item.payload.path as string)) ||
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
-    (item.type === 'ticker' && !!(item.payload.text as string))
+    (item.type === 'ticker' && !!(item.payload.text as string)) ||
+    (item.type === 'announcement' && item.ref_id != null)
   )
 }
 
@@ -43,6 +53,8 @@ export async function sendItemLive(item: ServiceItem): Promise<void> {
     const txt = item.payload.text as string
     if (!txt) return
     await window.wf.liveLoadText('Announcement', txt)
+  } else if (item.type === 'announcement' && item.ref_id != null) {
+    await window.wf.liveLoadAnnouncement(item.ref_id)
   } else {
     return
   }

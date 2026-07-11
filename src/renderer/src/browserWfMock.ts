@@ -237,6 +237,14 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     songDelete: noop,
     songsImportPptx: async (): Promise<ParsedPptxSong[]> => [],
 
+    announcementsList: async () => [],
+    announcementGet: async () => null,
+    announcementCreate: async () => 1,
+    announcementUpdate: noop,
+    announcementDelete: noop,
+    announcementsScheduled: async () => [],
+    liveLoadAnnouncement: noop,
+
     servicesList: async (): Promise<ServiceSummary[]> =>
       services.map(({ id, name, service_date }) => ({ id, name, service_date })),
     serviceCreate: async (name: string, date?: string): Promise<number> => {
@@ -312,6 +320,10 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     bgDelete: noop,
     bgGenerate: async (): Promise<string> => '',
     bgOpenDialog: async (): Promise<{ canceled: boolean; filePaths: string[] }> => ({ canceled: true, filePaths: [] }),
+    bgGetTags: async (): Promise<string[]> => [],
+    bgSetTags: async (): Promise<void> => {},
+    bgSearch: async (): Promise<string[]> => [],
+    bgAutoTag: async (): Promise<string[]> => ['other'],
     songSetBgMotion: noop,
     songSetTextColor: noop,
     songSetFont: noop,
@@ -333,13 +345,16 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     featuresGetServiceLog: async (): Promise<Array<{ ts: number; event: string }>> => [],
     featuresClearServiceLog: noop,
 
+    logsGetRecent: async (): Promise<string[]> => [],
+    logsOpenFolder: noop,
+
     getObsUrl: async (): Promise<string> => 'Browser preview only',
     obsOnStatus: (cb: (s: ObsStatus) => void): (() => void) => {
-      cb({ connected: false, streaming: false, recording: false, currentScene: null, scenes: [], error: null })
+      cb({ connected: false, streaming: false, recording: false, currentScene: null, scenes: [], error: null, streamStartedAt: null, recordStartedAt: null, reconnecting: false })
       return () => {}
     },
-    obsGetStatus: async (): Promise<ObsStatus> => ({ connected: false, streaming: false, recording: false, currentScene: null, scenes: [], error: null }),
-    obsConnect: async (): Promise<ObsStatus> => ({ connected: false, streaming: false, recording: false, currentScene: null, scenes: [], error: 'OBS is available in Electron only.' }),
+    obsGetStatus: async (): Promise<ObsStatus> => ({ connected: false, streaming: false, recording: false, currentScene: null, scenes: [], error: null, streamStartedAt: null, recordStartedAt: null, reconnecting: false }),
+    obsConnect: async (): Promise<ObsStatus> => ({ connected: false, streaming: false, recording: false, currentScene: null, scenes: [], error: 'OBS is available in Electron only.', streamStartedAt: null, recordStartedAt: null, reconnecting: false }),
     obsDisconnect: noop,
     obsStartStream: noop,
     obsStopStream: noop,
@@ -371,6 +386,11 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),
     serviceImportFile: async (): Promise<{ canceled: boolean; serviceId: number | null }> => ({ canceled: true, serviceId: null }),
+
+    templatesList: async (): Promise<any[]> => [],
+    templatesSave: async (template: any): Promise<any> => template,
+    templatesDelete: noop,
+    templatesFromService: async (): Promise<string> => 'template-id',
 
     soundCheck: {
       init: async (): Promise<Channel[]> => clone(soundCheckChannels),

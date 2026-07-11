@@ -1,14 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Church,
+  FileText,
+  Hand,
+  Image as ImageIcon,
+  Music,
+  Newspaper,
+  Square,
+  Timer,
+  X
+} from 'lucide-react'
 import type { Intent, LiveState, ServiceFull, ServiceItem, ServiceSummary } from '../../shared/types'
 
-const ICON: Record<ServiceItem['type'], string> = {
-  song: '🎵',
-  scripture: '📖',
-  text: '📝',
-  countdown: '⏱',
-  image: '🖼',
-  welcome: '👋',
-  ticker: '📰'
+const ICON: Record<ServiceItem['type'], JSX.Element> = {
+  song: <Music size={14} />,
+  scripture: <BookOpen size={14} />,
+  text: <FileText size={14} />,
+  countdown: <Timer size={14} />,
+  image: <ImageIcon size={14} />,
+  welcome: <Hand size={14} />,
+  ticker: <Newspaper size={14} />,
+  announcement: <Newspaper size={14} />
 }
 
 function canGoLive(item: ServiceItem): boolean {
@@ -19,7 +34,8 @@ function canGoLive(item: ServiceItem): boolean {
     (item.type === 'countdown' && (item.payload.seconds as number) > 0) ||
     (item.type === 'image' && !!(item.payload.path as string)) ||
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
-    (item.type === 'ticker' && !!(item.payload.text as string))
+    (item.type === 'ticker' && !!(item.payload.text as string)) ||
+    (item.type === 'announcement' && item.ref_id != null)
   )
 }
 
@@ -50,6 +66,8 @@ async function loadItem(item: ServiceItem): Promise<void> {
     const txt = item.payload.text as string
     if (!txt) return
     await window.wf.liveLoadText('Announcement', txt)
+  } else if (item.type === 'announcement' && item.ref_id != null) {
+    await window.wf.liveLoadAnnouncement(item.ref_id)
   } else {
     return
   }
@@ -126,23 +144,23 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
   const isCountdown = mode === 'countdown'
 
   return (
-    <div className="flex h-full select-none flex-col bg-[#080c14]">
+    <div className="flex h-full select-none flex-col bg-[#e9ecf1]">
       {/* ── Top bar ── */}
-      <div className="flex items-center gap-2 border-b border-white/10 bg-black/30 px-4 py-2">
-        <TopBtn active={isBlack} onClick={() => send('black')} className={isBlack ? 'bg-slate-700 ring-1 ring-white/20' : ''}>
-          ■ Black
+      <div className="flex items-center gap-2 border-b border-slate-200 bg-[#f4f6f9] px-4 py-2">
+        <TopBtn active={isBlack} onClick={() => send('black')} className={isBlack ? 'bg-slate-700 text-white ring-1 ring-slate-900/10' : ''}>
+          <Square size={16} /> Black
         </TopBtn>
-        <TopBtn active={isLogo} onClick={() => send('logo')} className={isLogo ? 'bg-blue-700' : ''}>
-          ✝ Logo
+        <TopBtn active={isLogo} onClick={() => send('logo')} className={isLogo ? 'bg-emerald-600 text-white' : ''}>
+          <Church size={16} /> Logo
         </TopBtn>
         <TopBtn active={!isBlack && !isLogo} onClick={() => send('lyrics')}>
           Lyrics
         </TopBtn>
-        <div className="mx-2 h-5 w-px bg-white/10" />
+        <div className="mx-2 h-5 w-px bg-slate-200" />
         <select
           value={activeServiceId ?? ''}
           onChange={(e) => e.target.value && pickService(Number(e.target.value))}
-          className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
+          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-emerald-500"
         >
           {services.length === 0 && <option value="">No services</option>}
           {services.map((s) => (
@@ -152,8 +170,8 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-slate-500">Space / → next · ← prev · B black · L logo</span>
           {onExit && (
-            <button onClick={onExit} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-slate-400 hover:bg-white/[0.12] hover:text-white">
-              ✕ Exit
+            <button onClick={onExit} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+              <X size={13} /> Exit
             </button>
           )}
         </div>
@@ -164,40 +182,40 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         {/* PREV */}
         <button
           onClick={() => send('prev')}
-          className="flex w-44 shrink-0 flex-col items-center justify-center gap-3 border-r border-white/10 text-slate-500 transition-all hover:bg-white/[0.06] hover:text-white active:bg-white/10"
+          className="flex w-44 shrink-0 flex-col items-center justify-center gap-3 border-r border-slate-200 bg-[#f4f6f9] text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
         >
-          <span className="text-6xl leading-none">◀</span>
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Prev</span>
+          <ChevronLeft size={64} strokeWidth={2.5} />
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Prev</span>
         </button>
 
         {/* Slide content */}
         <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-5 px-10 text-center">
           {isCountdown ? (
             <>
-              <div className="text-base font-semibold uppercase tracking-[0.35em] text-blue-300">
+              <div className="text-base font-semibold uppercase tracking-[0.35em] text-emerald-700">
                 Service begins in
               </div>
-              <div className="font-mono text-9xl font-black tabular-nums text-white">
+              <div className="font-mono text-9xl font-black tabular-nums text-slate-900">
                 {live?.line ?? ''}
               </div>
             </>
           ) : isBlack ? (
-            <div className="text-2xl font-semibold text-slate-700">Screen is black</div>
+            <div className="text-2xl font-semibold text-slate-500">Screen is black</div>
           ) : isLogo ? (
-            <div className="text-3xl font-bold text-blue-300">✝ SNOW HILL — Logo screen</div>
+            <div className="inline-flex items-center gap-2.5 text-3xl font-bold text-emerald-700"><Church size={30} /> SNOW HILL — Logo screen</div>
           ) : (
             <>
-              <div className="text-5xl font-bold leading-snug text-white" style={{ whiteSpace: 'pre-line' }}>
-                {live?.line || <span className="italic text-slate-700">Nothing loaded</span>}
+              <div className="text-5xl font-bold leading-snug text-slate-900" style={{ whiteSpace: 'pre-line' }}>
+                {live?.line || <span className="italic text-slate-400">Nothing loaded</span>}
               </div>
               {live && live.total > 0 && (
                 <div className="text-sm text-slate-500">
                   Slide {live.index + 1} of {live.total}
-                  {live.songTitle ? <> · <span className="text-slate-400">{live.songTitle}</span></> : null}
+                  {live.songTitle ? <> · <span className="text-slate-600">{live.songTitle}</span></> : null}
                 </div>
               )}
               {live?.next && (
-                <div className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-4 py-2 text-sm text-slate-600">
+                <div className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">
                   Next: {live.next}
                 </div>
               )}
@@ -208,17 +226,17 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         {/* NEXT */}
         <button
           onClick={goNext}
-          className="flex w-44 shrink-0 flex-col items-center justify-center gap-3 border-l border-white/10 bg-emerald-950/30 text-emerald-600 transition-all hover:bg-emerald-900/30 hover:text-emerald-400 active:bg-emerald-800/30"
+          className="flex w-44 shrink-0 flex-col items-center justify-center gap-3 border-l border-slate-200 bg-emerald-500/10 text-emerald-700 transition-all hover:bg-emerald-500/15 hover:text-emerald-800 active:bg-emerald-500/20"
         >
-          <span className="text-6xl leading-none">▶</span>
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-500">Next</span>
+          <ChevronRight size={64} strokeWidth={2.5} />
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Next</span>
         </button>
       </div>
 
       {/* ── Bottom: service item strip ── */}
       {service && service.items.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto border-t border-white/10 bg-black/20 px-3 py-2">
-          <span className="shrink-0 text-xs text-slate-600">Jump:</span>
+        <div className="flex items-center gap-2 overflow-x-auto border-t border-slate-200 bg-[#f4f6f9] px-3 py-2">
+          <span className="shrink-0 text-xs text-slate-500">Jump:</span>
           {service.items.map((item, i) => (
             <button
               key={item.id}
@@ -226,17 +244,17 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
               disabled={!canGoLive(item)}
               className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors ${
                 liveItemId === item.id
-                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700'
                   : canGoLive(item)
-                  ? 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.09]'
-                  : 'cursor-default border-transparent bg-transparent text-slate-700'
+                  ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                  : 'cursor-default border-transparent bg-transparent text-slate-400'
               }`}
             >
-              <span className="font-mono text-[10px] text-slate-600">{i + 1}</span>
+              <span className="font-mono text-[10px] text-slate-500">{i + 1}</span>
               <span>{ICON[item.type]}</span>
               <span className="max-w-[110px] truncate">{item.title}</span>
               {liveItemId === item.id && (
-                <span className="text-[9px] font-bold text-emerald-400">LIVE</span>
+                <span className="text-[9px] font-bold text-emerald-700">LIVE</span>
               )}
             </button>
           ))}
@@ -260,8 +278,8 @@ function TopBtn({
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${
-        active ? '' : 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.12] hover:text-white'
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${
+        active ? '' : 'bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900'
       } ${className}`}
     >
       {children}

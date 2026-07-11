@@ -497,7 +497,8 @@ function itemCanGoLive(item: ServiceItem): boolean {
     (item.type === 'countdown' && (item.payload.seconds as number) > 0) ||
     (item.type === 'image' && !!(item.payload.path as string)) ||
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
-    (item.type === 'ticker' && !!(item.payload.text as string))
+    (item.type === 'ticker' && !!(item.payload.text as string)) ||
+    (item.type === 'announcement' && item.ref_id != null)
   )
 }
 
@@ -721,6 +722,15 @@ async function computeItemSlides(item: ServiceItem): Promise<string[]> {
     return [`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`]
   }
   if (item.type === 'image') return ['🖼']
+  if (item.type === 'announcement' && item.ref_id != null) {
+    const a = getAnnouncement(item.ref_id)
+    if (!a) return []
+    if (a.display === 'ticker') return a.body ? [a.body] : []
+    const lines: string[] = []
+    if (a.title) lines.push(a.title)
+    a.body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
+    return lines.length ? lines : (a.title ? [a.title] : [])
+  }
   return []
 }
 
@@ -784,6 +794,8 @@ async function handleTabletLoadItem(itemId: number): Promise<void> {
     const txt = item.payload.text as string
     if (!txt) return
     doLoadText('Announcement', txt)
+  } else if (item.type === 'announcement' && item.ref_id != null) {
+    await doLoadAnnouncement(item.ref_id)
   } else {
     return
   }
