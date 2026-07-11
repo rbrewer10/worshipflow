@@ -5,6 +5,7 @@ import ServiceDeck from './ServiceDeck'
 import CardEditPanel from './CardEditPanel'
 import ServiceSlidePreview from './ServiceSlidePreview'
 import { sendItemLive } from './liveActions'
+import ScheduledAnnouncements from './ScheduledAnnouncements'
 
 function ServiceEditor({ serviceId, headerActions }: {
   serviceId: number
@@ -65,6 +66,12 @@ function ServiceEditor({ serviceId, headerActions }: {
     setSelectedId(id)
   }
 
+  const addAnnouncement = async (announcementId: number): Promise<void> => {
+    const id = await window.wf.serviceAddItem(serviceId, { type: 'announcement', ref_id: announcementId })
+    await reload()
+    setSelectedId(id)
+  }
+
   const delItem = (item: ServiceItem): void => setConfirmDeleteItem(item)
   const confirmDelete = async (): Promise<void> => {
     if (!confirmDeleteItem) return
@@ -82,7 +89,7 @@ function ServiceEditor({ serviceId, headerActions }: {
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="truncate text-lg font-semibold text-white">{service.name}</h2>
+        <h2 className="truncate text-lg font-semibold text-slate-900">{service.name}</h2>
         {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
       </div>
 
@@ -93,6 +100,11 @@ function ServiceEditor({ serviceId, headerActions }: {
       <div className="flex min-h-0 flex-1 gap-3">
         {/* Left: item deck */}
         <div className="flex w-80 shrink-0 flex-col min-h-0">
+          <ScheduledAnnouncements
+            serviceDate={service.service_date}
+            addedRefIds={new Set(service.items.filter((it) => it.type === 'announcement' && it.ref_id != null).map((it) => it.ref_id as number))}
+            onAdd={addAnnouncement}
+          />
           <ServiceDeck
             service={service}
             songs={songs}
@@ -118,10 +130,10 @@ function ServiceEditor({ serviceId, headerActions }: {
                 songFull={selectedSongFull}
                 className="max-w-3xl"
               />
-              <div className="text-center text-xs text-slate-400">
+              <div className="text-center text-xs text-slate-600">
                 <span className="capitalize">{selectedItem.type}</span>
-                <span className="px-1.5 text-slate-600">·</span>
-                <span className="text-slate-300">{selectedItem.title}</span>
+                <span className="px-1.5 text-slate-400">·</span>
+                <span className="text-slate-700">{selectedItem.title}</span>
               </div>
             </div>
           ) : (
@@ -146,15 +158,15 @@ function ServiceEditor({ serviceId, headerActions }: {
       {/* Confirm delete item modal */}
       {confirmDeleteItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="max-w-sm rounded-xl border border-white/10 bg-slate-900 p-5 text-white shadow-2xl">
-            <h3 className="mb-2 text-lg font-semibold text-white">Delete Item?</h3>
-            <p className="mb-4 text-sm text-slate-400">
+          <div className="max-w-sm rounded-xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl">
+            <h3 className="mb-2 text-lg font-semibold text-slate-900">Delete Item?</h3>
+            <p className="mb-4 text-sm text-slate-600">
               Are you sure you want to delete{' '}
-              <span className="font-semibold text-white">{confirmDeleteItem.title}</span>? This cannot be undone.
+              <span className="font-semibold text-slate-900">{confirmDeleteItem.title}</span>? This cannot be undone.
             </p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDeleteItem(null)}
-                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/10">
+                className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Cancel
               </button>
               <button onClick={confirmDelete}
