@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ServiceItem, SongFull, SongInput, ThemeColors } from '../../shared/types'
-import ServiceSlidePreview from './ServiceSlidePreview'
-import ItemBackgroundPanel from './ItemBackgroundPanel'
+import { ItemEditor } from './ItemEditor'
 import { parseSections, sectionsToText } from './songText'
+import { analyzeAndLabelSections, previewAutoLabels } from './autoLabel'
 
 function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, onClose, onChanged, onDelete }: {
   item: ServiceItem
@@ -18,6 +18,10 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   const [songFull, setSongFull] = useState<SongFull | null>(null)
   const [lyrics, setLyrics] = useState('')
   const [songSaved, setSongSaved] = useState(false)
+  const [showAutoLabelPreview, setShowAutoLabelPreview] = useState(false)
+  const [autoLabelPreview, setAutoLabelPreview] = useState('')
+  const [autoLabelAnalyses, setAutoLabelAnalyses] = useState<any[]>([])
+  const [showChords, setShowChords] = useState(true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setP(item.payload ?? {}); setNotes(item.notes ?? ''); setSongSaved(false)
@@ -74,191 +78,50 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   }
   const saveNotes = (): void => { window.wf.serviceUpdateItemNotes(item.id, notes.trim() || null).then(onChanged) }
 
-  const inputCls = 'rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-slate-400 outline-none focus:border-blue-500'
+  const handleAutoLabel = (): void => {
+    const analyses = analyzeAndLabelSections(lyrics)
+    const preview = previewAutoLabels(lyrics, analyses)
+    setAutoLabelAnalyses(analyses)
+    setAutoLabelPreview(preview)
+    setShowAutoLabelPreview(true)
+  }
+
+  const applyAutoLabels = (): void => {
+    setLyrics(autoLabelPreview)
+    setShowAutoLabelPreview(false)
+  }
 
   return (
-    <div className="flex w-80 shrink-0 flex-col gap-3 overflow-auto rounded-xl border border-white/[0.07] bg-[#161618] p-3 text-white">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold capitalize text-white">{item.type}</h3>
-        <button onClick={onClose} aria-label="Close item editor" className="text-xs text-slate-400 hover:text-white px-2 py-1 min-h-9">✕ Close</button>
-      </div>
-
-      {/* Live slide preview */}
-      {showPreview !== false && (
-        <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} />
-      )}
-
-      {item.type === 'scripture' && (
-        <div>
-          <label htmlFor="scripture-ref" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Scripture Reference</label>
-          <input id="scripture-ref" value={(p.reference as string) ?? ''} placeholder="John 3:16"
-            onChange={(e) => savePayload({ ...p, reference: e.target.value })}
-            aria-label="Scripture reference (e.g., John 3:16)"
-            className={inputCls} />
-        </div>
-      )}
-      {item.type === 'text' && (
-        <>
-          <div>
-            <label htmlFor="text-title" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Title</label>
-            <input id="text-title" value={(p.title as string) ?? ''} placeholder="Title (optional)"
-              onChange={(e) => savePayload({ ...p, title: e.target.value })}
-              aria-label="Text item title (optional)"
-              className={inputCls} />
-          </div>
-          <div>
-            <label htmlFor="text-body" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Body Text</label>
-            <textarea id="text-body" value={(p.body as string) ?? ''} placeholder="Body text — what you want on screen" rows={4}
-              onChange={(e) => savePayload({ ...p, body: e.target.value })}
-              aria-label="Text item body content"
-              className={inputCls} />
-          </div>
-
-          {/* ── Text Style ── */}
-          <div className="space-y-3 border-t border-white/[0.07] pt-3">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Text Style</label>
-
-            {/* Font size */}
-            <div>
-              <label htmlFor="font-size-slider" className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Font size</span>
-                <span className="font-mono text-slate-200">{(p.fontScale as number) ?? 6} vw</span>
-              </label>
-              <input id="font-size-slider" type="range" min={3} max={14} step={0.5}
-                value={(p.fontScale as number) ?? 6}
-                onChange={(e) => savePayload({ ...p, fontScale: Number(e.target.value) })}
-                aria-label="Font size slider from 3 to 14"
-                className="w-full accent-blue-600" />
-              <div className="mt-0.5 flex justify-between text-[10px] text-slate-500">
-                <span>Small</span><span>Large</span>
-              </div>
-            </div>
-
-            {/* Text alignment */}
-            <div>
-              <div className="mb-1.5 text-[11px] text-slate-400">Text alignment</div>
-              <div className="flex gap-1">
-                {(['left', 'center', 'right'] as const).map((a) => (
-                  <button key={a} onClick={() => savePayload({ ...p, textAlign: a })}
-                    aria-label={`Align text ${a}`}
-                    aria-pressed={((p.textAlign as string) ?? 'center') === a}
-                    className={`flex-1 rounded-lg border py-1.5 text-xs font-semibold transition-colors min-h-10 ${
-                      ((p.textAlign as string) ?? 'center') === a
-                        ? 'border-blue-500/50 bg-blue-500/15 text-blue-300'
-                        : 'border-white/10 bg-black/30 text-slate-400 hover:bg-white/5'
-                    }`}>
-                    {a === 'left' ? '⬛ Left' : a === 'center' ? '▪ Center' : 'Right ⬛'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Text position */}
-            <div>
-              <div className="mb-1.5 text-[11px] text-slate-400">Text position</div>
-              <div className="flex gap-1">
-                {(['top', 'center', 'bottom'] as const).map((pos) => (
-                  <button key={pos} onClick={() => savePayload({ ...p, textPosition: pos })}
-                    aria-label={`Position text at ${pos}`}
-                    aria-pressed={((p.textPosition as string) ?? 'center') === pos}
-                    className={`flex-1 rounded-lg border py-1.5 text-xs font-semibold capitalize transition-colors min-h-10 ${
-                      ((p.textPosition as string) ?? 'center') === pos
-                        ? 'border-blue-500/50 bg-blue-500/15 text-blue-300'
-                        : 'border-white/10 bg-black/30 text-slate-400 hover:bg-white/5'
-                    }`}>
-                    {pos === 'top' ? '▲ Top' : pos === 'center' ? '▪ Center' : '▼ Bottom'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-      {item.type === 'ticker' && (
-        <div>
-          <label htmlFor="ticker-text" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Announcement Text</label>
-          <input id="ticker-text" value={(p.text as string) ?? ''} placeholder="Announcement text"
-            onChange={(e) => savePayload({ ...p, text: e.target.value })}
-            aria-label="Ticker announcement text"
-            className={inputCls} />
-        </div>
-      )}
-      {(item.type === 'countdown' || item.type === 'welcome') && (
-        <div>
-          <label htmlFor="countdown-minutes" className="text-xs font-semibold text-slate-400 block mb-2">
-            Minutes
-          </label>
-          <input id="countdown-minutes" type="number" min="1" max="1440" value={Math.round(((p.seconds as number) ?? 300) / 60)}
-            onChange={(e) => savePayload({ ...p, seconds: Math.max(1, Number(e.target.value)) * 60 })}
-            aria-label="Countdown duration in minutes"
-            className="w-20 rounded border border-white/10 bg-black/30 px-2 py-1 text-sm text-white outline-none focus:border-blue-500" />
-        </div>
-      )}
-      {item.type === 'song' && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-200">{songFull?.title ?? item.title}</span>
-            {songSaved && <span className="text-[10px] font-bold text-emerald-400">✓ Saved</span>}
-          </div>
-          <label htmlFor="song-lyrics" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Lyrics</label>
-          <textarea id="song-lyrics" value={lyrics} onChange={(e) => setLyrics(e.target.value)} rows={10}
-            placeholder="Verse 1&#10;Amazing grace…&#10;&#10;Chorus&#10;…"
-            aria-label="Song lyrics (blank line creates new slide section)"
-            className="resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs leading-relaxed text-white placeholder:text-slate-400 outline-none focus:border-blue-500" />
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-500">Blank line = new slide section</span>
-            <button onClick={saveSong} disabled={!songFull}
-              aria-label="Save song lyrics"
-              className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 min-h-9">
-              Save lyrics
-            </button>
-          </div>
-
-          {/* Song background */}
-          <div className="space-y-2 border-t border-white/[0.07] pt-3">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Motion Background</label>
-            {songFull?.background ? (
-              <div className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2">
-                <span className="text-sm">{/\.(mp4|webm|mov|m4v)$/i.test(songFull.background) ? '🎬' : '🖼'}</span>
-                <span className="min-w-0 flex-1 truncate text-xs font-medium text-violet-300">
-                  {songFull.background.split(/[/\\]/).pop()}
-                </span>
-                <button onClick={removeSongBg} aria-label="Remove song background" className="shrink-0 text-xs text-slate-400 hover:text-red-400 min-h-9">✕ Remove</button>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500">No background set — lyrics show over animated gradient</p>
-            )}
-            <button onClick={pickSongBg}
-              aria-label={songFull?.background ? 'Change song background' : 'Add motion background to song'}
-              className="w-full rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-300 hover:bg-violet-500/20 min-h-9">
-              {songFull?.background ? '🎬 Change background…' : '🎬 Add motion background…'}
-            </button>
-          </div>
-        </div>
-      )}
-      {item.type === 'image' && (
-        <p className="break-all text-xs text-slate-400">Image: {(p.path as string) ?? '—'}</p>
-      )}
-
-      {/* ── Background & Color (panel renders its own header) ── */}
-      <div className="border-t border-white/[0.07] pt-3">
-        <ItemBackgroundPanel item={item} onChanged={onChanged} />
-      </div>
-
-      <div>
-        <label htmlFor="item-notes" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Notes</label>
-        <textarea id="item-notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={saveNotes} rows={2}
-          placeholder="Notes for operator / pastor…"
-          aria-label="Notes for operator and pastor"
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-slate-400 outline-none focus:border-blue-500" />
-      </div>
-
-      <button onClick={() => onDelete(item)}
-        aria-label={`Delete ${item.type} item: ${item.title}`}
-        className="mt-auto rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 min-h-9">
-        🗑 Delete item
-      </button>
-    </div>
+    <ItemEditor
+      item={item}
+      serviceTheme={serviceTheme}
+      serviceColors={serviceColors}
+      showPreview={showPreview}
+      onClose={onClose}
+      onChanged={onChanged}
+      onDelete={onDelete}
+      songFull={songFull}
+      lyrics={lyrics}
+      showChords={showChords}
+      showAutoLabelPreview={showAutoLabelPreview}
+      autoLabelPreview={autoLabelPreview}
+      autoLabelAnalyses={autoLabelAnalyses}
+      notes={notes}
+      onLyricsChange={setLyrics}
+      onNotesChange={setNotes}
+      onSaveSong={saveSong}
+      onShowChordsToggle={() => setShowChords(!showChords)}
+      onAutoLabelClick={handleAutoLabel}
+      onAutoLabelPreviewClose={() => setShowAutoLabelPreview(false)}
+      onAutoLabelApply={applyAutoLabels}
+      onBackgroundClick={pickSongBg}
+      onRemoveBackground={removeSongBg}
+      onSaveNotes={saveNotes}
+      setAutoLabelPreview={setAutoLabelPreview}
+      setAutoLabelAnalyses={setAutoLabelAnalyses}
+      setShowAutoLabelPreview={setShowAutoLabelPreview}
+      savePayload={savePayload}
+    />
   )
 }
 

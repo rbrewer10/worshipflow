@@ -2,6 +2,7 @@
 // Right-side panel for selecting/uploading/generating slide backgrounds.
 
 import { useState, useEffect, useRef } from 'react'
+import { Check, X, Pencil, Tag, Upload, Sparkles, Dices, MoveHorizontal, ZoomIn, Minus } from 'lucide-react'
 import { THEMES } from '../../../shared/themes'
 import type { SongFull } from '../../../shared/types'
 
@@ -16,11 +17,11 @@ interface BgEntry {
   isVideo: boolean
 }
 
-const MOTION_OPTIONS: { label: string; value: SongFull['bgMotion']; icon: string }[] = [
-  { label: 'Pan', value: 'pan', icon: '↔' },
-  { label: 'Zoom', value: 'zoom', icon: '⤢' },
-  { label: 'Shimmer', value: 'shimmer', icon: '✦' },
-  { label: 'None', value: null, icon: '–' },
+const MOTION_OPTIONS: { label: string; value: SongFull['bgMotion']; icon: JSX.Element }[] = [
+  { label: 'Pan', value: 'pan', icon: <MoveHorizontal size={13} /> },
+  { label: 'Zoom', value: 'zoom', icon: <ZoomIn size={13} /> },
+  { label: 'Shimmer', value: 'shimmer', icon: <Sparkles size={13} /> },
+  { label: 'None', value: null, icon: <Minus size={13} /> },
 ]
 
 const TAB_LABELS: Record<'uploads' | 'presets' | 'ai', string> = {
@@ -29,13 +30,17 @@ const TAB_LABELS: Record<'uploads' | 'presets' | 'ai', string> = {
   ai: 'AI Generate',
 }
 
+interface BackgroundWithTags extends BgEntry {
+  tags?: string[]
+}
+
 export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
   song: SongFull
   onApply: (bgPath: string) => void
   onBgMotionChange: (motion: SongFull['bgMotion']) => void
 }): JSX.Element {
   const [tab, setTab] = useState<'uploads' | 'presets' | 'ai'>('presets')
-  const [uploads, setUploads] = useState<BgEntry[]>([])
+  const [uploads, setUploads] = useState<BackgroundWithTags[]>([])
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
@@ -44,6 +49,9 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [apiKeySaved, setApiKeySaved] = useState(false)
   const [provider, setProvider] = useState<'pollinations' | 'replicate'>('pollinations')
+  const [searchTags, setSearchTags] = useState<string[]>([])
+  const [editingPath, setEditingPath] = useState<string | null>(null)
+  const [editingTags, setEditingTags] = useState<string>('')
   const dropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -72,11 +80,43 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
   async function loadUploads(): Promise<void> {
     try {
       const list = await window.wf.bgList()
-      setUploads(list)
+      // Load tags for each background
+      const withTags = await Promise.all(
+        list.map(async (bg) => ({
+          ...bg,
+          tags: await window.wf.bgGetTags(bg.path)
+        }))
+      )
+      setUploads(withTags)
     } catch {
       setUploads([])
     }
   }
+
+  async function handleSaveTags(filePath: string, tags: string[]): Promise<void> {
+    try {
+      await window.wf.bgSetTags(filePath, tags)
+      await loadUploads()
+      setEditingPath(null)
+      setEditingTags('')
+    } catch (err) {
+      console.error('Failed to save tags:', err)
+    }
+  }
+
+  async function handleAutoTag(filePath: string): Promise<void> {
+    try {
+      const tags = await window.wf.bgAutoTag(filePath)
+      await loadUploads()
+      console.log(`[BackgroundPanel] Auto-tagged with: ${tags.join(', ')}`)
+    } catch (err) {
+      console.error('Failed to auto-tag:', err)
+    }
+  }
+
+  const filteredUploads = searchTags.length === 0
+    ? uploads
+    : uploads.filter((bg) => bg.tags?.some((t) => searchTags.includes(t)))
 
   async function handleUploadFile(file: File): Promise<void> {
     const path = (file as File & { path?: string }).path
@@ -142,11 +182,11 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
   const noneActive = !song.background
 
   return (
-    <div className="flex h-full flex-col bg-[#161618] text-white">
+    <div className="flex h-full flex-col bg-[#f4f6f9] text-slate-900">
 
       {/* ── Segmented tab strip ── */}
       <div className="shrink-0 px-3 pt-3 pb-0">
-        <div className="flex rounded-lg bg-white/[0.06] p-0.5">
+        <div className="flex rounded-lg bg-slate-100 p-0.5">
           {(['uploads', 'presets', 'ai'] as const).map((t) => (
             <button
               key={t}
@@ -154,8 +194,8 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
               className={[
                 'flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-all duration-150',
                 tab === t
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-400 hover:text-slate-200',
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'text-slate-600 hover:text-slate-900',
               ].join(' ')}
             >
               {TAB_LABELS[t]}
@@ -171,6 +211,39 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
         {tab === 'uploads' && (
           <div className="flex flex-col gap-3">
 
+            {/* Search by tags */}
+            <div className="rounded-lg border border-slate-200 bg-white p-2.5">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-600">Filter by mood</p>
+              <div className="flex flex-wrap gap-1.5">
+                {['worship', 'prayer', 'energetic', 'peaceful', 'joyful', 'dark', 'bright', 'nature', 'modern', 'seasonal'].map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() =>
+                      setSearchTags((cur) =>
+                        cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]
+                      )
+                    }
+                    className={[
+                      'rounded-full px-2 py-1 text-[10px] font-semibold transition-all',
+                      searchTags.includes(tag)
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                    ].join(' ')}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+              {searchTags.length > 0 && (
+                <button
+                  onClick={() => setSearchTags([])}
+                  className="mt-2 text-[10px] text-slate-500 hover:text-slate-700"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+
             {/* Drag-drop zone */}
             <div
               ref={dropRef}
@@ -181,21 +254,23 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
               className={[
                 'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-7 text-center transition-all',
                 dragging
-                  ? 'border-indigo-400 bg-indigo-500/10 text-indigo-300'
-                  : 'border-white/10 text-slate-400 hover:border-white/25 hover:bg-white/[0.03] hover:text-slate-300',
+                  ? 'border-emerald-400 bg-emerald-500/10 text-emerald-700'
+                  : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700',
               ].join(' ')}
             >
-              <span className="text-xl leading-none">📁</span>
+              <Upload size={20} />
               <span className="text-xs font-medium">Drop image or video here</span>
               <span className="text-[10px] text-slate-500">or click to browse</span>
             </div>
 
             {/* Thumbnails grid */}
             {uploads.length === 0 ? (
-              <p className="py-8 text-center text-xs text-slate-600">No uploads yet</p>
+              <p className="py-8 text-center text-xs text-slate-400">No uploads yet</p>
+            ) : filteredUploads.length === 0 ? (
+              <p className="py-8 text-center text-xs text-slate-400">No backgrounds match the selected mood</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {uploads.map((u) => {
+                {filteredUploads.map((u) => {
                   const active = song.background === u.path
                   return (
                     <div
@@ -204,8 +279,8 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                       className={[
                         'group relative cursor-pointer overflow-hidden rounded-lg transition-all duration-150',
                         active
-                          ? 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#161618]'
-                          : 'ring-1 ring-white/10 hover:ring-white/25 hover:scale-[1.02]',
+                          ? 'ring-2 ring-emerald-500 ring-offset-1 ring-offset-[#f4f6f9]'
+                          : 'ring-1 ring-slate-200 hover:ring-slate-300 hover:scale-[1.02]',
                       ].join(' ')}
                       style={{ aspectRatio: '16/9' }}
                     >
@@ -220,19 +295,54 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
 
                       {/* Active badge */}
                       {active && (
-                        <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white shadow">
-                          ✓
+                        <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
+                          <Check size={10} strokeWidth={3} />
                         </div>
                       )}
 
-                      {/* Delete button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(u.path) }}
-                        className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-red-600/90 text-[10px] text-white shadow group-hover:flex hover:bg-red-500"
-                        title="Remove"
-                      >
-                        ✕
-                      </button>
+                      {/* Delete & Tag buttons */}
+                      <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleAutoTag(u.path) }}
+                          className="h-5 w-5 flex items-center justify-center rounded-full bg-black/60 text-white shadow hover:bg-black/80"
+                          title="Auto-tag by filename"
+                        >
+                          <Tag size={11} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingPath(u.path); setEditingTags((u.tags || []).join(', ')) }}
+                          className="h-5 w-5 flex items-center justify-center rounded-full bg-black/60 text-white shadow hover:bg-black/80"
+                          title="Edit tags"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDelete(u.path) }}
+                          className="h-5 w-5 flex items-center justify-center rounded-full bg-red-600/90 text-white shadow hover:bg-red-500"
+                          title="Remove"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+
+                      {/* Tag display */}
+                      {u.tags && u.tags.length > 0 && (
+                        <div className="absolute bottom-1 left-1 right-1 flex flex-wrap gap-1">
+                          {u.tags.slice(0, 2).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full bg-slate-700/80 px-1.5 py-0.5 text-[8px] font-semibold text-slate-200"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {u.tags.length > 2 && (
+                            <span className="rounded-full bg-slate-700/80 px-1.5 py-0.5 text-[8px] font-semibold text-slate-200">
+                              +{u.tags.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -248,9 +358,9 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
             {/* Random button */}
             <button
               onClick={handleRandomPreset}
-              className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-500/20 hover:shadow-lg active:scale-[0.98]"
+              className="group flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-emerald-500 hover:shadow-emerald-500/20 hover:shadow-lg active:scale-[0.98]"
             >
-              <span className="text-base leading-none group-hover:animate-spin" style={{ display: 'inline-block' }}>🎲</span>
+              <Dices size={15} className="group-hover:animate-spin" />
               Random Preset
             </button>
 
@@ -261,8 +371,8 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                 className={[
                   'relative flex items-center justify-center overflow-hidden rounded-xl border transition-all duration-150',
                   noneActive
-                    ? 'border-indigo-500 ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#161618]'
-                    : 'border-white/10 hover:border-white/25 hover:scale-[1.02]',
+                    ? 'border-emerald-500 ring-2 ring-emerald-500 ring-offset-1 ring-offset-[#f4f6f9]'
+                    : 'border-slate-200 hover:border-slate-300 hover:scale-[1.02]',
                 ].join(' ')}
                 style={{ aspectRatio: '16/9' }}
               >
@@ -274,10 +384,10 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                       'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\'%3E%3Crect width=\'8\' height=\'8\' fill=\'%23222\'/%3E%3Crect x=\'8\' y=\'8\' width=\'8\' height=\'8\' fill=\'%23222\'/%3E%3Crect x=\'8\' width=\'8\' height=\'8\' fill=\'%23181818\'/%3E%3Crect y=\'8\' width=\'8\' height=\'8\' fill=\'%23181818\'/%3E%3C/svg%3E")',
                   }}
                 />
-                <span className="relative z-10 text-[10px] font-semibold text-slate-400">None</span>
+                <span className="relative z-10 text-[10px] font-semibold text-slate-600">None</span>
                 {noneActive && (
-                  <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white shadow">
-                    ✓
+                  <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
+                    <Check size={10} strokeWidth={3} />
                   </div>
                 )}
               </button>
@@ -292,8 +402,8 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                     className={[
                       'relative overflow-hidden rounded-xl border transition-all duration-150',
                       active
-                        ? 'border-indigo-500 ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#161618] scale-[1.01]'
-                        : 'border-white/[0.08] hover:border-white/25 hover:scale-[1.03] hover:shadow-lg',
+                        ? 'border-emerald-500 ring-2 ring-emerald-500 ring-offset-1 ring-offset-[#f4f6f9] scale-[1.01]'
+                        : 'border-slate-200 hover:border-slate-300 hover:scale-[1.03] hover:shadow-lg',
                     ].join(' ')}
                     style={{
                       aspectRatio: '16/9',
@@ -310,8 +420,8 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
 
                     {/* Active check badge */}
                     {active && (
-                      <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white shadow">
-                        ✓
+                      <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
+                        <Check size={10} strokeWidth={3} />
                       </div>
                     )}
                   </button>
@@ -326,19 +436,19 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
           <div className="flex flex-col gap-3">
 
             {/* Provider toggle */}
-            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] p-1">
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-slate-200 bg-white p-1">
               <button
                 onClick={() => chooseProvider('pollinations')}
-                className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
-                  provider === 'pollinations' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                  provider === 'pollinations' ? 'bg-emerald-600 text-white shadow' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                ✦ Free
+                <Sparkles size={13} /> Free
               </button>
               <button
                 onClick={() => chooseProvider('replicate')}
                 className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
-                  provider === 'replicate' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                  provider === 'replicate' ? 'bg-emerald-600 text-white shadow' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Replicate
@@ -346,19 +456,19 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
             </div>
 
             {provider === 'pollinations' ? (
-              <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2 text-[11px] leading-relaxed text-emerald-300/90">
+              <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2 text-[11px] leading-relaxed text-emerald-700">
                 Free · no key needed · powered by Pollinations.ai. Generation can take ~10–40s.
               </p>
             ) : (
               /* Replicate API key */
-              <div className={`rounded-xl border p-3 ${apiKey ? 'border-white/[0.08] bg-white/[0.03]' : 'border-amber-500/30 bg-amber-500/[0.07]'}`}>
+              <div className={`rounded-xl border p-3 ${apiKey ? 'border-slate-200 bg-white' : 'border-amber-500/30 bg-amber-500/[0.07]'}`}>
                 <div className="mb-1.5 flex items-center justify-between">
                   <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Replicate API key
                   </label>
                   {apiKey
-                    ? <span className="text-[10px] font-semibold text-emerald-400">● Set</span>
-                    : <span className="text-[10px] font-semibold text-amber-400">Required</span>}
+                    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Set</span>
+                    : <span className="text-[10px] font-semibold text-amber-700">Required</span>}
                 </div>
                 <div className="flex gap-1.5">
                   <input
@@ -366,17 +476,17 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
                     placeholder="r8_…"
-                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:border-indigo-500/70 focus:outline-none"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-emerald-500/70 focus:outline-none"
                   />
                   <button
                     onClick={saveApiKey}
                     disabled={apiKeyInput.trim() === (apiKey ?? '')}
-                    className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {apiKeySaved ? '✓ Saved' : 'Save'}
+                    {apiKeySaved ? <><Check size={13} /> Saved</> : 'Save'}
                   </button>
                 </div>
-                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-600">
+                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
                   Get a token at replicate.com/account/api-tokens · stored locally on this computer
                 </p>
               </div>
@@ -388,7 +498,7 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                 Describe the background
               </label>
               <textarea
-                className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-xs text-white placeholder:text-slate-600 transition-colors focus:border-indigo-500/70 focus:outline-none focus:ring-1 focus:ring-indigo-500/40"
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 transition-colors focus:border-emerald-500/70 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                 rows={3}
                 placeholder='e.g. "golden rays of light through stained glass"'
                 value={aiPrompt}
@@ -400,7 +510,7 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
             <button
               onClick={handleGenerate}
               disabled={aiLoading || !aiPrompt.trim()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow transition-all hover:bg-indigo-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow transition-all hover:bg-emerald-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {aiLoading ? (
                 <>
@@ -411,7 +521,7 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                   Generating…
                 </>
               ) : (
-                <>✨ Generate Background</>
+                <><Sparkles size={15} /> Generate Background</>
               )}
             </button>
 
@@ -422,13 +532,13 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
               </p>
             )}
             {aiError && (
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-400">
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-600">
                 {aiError}
               </div>
             )}
 
             {/* Motion Effect picker */}
-            <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
               <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 Motion Effect
               </p>
@@ -442,11 +552,11 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
                       className={[
                         'flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all duration-100',
                         active
-                          ? 'bg-indigo-600 text-white shadow'
-                          : 'bg-white/[0.05] text-slate-400 hover:bg-white/10 hover:text-slate-200',
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900',
                       ].join(' ')}
                     >
-                      <span className="text-[13px] leading-none">{m.icon}</span>
+                      {m.icon}
                       {m.label}
                     </button>
                   )
@@ -455,7 +565,7 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
             </div>
 
             {/* Fine print */}
-            <p className="text-[10px] leading-relaxed text-slate-600">
+            <p className="text-[10px] leading-relaxed text-slate-400">
               {provider === 'pollinations'
                 ? 'Free image generation · Pollinations.ai'
                 : 'Powered by Replicate Flux Schnell · ~$0.003 / image'}
@@ -463,6 +573,65 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
           </div>
         )}
       </div>
+
+      {/* Tag editing modal */}
+      {editingPath && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl">
+            <h3 className="mb-3 text-sm font-bold text-slate-900">Edit Tags</h3>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {['worship', 'prayer', 'energetic', 'peaceful', 'joyful', 'dark', 'bright', 'nature', 'modern', 'seasonal', 'other'].map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => {
+                    const tags = editingTags.split(',').map((t) => t.trim()).filter(Boolean)
+                    if (tags.includes(tag)) {
+                      setEditingTags(tags.filter((t) => t !== tag).join(', '))
+                    } else {
+                      setEditingTags([...tags, tag].join(', '))
+                    }
+                  }}
+                  className={[
+                    'rounded-lg px-2 py-1 text-xs font-semibold transition-all',
+                    editingTags.split(',').map((t) => t.trim()).includes(tag)
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+                  ].join(' ')}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={editingTags}
+              onChange={(e) => setEditingTags(e.target.value)}
+              placeholder="Tags separated by commas"
+              className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 resize-none"
+              rows={3}
+            />
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => {
+                  const tags = editingTags.split(',').map((t) => t.trim()).filter(Boolean)
+                  if (editingPath) handleSaveTags(editingPath, tags)
+                }}
+                className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setEditingPath(null)
+                  setEditingTags('')
+                }}
+                className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
