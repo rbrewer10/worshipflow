@@ -62,6 +62,8 @@ const wf = {
     ipcRenderer.invoke('wf:services:create', name, date),
   serviceDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:services:delete', id),
   serviceGet: (id: number): Promise<ServiceFull | null> => ipcRenderer.invoke('wf:services:get', id),
+  serviceRefreshActiveItems: (id: number): Promise<void> =>
+    ipcRenderer.invoke('wf:services:refreshActiveItems', id),
   serviceAddItem: (serviceId: number, item: NewServiceItem): Promise<number> =>
     ipcRenderer.invoke('wf:services:addItem', serviceId, item),
   serviceRemoveItem: (itemId: number): Promise<void> =>

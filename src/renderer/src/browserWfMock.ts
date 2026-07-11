@@ -255,6 +255,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     },
     serviceDelete: noop,
     serviceGet: async (id: number): Promise<ServiceFull | null> => clone(services.find((svc) => svc.id === id) ?? null),
+    serviceRefreshActiveItems: noop,
     serviceAddItem: async (serviceId: number, item: NewServiceItem): Promise<number> => {
       const service = services.find((svc) => svc.id === serviceId)
       const id = nextItemId++

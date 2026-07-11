@@ -1245,14 +1245,13 @@ ipcMain.handle('wf:ccli:clearUsage', () => clearSongUsage())
 // --- Tablet IPCs ---
 ipcMain.handle('wf:getTabletUrl', () => `http://${getLocalIp()}:${boundTabletPort}`)
 
-ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
-  loggedSongIds.clear()  // new/switched service → start CCLI counting fresh
-  if (serviceId == null) {
-    activeServiceItems = []
-    liveItemNotes = null
-    broadcast()  // push the cleared service to tablet/zones/projector
-    return
-  }
+// Rebuilds activeServiceItems (and dependent theme/notes state) from the DB.
+// This is the cache handleTabletLoadItem/computeZoneStates read to resolve an
+// item id into its type/routing when going live — it does NOT update itself
+// when items are added/edited in Build Service, so callers must explicitly
+// refresh it after any such change or newly-added items silently fail to go
+// live (found in the UI, invisible to the live-routing layer).
+function refreshActiveServiceItems(serviceId: number): void {
   const svc = getService(serviceId)
   activeServiceItems = (svc as { items: ServiceItem[] } | null)?.items ?? []
   serviceSlideTheme = (svc as { theme?: string | null } | null)?.theme || DEFAULT_THEME_ID
@@ -1263,6 +1262,24 @@ ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   }
   applyItemTheme(activeServiceItems.find((it) => it.id === liveServiceItemId))
   broadcast()  // projector needs the new theme, not just the tablet
+}
+
+ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
+  loggedSongIds.clear()  // new/switched service → start CCLI counting fresh
+  if (serviceId == null) {
+    activeServiceItems = []
+    liveItemNotes = null
+    broadcast()  // push the cleared service to tablet/zones/projector
+    return
+  }
+  refreshActiveServiceItems(serviceId)
+})
+
+// Same cache rebuild as wf:setActiveService, but without resetting CCLI usage
+// tracking — call this after edits to a service that's already active (e.g.
+// adding an item), not when switching which service is open.
+ipcMain.handle('wf:services:refreshActiveItems', (_e, serviceId: number) => {
+  refreshActiveServiceItems(serviceId)
 })
 
 ipcMain.handle('wf:service:setTheme', (_e, serviceId: number, themeId: string | null, colors: ThemeColors | null) => {

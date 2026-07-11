@@ -26,6 +26,10 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const reload = async (): Promise<void> => {
     const s = await window.wf.serviceGet(serviceId)
     setService(s)
+    // Also refresh the main process's live-routing item cache — it's separate
+    // from this component's local state and from ServiceContext, and nothing
+    // else keeps it in sync after an edit (see wf:services:refreshActiveItems).
+    void window.wf.serviceRefreshActiveItems(serviceId)
     onServiceChanged?.()
   }
 
