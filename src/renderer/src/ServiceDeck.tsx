@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ComponentType } from 'react'
 import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic } from 'lucide-react'
-import type { ServiceFull, ServiceItem, SongSummary } from '../../shared/types'
+import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary } from '../../shared/types'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
@@ -34,14 +34,16 @@ function itemPreview(it: ServiceItem): string {
   return ''
 }
 
-function ServiceDeck({ service, songs, liveItemId, selectedId, onSelect, onAdd, onAddSong, onGoLive, onDelete, onReordered }: {
+function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onGoLive, onDelete, onReordered }: {
   service: ServiceFull
   songs: SongSummary[]
+  announcements: AnnouncementSummary[]
   liveItemId: number | null
   selectedId: number | null
   onSelect: (id: number) => void
   onAdd: (type: ServiceItem['type']) => void
   onAddSong: (songId: number) => void
+  onAddAnnouncement: (announcementId: number) => void
   onGoLive: (item: ServiceItem) => void
   onDelete: (item: ServiceItem) => void
   onReordered: () => void
@@ -144,6 +146,19 @@ function ServiceDeck({ service, songs, liveItemId, selectedId, onSelect, onAdd, 
               {songs.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
             </select>
           </div>
+          {announcements.length > 0 && (
+            <div className="mb-3">
+              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Announcement from library</label>
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) { onAddAnnouncement(Number(e.target.value)); setShowAdd(false) } }}
+                className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none hover:bg-slate-200"
+              >
+                <option value="">Choose an announcement…</option>
+                {announcements.map((a) => <option key={a.id} value={a.id}>{a.title}{a.expired ? ' (expired)' : ''}</option>)}
+              </select>
+            </div>
+          )}
           <div className="mb-1.5 text-xs font-semibold text-slate-600">Or add another item type</div>
           <div className="grid grid-cols-3 gap-2">
             {ADD_TYPES.map((a) => (

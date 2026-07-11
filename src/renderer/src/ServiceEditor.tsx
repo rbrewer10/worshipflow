@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary } from '../../shared/types'
+import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary, AnnouncementSummary } from '../../shared/types'
 import ThemePicker from './ThemePicker'
 import ServiceDeck from './ServiceDeck'
 import CardEditPanel from './CardEditPanel'
@@ -13,6 +13,7 @@ function ServiceEditor({ serviceId, headerActions }: {
 }): JSX.Element {
   const [service, setService] = useState<ServiceFull | null>(null)
   const [songs, setSongs] = useState<SongSummary[]>([])
+  const [announcements, setAnnouncements] = useState<AnnouncementSummary[]>([])
   const [live, setLive] = useState<LiveState | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [selectedSongFull, setSelectedSongFull] = useState<SongFull | null>(null)
@@ -24,6 +25,7 @@ function ServiceEditor({ serviceId, headerActions }: {
     window.wf.setActiveService(serviceId)
     reload()
     window.wf.songsList().then(setSongs)
+    window.wf.announcementsList().then(setAnnouncements)
     setSelectedId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceId])
@@ -108,11 +110,13 @@ function ServiceEditor({ serviceId, headerActions }: {
           <ServiceDeck
             service={service}
             songs={songs}
+            announcements={announcements}
             liveItemId={live?.liveServiceItemId ?? null}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onAdd={addCard}
             onAddSong={addSong}
+            onAddAnnouncement={addAnnouncement}
             onGoLive={(it) => sendItemLive(it)}
             onDelete={delItem}
             onReordered={reload}
