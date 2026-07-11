@@ -277,12 +277,12 @@ const FLEX_SCRIPT = `
       } else if(prevBg!=='__logo_grad__'){
         prevBg='__logo_grad__';
         bgvid.style.opacity='0';
-        bgimg.style.backgroundImage='linear-gradient(135deg,#3a3d42 0%,#1c1e20 100%)';
+        bgimg.style.backgroundImage='linear-gradient(135deg,#54585f 0%,#3a3d43 100%)';
         bgimg.style.backgroundSize='300% 300%';
         bgimg.style.animation='none';void bgimg.offsetHeight;
         bgimg.style.animation='gradDrift 20s ease infinite';
         bgimg.style.opacity='1';
-        blob1.style.background='#3a3d42';blob2.style.background='#4a4e54';
+        blob1.style.background='#5a5f68';blob2.style.background='#4a4e54';
         blob1.style.opacity='0.45';blob2.style.opacity='0.35';
         root.style.background='#000';
       }
