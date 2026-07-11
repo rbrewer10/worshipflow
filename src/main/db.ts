@@ -14,8 +14,12 @@ import type {
   SongUsage,
   ThemeColors,
   ItemStyle,
-  ZoneRouting
+  ZoneRouting,
+  AnnouncementSummary,
+  Announcement,
+  AnnouncementInput
 } from '../shared/types'
+import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
 
 let db: Database
 let dbPath = ''
@@ -31,6 +35,18 @@ CREATE TABLE IF NOT EXISTS song (
   background TEXT,
   arrangement TEXT,
   font_scale REAL,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS announcement (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  display TEXT NOT NULL DEFAULT 'slide',
+  background TEXT,
+  frequency TEXT NOT NULL DEFAULT 'recurring',
+  start_date TEXT,
+  end_date TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS setting (
@@ -84,6 +100,22 @@ CREATE TABLE IF NOT EXISTS sound_check_reference_mix (
   recorded_at INTEGER NOT NULL,
   duration_seconds REAL NOT NULL,
   notes TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS service_template (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  thumbnail_url TEXT,
+  items_json TEXT NOT NULL,
+  theme TEXT,
+  theme_colors_json TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS background_tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_path TEXT NOT NULL UNIQUE,
+  tags_json TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
 `
@@ -326,8 +358,126 @@ function fmtSeconds(s: number): string {
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function rowToAnnouncement(r: {
+  id: number; title: string; body: string; display: string; background: string | null
+  frequency: string; start_date: string | null; end_date: string | null; active: number
+}): Announcement {
+  const startDate = r.start_date ?? null
+  const endDate = r.end_date ?? null
+  const frequency = (r.frequency === 'once' ? 'once' : 'recurring') as Announcement['frequency']
+  return {
+    id: r.id,
+    title: r.title,
+    body: r.body,
+    display: (r.display === 'ticker' ? 'ticker' : 'slide') as Announcement['display'],
+    background: r.background ?? null,
+    frequency,
+    startDate,
+    endDate,
+    active: r.active !== 0,
+    expired: announcementExpired({ frequency, startDate, endDate }, todayIso())
+  }
+}
+
+export function listAnnouncements(search = ''): AnnouncementSummary[] {
+  const sql = search
+    ? `SELECT id, title, body, display, background, frequency, start_date, end_date, active
+       FROM announcement WHERE title LIKE $q OR body LIKE $q ORDER BY title COLLATE NOCASE`
+    : `SELECT id, title, body, display, background, frequency, start_date, end_date, active
+       FROM announcement ORDER BY title COLLATE NOCASE`
+  const stmt = db.prepare(sql)
+  if (search) stmt.bind({ $q: `%${search}%` })
+  const rows: AnnouncementSummary[] = []
+  while (stmt.step()) {
+    const a = rowToAnnouncement(stmt.getAsObject() as never)
+    rows.push({
+      id: a.id, title: a.title, display: a.display, frequency: a.frequency,
+      startDate: a.startDate, endDate: a.endDate, active: a.active, expired: a.expired
+    })
+  }
+  stmt.free()
+  return rows
+}
+
+export function getAnnouncement(id: number): Announcement | null {
+  const stmt = db.prepare(
+    'SELECT id, title, body, display, background, frequency, start_date, end_date, active FROM announcement WHERE id = ?'
+  )
+  stmt.bind([id])
+  if (!stmt.step()) { stmt.free(); return null }
+  const a = rowToAnnouncement(stmt.getAsObject() as never)
+  stmt.free()
+  return a
+}
+
+export function createAnnouncement(input: AnnouncementInput): number {
+  db.run(
+    'INSERT INTO announcement (title, body, display, background, frequency, start_date, end_date, active, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+    [
+      input.title,
+      input.body,
+      input.display,
+      input.background ?? null,
+      input.frequency,
+      input.startDate ?? null,
+      input.endDate ?? null,
+      input.active === false ? 0 : 1,
+      Date.now()
+    ]
+  )
+  const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number
+  persist()
+  return id
+}
+
+export function updateAnnouncement(id: number, input: AnnouncementInput): void {
+  db.run(
+    'UPDATE announcement SET title = ?, body = ?, display = ?, background = ?, frequency = ?, start_date = ?, end_date = ?, active = ? WHERE id = ?',
+    [
+      input.title,
+      input.body,
+      input.display,
+      input.background ?? null,
+      input.frequency,
+      input.startDate ?? null,
+      input.endDate ?? null,
+      input.active === false ? 0 : 1,
+      id
+    ]
+  )
+  persist()
+}
+
+export function deleteAnnouncement(id: number): void {
+  db.run('DELETE FROM announcement WHERE id = ?', [id])
+  persist()
+}
+
+// Active announcements whose schedule covers `serviceDate` (ISO YYYY-MM-DD).
+export function listScheduledAnnouncements(serviceDate: string): AnnouncementSummary[] {
+  return listAnnouncements().filter((a) =>
+    announcementMatchesDate(
+      { active: a.active, frequency: a.frequency, startDate: a.startDate, endDate: a.endDate },
+      serviceDate
+    )
+  )
+}
+
+export function announcementTitle(id: number): string | null {
+  const stmt = db.prepare('SELECT title FROM announcement WHERE id = ?')
+  stmt.bind([id])
+  const title = stmt.step() ? (stmt.getAsObject().title as string) : null
+  stmt.free()
+  return title
+}
+
 function itemTitle(type: string, refId: number | null, payload: Record<string, unknown>): string {
   if (type === 'song' && refId) return songTitle(refId) ?? 'Song (missing)'
+  if (type === 'announcement' && refId) return announcementTitle(refId) ?? 'Announcement (missing)'
   if (type === 'text') return (payload.title as string) || 'Text slide'
   if (type === 'scripture') return (payload.reference as string) || 'Scripture'
   if (type === 'countdown') return `Countdown ${fmtSeconds((payload.seconds as number) || 0)}`
@@ -625,15 +775,19 @@ export function loadAutomationRules(): StoredAutomationRule[] {
   const stmt = db.prepare('SELECT * FROM sound_check_automation_rule ORDER BY created_at DESC')
   const rows: StoredAutomationRule[] = []
   while (stmt.step()) {
-    const r = stmt.getAsObject() as any
-    rows.push({
-      id: r.id,
-      service_item_type: r.service_item_type,
-      enabled: !!r.enabled,
-      ...(r.scene_name_to_recall && { scene_name_to_recall: r.scene_name_to_recall }),
-      ...(r.fader_adjustments_json && { fader_adjustments: JSON.parse(r.fader_adjustments_json) }),
-      created_at: r.created_at
-    })
+    try {
+      const r = stmt.getAsObject() as any
+      rows.push({
+        id: r.id,
+        service_item_type: r.service_item_type,
+        enabled: !!r.enabled,
+        ...(r.scene_name_to_recall && { scene_name_to_recall: r.scene_name_to_recall }),
+        ...(r.fader_adjustments_json && { fader_adjustments: JSON.parse(r.fader_adjustments_json) }),
+        created_at: r.created_at
+      })
+    } catch (err) {
+      console.error('[db] Failed to parse automation rule:', err)
+    }
   }
   stmt.free()
   return rows
@@ -646,26 +800,36 @@ export function saveAutomationRule(rule: {
   sceneNameToRecall?: string
   faderAdjustments?: Array<{ channelId: number; deltaDb: number }>
 }): void {
-  const now = Date.now()
-  db.run(
-    `INSERT OR REPLACE INTO sound_check_automation_rule
-     (id, service_item_type, enabled, scene_name_to_recall, fader_adjustments_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [
-      rule.id,
-      rule.serviceItemType,
-      rule.enabled ? 1 : 0,
-      rule.sceneNameToRecall || null,
-      rule.faderAdjustments ? JSON.stringify(rule.faderAdjustments) : null,
-      now
-    ]
-  )
-  persist()
+  try {
+    const now = Date.now()
+    db.run(
+      `INSERT OR REPLACE INTO sound_check_automation_rule
+       (id, service_item_type, enabled, scene_name_to_recall, fader_adjustments_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        rule.id,
+        rule.serviceItemType,
+        rule.enabled ? 1 : 0,
+        rule.sceneNameToRecall || null,
+        rule.faderAdjustments ? JSON.stringify(rule.faderAdjustments) : null,
+        now
+      ]
+    )
+    persist()
+  } catch (err) {
+    console.error('[db] Failed to save automation rule:', err)
+    throw err
+  }
 }
 
 export function deleteAutomationRule(id: string): void {
-  db.run('DELETE FROM sound_check_automation_rule WHERE id = ?', [id])
-  persist()
+  try {
+    db.run('DELETE FROM sound_check_automation_rule WHERE id = ?', [id])
+    persist()
+  } catch (err) {
+    console.error('[db] Failed to delete automation rule:', err)
+    throw err
+  }
 }
 
 // Sound Check: Reference Mixes (SQLite persistence)
@@ -682,15 +846,19 @@ export function loadReferenceMixes(): StoredReferenceMix[] {
   const stmt = db.prepare('SELECT * FROM sound_check_reference_mix ORDER BY recorded_at DESC')
   const rows: StoredReferenceMix[] = []
   while (stmt.step()) {
-    const r = stmt.getAsObject() as any
-    rows.push({
-      id: r.id,
-      spectral_profile: JSON.parse(r.spectral_profile_json),
-      recorded_at: r.recorded_at,
-      duration_seconds: r.duration_seconds,
-      ...(r.notes && { notes: r.notes }),
-      created_at: r.created_at
-    })
+    try {
+      const r = stmt.getAsObject() as any
+      rows.push({
+        id: r.id,
+        spectral_profile: JSON.parse(r.spectral_profile_json),
+        recorded_at: r.recorded_at,
+        duration_seconds: r.duration_seconds,
+        ...(r.notes && { notes: r.notes }),
+        created_at: r.created_at
+      })
+    } catch (err) {
+      console.error('[db] Failed to parse reference mix:', err)
+    }
   }
   stmt.free()
   return rows
@@ -703,19 +871,162 @@ export function saveReferenceMix(mix: {
   durationSeconds: number
   notes?: string
 }): void {
-  const now = Date.now()
-  db.run(
-    `INSERT OR REPLACE INTO sound_check_reference_mix
-     (id, spectral_profile_json, recorded_at, duration_seconds, notes, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [
-      mix.id,
-      JSON.stringify(mix.spectralProfile),
-      mix.recordedAt.getTime(),
-      mix.durationSeconds,
-      mix.notes || null,
-      now
-    ]
-  )
-  persist()
+  try {
+    const now = Date.now()
+    db.run(
+      `INSERT OR REPLACE INTO sound_check_reference_mix
+       (id, spectral_profile_json, recorded_at, duration_seconds, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        mix.id,
+        JSON.stringify(mix.spectralProfile),
+        mix.recordedAt.getTime(),
+        mix.durationSeconds,
+        mix.notes || null,
+        now
+      ]
+    )
+    persist()
+  } catch (err) {
+    console.error('[db] Failed to save reference mix:', err)
+    throw err
+  }
+}
+
+// --- Service Templates ---
+export interface ServiceTemplate {
+  id: string
+  name: string
+  description?: string
+  items: ServiceItem[]
+  theme: string | null
+  themeColors: ThemeColors | null
+  createdAt: number
+}
+
+export function listServiceTemplates(): ServiceTemplate[] {
+  const stmt = db.prepare('SELECT * FROM service_template ORDER BY created_at DESC')
+  const templates: ServiceTemplate[] = []
+  while (stmt.step()) {
+    try {
+      const r = stmt.getAsObject() as any
+      templates.push({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        items: JSON.parse(r.items_json),
+        theme: r.theme,
+        themeColors: r.theme_colors_json ? JSON.parse(r.theme_colors_json) : null,
+        createdAt: r.created_at
+      })
+    } catch (err) {
+      console.error('[db] Failed to parse service template:', err)
+    }
+  }
+  stmt.free()
+  return templates
+}
+
+export function saveServiceTemplate(template: {
+  id: string
+  name: string
+  description?: string
+  items: ServiceItem[]
+  theme: string | null
+  themeColors: ThemeColors | null
+}): void {
+  try {
+    const now = Date.now()
+    db.run(
+      `INSERT OR REPLACE INTO service_template
+       (id, name, description, items_json, theme, theme_colors_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        template.id,
+        template.name,
+        template.description || null,
+        JSON.stringify(template.items),
+        template.theme,
+        template.themeColors ? JSON.stringify(template.themeColors) : null,
+        now
+      ]
+    )
+    persist()
+    console.log(`[db] Saved service template: ${template.name}`)
+  } catch (err) {
+    console.error('[db] Failed to save service template:', err)
+    throw err
+  }
+}
+
+export function deleteServiceTemplate(id: string): void {
+  try {
+    db.run('DELETE FROM service_template WHERE id = ?', [id])
+    persist()
+    console.log(`[db] Deleted service template: ${id}`)
+  } catch (err) {
+    console.error('[db] Failed to delete service template:', err)
+    throw err
+  }
+}
+
+// --- Background Tags ---
+export function getBackgroundTags(filePath: string): string[] {
+  try {
+    const stmt = db.prepare('SELECT tags_json FROM background_tags WHERE file_path = ?')
+    stmt.bind([filePath])
+    if (stmt.step()) {
+      const r = stmt.getAsObject() as any
+      const tags = JSON.parse(r.tags_json) as string[]
+      stmt.free()
+      return tags
+    }
+    stmt.free()
+    return []
+  } catch (err) {
+    console.error('[db] Failed to get background tags:', err)
+    return []
+  }
+}
+
+export function setBackgroundTags(filePath: string, tags: string[]): void {
+  try {
+    const now = Date.now()
+    db.run(
+      `INSERT OR REPLACE INTO background_tags (file_path, tags_json, created_at)
+       VALUES (?, ?, ?)`,
+      [filePath, JSON.stringify(tags), now]
+    )
+    persist()
+    console.log(`[db] Set tags for background: ${tags.join(', ')}`)
+  } catch (err) {
+    console.error('[db] Failed to set background tags:', err)
+    throw err
+  }
+}
+
+export function searchBackgroundsByTags(searchTags: string[]): string[] {
+  try {
+    const stmt = db.prepare('SELECT file_path, tags_json FROM background_tags')
+    const results: string[] = []
+    while (stmt.step()) {
+      const r = stmt.getAsObject() as any
+      try {
+        const tags = JSON.parse(r.tags_json) as string[]
+        // Match if any search tag is in the background's tags (case-insensitive)
+        const normalizedTags = tags.map((t) => t.toLowerCase())
+        const matches = searchTags.some((st) =>
+          normalizedTags.includes(st.toLowerCase())
+        )
+        if (matches) results.push(r.file_path)
+      } catch {
+        /* skip malformed tags */
+      }
+    }
+    stmt.free()
+    return results
+  } catch (err) {
+    console.error('[db] Failed to search backgrounds:', err)
+    return []
+  }
 }
