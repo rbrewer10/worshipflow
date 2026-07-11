@@ -34,7 +34,12 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
   const pickBg = async (): Promise<void> => {
     const result = await window.wf.dialogOpenFile()
     if (result.canceled || !result.filePaths[0]) return
-    save({ background: result.filePaths[0] })
+    // Copy into the managed backgrounds directory (like song backgrounds do) —
+    // zone pages fetch media through /file, which only serves files under
+    // userData (plus the configured logo). An arbitrary picked path (e.g. from
+    // Downloads) would 403 there and silently fail to render on the zones.
+    const dest = await window.wf.bgUpload(result.filePaths[0])
+    save({ background: dest })
   }
 
   const isVid = a.background ? /\.(mp4|webm|mov|m4v)$/i.test(a.background) : false
