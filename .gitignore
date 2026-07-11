@@ -13,3 +13,5 @@ src/renderer/public/assets/*.mp4
 *.sqlite3
 # Google Drive junk (this repo must live off Drive, but just in case)
 desktop.ini
+# Claude Code brainstorming-companion session scratch (mockups, server state)
+.superpowers/
