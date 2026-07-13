@@ -115,6 +115,11 @@ const wf = {
     ipcRenderer.on('wf:recordings:renderState', handler)
     return () => ipcRenderer.removeListener('wf:recordings:renderState', handler)
   },
+  onAiProgress: (cb: (p: { recordingId: number; label: string }) => void): (() => void) => {
+    const handler = (_e: unknown, p: { recordingId: number; label: string }): void => cb(p)
+    ipcRenderer.on('wf:recordings:aiProgress', handler)
+    return () => ipcRenderer.removeListener('wf:recordings:aiProgress', handler)
+  },
   liveSetItemId: (id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', id),
   liveGoLiveAt: (itemId: number, slideIndex: number): Promise<void> =>
     ipcRenderer.invoke('wf:live:goLiveAt', itemId, slideIndex),
@@ -236,6 +241,14 @@ const wf = {
     ipcRenderer.invoke('wf:recordings:setAssemblySetting', key, value),
   pickAssemblyFile: (kind: 'video' | 'folder'): Promise<string | null> =>
     ipcRenderer.invoke('wf:recordings:pickAssemblyFile', kind),
+
+  // Recordings — Phase 3 AI content
+  generateContent: (recordingId: number): Promise<void> => ipcRenderer.invoke('wf:recordings:generateContent', recordingId),
+  saveAi: (recordingId: number, fields: { aiTitle?: string; aiDescription?: string }): Promise<void> =>
+    ipcRenderer.invoke('wf:recordings:saveAi', recordingId, fields),
+  revealPath: (p: string): Promise<void> => ipcRenderer.invoke('wf:recordings:revealPath', p),
+  getAnthropicKey: (): Promise<string> => ipcRenderer.invoke('wf:recordings:getAnthropicKey'),
+  setAnthropicKey: (key: string): Promise<void> => ipcRenderer.invoke('wf:recordings:setAnthropicKey', key),
 
   // Logo settings
   logoGet: (): Promise<{ logoPath: string | null; logoBg: string | null }> =>

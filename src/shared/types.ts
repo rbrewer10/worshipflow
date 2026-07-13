@@ -277,6 +277,8 @@ export type RecordingMarkerKind = 'sermon' | 'song' | 'item'
 
 export type RenderState = 'idle' | 'rendering' | 'done' | 'failed'
 
+export type AiState = 'idle' | 'generating' | 'done' | 'failed'
+
 export interface RecordingRow {
   id: number
   serviceId: number | null
@@ -287,6 +289,13 @@ export interface RecordingRow {
   markerCount?: number         // populated by listRecordings for the UI
   outputPath: string | null    // finished MP4 (null until produced)
   renderState: RenderState     // assembly status; 'idle' when never produced
+  transcript: string | null
+  aiTitle: string | null
+  aiDescription: string | null
+  chapters: string | null
+  srtPath: string | null
+  thumbnailPath: string | null
+  aiState: AiState
 }
 
 export interface RecordingMarkerInput {

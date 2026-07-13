@@ -10,6 +10,7 @@ function fmtDuration(startedAt: number, endedAt: number | null): string {
 export function RecordingsPanel(): JSX.Element {
   const [rows, setRows] = useState<RecordingRow[]>([])
   const [progress, setProgress] = useState<Record<number, number>>({})
+  const [aiStep, setAiStep] = useState<Record<number, string>>({})
 
   const refresh = (): void => { void window.wf.recordingsList().then(setRows) }
   useEffect(() => {
@@ -20,7 +21,19 @@ export function RecordingsPanel(): JSX.Element {
     // Every render-state transition (rendering/done/failed/idle) triggers a refresh,
     // so the progress bar + Cancel show the moment a produce starts and clear when it ends.
     const offState = window.wf.onRenderState(() => refresh())
-    return () => { offProgress(); offState() }
+    // AI progress isn't a render-state event, so track step labels separately.
+    // Also refresh on each step: the row's aiState only flips to 'generating' in the
+    // DB, so without this the 'generating' UI (and the poll's bootstrap) never appears.
+    const offAi = window.wf.onAiProgress(({ recordingId, label }) => {
+      setAiStep((s) => ({ ...s, [recordingId]: label }))
+      refresh()
+    })
+    // AI completion isn't pushed as an event; poll while any row is generating so the
+    // finished title/description/reveal buttons appear on their own.
+    const iv = setInterval(() => {
+      setRows((cur) => { if (cur.some((r) => r.aiState === 'generating')) refresh(); return cur })
+    }, 4000)
+    return () => { offProgress(); offState(); offAi(); clearInterval(iv) }
   }, [])
 
   if (rows.length === 0) {
@@ -45,10 +58,13 @@ export function RecordingsPanel(): JSX.Element {
               <button onClick={() => void window.wf.cancelRender(r.id)} className="mt-1 text-rose-600 hover:underline">Cancel</button>
             </div>
           ) : r.renderState === 'done' && r.outputPath ? (
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-emerald-600">Produced</span>
-              <button onClick={() => void window.wf.revealOutput(r.outputPath!)} className="text-slate-600 hover:underline">Reveal file</button>
-              <ProduceButton row={r} onDone={refresh} label="Re-produce" />
+            <div className="mt-1">
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-600">Produced</span>
+                <button onClick={() => void window.wf.revealOutput(r.outputPath!)} className="text-slate-600 hover:underline">Reveal file</button>
+                <ProduceButton row={r} onDone={refresh} label="Re-produce" />
+              </div>
+              <AiBlock row={r} step={aiStep[r.id]} onChanged={refresh} />
             </div>
           ) : (
             <div className="mt-1 flex items-center gap-2">
@@ -92,5 +108,39 @@ function ProduceButton({ row, onDone, label }: { row: RecordingRow; onDone: () =
       <button onClick={() => void start()} className="text-emerald-700 hover:underline">Go</button>
       <button onClick={() => setOpen(false)} className="text-slate-400 hover:underline">✕</button>
     </span>
+  )
+}
+
+function AiBlock({ row, step, onChanged }: { row: RecordingRow; step?: string; onChanged: () => void }): JSX.Element {
+  const [title, setTitle] = useState(row.aiTitle ?? '')
+  const [desc, setDesc] = useState(row.aiDescription ?? '')
+  useEffect(() => { setTitle(row.aiTitle ?? ''); setDesc(row.aiDescription ?? '') }, [row.aiTitle, row.aiDescription])
+
+  const generate = async (): Promise<void> => { await window.wf.generateContent(row.id); onChanged() }
+  const save = (): void => { void window.wf.saveAi(row.id, { aiTitle: title, aiDescription: desc }) }
+
+  if (row.aiState === 'generating') {
+    return <div className="mt-2 text-emerald-600">{step ?? 'Generating…'}</div>
+  }
+  if (row.aiState === 'done') {
+    return (
+      <div className="mt-2 flex flex-col gap-1">
+        <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={save}
+          className="w-full rounded border border-slate-300 px-1 py-0.5 font-medium" />
+        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} onBlur={save} rows={4}
+          className="w-full rounded border border-slate-300 px-1 py-0.5" />
+        <div className="flex items-center gap-2">
+          {row.srtPath && <button onClick={() => void window.wf.revealPath(row.srtPath!)} className="text-slate-600 hover:underline">Reveal .srt</button>}
+          {row.thumbnailPath && <button onClick={() => void window.wf.revealPath(row.thumbnailPath!)} className="text-slate-600 hover:underline">Reveal thumbnail</button>}
+          <button onClick={() => void generate()} className="text-emerald-700 hover:underline">Regenerate</button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="mt-1 flex items-center gap-2">
+      {row.aiState === 'failed' && <span className="text-rose-600">AI failed</span>}
+      <button onClick={() => void generate()} className="text-emerald-700 hover:underline">Generate content</button>
+    </div>
   )
 }
