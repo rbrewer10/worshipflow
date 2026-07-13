@@ -2,6 +2,8 @@
 // Calls Replicate to generate a background image from a text prompt.
 import https from 'https'
 import { createHash } from 'crypto'
+import { readFileSync } from 'fs'
+import { basename } from 'path'
 import { downloadToGenerated } from './backgroundLib'
 
 // Rolling idle timeout: fires only after IDLE_MS of no activity (connect stall OR
@@ -97,4 +99,71 @@ export async function generateBackgroundImage(prompt: string, apiKey: string): P
     }
   }
   throw new Error('Replicate: timed out after 60s')
+}
+
+// Uploads a local file to Replicate's files API and returns a servable URL.
+function uploadFileToReplicate(filePath: string, token: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fileBuf = readFileSync(filePath)
+    const boundary = '----wfform' + Date.now()
+    const head = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="content"; filename="${basename(filePath)}"\r\n` +
+      `Content-Type: audio/mpeg\r\n\r\n`
+    )
+    const tail = Buffer.from(`\r\n--${boundary}--\r\n`)
+    const body = Buffer.concat([head, fileBuf, tail])
+    const req = https.request({
+      hostname: 'api.replicate.com', path: '/v1/files', method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length
+      }
+    }, (res) => {
+      let raw = ''
+      res.on('data', (c) => { raw += c })
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(raw) as { urls?: { get?: string } }
+          if (j.urls?.get) resolve(j.urls.get)
+          else reject(new Error(`Replicate upload failed: ${raw.slice(0, 200)}`))
+        } catch (e) { reject(e) }
+      })
+    })
+    req.on('error', reject)
+    req.write(body)
+    req.end()
+  })
+}
+
+export interface WhisperResult {
+  text: string
+  segments: { start: number; end: number; text: string }[]
+}
+
+// Transcribes an audio file via Replicate's Whisper model, returning full text + timed segments.
+export async function transcribeAudio(mp3Path: string, apiKey: string): Promise<WhisperResult> {
+  const audioUrl = await uploadFileToReplicate(mp3Path, apiKey)
+  const created = await httpsPost(
+    'https://api.replicate.com/v1/models/openai/whisper/predictions',
+    { input: { audio: audioUrl, model: 'large-v3' } },
+    apiKey
+  ) as { id: string; urls: { get: string } }
+  if (!created.id) throw new Error('Replicate: no prediction id (whisper)')
+
+  for (let i = 0; i < 150; i++) { // up to ~5 min
+    await sleep(2000)
+    const poll = await httpsGet(created.urls.get, apiKey) as {
+      status: string
+      output: { transcription?: string; segments?: { start: number; end: number; text: string }[] } | null
+      error: string | null
+    }
+    if (poll.error) throw new Error(`Replicate whisper error: ${poll.error}`)
+    if (poll.status === 'succeeded' && poll.output) {
+      const segs = (poll.output.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: s.text }))
+      return { text: poll.output.transcription ?? segs.map((s) => s.text).join(' '), segments: segs }
+    }
+    if (poll.status === 'failed' || poll.status === 'canceled') throw new Error('Replicate whisper: ' + poll.status)
+  }
+  throw new Error('Replicate whisper: timed out')
 }
