@@ -59,7 +59,10 @@ export function buildFfmpegArgs(input: FfmpegBuildInput): string[] {
   const vf =
     `scale=${width}:${height}:force_original_aspect_ratio=decrease,` +
     `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},format=yuv420p`
-  const af = 'aformat=sample_rates=48000:channel_layouts=stereo'
+  // Pin sample_fmts too — concat requires a matching sample format across segments
+  // and won't auto-convert it, so an intro/outro that decodes to a different fmt
+  // (e.g. PCM s16 vs the service's fltp) would otherwise fail the concat.
+  const af = 'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo'
 
   const filters: string[] = []
   let concatInputs = ''

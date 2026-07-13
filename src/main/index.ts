@@ -278,7 +278,14 @@ const renderer = createRenderer({
   ffmpegPath: resolveFfmpegPath(),
   getRecording,
   listMarkers: listRecordingMarkers,
-  setRenderState: setRecordingRender,
+  setRenderState: (id, state, outputPath) => {
+    setRecordingRender(id, state, outputPath)
+    // Notify the panel of every transition so it can reflect rendering/done/failed
+    // live (the produce IPC only resolves at the very end, so the UI can't rely on it).
+    if (operatorWin && !operatorWin.isDestroyed()) {
+      operatorWin.webContents.send('wf:recordings:renderState', { recordingId: id, state })
+    }
+  },
   getSetting,
   onProgress: (id, fraction) => {
     if (operatorWin && !operatorWin.isDestroyed()) {

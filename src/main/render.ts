@@ -82,18 +82,23 @@ export function createRenderer(deps: RenderDeps): Renderer {
       canceledId = null
 
       await new Promise<void>((resolve) => {
+        // A failed spawn emits both 'error' and 'close' (code null); this flag keeps
+        // the close handler from re-reporting a bogus "exit null" failure.
+        let errored = false
         child = spawn(deps.ffmpegPath, args)
         child.stderr.on('data', (buf: Buffer) => {
           const frac = parseFfmpegProgress(buf.toString(), totalSec)
           if (frac != null) deps.onProgress(recordingId, frac)
         })
         child.on('error', (err) => {
+          errored = true
           child = null; activeId = null
           deps.setRenderState(recordingId, 'failed')
           deps.toast(`Video production failed: ${err.message}`, 'error')
           resolve()
         })
         child.on('close', (code) => {
+          if (errored) { resolve(); return }
           const wasCanceled = canceledId === recordingId
           child = null; activeId = null
           if (wasCanceled) {

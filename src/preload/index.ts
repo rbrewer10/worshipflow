@@ -110,6 +110,11 @@ const wf = {
     ipcRenderer.on('wf:recordings:renderProgress', handler)
     return () => ipcRenderer.removeListener('wf:recordings:renderProgress', handler)
   },
+  onRenderState: (cb: (p: { recordingId: number; state: string }) => void): (() => void) => {
+    const handler = (_e: unknown, p: { recordingId: number; state: string }): void => cb(p)
+    ipcRenderer.on('wf:recordings:renderState', handler)
+    return () => ipcRenderer.removeListener('wf:recordings:renderState', handler)
+  },
   liveSetItemId: (id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', id),
   liveGoLiveAt: (itemId: number, slideIndex: number): Promise<void> =>
     ipcRenderer.invoke('wf:live:goLiveAt', itemId, slideIndex),

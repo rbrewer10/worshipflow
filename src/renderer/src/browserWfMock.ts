@@ -302,6 +302,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     outputOpen: noop,
     onNotify: () => () => {},
     onRenderProgress: () => () => {},
+    onRenderState: () => () => {},
     liveSetItemId: async (id: number | null): Promise<void> => publish({ liveServiceItemId: id }),
     liveGoLiveAt: async (_itemId: number, slideIndex: number): Promise<void> => {
       const index = Math.max(0, Math.min(slideIndex, demoLines.length - 1))

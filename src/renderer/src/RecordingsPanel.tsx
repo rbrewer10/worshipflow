@@ -14,11 +14,13 @@ export function RecordingsPanel(): JSX.Element {
   const refresh = (): void => { void window.wf.recordingsList().then(setRows) }
   useEffect(() => {
     refresh()
-    const off = window.wf.onRenderProgress(({ recordingId, fraction }) => {
+    const offProgress = window.wf.onRenderProgress(({ recordingId, fraction }) => {
       setProgress((p) => ({ ...p, [recordingId]: fraction }))
-      if (fraction >= 1) setTimeout(refresh, 800)
     })
-    return off
+    // Every render-state transition (rendering/done/failed/idle) triggers a refresh,
+    // so the progress bar + Cancel show the moment a produce starts and clear when it ends.
+    const offState = window.wf.onRenderState(() => refresh())
+    return () => { offProgress(); offState() }
   }, [])
 
   if (rows.length === 0) {
