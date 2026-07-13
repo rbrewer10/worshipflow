@@ -18,3 +18,32 @@ describe('buildSrt', () => {
     expect(out).toContain('\nhi\n')
   })
 })
+
+import { buildChapters } from './aiContent'
+import type { RecordingMarker } from '../shared/types'
+
+function mk(kind: RecordingMarker['kind'], label: string, offsetMs: number): RecordingMarker {
+  return { id: offsetMs, recordingId: 1, itemId: null, kind, label, offsetMs }
+}
+
+describe('buildChapters', () => {
+  it('shifts marker offsets by the trim start and forces a 0:00 first line', () => {
+    const markers = [
+      mk('item', 'Countdown', 0),
+      mk('song', 'Opener', 300000),   // 5:00 raw
+      mk('sermon', 'The Prodigal Son', 1800000) // 30:00 raw
+    ]
+    // trim started at 5:00 (300000ms): Opener→0:00, sermon→25:00
+    expect(buildChapters(markers, 300000)).toBe('0:00 Opener\n25:00 The Prodigal Son')
+  })
+
+  it('prepends "0:00 Intro" when the first kept marker is not at zero', () => {
+    const markers = [mk('song', 'Opener', 60000)]
+    expect(buildChapters(markers, 0)).toBe('0:00 Intro\n1:00 Opener')
+  })
+
+  it('drops markers before the trim start and formats past an hour', () => {
+    const markers = [mk('item', 'pre', 0), mk('sermon', 'Msg', 3700000)]
+    expect(buildChapters(markers, 100000)).toBe('0:00 Intro\n1:00:00 Msg')
+  })
+})
