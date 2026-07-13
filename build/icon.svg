@@ -1,0 +1,40 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WorshipFlow Pro">
+  <defs>
+    <linearGradient id="tile" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#173a6b"/>
+      <stop offset="0.55" stop-color="#0f2b52"/>
+      <stop offset="1" stop-color="#0a1e3c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.28" r="0.75" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cross" x1="256" y1="150" x2="256" y2="406" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef4ff"/>
+    </linearGradient>
+    <!-- Vertical shading gives the infinity a ribbon feel: lit on top, deeper on the bottom -->
+    <linearGradient id="ribbon" x1="256" y1="300" x2="256" y2="404" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9cc6f7"/>
+      <stop offset="0.5" stop-color="#5a97e8"/>
+      <stop offset="1" stop-color="#2f6fd6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App tile -->
+  <rect x="32" y="32" width="448" height="448" rx="108" fill="url(#tile)"/>
+  <rect x="32" y="32" width="448" height="448" rx="108" fill="url(#glow)"/>
+
+  <!-- White cross (clearly visible on the navy tile) -->
+  <g fill="url(#cross)">
+    <rect x="222" y="150" width="68" height="256" rx="26"/>
+    <rect x="164" y="232" width="184" height="68" rx="26"/>
+  </g>
+
+  <!-- Ribbon infinity, drawn last so it sits in FRONT of the cross -->
+  <path d="M256 350 C 214 296, 150 296, 128 350 C 106 404, 214 404, 256 350 C 298 296, 406 296, 384 350 C 362 404, 298 404, 256 350 Z"
+        stroke="url(#ribbon)" stroke-width="42" stroke-linejoin="round" fill="none"/>
+  <!-- Soft top highlight along the ribbon -->
+  <path d="M256 350 C 214 296, 150 296, 128 350 C 106 404, 214 404, 256 350 C 298 296, 406 296, 384 350 C 362 404, 298 404, 256 350 Z"
+        stroke="#dbeafe" stroke-opacity="0.35" stroke-width="10" stroke-linejoin="round" fill="none"/>
+</svg>
