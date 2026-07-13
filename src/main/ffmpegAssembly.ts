@@ -77,3 +77,13 @@ export function buildFfmpegArgs(input: FfmpegBuildInput): string[] {
   args.push(input.outputPath)
   return args
 }
+
+// Extracts a 0..1 progress fraction from an ffmpeg stderr line's `time=HH:MM:SS.ss`
+// against the expected output duration in seconds. Returns null if no time is present.
+export function parseFfmpegProgress(line: string, totalSec: number): number | null {
+  const m = line.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/)
+  if (!m) return null
+  const sec = Number(m[1]) * 3600 + Number(m[2]) * 60 + parseFloat(m[3])
+  if (totalSec <= 0) return 0
+  return Math.max(0, Math.min(1, sec / totalSec))
+}

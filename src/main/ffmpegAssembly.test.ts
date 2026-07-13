@@ -81,3 +81,18 @@ describe('buildFfmpegArgs', () => {
     expect(a[0]).toBe('-y')
   })
 })
+
+import { parseFfmpegProgress } from './ffmpegAssembly'
+
+describe('parseFfmpegProgress', () => {
+  it('parses a time= line into a 0..1 fraction of the total', () => {
+    // 30 min into a 60 min output → 0.5
+    expect(parseFfmpegProgress('frame=1 fps=30 time=00:30:00.00 bitrate=…', 3600)).toBeCloseTo(0.5, 5)
+  })
+  it('returns null for a line with no time=', () => {
+    expect(parseFfmpegProgress('Press [q] to stop', 3600)).toBeNull()
+  })
+  it('clamps to 1 when time exceeds the total', () => {
+    expect(parseFfmpegProgress('time=01:10:00.00', 3600)).toBe(1)
+  })
+})
