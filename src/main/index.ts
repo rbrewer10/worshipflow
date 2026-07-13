@@ -57,7 +57,13 @@ import {
   deleteServiceTemplate,
   getBackgroundTags,
   setBackgroundTags,
-  searchBackgroundsByTags
+  searchBackgroundsByTags,
+  createRecording,
+  addRecordingMarker,
+  finalizeRecording,
+  listRecordingMarkers,
+  listRecordings,
+  closeDanglingRecordings
 } from './db'
 import { listBackgrounds, copyBackground, deleteBackground } from './backgroundLib'
 import { generateBackgroundImage } from './replicateApi'
@@ -81,6 +87,7 @@ import {
   initObsAutoConnect
 } from './obs'
 import { logInfo, logWarn, logError, getRecentLogLines, getLogsDir } from './logger'
+import { createRecordingSession } from './recording'
 
 export { TABLET_PORT }
 
@@ -218,7 +225,40 @@ let tabletHeartbeat: ReturnType<typeof setInterval> | null = null
 let boundTabletPort = TABLET_PORT
 let activeServiceItems: ServiceItem[] = []
 let activeServiceId: number | null = null  // which service is currently active (for Volunteer mode to honor)
+let activeServiceName = ''
+let activeServiceDate: string | null = null
 let liveItemNotes: string | null = null
+
+// --- Service recording (Phase 1: capture & markers) ---
+// The session is driven by two live chokepoints: wf:live:setItemId (first live
+// item starts the recording + every live item stamps a marker) and
+// wf:setActiveService(null)/quit (stops + writes the sidecar). All side-effects
+// are injected so recording.ts stays unit-testable. notifyOperator below is a
+// hoisted function declaration, so it is safe to reference here at module load.
+const recordingSession = createRecordingSession({
+  now: () => Date.now(),
+  appVersion: app.getVersion(),
+  autoRecordEnabled: () => getSetting('autoRecord') !== 'off', // default ON
+  obsConnected: () => getObsStatus().connected,
+  obsRecording: () => getObsStatus().recording,
+  obsRecordStartedMs: () => getObsStatus().recordStartedAt ?? Date.now(),
+  startRecord: () => obsStartRecord(),
+  stopRecord: () => obsStopRecord(),
+  createRecording,
+  addMarker: addRecordingMarker,
+  finalizeRecording,
+  listMarkers: listRecordingMarkers,
+  writeSidecar: (videoPath, sidecar) => {
+    const jsonPath = videoPath.replace(/\.[^.\\/]+$/, '') + '.worshipflow.json'
+    try {
+      writeFileSync(jsonPath, JSON.stringify(sidecar, null, 2), 'utf-8')
+    } catch (err) {
+      console.error('[recording] sidecar write failed', err)
+      notifyOperator('Recording saved, but the marker sidecar could not be written.', 'warn')
+    }
+  },
+  toast: (msg) => notifyOperator(msg, 'warn')
+})
 
 // Feature states
 let hmsLoadedAt: number | null = null  // Hymn timer: when song was loaded
@@ -1251,6 +1291,9 @@ ipcMain.handle('wf:live:setItemId', (_e, id: number | null) => {
   liveItemNotes = item?.notes ?? null
   applyItemTheme(item)
   broadcast()
+  if (item) {
+    void recordingSession.onItemLive(item, activeServiceId, activeServiceName, activeServiceDate)
+  }
 })
 
 ipcMain.handle('wf:live:setFontScale', (_e, scale: number) => {
@@ -1302,6 +1345,8 @@ function refreshActiveServiceItems(serviceId: number): void {
   const svc = getService(serviceId)
   activeServiceId = serviceId
   activeServiceItems = (svc as { items: ServiceItem[] } | null)?.items ?? []
+  activeServiceName = (svc as { name?: string } | null)?.name ?? ''
+  activeServiceDate = (svc as { service_date?: string | null } | null)?.service_date ?? null
   serviceSlideTheme = (svc as { theme?: string | null } | null)?.theme || DEFAULT_THEME_ID
   serviceSlideThemeColors = (svc as { themeColors?: ThemeColors | null } | null)?.themeColors ?? null
   if (liveServiceItemId != null) {
@@ -1317,7 +1362,10 @@ ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   if (serviceId == null) {
     activeServiceId = null
     activeServiceItems = []
+    activeServiceName = ''
+    activeServiceDate = null
     liveItemNotes = null
+    void recordingSession.onServiceEnded()  // stop OBS + write the marker sidecar
     broadcast()  // push the cleared service to tablet/zones/projector
     return
   }
@@ -1357,6 +1405,14 @@ ipcMain.handle('wf:obs:startStream', () => obsStartStream())
 ipcMain.handle('wf:obs:stopStream', () => obsStopStream())
 ipcMain.handle('wf:obs:startRecord', () => obsStartRecord())
 ipcMain.handle('wf:obs:stopRecord', () => obsStopRecord())
+
+// --- Recording IPCs (Phase 1: capture & markers) ---
+ipcMain.handle('wf:recordings:list', () => listRecordings())
+ipcMain.handle('wf:recordings:markers', (_e, recordingId: number) => listRecordingMarkers(recordingId))
+ipcMain.handle('wf:recordings:getAutoRecord', () => getSetting('autoRecord') !== 'off')
+ipcMain.handle('wf:recordings:setAutoRecord', (_e, on: boolean) => {
+  setSetting('autoRecord', on ? 'on' : 'off')
+})
 ipcMain.handle('wf:obs:setScene', (_e, sceneName: string) => {
   lastAutoScene = sceneName  // manual switch updates the baseline so auto-switch won't fight it
   return obsSetScene(sceneName)
@@ -1978,6 +2034,9 @@ app.whenReady().then(async () => {
   // loads its saved rules/reference mixes during initialize(), so initDb() has to
   // run first or that read hits an undefined db handle and silently fails.
   await initDb()
+  // Reconcile any recording left open by a crash/hard-quit so it doesn't stay
+  // dangling forever — mark it ended now.
+  closeDanglingRecordings(Date.now())
   // Surface save failures to the operator instead of losing them to the console.
   onPersistError((err) => {
     logError('[persist] save failed', err)
@@ -2021,6 +2080,9 @@ app.on('window-all-closed', () => {
 // Release the LAN server socket + timers on quit so a relaunch doesn't hit
 // EADDRINUSE and leave the tablet/zone/OBS layer silently dead.
 app.on('before-quit', () => {
+  // Best-effort final stop so a quit mid-service still finalizes the recording +
+  // writes its sidecar (fire-and-forget; the app is shutting down regardless).
+  if (recordingSession.isActive()) void recordingSession.onServiceEnded()
   stopTabletServer()
   clearCountdown()
   clearAutoAdvance()
