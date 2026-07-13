@@ -38,7 +38,8 @@ function canGoLive(item: ServiceItem): boolean {
     (item.type === 'image' && !!(item.payload.path as string)) ||
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
     (item.type === 'ticker' && !!(item.payload.text as string)) ||
-    (item.type === 'announcement' && item.ref_id != null)
+    (item.type === 'announcement' && item.ref_id != null) ||
+    (item.type === 'sermon')
   )
 }
 
