@@ -65,7 +65,8 @@ import {
   listRecordings,
   closeDanglingRecordings,
   getRecording,
-  setRecordingRender
+  setRecordingRender,
+  setRecordingAi
 } from './db'
 import { listBackgrounds, copyBackground, deleteBackground } from './backgroundLib'
 import { generateBackgroundImage } from './replicateApi'
@@ -92,6 +93,7 @@ import { logInfo, logWarn, logError, getRecentLogLines, getLogsDir } from './log
 import { createRecordingSession } from './recording'
 import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
+import { createContentRunner } from './content'
 
 export { TABLET_PORT }
 
@@ -291,6 +293,45 @@ const renderer = createRenderer({
     if (operatorWin && !operatorWin.isDestroyed()) {
       operatorWin.webContents.send('wf:recordings:renderProgress', { recordingId: id, fraction })
     }
+  },
+  toast: (message, level) => notifyOperator(message, level ?? 'info')
+})
+
+// Renders a 1280x720 thumbnail (background image + sermon title/speaker) via an
+// offscreen window + capturePage — no native image dependency.
+async function renderThumbnail(bgImagePath: string | null, title: string, speaker: string, outPath: string): Promise<void> {
+  const win = new BrowserWindow({ width: 1280, height: 720, show: false, webPreferences: { offscreen: true } })
+  try {
+    const bg = bgImagePath ? `url("file://${bgImagePath.replace(/\\/g, '/')}")` : 'linear-gradient(135deg,#0f172a,#334155)'
+    const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+      html,body{margin:0;width:1280px;height:720px;overflow:hidden;font-family:Arial,Helvetica,sans-serif}
+      .bg{width:1280px;height:720px;background:${bg};background-size:cover;background-position:center;position:relative}
+      .scrim{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.75),rgba(0,0,0,.15) 55%)}
+      .txt{position:absolute;left:64px;right:64px;bottom:70px;color:#fff}
+      .title{font-size:84px;font-weight:800;line-height:1.05;text-shadow:0 3px 18px rgba(0,0,0,.6)}
+      .spk{font-size:38px;font-weight:600;margin-top:18px;opacity:.92;text-shadow:0 2px 10px rgba(0,0,0,.6)}
+      </style></head><body><div class="bg"><div class="scrim"></div>
+      <div class="txt"><div class="title">${esc(title)}</div>${speaker ? `<div class="spk">${esc(speaker)}</div>` : ''}</div>
+      </div></body></html>`
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+    await new Promise((r) => setTimeout(r, 350)) // let the background image paint
+    const img = await win.webContents.capturePage()
+    writeFileSync(outPath, img.toJPEG(90))
+  } finally {
+    win.destroy()
+  }
+}
+
+const contentRunner = createContentRunner({
+  ffmpegPath: resolveFfmpegPath(),
+  getRecording,
+  listMarkers: listRecordingMarkers,
+  getSetting,
+  saveAi: (id, fields) => setRecordingAi(id, fields),
+  renderThumbnail,
+  onProgress: (id, label) => {
+    if (operatorWin && !operatorWin.isDestroyed()) operatorWin.webContents.send('wf:recordings:aiProgress', { recordingId: id, label })
   },
   toast: (message, level) => notifyOperator(message, level ?? 'info')
 })
@@ -1471,6 +1512,13 @@ ipcMain.handle('wf:recordings:pickAssemblyFile', async (_e, kind: 'video' | 'fol
   if (res.canceled || res.filePaths.length === 0) return null
   return res.filePaths[0]
 })
+ipcMain.handle('wf:recordings:generateContent', (_e, recordingId: number) => contentRunner.generate(recordingId))
+ipcMain.handle('wf:recordings:saveAi', (_e, recordingId: number, fields: { aiTitle?: string; aiDescription?: string }) => {
+  setRecordingAi(recordingId, fields)
+})
+ipcMain.handle('wf:recordings:revealPath', async (_e, p: string) => { if (p) shell.showItemInFolder(p) })
+ipcMain.handle('wf:recordings:getAnthropicKey', () => getSetting('anthropic_api_key') ?? '')
+ipcMain.handle('wf:recordings:setAnthropicKey', (_e, key: string) => { setSetting('anthropic_api_key', key || null) })
 ipcMain.handle('wf:obs:setScene', (_e, sceneName: string) => {
   lastAutoScene = sceneName  // manual switch updates the baseline so auto-switch won't fight it
   return obsSetScene(sceneName)
