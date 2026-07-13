@@ -164,6 +164,8 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN style TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN zone_routing TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN output_path TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN render_state TEXT') } catch { /* already exists */ }
   normalizeSectionLyrics()
   persist()
 }
@@ -1125,6 +1127,7 @@ export function listRecordingMarkers(recordingId: number): RecordingMarker[] {
 export function listRecordings(): RecordingRow[] {
   const res = db.exec(
     `SELECT r.id, r.service_id, r.started_at, r.ended_at, r.file_path, r.obs_record_started_ms,
+            r.output_path, r.render_state,
             (SELECT COUNT(*) FROM recording_marker m WHERE m.recording_id = r.id) AS marker_count
        FROM recording r ORDER BY r.started_at DESC`
   )
@@ -1136,8 +1139,39 @@ export function listRecordings(): RecordingRow[] {
     endedAt: r[3] as number | null,
     filePath: r[4] as string | null,
     obsRecordStartedMs: r[5] as number,
-    markerCount: r[6] as number
+    outputPath: r[6] as string | null,
+    renderState: ((r[7] as string | null) ?? 'idle') as RecordingRow['renderState'],
+    markerCount: r[8] as number
   }))
+}
+
+export function getRecording(id: number): RecordingRow | null {
+  const res = db.exec(
+    `SELECT id, service_id, started_at, ended_at, file_path, obs_record_started_ms, output_path, render_state
+       FROM recording WHERE id = ?`,
+    [id]
+  )
+  if (!res[0] || res[0].values.length === 0) return null
+  const r = res[0].values[0]
+  return {
+    id: r[0] as number,
+    serviceId: r[1] as number | null,
+    startedAt: r[2] as number,
+    endedAt: r[3] as number | null,
+    filePath: r[4] as string | null,
+    obsRecordStartedMs: r[5] as number,
+    outputPath: r[6] as string | null,
+    renderState: ((r[7] as string | null) ?? 'idle') as RecordingRow['renderState']
+  }
+}
+
+export function setRecordingRender(id: number, state: RecordingRow['renderState'], outputPath?: string | null): void {
+  if (outputPath === undefined) {
+    db.run('UPDATE recording SET render_state = ? WHERE id = ?', [state, id])
+  } else {
+    db.run('UPDATE recording SET render_state = ?, output_path = ? WHERE id = ?', [state, outputPath, id])
+  }
+  persist()
 }
 
 // Reconcile any recording left open by a crash: mark it ended at `endedAt`.

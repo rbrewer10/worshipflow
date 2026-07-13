@@ -275,6 +275,8 @@ export interface AnnouncementInput {
 // --- Service recording (Phase 1: capture & markers) ---
 export type RecordingMarkerKind = 'sermon' | 'song' | 'item'
 
+export type RenderState = 'idle' | 'rendering' | 'done' | 'failed'
+
 export interface RecordingRow {
   id: number
   serviceId: number | null
@@ -283,6 +285,8 @@ export interface RecordingRow {
   filePath: string | null      // from OBS StopRecord.outputPath
   obsRecordStartedMs: number   // epoch ms; OBS's actual record start
   markerCount?: number         // populated by listRecordings for the UI
+  outputPath: string | null    // finished MP4 (null until produced)
+  renderState: RenderState     // assembly status; 'idle' when never produced
 }
 
 export interface RecordingMarkerInput {
