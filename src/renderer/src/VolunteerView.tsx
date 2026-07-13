@@ -73,6 +73,8 @@ async function loadItem(item: ServiceItem): Promise<void> {
     await window.wf.liveLoadText('Announcement', txt)
   } else if (item.type === 'announcement' && item.ref_id != null) {
     await window.wf.liveLoadAnnouncement(item.ref_id)
+  } else if (item.type === 'sermon') {
+    window.wf.sendIntent('logo')
   } else {
     return
   }
