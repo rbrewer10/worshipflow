@@ -47,3 +47,25 @@ describe('buildChapters', () => {
     expect(buildChapters(markers, 100000)).toBe('0:00 Intro\n1:00:00 Msg')
   })
 })
+
+import { buildContentPrompt } from './aiContent'
+
+describe('buildContentPrompt', () => {
+  const base = { transcript: 'Today we talk about grace.', title: 'Grace', speaker: 'Pastor Ryan', passage: 'Eph 2', chapters: '0:00 Opener\n25:00 Grace' }
+  it('includes transcript, sermon meta, chapters, and a JSON-only instruction', () => {
+    const p = buildContentPrompt(base)
+    expect(p).toContain('Today we talk about grace.')
+    expect(p).toContain('Pastor Ryan')
+    expect(p).toContain('Eph 2')
+    expect(p).toContain('0:00 Opener')
+    expect(p.toLowerCase()).toContain('json')
+  })
+  it('truncates a very long transcript', () => {
+    const p = buildContentPrompt({ ...base, transcript: 'x'.repeat(20000) })
+    expect(p.length).toBeLessThan(20000)
+  })
+  it('omits optional meta lines when absent', () => {
+    const p = buildContentPrompt({ transcript: 'hi', chapters: '0:00 Intro' })
+    expect(p).not.toContain('Speaker:')
+  })
+})

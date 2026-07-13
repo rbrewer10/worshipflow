@@ -45,3 +45,23 @@ export function buildChapters(markers: RecordingMarker[], trimStartMs: number): 
   for (const k of kept) lines.push(`${chapterTime(k.ms)} ${k.label}`)
   return lines.join('\n')
 }
+
+export function buildContentPrompt(input: {
+  transcript: string
+  title?: string
+  speaker?: string
+  passage?: string
+  chapters: string
+}): string {
+  return [
+    'You are writing YouTube metadata for a church sermon video.',
+    input.title ? `Sermon title (hint): ${input.title}` : '',
+    input.speaker ? `Speaker: ${input.speaker}` : '',
+    input.passage ? `Passage: ${input.passage}` : '',
+    `Chapters:\n${input.chapters}`,
+    `Transcript:\n${input.transcript.slice(0, 12000)}`,
+    'Return ONLY minified JSON of the form {"title": string, "description": string}. ' +
+      'Title <= 100 characters. Description: 2-3 short paragraphs summarizing the message, ' +
+      'then a blank line, then the chapter list verbatim, then the passage reference.'
+  ].filter(Boolean).join('\n\n')
+}
