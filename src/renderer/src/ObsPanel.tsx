@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Video, Copy, Check, TriangleAlert, RefreshCw, Music, BookOpen, Timer } from 'lucide-react'
 import type { ObsStatus, SceneContext } from '../../shared/types'
+import { RecordingsPanel } from './RecordingsPanel'
 
 const BLANK_STATUS: ObsStatus = {
   connected: false,
@@ -43,6 +44,7 @@ function ObsPanel(): JSX.Element {
   const [sceneMap, setSceneMap] = useState<Record<SceneContext, string>>({ worship: '', word: '', countdown: '' })
   const [copied, setCopied] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [autoRecord, setAutoRecord] = useState(true)
 
   const copyUrl = (): void => {
     navigator.clipboard.writeText(obsUrl).then(() => {
@@ -66,6 +68,17 @@ function ObsPanel(): JSX.Element {
     const off = window.wf.obsOnStatus(setStatus)
     return off
   }, [])
+
+  // Load the auto-record setting on mount.
+  useEffect(() => {
+    void window.wf.getAutoRecord().then(setAutoRecord)
+  }, [])
+
+  const toggleAutoRecord = (): void => {
+    const next = !autoRecord
+    setAutoRecord(next)
+    void window.wf.setAutoRecord(next)
+  }
 
   // Persist + push auto-switch config to main whenever it changes.
   useEffect(() => {
@@ -205,6 +218,19 @@ function ObsPanel(): JSX.Element {
             )}
           </div>
         )}
+
+        {/* Auto-record + recordings history */}
+        <div className="rounded-lg border border-slate-200 bg-white p-2">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={autoRecord} onChange={toggleAutoRecord} className="h-4 w-4" />
+            <span className="text-xs font-semibold text-slate-700">Auto-record services</span>
+          </label>
+          <div className="mt-1 text-[10px] text-slate-500">
+            Recording is written to OBS&rsquo;s configured record folder — point that at your NAS.
+          </div>
+          <div className="mt-2 mb-1 text-xs font-semibold text-slate-700">Recent recordings</div>
+          <RecordingsPanel />
+        </div>
 
         {/* Scenes */}
         {status.connected && (
