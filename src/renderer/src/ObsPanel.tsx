@@ -83,6 +83,8 @@ function ObsPanel(): JSX.Element {
 
   // Load the video-assembly settings (intro/outro/output folder) on mount.
   useEffect(() => { void window.wf.getAssemblySettings().then(setAsm) }, [])
+  const [anthropicKey, setAnthropicKey] = useState('')
+  useEffect(() => { void window.wf.getAnthropicKey().then(setAnthropicKey) }, [])
   const pickAsm = async (key: 'introPath' | 'outroPath' | 'outputFolder'): Promise<void> => {
     const path = await window.wf.pickAssemblyFile(key === 'outputFolder' ? 'folder' : 'video')
     if (path == null) return
@@ -256,6 +258,14 @@ function ObsPanel(): JSX.Element {
               </div>
             ))}
             <p className="text-[10px] text-slate-500">Intro/outro are optional bumper videos. Output defaults to each recording&rsquo;s own folder.</p>
+            <div className="mt-1 flex items-center gap-2 text-[11px]">
+              <span className="w-14 shrink-0 text-slate-500">Claude key</span>
+              <input type="password" value={anthropicKey} placeholder="sk-ant-…"
+                onChange={(e) => setAnthropicKey(e.target.value)}
+                onBlur={() => void window.wf.setAnthropicKey(anthropicKey)}
+                className="min-w-0 flex-1 rounded border border-slate-300 px-1 text-slate-700" />
+            </div>
+            <p className="text-[10px] text-slate-500">AI content also needs your Replicate key (set elsewhere).</p>
           </div>
 
           <div className="mt-2 mb-1 text-xs font-semibold text-slate-700">Recent recordings</div>
