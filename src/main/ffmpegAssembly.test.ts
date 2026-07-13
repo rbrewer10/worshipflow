@@ -41,3 +41,43 @@ describe('computeTrim', () => {
     expect(computeTrim(sc, { startMs: 3000000, endMs: 1000000 })).toEqual({ startMs: 0, endMs: 3600000 })
   })
 })
+
+import { buildFfmpegArgs } from './ffmpegAssembly'
+
+describe('buildFfmpegArgs', () => {
+  const base = { servicePath: '/nas/svc.mkv', startMs: 300000, endMs: 3600000, outputPath: '/nas/svc-final.mp4' }
+
+  it('trims the service and concats a single segment when no bumpers', () => {
+    const a = buildFfmpegArgs(base)
+    expect(a.filter((x) => x === '-i')).toHaveLength(1)
+    expect(a).toContain('-ss'); expect(a).toContain('300.000')
+    expect(a).toContain('-to'); expect(a).toContain('3600.000')
+    expect(a.join(' ')).toContain('concat=n=1:v=1:a=1')
+    expect(a[a.length - 1]).toBe('/nas/svc-final.mp4')
+    expect(a.join(' ')).toContain('-map [v] -map [a]')
+  })
+
+  it('puts the intro first and the service second', () => {
+    const a = buildFfmpegArgs({ ...base, introPath: '/nas/intro.mp4' })
+    expect(a.filter((x) => x === '-i')).toHaveLength(2)
+    const introIdx = a.indexOf('/nas/intro.mp4')
+    const svcIdx = a.indexOf('/nas/svc.mkv')
+    expect(introIdx).toBeGreaterThan(-1)
+    expect(introIdx).toBeLessThan(svcIdx)
+    expect(a.join(' ')).toContain('concat=n=2:v=1:a=1')
+  })
+
+  it('appends the outro last and builds a 3-segment concat', () => {
+    const a = buildFfmpegArgs({ ...base, introPath: '/nas/intro.mp4', outroPath: '/nas/outro.mp4' })
+    expect(a.filter((x) => x === '-i')).toHaveLength(3)
+    expect(a.indexOf('/nas/outro.mp4')).toBeGreaterThan(a.indexOf('/nas/svc.mkv'))
+    expect(a.join(' ')).toContain('concat=n=3:v=1:a=1')
+  })
+
+  it('includes libx264/aac output flags and -y', () => {
+    const a = buildFfmpegArgs(base)
+    expect(a).toContain('-c:v'); expect(a).toContain('libx264')
+    expect(a).toContain('-c:a'); expect(a).toContain('aac')
+    expect(a[0]).toBe('-y')
+  })
+})
