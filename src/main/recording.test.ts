@@ -93,4 +93,14 @@ describe('recording session', () => {
     expect(deps.createRecording).toHaveBeenCalledOnce() // still tracked
     expect(s.isActive()).toBe(true)
   })
+
+  it('measures marker offsets from OBS record start, not go-live time (adoption path)', async () => {
+    // makeDeps' clock starts at 1000; OBS actually began recording at 500 (500ms earlier).
+    const { deps, markers } = makeDeps({ obsRecording: () => true, obsRecordStartedMs: () => 500 })
+    const s = createRecordingSession(deps)
+    await s.onItemLive(makeItem(1, 'song', 'Opener'), 42, 'Sunday AM', '2026-07-19')
+    expect(deps.startRecord).not.toHaveBeenCalled() // adopted, not restarted
+    // Offset must be relative to the real video start (1000 - 500), NOT 0.
+    expect(markers).toEqual([{ recId: 7, kind: 'song', label: 'Opener', offsetMs: 500 }])
+  })
 })

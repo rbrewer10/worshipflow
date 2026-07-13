@@ -38,7 +38,8 @@ function markerKind(type: ServiceItem['type']): RecordingMarkerKind {
 
 export function createRecordingSession(deps: RecordingDeps): RecordingSession {
   let recordingId: number | null = null
-  let startedAtMs = 0
+  let startedAtMs = 0     // app wall clock when the session began (row started_at)
+  let offsetBaseMs = 0    // OBS's actual record-start time — the t=0 all marker offsets are measured from
   let ctx: { serviceId: number | null; serviceName: string; serviceDate: string | null } | null = null
 
   async function ensureStarted(serviceId: number | null, serviceName: string, serviceDate: string | null): Promise<boolean> {
@@ -52,8 +53,12 @@ export function createRecordingSession(deps: RecordingDeps): RecordingSession {
       await deps.startRecord()
     }
     startedAtMs = deps.now()
+    // Measure offsets from OBS's real record start, not go-live time. On the auto-start
+    // path these are ~equal; on the adopt-existing-recording path OBS may have started
+    // minutes earlier, and marker offsets must reflect the true position in the video file.
+    offsetBaseMs = deps.obsRecordStartedMs()
     ctx = { serviceId, serviceName, serviceDate }
-    recordingId = deps.createRecording(serviceId, startedAtMs, deps.obsRecordStartedMs())
+    recordingId = deps.createRecording(serviceId, startedAtMs, offsetBaseMs)
     return true
   }
 
@@ -65,7 +70,7 @@ export function createRecordingSession(deps: RecordingDeps): RecordingSession {
         itemId: item.id,
         kind: markerKind(item.type),
         label: item.title,
-        offsetMs: Math.max(0, deps.now() - startedAtMs)
+        offsetMs: Math.max(0, deps.now() - offsetBaseMs)
       })
     },
 
@@ -80,7 +85,7 @@ export function createRecordingSession(deps: RecordingDeps): RecordingSession {
         deps.writeSidecar(filePath, {
           worshipflowVersion: deps.appVersion,
           service: { id: ctx?.serviceId ?? null, name: ctx?.serviceName ?? '', date: ctx?.serviceDate ?? null },
-          recording: { startedAt: startedAtMs, durationMs: endedAt - startedAtMs, file },
+          recording: { startedAt: offsetBaseMs, durationMs: endedAt - offsetBaseMs, file },
           markers: markers.map((m) => ({ kind: m.kind, label: m.label, offsetMs: m.offsetMs }))
         })
       } else {
