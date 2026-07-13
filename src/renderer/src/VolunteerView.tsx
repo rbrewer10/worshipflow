@@ -8,6 +8,7 @@ import {
   FileText,
   Hand,
   Image as ImageIcon,
+  Mic,
   Music,
   Newspaper,
   Square,
@@ -24,7 +25,8 @@ const ICON: Record<ServiceItem['type'], JSX.Element> = {
   image: <ImageIcon size={14} />,
   welcome: <Hand size={14} />,
   ticker: <Newspaper size={14} />,
-  announcement: <Newspaper size={14} />
+  announcement: <Newspaper size={14} />,
+  sermon: <Mic size={14} />
 }
 
 function canGoLive(item: ServiceItem): boolean {
@@ -36,7 +38,8 @@ function canGoLive(item: ServiceItem): boolean {
     (item.type === 'image' && !!(item.payload.path as string)) ||
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
     (item.type === 'ticker' && !!(item.payload.text as string)) ||
-    (item.type === 'announcement' && item.ref_id != null)
+    (item.type === 'announcement' && item.ref_id != null) ||
+    (item.type === 'sermon')
   )
 }
 
@@ -70,6 +73,8 @@ async function loadItem(item: ServiceItem): Promise<void> {
     await window.wf.liveLoadText('Announcement', txt)
   } else if (item.type === 'announcement' && item.ref_id != null) {
     await window.wf.liveLoadAnnouncement(item.ref_id)
+  } else if (item.type === 'sermon') {
+    window.wf.sendIntent('logo')
   } else {
     return
   }

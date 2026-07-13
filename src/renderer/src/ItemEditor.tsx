@@ -10,6 +10,7 @@ import { TextEditor } from './editors/TextEditor'
 import { ImageEditor } from './editors/ImageEditor'
 import { CountdownEditor } from './editors/CountdownEditor'
 import { TickerEditor } from './editors/TickerEditor'
+import { SermonEditor } from './editors/SermonEditor'
 import AnnouncementItemEditor from './AnnouncementItemEditor'
 
 interface ItemEditorProps {
@@ -159,6 +160,17 @@ export const ItemEditor = memo(function ItemEditor({
         <TickerEditor
           text={(payload.text as string) ?? ''}
           onTextChange={(text) => savePayload({ ...payload, text })}
+        />
+      )}
+
+      {item.type === 'sermon' && (
+        <SermonEditor
+          title={(payload.title as string) ?? ''}
+          speaker={(payload.speaker as string) ?? ''}
+          passage={(payload.passage as string) ?? ''}
+          onTitleChange={(title) => savePayload({ ...payload, title })}
+          onSpeakerChange={(speaker) => savePayload({ ...payload, speaker })}
+          onPassageChange={(passage) => savePayload({ ...payload, passage })}
         />
       )}
 

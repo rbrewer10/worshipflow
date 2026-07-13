@@ -17,7 +17,10 @@ import type {
   ZoneRouting,
   AnnouncementSummary,
   Announcement,
-  AnnouncementInput
+  AnnouncementInput,
+  RecordingRow,
+  RecordingMarker,
+  RecordingMarkerInput
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
 import { splitLyricLines } from '../shared/lyrics'
@@ -118,6 +121,23 @@ CREATE TABLE IF NOT EXISTS background_tags (
   file_path TEXT NOT NULL UNIQUE,
   tags_json TEXT NOT NULL,
   created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS recording (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  service_id            INTEGER,
+  started_at            INTEGER NOT NULL,
+  ended_at              INTEGER,
+  file_path             TEXT,
+  obs_record_started_ms INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS recording_marker (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  recording_id INTEGER NOT NULL,
+  item_id      INTEGER,
+  kind         TEXT NOT NULL,
+  label        TEXT NOT NULL,
+  offset_ms    INTEGER NOT NULL
 );
 `
 
@@ -1056,4 +1076,72 @@ export function searchBackgroundsByTags(searchTags: string[]): string[] {
     console.error('[db] Failed to search backgrounds:', err)
     return []
   }
+}
+
+// --- Recordings (Phase 1) ---
+export function createRecording(
+  serviceId: number | null,
+  startedAt: number,
+  obsRecordStartedMs: number
+): number {
+  db.run(
+    'INSERT INTO recording (service_id, started_at, obs_record_started_ms) VALUES (?, ?, ?)',
+    [serviceId, startedAt, obsRecordStartedMs]
+  )
+  const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number
+  persist()
+  return id
+}
+
+export function addRecordingMarker(recordingId: number, m: RecordingMarkerInput): void {
+  db.run(
+    'INSERT INTO recording_marker (recording_id, item_id, kind, label, offset_ms) VALUES (?, ?, ?, ?, ?)',
+    [recordingId, m.itemId, m.kind, m.label, m.offsetMs]
+  )
+  persist()
+}
+
+export function finalizeRecording(recordingId: number, endedAt: number, filePath: string | null): void {
+  db.run('UPDATE recording SET ended_at = ?, file_path = ? WHERE id = ?', [endedAt, filePath, recordingId])
+  persist()
+}
+
+export function listRecordingMarkers(recordingId: number): RecordingMarker[] {
+  const res = db.exec(
+    'SELECT id, recording_id, item_id, kind, label, offset_ms FROM recording_marker WHERE recording_id = ? ORDER BY offset_ms ASC',
+    [recordingId]
+  )
+  if (!res[0]) return []
+  return res[0].values.map((r) => ({
+    id: r[0] as number,
+    recordingId: r[1] as number,
+    itemId: r[2] as number | null,
+    kind: r[3] as RecordingMarker['kind'],
+    label: r[4] as string,
+    offsetMs: r[5] as number
+  }))
+}
+
+export function listRecordings(): RecordingRow[] {
+  const res = db.exec(
+    `SELECT r.id, r.service_id, r.started_at, r.ended_at, r.file_path, r.obs_record_started_ms,
+            (SELECT COUNT(*) FROM recording_marker m WHERE m.recording_id = r.id) AS marker_count
+       FROM recording r ORDER BY r.started_at DESC`
+  )
+  if (!res[0]) return []
+  return res[0].values.map((r) => ({
+    id: r[0] as number,
+    serviceId: r[1] as number | null,
+    startedAt: r[2] as number,
+    endedAt: r[3] as number | null,
+    filePath: r[4] as string | null,
+    obsRecordStartedMs: r[5] as number,
+    markerCount: r[6] as number
+  }))
+}
+
+// Reconcile any recording left open by a crash: mark it ended at `endedAt`.
+export function closeDanglingRecordings(endedAt: number): void {
+  db.run('UPDATE recording SET ended_at = ? WHERE ended_at IS NULL', [endedAt])
+  persist()
 }
