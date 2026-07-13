@@ -1,17 +1,22 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WorshipFlow Pro">
   <defs>
     <linearGradient id="tile" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#34d399"/>
-      <stop offset="0.55" stop-color="#10b981"/>
-      <stop offset="1" stop-color="#047857"/>
+      <stop offset="0" stop-color="#173a6b"/>
+      <stop offset="0.55" stop-color="#0f2b52"/>
+      <stop offset="1" stop-color="#0a1e3c"/>
     </linearGradient>
     <radialGradient id="glow" cx="0.5" cy="0.28" r="0.75" gradientUnits="objectBoundingBox">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
       <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="cross" x1="256" y1="150" x2="256" y2="404" gradientUnits="userSpaceOnUse">
+    <linearGradient id="cross" x1="256" y1="150" x2="256" y2="406" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#eafff5"/>
+      <stop offset="1" stop-color="#eaf2ff"/>
+    </linearGradient>
+    <linearGradient id="infinity" x1="150" y1="366" x2="362" y2="366" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#93c0f5"/>
+      <stop offset="0.5" stop-color="#5a97e8"/>
+      <stop offset="1" stop-color="#3f83e0"/>
     </linearGradient>
   </defs>
 
@@ -19,13 +24,11 @@
   <rect x="32" y="32" width="448" height="448" rx="108" fill="url(#tile)"/>
   <rect x="32" y="32" width="448" height="448" rx="108" fill="url(#glow)"/>
 
-  <!-- Flow: a stream of light passing behind the cross -->
-  <path d="M64 356 C 128 316, 176 316, 232 344 S 356 388, 448 340"
-        stroke="#d1fae5" stroke-opacity="0.9" stroke-width="18" stroke-linecap="round" fill="none"/>
-  <path d="M64 396 C 136 364, 188 372, 248 392 S 372 420, 448 384"
-        stroke="#ffffff" stroke-opacity="0.35" stroke-width="12" stroke-linecap="round" fill="none"/>
+  <!-- Infinity woven at the base of the cross (sits behind the vertical bar) -->
+  <path d="M256 366 C 224 322, 168 322, 150 366 C 132 410, 224 410, 256 366 C 288 322, 380 322, 362 366 C 344 410, 288 410, 256 366 Z"
+        stroke="url(#infinity)" stroke-width="30" stroke-linejoin="round" fill="none"/>
 
-  <!-- Cross (soft-rounded bars, sitting in front of the flow) -->
+  <!-- Cross (soft-rounded bars, in front of the infinity) -->
   <g fill="url(#cross)">
     <rect x="222" y="150" width="68" height="256" rx="26"/>
     <rect x="164" y="232" width="184" height="68" rx="26"/>
