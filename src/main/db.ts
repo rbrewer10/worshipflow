@@ -166,6 +166,13 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE service_item ADD COLUMN zone_routing TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN output_path TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN render_state TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN transcript TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN ai_title TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN ai_description TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN chapters TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN srt_path TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN thumbnail_path TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE recording ADD COLUMN ai_state TEXT') } catch { /* already exists */ }
   normalizeSectionLyrics()
   persist()
 }
@@ -1128,6 +1135,7 @@ export function listRecordings(): RecordingRow[] {
   const res = db.exec(
     `SELECT r.id, r.service_id, r.started_at, r.ended_at, r.file_path, r.obs_record_started_ms,
             r.output_path, r.render_state,
+            r.transcript, r.ai_title, r.ai_description, r.chapters, r.srt_path, r.thumbnail_path, r.ai_state,
             (SELECT COUNT(*) FROM recording_marker m WHERE m.recording_id = r.id) AS marker_count
        FROM recording r ORDER BY r.started_at DESC`
   )
@@ -1141,13 +1149,21 @@ export function listRecordings(): RecordingRow[] {
     obsRecordStartedMs: r[5] as number,
     outputPath: r[6] as string | null,
     renderState: ((r[7] as string | null) ?? 'idle') as RecordingRow['renderState'],
-    markerCount: r[8] as number
+    transcript: r[8] as string | null,
+    aiTitle: r[9] as string | null,
+    aiDescription: r[10] as string | null,
+    chapters: r[11] as string | null,
+    srtPath: r[12] as string | null,
+    thumbnailPath: r[13] as string | null,
+    aiState: ((r[14] as string | null) ?? 'idle') as RecordingRow['aiState'],
+    markerCount: r[15] as number
   }))
 }
 
 export function getRecording(id: number): RecordingRow | null {
   const res = db.exec(
-    `SELECT id, service_id, started_at, ended_at, file_path, obs_record_started_ms, output_path, render_state
+    `SELECT id, service_id, started_at, ended_at, file_path, obs_record_started_ms, output_path, render_state,
+            transcript, ai_title, ai_description, chapters, srt_path, thumbnail_path, ai_state
        FROM recording WHERE id = ?`,
     [id]
   )
@@ -1161,7 +1177,14 @@ export function getRecording(id: number): RecordingRow | null {
     filePath: r[4] as string | null,
     obsRecordStartedMs: r[5] as number,
     outputPath: r[6] as string | null,
-    renderState: ((r[7] as string | null) ?? 'idle') as RecordingRow['renderState']
+    renderState: ((r[7] as string | null) ?? 'idle') as RecordingRow['renderState'],
+    transcript: r[8] as string | null,
+    aiTitle: r[9] as string | null,
+    aiDescription: r[10] as string | null,
+    chapters: r[11] as string | null,
+    srtPath: r[12] as string | null,
+    thumbnailPath: r[13] as string | null,
+    aiState: ((r[14] as string | null) ?? 'idle') as RecordingRow['aiState']
   }
 }
 
@@ -1171,6 +1194,20 @@ export function setRecordingRender(id: number, state: RecordingRow['renderState'
   } else {
     db.run('UPDATE recording SET render_state = ?, output_path = ? WHERE id = ?', [state, outputPath, id])
   }
+  persist()
+}
+
+export function setRecordingAi(id: number, fields: Partial<Pick<RecordingRow,
+  'transcript' | 'aiTitle' | 'aiDescription' | 'chapters' | 'srtPath' | 'thumbnailPath' | 'aiState'>>): void {
+  const map: Record<string, string> = {
+    transcript: 'transcript', aiTitle: 'ai_title', aiDescription: 'ai_description',
+    chapters: 'chapters', srtPath: 'srt_path', thumbnailPath: 'thumbnail_path', aiState: 'ai_state'
+  }
+  const cols = Object.keys(fields) as (keyof typeof map)[]
+  if (cols.length === 0) return
+  const sets = cols.map((k) => `${map[k]} = ?`).join(', ')
+  const vals = cols.map((k) => (fields as Record<string, unknown>)[k] as string | null)
+  db.run(`UPDATE recording SET ${sets} WHERE id = ?`, [...vals, id])
   persist()
 }
 
