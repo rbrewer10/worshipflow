@@ -138,7 +138,15 @@ export async function initObsAutoConnect(): Promise<void> {
 export async function obsStartStream(): Promise<void> { await safe(() => obs.call('StartStream')) }
 export async function obsStopStream(): Promise<void> { await safe(() => obs.call('StopStream')) }
 export async function obsStartRecord(): Promise<void> { await safe(() => obs.call('StartRecord')) }
-export async function obsStopRecord(): Promise<void> { await safe(() => obs.call('StopRecord')) }
+export async function obsStopRecord(): Promise<string | null> {
+  try {
+    const res = await obs.call('StopRecord')
+    return (res as { outputPath?: string }).outputPath ?? null
+  } catch (err) {
+    console.error('[obs] StopRecord failed', err)
+    return null
+  }
+}
 
 export async function obsSetScene(sceneName: string): Promise<void> {
   if (!status.connected || !sceneName) return
