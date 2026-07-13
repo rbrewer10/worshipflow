@@ -175,7 +175,7 @@ function ObsPanel(): JSX.Element {
               <span className="h-2 w-2 rounded-[2px] bg-white" /> Stop Stream
             </button>
           ) : (
-            <button onClick={() => window.wf.obsStartStream()} disabled={!status.connected} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600/20 px-2 py-2 text-xs font-bold text-red-700 hover:bg-red-600/30 disabled:opacity-40">
+            <button onClick={() => { if (window.confirm('Go live to the internet now? This starts the public stream.')) window.wf.obsStartStream() }} disabled={!status.connected} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600/20 px-2 py-2 text-xs font-bold text-red-700 hover:bg-red-600/30 disabled:opacity-40">
               <span className="h-2 w-2 rounded-full bg-current" /> Start Stream
             </button>
           )}

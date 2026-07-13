@@ -5,13 +5,20 @@ function LogoSettings(): JSX.Element {
   const [logoPath, setLogoPath] = useState<string | null>(null)
   const [logoBg, setLogoBg] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [churchName, setChurchName] = useState('')
 
   useEffect(() => {
     window.wf.logoGet().then(({ logoPath: p, logoBg: b }) => {
       setLogoPath(p)
       setLogoBg(b)
     })
+    window.wf.settingGet('church_name').then((v) => setChurchName(v ?? ''))
   }, [])
+
+  const saveChurchName = (name: string): void => {
+    setChurchName(name)
+    window.wf.settingSet('church_name', name.trim() || null)
+  }
 
   const save = (path: string | null, bg: string | null): void => {
     window.wf.logoSet(path, bg).then(() => {
@@ -60,6 +67,19 @@ function LogoSettings(): JSX.Element {
       </div>
 
       <div className="mx-auto max-w-xl space-y-5">
+        {/* Church Name */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="font-semibold text-gray-900">Church Name</div>
+          <div className="text-xs text-gray-400 mt-0.5 mb-3">Shown on logo / idle screens when no logo image is set.</div>
+          <input
+            type="text"
+            value={churchName}
+            onChange={(e) => saveChurchName(e.target.value)}
+            placeholder="e.g. Snow Hill Church"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-emerald-400 focus:outline-none"
+          />
+        </div>
+
         {/* Church Logo */}
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
@@ -74,7 +94,7 @@ function LogoSettings(): JSX.Element {
           <div className="mb-4 flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-900">
             {logoPath ? (
               <img
-                src={`http://localhost:3691/file?path=${encodeURIComponent(logoPath)}`}
+                src={`wf-asset://?path=${encodeURIComponent(logoPath)}`}
                 alt="Church logo"
                 className="max-h-full max-w-full object-contain p-6"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -132,7 +152,7 @@ function LogoSettings(): JSX.Element {
                 </div>
               ) : (
                 <img
-                  src={`http://localhost:3691/file?path=${encodeURIComponent(logoBg)}`}
+                  src={`wf-asset://?path=${encodeURIComponent(logoBg)}`}
                   alt="Background"
                   className="h-full w-full object-cover opacity-70"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}

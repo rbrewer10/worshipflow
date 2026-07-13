@@ -302,7 +302,17 @@ function ConnectionErrorState({
     <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 px-4 text-center">
       <div className="max-w-[440px] rounded-2xl border border-red-300 bg-red-50 px-6 py-5">
         <p className="mb-1 text-sm font-semibold text-red-700">Couldn&rsquo;t connect to the mixer</p>
-        <p className="m-0 text-[13px] leading-relaxed text-slate-700">{message}</p>
+        <p className="m-0 text-[13px] leading-relaxed text-slate-700">
+          Check that it&rsquo;s powered on and on the same network.
+        </p>
+        {message && (
+          <details className="mt-2 text-left">
+            <summary className="cursor-pointer text-[11px] font-semibold text-slate-500 hover:text-slate-700">
+              Details
+            </summary>
+            <p className="m-0 mt-1 break-words text-[11px] leading-relaxed text-slate-500">{message}</p>
+          </details>
+        )}
       </div>
       <form
         className="flex items-center gap-2"

@@ -11,6 +11,7 @@ import ScriptureLookup from './ScriptureLookup'
 import VolunteerView from './VolunteerView'
 import LogoSettings from './LogoSettings'
 import SoundCheckTab from './sound-check/SoundCheckTab'
+import NotifyToasts from './NotifyToasts'
 
 export type View = 'home' | 'live' | 'service' | 'songs' | 'announcements' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck'
 
@@ -93,12 +94,14 @@ function AppShell(): JSX.Element {
   if (view === 'volunteer') {
     return (
       <ServiceProvider>
+        <NotifyToasts />
         <VolunteerView onExit={() => setView('home')} />
       </ServiceProvider>
     )
   }
   return (
     <ServiceProvider>
+      <NotifyToasts />
       <div className="flex h-screen flex-row overflow-hidden bg-[#e9ecf1] text-slate-900">
         <Sidebar view={view} setView={setView} />
         <div className="flex min-w-0 flex-1 flex-col">

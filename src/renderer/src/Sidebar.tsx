@@ -66,9 +66,17 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }):
               <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
               <span className="text-xs font-semibold text-emerald-700">{outputs} screen{outputs !== 1 ? 's' : ''} live</span>
             </div>
-          : <div className="flex items-center gap-1.5 rounded-lg px-3 py-2">
-              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-slate-400" />
-              <span className="text-xs text-slate-500">No output</span>
+          : <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 rounded-lg px-3 py-2">
+                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-slate-400" />
+                <span className="text-xs text-slate-500">No output</span>
+              </div>
+              <button
+                onClick={() => window.wf.outputOpen()}
+                className="w-full rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+              >
+                Open on projector
+              </button>
             </div>
         }
       </div>

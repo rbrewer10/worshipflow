@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useChurchName } from './useChurchName'
 import {
   BookOpen,
   ChevronLeft,
@@ -45,7 +46,8 @@ async function loadItem(item: ServiceItem): Promise<void> {
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    await window.wf.liveLoadScripture(ref)
+    const ok = await window.wf.liveLoadScripture(ref)
+    if (!ok) return
   } else if (item.type === 'text') {
     await window.wf.liveLoadText(
       (item.payload.title as string) ?? '',
@@ -89,6 +91,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
   const liveRef = useRef<LiveState | null>(null)
   const serviceRef = useRef<ServiceFull | null>(null)
   const liveItemIdRef = useRef<number | null>(null)
+  const churchName = useChurchName()
   useEffect(() => { liveRef.current = live }, [live])
   useEffect(() => { serviceRef.current = service }, [service])
   useEffect(() => { liveItemIdRef.current = liveItemId }, [liveItemId])
@@ -96,18 +99,23 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
   useEffect(() => {
     const off = window.wf.onState(setLive)
     window.wf.getState().then(setLive)
-    window.wf.servicesList().then((list) => {
+    window.wf.servicesList().then(async (list) => {
       setServices(list)
-      if (list.length > 0) {
-        setActiveServiceId(list[0].id)
-        window.wf.serviceGet(list[0].id).then(setService)
-      }
+      if (list.length === 0) return
+      // Honor the service the operator prepared (the shared active service) rather
+      // than blindly defaulting to the first/most-recent one.
+      const activeId = await window.wf.getActiveServiceId()
+      const chosen = activeId != null && list.some((s) => s.id === activeId) ? activeId : list[0].id
+      setActiveServiceId(chosen)
+      window.wf.setActiveService(chosen)
+      window.wf.serviceGet(chosen).then(setService)
     })
     return off
   }, [])
 
   const pickService = (id: number): void => {
     setActiveServiceId(id)
+    window.wf.setActiveService(id)  // keep projector/zones/tablet in sync with the volunteer's choice
     window.wf.serviceGet(id).then(setService)
   }
 
@@ -202,7 +210,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
           ) : isBlack ? (
             <div className="text-2xl font-semibold text-slate-500">Screen is black</div>
           ) : isLogo ? (
-            <div className="inline-flex items-center gap-2.5 text-3xl font-bold text-emerald-700"><Church size={30} /> SNOW HILL — Logo screen</div>
+            <div className="inline-flex items-center gap-2.5 text-3xl font-bold text-emerald-700"><Church size={30} /> {churchName} — Logo screen</div>
           ) : (
             <>
               <div className="text-5xl font-bold leading-snug text-slate-900" style={{ whiteSpace: 'pre-line' }}>

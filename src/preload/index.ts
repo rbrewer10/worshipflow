@@ -99,6 +99,12 @@ const wf = {
 
   // Live engine
   stageOpen: (): Promise<void> => ipcRenderer.invoke('wf:stage:open'),
+  outputOpen: (): Promise<void> => ipcRenderer.invoke('wf:output:open'),
+  onNotify: (cb: (n: { message: string; level: 'info' | 'warn' | 'error' }) => void): (() => void) => {
+    const handler = (_e: unknown, n: { message: string; level: 'info' | 'warn' | 'error' }): void => cb(n)
+    ipcRenderer.on('wf:notify', handler)
+    return () => ipcRenderer.removeListener('wf:notify', handler)
+  },
   liveSetItemId: (id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', id),
   liveGoLiveAt: (itemId: number, slideIndex: number): Promise<void> =>
     ipcRenderer.invoke('wf:live:goLiveAt', itemId, slideIndex),
@@ -106,7 +112,7 @@ const wf = {
   liveSaveFontScale: (): Promise<void> => ipcRenderer.invoke('wf:live:saveFontScale'),
   liveSetStageMessage: (msg: string | null): Promise<void> => ipcRenderer.invoke('wf:live:setStageMessage', msg),
   liveLoadSong: (id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', id),
-  liveLoadScripture: (reference: string): Promise<void> =>
+  liveLoadScripture: (reference: string): Promise<boolean> =>
     ipcRenderer.invoke('wf:live:loadScripture', reference),
   liveLoadText: (title: string, body: string, background?: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadText', title, body, background ?? null),
@@ -156,6 +162,8 @@ const wf = {
     ipcRenderer.invoke('wf:getTabletUrl'),
   setActiveService: (serviceId: number | null): Promise<void> =>
     ipcRenderer.invoke('wf:setActiveService', serviceId),
+  getActiveServiceId: (): Promise<number | null> =>
+    ipcRenderer.invoke('wf:getActiveServiceId'),
 
   // Features
   featuresStartAutoAdvance: (durationMs: number, loop?: boolean): Promise<void> =>

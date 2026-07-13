@@ -44,7 +44,10 @@ function LiveTools(): JSX.Element {
   const quickScripture = async (): Promise<void> => {
     const ref = scriptureRef.trim()
     if (!ref) return
-    await window.wf.liveLoadScripture(ref)
+    // On a failed lookup keep the typed reference and leave the current item live
+    // rather than clearing both silently.
+    const ok = await window.wf.liveLoadScripture(ref)
+    if (!ok) return
     window.wf.liveSetItemId(null)
     setScriptureRef('')
   }

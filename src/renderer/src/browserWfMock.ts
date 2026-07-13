@@ -297,6 +297,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     }),
 
     stageOpen: noop,
+    outputOpen: noop,
+    onNotify: () => () => {},
     liveSetItemId: async (id: number | null): Promise<void> => publish({ liveServiceItemId: id }),
     liveGoLiveAt: async (_itemId: number, slideIndex: number): Promise<void> => {
       const index = Math.max(0, Math.min(slideIndex, demoLines.length - 1))
@@ -309,7 +311,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       const song = songs.find((s) => s.id === id)
       if (song) publish({ songTitle: song.title, index: 0, line: demoLines[0], next: demoLines[1], total: demoLines.length })
     },
-    liveLoadScripture: async (reference: string): Promise<void> => publish({ songTitle: reference, line: 'Browser preview scripture text.', next: '', total: 1, index: 0 }),
+    liveLoadScripture: async (reference: string): Promise<boolean> => { publish({ songTitle: reference, line: 'Browser preview scripture text.', next: '', total: 1, index: 0 }); return true },
     liveLoadText: async (title: string, body: string): Promise<void> => publish({ songTitle: title || 'Announcement', line: body || title, next: '', total: 1, index: 0 }),
     liveLoadCountdown: async (seconds: number): Promise<void> => publish({ mode: 'countdown', songTitle: 'Countdown', line: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, next: '', total: 1, index: 0 }),
     liveLoadMedia: async (_filePath: string, title: string): Promise<void> => publish({ songTitle: title || 'Media', line: '', next: '', total: 1, index: 0 }),
@@ -339,6 +341,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
 
     getTabletUrl: async (): Promise<string> => 'Browser preview only',
     setActiveService: async (serviceId: number | null): Promise<void> => { activeServiceId = serviceId },
+    getActiveServiceId: async (): Promise<number | null> => activeServiceId,
     featuresStartAutoAdvance: noop,
     featuresStopAutoAdvance: noop,
     featuresSetTheme: async (theme: Theme): Promise<void> => publish({ theme }),

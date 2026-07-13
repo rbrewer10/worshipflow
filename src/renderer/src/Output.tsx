@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { LiveState, Mode, ThemeColors } from '../../shared/types'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
 import type { MotionEffect } from '../../shared/themes'
+import { useChurchName } from './useChurchName'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -107,9 +108,14 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
     slideThemeId, slideThemeColors, songTextColor, songFont, ccli
   } = model
   const [bgReady, setBgReady] = useState(false)
+  const [logoImg, setLogoImg] = useState<string | null>(null)
+  const churchName = useChurchName()
 
   // Reset ready-state when source changes so gradient shows while new video loads.
   useEffect(() => { setBgReady(false) }, [bgSrc])
+  useEffect(() => {
+    window.wf.logoGet().then((l) => setLogoImg(l.logoPath ?? null)).catch(() => {})
+  }, [])
 
   const black = mode === 'black'
   const logo = mode === 'logo'
@@ -236,10 +242,20 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
           className="absolute inset-0 flex flex-col items-center justify-center"
           style={{ background: 'radial-gradient(circle at 50% 40%, #0b2350, #050a1a)' }}
         >
-          <div className="text-[9cqw] font-extrabold tracking-wide text-white">✝ SNOW HILL</div>
-          <div className="mt-[0.5cqh] text-[2.2cqw] uppercase tracking-[0.4em] text-blue-200">
-            Worship Service
-          </div>
+          {logoImg ? (
+            <img
+              src={toAssetUrl(logoImg)}
+              className="max-h-[55cqh] max-w-[60cqw] object-contain"
+              style={{ filter: 'drop-shadow(0 0 6cqw rgba(0,0,0,0.6))' }}
+            />
+          ) : (
+            <>
+              <div className="text-[9cqw] font-extrabold tracking-wide text-white">✝ {churchName}</div>
+              <div className="mt-[0.5cqh] text-[2.2cqw] uppercase tracking-[0.4em] text-blue-200">
+                Worship Service
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

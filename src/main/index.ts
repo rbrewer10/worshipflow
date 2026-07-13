@@ -4,7 +4,7 @@ import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative } from 'path'
 import { randomUUID } from 'crypto'
 import { createServer } from 'http'
-import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
@@ -16,6 +16,7 @@ import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
 import {
   initDb,
+  onPersistError,
   listSongs,
   getSong,
   createSong,
@@ -168,7 +169,11 @@ const outputWins = new Map<string, BrowserWindow>()
 // makes a second launch just focus the existing window instead.
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
-  app.quit()
+  // app.quit() is async and does NOT stop this module from continuing to run —
+  // the whenReady handler would still fire, open the DB, and persist() it back
+  // over the live file (the data-loss incident). app.exit() terminates now, and
+  // the whenReady body also guards on the lock as belt-and-suspenders.
+  app.exit(0)
 } else {
   app.on('second-instance', () => {
     if (operatorWin) {
@@ -212,6 +217,7 @@ let tabletWss: WebSocketServer | null = null
 let tabletHeartbeat: ReturnType<typeof setInterval> | null = null
 let boundTabletPort = TABLET_PORT
 let activeServiceItems: ServiceItem[] = []
+let activeServiceId: number | null = null  // which service is currently active (for Volunteer mode to honor)
 let liveItemNotes: string | null = null
 
 // Feature states
@@ -536,6 +542,13 @@ function adjacentLiveItem(dir: 1 | -1): ServiceItem | undefined {
   return rest.find(itemCanGoLive)
 }
 
+// Send a transient banner to the operator window (non-technical-friendly toast).
+function notifyOperator(message: string, level: 'info' | 'warn' | 'error' = 'info'): void {
+  if (operatorWin && !operatorWin.isDestroyed()) {
+    operatorWin.webContents.send('wf:notify', { message, level })
+  }
+}
+
 // --- Extracted intent processing (used by both IPC and WebSocket) ---
 function processIntent(type: Intent): void {
   // Only clear auto-advance for mode-changing intents (black/logo/lyrics), not for navigation (next/prev)
@@ -548,7 +561,9 @@ function processIntent(type: Intent): void {
       // A live countdown/welcome is a single view — Next moves to the next item.
       const nextItem = adjacentLiveItem(1)
       if (nextItem) { void handleTabletLoadItem(nextItem.id); return }
-      clearCountdown(); state.mode = 'lyrics'
+      // Nothing after the countdown — go to the logo hold screen instead of
+      // stranding the frozen timer value (e.g. "0:42") as a lyric slide.
+      clearCountdown(); liveSong = { title: '', lines: [], background: null }; state.mode = 'logo'
     } else if (state.mode !== 'lyrics') {
       // Black/logo were operator-blanked — Next un-blanks back to the slide.
       clearCountdown(); state.mode = 'lyrics'
@@ -635,8 +650,8 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
     }
   } catch (err) {
     clearTimeout(timeout)
-    console.error('[scripture] online fetch failed, falling back to KJV:', err)
-    return lookupScripture(reference)
+    logWarn(`[scripture] online fetch failed, falling back to KJV: ${(err as Error)?.message ?? err}`)
+    return { ...lookupScripture(reference), usedFallback: true }
   }
 }
 
@@ -650,6 +665,9 @@ async function doLoadScripture(reference: string): Promise<boolean> {
   if (!result.ok || !result.verses) {
     logWarn(`[scripture] lookup failed for reference="${reference}" translation=${bibleTranslation}`)
     return false
+  }
+  if (result.usedFallback) {
+    notifyOperator(`Online lookup failed — showing KJV for "${reference}"`, 'warn')
   }
   clearCountdown()
   liveSongId = null
@@ -668,19 +686,21 @@ async function doLoadScripture(reference: string): Promise<boolean> {
 }
 
 // Order a song's sections (honoring arrangement) and group into slide lines.
+// Grouping happens WITHIN each section so a slide never mixes the end of one
+// section with the start of the next (e.g. a verse and the chorus). Mirrors the
+// editor's computeEditorSlides so the projector matches the editor preview.
 function songLines(full: SongFull): string[] {
   const sorted = [...full.sections].sort((a, b) => a.ordinal - b.ordinal)
   const ordered = full.arrangement && full.arrangement.length > 0
     ? full.arrangement.map((i) => sorted[i]).filter(Boolean)
     : sorted
-  const rawLines: string[] = []
+  const perSlide = full.linesPerSlide ?? 2
+  const slides: string[] = []
   for (const section of ordered) {
-    for (const raw of section.lyrics.split('\n')) {
-      const line = raw.trim()
-      if (line) rawLines.push(line)
-    }
+    const lines = section.lyrics.split('\n').map((l) => l.trim()).filter(Boolean)
+    for (const slide of groupLines(lines, perSlide)) slides.push(slide)
   }
-  return groupLines(rawLines, full.linesPerSlide ?? 2)
+  return slides
 }
 
 async function doLoadSong(id: number): Promise<void> {
@@ -1120,7 +1140,29 @@ function createOutput(label: string, opts: OutputOpts): void {
   loadRoute(win, '/output', { id: String(opts.id) })
 }
 
+// Signature of the current physical display arrangement — used to ignore spurious
+// display events (DPI tweaks, sleep/wake) that would otherwise tear down and rebuild
+// the live output for no reason.
+function displaySignature(): string {
+  return screen.getAllDisplays()
+    .map((d) => `${d.id}:${d.bounds.width}x${d.bounds.height}@${d.bounds.x},${d.bounds.y}`)
+    .sort().join('|')
+}
+
+let lastDisplaySig = ''
+let relayoutTimer: ReturnType<typeof setTimeout> | null = null
+// Debounce display events and only rebuild when the arrangement actually changed.
+function scheduleLayoutOutputs(): void {
+  if (relayoutTimer) clearTimeout(relayoutTimer)
+  relayoutTimer = setTimeout(() => {
+    relayoutTimer = null
+    if (displaySignature() === lastDisplaySig) return
+    layoutOutputs()
+  }, 500)
+}
+
 function layoutOutputs(): void {
+  lastDisplaySig = displaySignature()
   for (const w of outputWins.values()) if (!w.isDestroyed()) w.destroy()
   outputWins.clear()
 
@@ -1177,8 +1219,10 @@ ipcMain.handle('wf:live:loadCountdown', (_e, seconds: number) => {
   doLoadCountdown(seconds); broadcast()
 })
 
-ipcMain.handle('wf:live:loadScripture', async (_e, reference: string) => {
-  if (await doLoadScripture(reference)) broadcast()
+ipcMain.handle('wf:live:loadScripture', async (_e, reference: string): Promise<boolean> => {
+  const ok = await doLoadScripture(reference)
+  if (ok) broadcast()
+  return ok
 })
 
 ipcMain.handle('wf:live:loadSong', async (_e, id: number) => {
@@ -1197,6 +1241,9 @@ ipcMain.handle('wf:getState', (): LiveState => renderState())
 
 ipcMain.handle('wf:stage:open', () => { createStageWindow() })
 ipcMain.handle('wf:multiview:open', () => { createMultiviewWindow() })
+// Manual re-open of the audience output (e.g. operator closed it, or it never
+// opened because the projector was connected before launch with no display event).
+ipcMain.handle('wf:output:open', () => { layoutOutputs(); broadcast() })
 
 ipcMain.handle('wf:live:setItemId', (_e, id: number | null) => {
   liveServiceItemId = id
@@ -1253,6 +1300,7 @@ ipcMain.handle('wf:getTabletUrl', () => `http://${getLocalIp()}:${boundTabletPor
 // live (found in the UI, invisible to the live-routing layer).
 function refreshActiveServiceItems(serviceId: number): void {
   const svc = getService(serviceId)
+  activeServiceId = serviceId
   activeServiceItems = (svc as { items: ServiceItem[] } | null)?.items ?? []
   serviceSlideTheme = (svc as { theme?: string | null } | null)?.theme || DEFAULT_THEME_ID
   serviceSlideThemeColors = (svc as { themeColors?: ThemeColors | null } | null)?.themeColors ?? null
@@ -1267,6 +1315,7 @@ function refreshActiveServiceItems(serviceId: number): void {
 ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   loggedSongIds.clear()  // new/switched service → start CCLI counting fresh
   if (serviceId == null) {
+    activeServiceId = null
     activeServiceItems = []
     liveItemNotes = null
     broadcast()  // push the cleared service to tablet/zones/projector
@@ -1274,6 +1323,7 @@ ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   }
   refreshActiveServiceItems(serviceId)
 })
+ipcMain.handle('wf:getActiveServiceId', () => activeServiceId)
 
 // Same cache rebuild as wf:setActiveService, but without resetting CCLI usage
 // tracking — call this after edits to a service that's already active (e.g.
@@ -1801,8 +1851,24 @@ function createTimestampedBackup(): void {
       copyFileSync(dbPath, backupPath)
       console.log(`Backup created: ${backupPath}`)
     }
+    pruneBackups(bakDir, 40)
   } catch (err) {
     console.error('Failed to create backup:', err)
+  }
+}
+
+// Keep the most recent `keep` launch backups; delete older ones so the backups
+// folder can't grow without bound and eventually fill the media PC's disk.
+function pruneBackups(bakDir: string, keep: number): void {
+  try {
+    const files = readdirSync(bakDir)
+      .filter((f) => /^worshipflow-.*\.db$/.test(f))
+      .sort()  // ISO-ish timestamp in the name sorts chronologically
+    for (const f of files.slice(0, Math.max(0, files.length - keep))) {
+      try { unlinkSync(join(bakDir, f)) } catch { /* ignore individual failures */ }
+    }
+  } catch (err) {
+    console.error('Failed to prune backups:', err)
   }
 }
 
@@ -1879,7 +1945,9 @@ ipcMain.handle('wf:service:importPptx', async (): Promise<{ id: number; name: st
 })
 
 app.whenReady().then(async () => {
-  protocol.handle('wf-asset', (request) => {
+  // Belt-and-suspenders: never touch the DB or open windows on a losing instance.
+  if (!gotSingleInstanceLock) return
+  protocol.handle('wf-asset', async (request) => {
     const url = new URL(request.url)
     const pathParam = url.searchParams.get('path')
     if (!pathParam) {
@@ -1893,7 +1961,14 @@ app.whenReady().then(async () => {
     const headers: Record<string, string> = {}
     const range = request.headers.get('range')
     if (range) headers['range'] = range
-    return net.fetch(fileUrl, { headers })
+    // A moved/deleted/unplugged media file should surface as a logged 404, not a
+    // silent blank projector slide with nothing to diagnose afterward.
+    try {
+      return await net.fetch(fileUrl, { headers })
+    } catch (err) {
+      logWarn(`[wf-asset] failed to load media: ${validPath} — ${(err as Error)?.message ?? err}`)
+      return new Response('Media file not found', { status: 404 })
+    }
   })
 
   // Snapshot the last-good database file BEFORE initDb() runs migrations, so a bad
@@ -1903,6 +1978,11 @@ app.whenReady().then(async () => {
   // loads its saved rules/reference mixes during initialize(), so initDb() has to
   // run first or that read hits an undefined db handle and silently fails.
   await initDb()
+  // Surface save failures to the operator instead of losing them to the console.
+  onPersistError((err) => {
+    logError('[persist] save failed', err)
+    notifyOperator('Save failed — your last change may not be saved. Check disk space and pause Google Drive/OneDrive sync.', 'error')
+  })
   ccliLicense = getSetting('ccli_license')
   logoPath = getSetting('logo_path')
   logoBg = getSetting('logo_bg')
@@ -1913,13 +1993,18 @@ app.whenReady().then(async () => {
 
   startTabletServer()
   createOperator()
-  // layoutOutputs() — commented for single-window dev; output windows created via IPC intent
+  // Open the audience output automatically at launch (fullscreen on an external
+  // display / projector, or a large window on the primary when there is none) so
+  // the congregation screen is never left dark waiting for a hotplug event.
+  layoutOutputs()
   broadcast()
   // Reconnect to OBS in the background if the operator connected before (non-blocking).
   void initObsAutoConnect()
-  screen.on('display-added', layoutOutputs)
-  screen.on('display-removed', layoutOutputs)
-  screen.on('display-metrics-changed', layoutOutputs)
+  // Debounced + change-guarded so DPI/resolution/sleep-wake churn doesn't tear
+  // down and rebuild the live output (a mid-service black flash).
+  screen.on('display-added', scheduleLayoutOutputs)
+  screen.on('display-removed', scheduleLayoutOutputs)
+  screen.on('display-metrics-changed', scheduleLayoutOutputs)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -14,6 +14,13 @@ const CARDS: { view?: View; action?: string; Icon: IconType; label: string; sub:
   { view: 'volunteer',   Icon: User,           label: 'Volunteer mode', sub: 'Simple touch screen' },
 ]
 
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
 function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
   const { activeService } = useService()
 
@@ -25,7 +32,7 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
 
   return (
     <div className="h-full overflow-auto bg-[#e9ecf1] p-6">
-      <div className="mb-1 text-xl font-semibold text-slate-900">Good morning</div>
+      <div className="mb-1 text-xl font-semibold text-slate-900">{greeting()}</div>
       <div className="mb-6 text-sm text-slate-500">WorshipFlow is ready</div>
 
       <button

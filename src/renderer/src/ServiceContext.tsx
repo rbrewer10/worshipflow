@@ -20,7 +20,12 @@ export function ServiceProvider({ children }: { children: ReactNode }): JSX.Elem
 
   const refreshServices = (): void => { window.wf.servicesList().then(setServices) }
   const reloadActiveService = (): void => {
-    if (activeServiceId != null) window.wf.serviceGet(activeServiceId).then(setActiveService)
+    if (activeServiceId != null) {
+      // Keep the main-process live-routing cache in sync with edits (add/remove,
+      // template load, reorder) — otherwise newly added items can't go live.
+      window.wf.serviceRefreshActiveItems(activeServiceId)
+      window.wf.serviceGet(activeServiceId).then(setActiveService)
+    }
   }
   const selectService = (id: number | null): void => {
     setActiveServiceId(id)

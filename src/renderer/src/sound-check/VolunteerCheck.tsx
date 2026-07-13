@@ -251,11 +251,18 @@ function SetupView({
           When the band sounds great, press record and let it listen for a few minutes. That becomes the
           &ldquo;this is how our room should sound&rdquo; yardstick.
         </p>
+        <p className="mt-2 inline-flex items-center gap-2 text-[12.5px] font-semibold text-amber-700">
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] uppercase tracking-wide">
+            Coming soon
+          </span>
+          Reference-mix capture isn&rsquo;t available yet — the live audio feed isn&rsquo;t connected.
+        </p>
         <button
           type="button"
-          disabled={recording}
+          disabled
+          title="Reference-mix capture isn't available yet"
           onClick={handleRecordReference}
-          className="mt-3 inline-flex items-center gap-2.5 rounded-xl border border-emerald-500 bg-emerald-500/10 px-5 py-3 text-[14.5px] font-bold text-emerald-700 disabled:opacity-60"
+          className="mt-3 inline-flex items-center gap-2.5 rounded-xl border border-emerald-500 bg-emerald-500/10 px-5 py-3 text-[14.5px] font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span className="h-[11px] w-[11px] rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,.5)]" />
           {recording ? 'Recording reference mix…' : recorded ? 'Recorded — record again' : 'Record Reference Mix'}

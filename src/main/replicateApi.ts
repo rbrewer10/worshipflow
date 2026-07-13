@@ -4,14 +4,21 @@ import https from 'https'
 import { createHash } from 'crypto'
 import { downloadToGenerated } from './backgroundLib'
 
+// Rolling idle timeout: fires only after IDLE_MS of no activity (connect stall OR
+// a stalled response body), resetting on every chunk. Prevents a half-delivered
+// response from hanging the generation forever on flaky wifi.
+const IDLE_MS = 8000
+
 function httpsPost(url: string, body: object, token: string): Promise<object> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body)
     const u = new URL(url)
-    const timeout = setTimeout(() => {
-      req.destroy(new Error('Request timeout'))
-      reject(new Error('Request timeout'))
-    }, 5000)
+    let timeout: ReturnType<typeof setTimeout>
+    const arm = (): void => {
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(() => { req.destroy(new Error('Request timeout')); reject(new Error('Request timeout')) }, IDLE_MS)
+    }
+    arm()
 
     const req = https.request({
       hostname: u.hostname, path: u.pathname + u.search,
@@ -22,10 +29,9 @@ function httpsPost(url: string, body: object, token: string): Promise<object> {
         'Content-Length': Buffer.byteLength(data)
       }
     }, (res) => {
-      clearTimeout(timeout)
       let raw = ''
-      res.on('data', (c) => { raw += c })
-      res.on('end', () => { try { resolve(JSON.parse(raw)) } catch (e) { reject(e) } })
+      res.on('data', (c) => { arm(); raw += c })
+      res.on('end', () => { clearTimeout(timeout); try { resolve(JSON.parse(raw)) } catch (e) { reject(e) } })
     })
     req.on('error', (err) => {
       clearTimeout(timeout)
@@ -39,18 +45,19 @@ function httpsPost(url: string, body: object, token: string): Promise<object> {
 function httpsGet(url: string, token: string): Promise<object> {
   return new Promise((resolve, reject) => {
     const u = new URL(url)
-    const timeout = setTimeout(() => {
-      req.destroy(new Error('Request timeout'))
-      reject(new Error('Request timeout'))
-    }, 5000)
+    let timeout: ReturnType<typeof setTimeout>
+    const arm = (): void => {
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(() => { req.destroy(new Error('Request timeout')); reject(new Error('Request timeout')) }, IDLE_MS)
+    }
+    arm()
 
     const req = https.get({ hostname: u.hostname, path: u.pathname + u.search,
       headers: { 'Authorization': `Bearer ${token}` }
     }, (res) => {
-      clearTimeout(timeout)
       let raw = ''
-      res.on('data', (c) => { raw += c })
-      res.on('end', () => { try { resolve(JSON.parse(raw)) } catch (e) { reject(e) } })
+      res.on('data', (c) => { arm(); raw += c })
+      res.on('end', () => { clearTimeout(timeout); try { resolve(JSON.parse(raw)) } catch (e) { reject(e) } })
     })
     req.on('error', (err) => {
       clearTimeout(timeout)

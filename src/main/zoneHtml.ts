@@ -11,6 +11,21 @@ const SHARED_JS = `
     if(/^https?:\\/\\//i.test(p)) return p;
     return 'http://'+location.host+'/file?path='+encodeURIComponent(p);
   }
+  // Shrink-to-fit: keep the desired font size when it fits, otherwise binary-search
+  // the largest size (down to minVw) whose rendered text fits within availW x availH.
+  // Prevents oversized slides (whole verse+chorus on one slide) from clipping.
+  function fitText(el,maxVw,minVw,availW,availH){
+    if(!el) return;
+    el.style.fontSize=maxVw+'vw';
+    if(el.scrollHeight<=availH+1 && el.scrollWidth<=availW+1) return;
+    var lo=minVw, hi=maxVw;
+    for(var i=0;i<16;i++){
+      var mid=(lo+hi)/2;
+      el.style.fontSize=mid+'vw';
+      if(el.scrollHeight<=availH+1 && el.scrollWidth<=availW+1){ lo=mid; } else { hi=mid; }
+    }
+    el.style.fontSize=lo+'vw';
+  }
 `
 
 function zoneBase(zoneId: number, css: string, body: string, script: string): string {
@@ -84,6 +99,7 @@ const LYRICS_CSS = `
 const LYRICS_BODY_INNER = `<div id="root"><video id="bgvid" autoplay muted loop playsinline></video><div id="bgimg"></div><div id="blob1"></div><div id="blob2"></div><div id="gradient"></div><div id="line"></div><div id="title"></div><div id="slidenum"></div></div>`
 
 const LYRICS_SCRIPT = `
+  var root=document.getElementById('root');
   var bgvid=document.getElementById('bgvid');
   var bgimg=document.getElementById('bgimg');
   var blob1=document.getElementById('blob1');
@@ -151,7 +167,9 @@ const LYRICS_SCRIPT = `
       document.body.style.background='linear-gradient(135deg,#0c1a3a 0%,#0a1628 100%)';
       bgvid.style.opacity='0';bgimg.style.opacity='0';gradient.style.opacity='0';
       blob1.style.opacity='0';blob2.style.opacity='0';
-      lineEl.innerHTML='<div style="font-size:18vw;font-weight:900;color:rgba(255,255,255,0.75)">\\u271d</div>';
+      lineEl.innerHTML=state.imagePath
+        ?'<img src="'+fileUrl(state.imagePath)+'" style="max-width:60vw;max-height:55vh;object-fit:contain;filter:drop-shadow(0 0 80px rgba(0,0,0,0.7))"/>'
+        :'<div style="font-size:18vw;font-weight:900;color:rgba(255,255,255,0.75)">\\u271d</div>';
       titleEl.innerHTML='';slideNum.innerHTML='';return;
     }
     if(m==='countdown'){
@@ -190,6 +208,9 @@ const LYRICS_SCRIPT = `
     var lineChanged=state.line!==prevLine;prevLine=state.line;
     var shadow='text-shadow:0 4px 32px rgba(0,0,0,0.9),0 1px 0 rgba(0,0,0,0.5);';
     lineEl.innerHTML='<div class="'+(lineChanged?'fade-up':'')+'" style="font-size:'+fs+'vw;font-weight:900;line-height:1.2;color:#fff;white-space:pre-line;text-align:'+align+';'+shadow+'">'+esc(state.line)+'</div>';
+    // Shrink to fit: reserve vertical room for the bottom title and any top/bottom offset.
+    var reservedFrac=(state.title?0.14:0.06)+(pos!=='center'?0.10:0);
+    fitText(lineEl.firstChild,fs,2,window.innerWidth*0.84,window.innerHeight*(1-reservedFrac));
     titleEl.innerHTML=state.title?'<span style="font-size:'+(fs*0.28)+'vw;color:#fff;opacity:0.5;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;display:block;text-align:'+align+'">'+esc(state.title)+'</span>':'';
     slideNum.innerHTML=state.total>1?(state.index+1)+' / '+state.total:'';
   }
@@ -301,6 +322,10 @@ const FLEX_SCRIPT = `
       var lineChanged=state.line!==prevLine;prevLine=state.line;
       content.innerHTML='<div class="'+(lineChanged?'fade-up':'')+'" style="font-size:'+fs+'vw;font-weight:800;line-height:1.25;color:'+textColor+';white-space:pre-line;'+shadow+'">'+esc(state.line)+'</div>'
         +(state.title?'<div style="margin-top:2vw;font-size:'+(fs*0.3)+'vw;color:'+textColor+';opacity:0.5;font-weight:600;letter-spacing:0.15em;text-transform:uppercase">'+esc(state.title)+'</div>':'');
+      // Reserve the actual title block height (title + its 2vw top margin) so a long
+      // titled slide shrinks to fit both, not just the line.
+      var titleH=content.children.length>1?content.children[1].getBoundingClientRect().height+window.innerWidth*0.02:0;
+      fitText(content.firstChild,fs,2,window.innerWidth*0.82,window.innerHeight*0.90-titleH);
       return;
     }
     if(m==='countdown'){
@@ -372,7 +397,9 @@ const STAGE_SCRIPT = `
       nextLine.textContent='';slideCounter.textContent='';return;
     }
     if(m==='logo'){
-      current.innerHTML='<div style="font-size:4vw;font-weight:700;color:rgba(255,255,255,0.15)">\\u271d Logo</div>';
+      current.innerHTML=state.imagePath
+        ?'<img src="'+fileUrl(state.imagePath)+'" style="max-width:40vw;max-height:40vh;object-fit:contain;opacity:0.85"/>'
+        :'<div style="font-size:4vw;font-weight:700;color:rgba(255,255,255,0.15)">\\u271d Logo</div>';
       nextLine.textContent='';slideCounter.textContent='';return;
     }
     if(m==='countdown'){
@@ -383,6 +410,8 @@ const STAGE_SCRIPT = `
     var fs=Math.max(5,Math.min(state.fontScale||6,12));
     var lineChanged=state.line!==prevLine;prevLine=state.line;
     current.innerHTML='<div class="'+(lineChanged?'fade-in':'')+'" style="font-size:'+fs+'vw;font-weight:900;line-height:1.2;color:#fff;white-space:pre-line">'+esc(state.line||'\\u2014')+'</div>';
+    // #current is a bounded flex:1 box (padding 3vw 5vw) — fit within its real content area.
+    fitText(current.firstChild,fs,3,current.clientWidth-window.innerWidth*0.10,current.clientHeight-window.innerWidth*0.06);
     nextLine.textContent=state.next||'';
     slideCounter.textContent=state.total>1?'Slide '+(state.index+1)+' of '+state.total:'';
   }

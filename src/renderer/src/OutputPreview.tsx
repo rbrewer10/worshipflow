@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { MonitorOff, Image as ImageIcon, Play } from 'lucide-react'
 import type { LiveState } from '../../shared/types'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
+import { useChurchName } from './useChurchName'
 
 // Miniature live render of the projector, pinned in the service rail.
 function OutputPreview(): JSX.Element {
@@ -12,13 +13,14 @@ function OutputPreview(): JSX.Element {
     return off
   }, [])
 
+  const churchName = useChurchName()
   const mode = s?.mode ?? 'lyrics'
   const theme = getTheme(s?.slideTheme)
   const colors = resolveColors(theme, s?.slideThemeColors ?? null)
   const bg = mode === 'black' ? '#000'
     : theme.kind === 'static' ? staticBackgroundCss(theme, colors)
     : `linear-gradient(120deg, ${colors.primary}, ${colors.secondary})`
-  const text = mode === 'black' ? '' : mode === 'logo' ? '✝ SNOW HILL' : (s?.line ?? '')
+  const text = mode === 'black' ? '' : mode === 'logo' ? `✝ ${churchName}` : (s?.line ?? '')
 
   return (
     <div className="p-2">

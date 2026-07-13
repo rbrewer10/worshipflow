@@ -20,6 +20,7 @@ import type {
   AnnouncementInput
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
+import { splitLyricLines } from '../shared/lyrics'
 
 let db: Database
 let dbPath = ''
@@ -143,7 +144,32 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN style TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN zone_routing TEXT') } catch { /* already exists */ }
+  normalizeSectionLyrics()
   persist()
+}
+
+// One-time (idempotent) pass that re-splits over-long single-line verses into
+// phrase lines so existing songs display as several readable slides instead of one
+// oversized block. Only rows whose text actually changes are rewritten.
+function normalizeSectionLyrics(): void {
+  const rows: { id: number; lyrics: string }[] = []
+  const stmt = db.prepare('SELECT id, lyrics FROM song_section')
+  while (stmt.step()) rows.push(stmt.getAsObject() as unknown as { id: number; lyrics: string })
+  stmt.free()
+  for (const row of rows) {
+    const next = splitLyricLines(row.lyrics ?? '')
+    if (next !== row.lyrics) {
+      db.run('UPDATE song_section SET lyrics = ? WHERE id = ?', [next, row.id])
+    }
+  }
+}
+
+// Registered by the main process so a failed save (disk full, file locked by
+// Google Drive/antivirus, permission denied) can be surfaced to the operator
+// instead of only logging to the invisible console.
+let persistErrorHandler: ((err: unknown) => void) | null = null
+export function onPersistError(cb: (err: unknown) => void): void {
+  persistErrorHandler = cb
 }
 
 function persist(): void {
@@ -160,6 +186,7 @@ function persist(): void {
   } catch (err) {
     console.error('Persist failed:', err)
     if (existsSync(tmpPath)) unlinkSync(tmpPath)
+    try { persistErrorHandler?.(err) } catch { /* never let notification break persist */ }
     throw err
   }
 }
@@ -264,7 +291,7 @@ export function createSong(input: SongInput): number {
         sec.kind,
         sec.label ?? null,
         sec.ordinal ?? i,
-        sec.lyrics
+        splitLyricLines(sec.lyrics)
       ])
     })
     db.run('COMMIT')
@@ -308,7 +335,7 @@ export function updateSong(id: number, input: SongInput): void {
         sec.kind,
         sec.label ?? null,
         sec.ordinal ?? i,
-        sec.lyrics
+        splitLyricLines(sec.lyrics)
       ])
     })
     db.run('COMMIT')

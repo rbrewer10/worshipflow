@@ -101,7 +101,9 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
                 >
                   Auto
                 </button>
-                {(['black', 'logo', 'lyrics', 'stage'] as ZoneState['mode'][]).map((m) => (
+                {/* 'stage' only renders on the Stage Monitor (zone 4); the flex/lyrics
+                    zones have no stage layout and would show a blank screen. */}
+                {((zoneId === 4 ? ['black', 'logo', 'lyrics', 'stage'] : ['black', 'logo', 'lyrics']) as ZoneState['mode'][]).map((m) => (
                   <button
                     key={m}
                     onClick={() => setOverride(zoneId, m)}

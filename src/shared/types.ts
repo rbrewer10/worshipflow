@@ -235,6 +235,9 @@ export interface ScriptureResult {
   reference?: string
   verses?: ScriptureVerse[]
   error?: string
+  // True when an online translation lookup failed and this is the bundled KJV
+  // fallback — so the operator can be warned the wrong translation is showing.
+  usedFallback?: boolean
 }
 
 // --- Announcements library ---
