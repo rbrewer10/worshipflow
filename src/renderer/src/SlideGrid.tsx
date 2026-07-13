@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play, Mic } from 'lucide-react'
 import type { LiveState, ServiceItem } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
@@ -9,7 +9,7 @@ import { canGoLive, itemThumbBackground } from './liveActions'
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
 const ICON: Record<ServiceItem['type'], IconType> = {
-  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone
+  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic
 }
 
 // The Live tab's main area: each item a panel of clickable slide thumbnails.

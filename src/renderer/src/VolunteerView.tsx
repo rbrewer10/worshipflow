@@ -8,6 +8,7 @@ import {
   FileText,
   Hand,
   Image as ImageIcon,
+  Mic,
   Music,
   Newspaper,
   Square,
@@ -24,7 +25,8 @@ const ICON: Record<ServiceItem['type'], JSX.Element> = {
   image: <ImageIcon size={14} />,
   welcome: <Hand size={14} />,
   ticker: <Newspaper size={14} />,
-  announcement: <Newspaper size={14} />
+  announcement: <Newspaper size={14} />,
+  sermon: <Mic size={14} />
 }
 
 function canGoLive(item: ServiceItem): boolean {
