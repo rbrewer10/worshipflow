@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
 import { effectiveRouting, matchScene } from '../../shared/zoneScenes'
@@ -9,7 +9,7 @@ import ZoneStripBadge from './ZoneStripBadge'
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
 const TYPE_ICON: Record<ServiceItem['type'], IconType> = {
-  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone
+  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic
 }
 
 const ADD_TYPES: { type: ServiceItem['type']; label: string; Icon: IconType }[] = [
@@ -19,6 +19,7 @@ const ADD_TYPES: { type: ServiceItem['type']; label: string; Icon: IconType }[] 
   { type: 'image',     label: 'Image/Video', Icon: ImageIcon },
   { type: 'welcome',   label: 'Welcome',   Icon: Hand },
   { type: 'ticker',    label: 'Ticker',    Icon: ScrollText },
+  { type: 'sermon',    label: 'Sermon',    Icon: Mic },
 ]
 
 function itemPreview(it: ServiceItem): string {
@@ -34,6 +35,7 @@ function itemPreview(it: ServiceItem): string {
     return `${mins} minute${mins !== 1 ? 's' : ''}`
   }
   if (it.type === 'ticker') return (p.text as string | undefined)?.slice(0, 50) ?? ''
+  if (it.type === 'sermon') return (p.title as string | undefined) ?? 'Sermon'
   return ''
 }
 
