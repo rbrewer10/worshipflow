@@ -151,7 +151,7 @@ export const SongEditor = memo(function SongEditor({
                 <div key={analysis.ordinal} className="text-xs">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-slate-700">
-                      Section {analysis.ordinal + 1}: <span className="text-emerald-700">{analysis.detectedKind}</span>
+                      Section {analysis.ordinal + 1}: <span className="text-blue-700">{analysis.detectedKind}</span>
                     </span>
                     <span className="text-slate-500">
                       {Math.round(analysis.confidence * 100)}% confidence

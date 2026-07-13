@@ -47,12 +47,12 @@ function Modes({ mode }: { mode: ViewMode }): JSX.Element {
       key={label}
       className={`flex-1 rounded-xl border p-3 text-center text-[13.5px] font-semibold ${
         on
-          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 shadow-[0_0_0_1px_rgba(16,185,129,.35)]'
+          ? 'border-blue-500 bg-blue-500/10 text-blue-700 shadow-[0_0_0_1px_rgba(16,185,129,.35)]'
           : 'border-slate-200 bg-white text-slate-500'
       }`}
     >
       {label}
-      <small className={`mt-0.5 block text-[11px] font-medium ${on ? 'text-emerald-600' : 'text-slate-500'}`}>{sub}</small>
+      <small className={`mt-0.5 block text-[11px] font-medium ${on ? 'text-blue-600' : 'text-slate-500'}`}>{sub}</small>
     </span>
   )
   return (
@@ -77,7 +77,7 @@ function SetupRow({
 }): JSX.Element {
   const badge: Record<RowState, string> = {
     done: 'border border-green-500/40 bg-green-500/15 text-green-700',
-    cur: 'bg-emerald-600 text-white',
+    cur: 'bg-blue-600 text-white',
     todo: 'border border-slate-200 bg-slate-100 text-slate-500'
   }
   return (
@@ -115,7 +115,7 @@ function ChannelChip({
   const kind = classificationOf(channel)
   const pill: Record<ChipKind, JSX.Element> = {
     mic: (
-      <span className="rounded-[5px] border border-emerald-500/35 bg-emerald-500/15 px-[7px] py-0.5 text-[10px] font-extrabold tracking-wide text-emerald-700">
+      <span className="rounded-[5px] border border-blue-500/35 bg-blue-500/15 px-[7px] py-0.5 text-[10px] font-extrabold tracking-wide text-blue-700">
         MIC
       </span>
     ),
@@ -140,7 +140,7 @@ function ChannelChip({
           disabled={pending}
           onClick={() => onClassify('isMic', !channel.isMic)}
           className={`rounded px-1.5 py-0.5 text-[10px] font-semibold disabled:opacity-50 ${
-            channel.isMic ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:text-emerald-700'
+            channel.isMic ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:text-blue-700'
           }`}
         >
           Mic
@@ -228,7 +228,7 @@ function SetupView({
       </SetupRow>
       <SetupRow state={unassignedCount === 0 ? 'done' : 'cur'} n={2} title="Tell us what each channel is">
         <p className="m-0 text-[13.5px] leading-normal text-slate-600">
-          Tap <b className="font-semibold text-emerald-700">Mic</b> or <b className="font-semibold text-purple-700">Track</b>{' '}
+          Tap <b className="font-semibold text-blue-700">Mic</b> or <b className="font-semibold text-purple-700">Track</b>{' '}
           on each one.{' '}
           {unassignedCount > 0
             ? `${unassignedCount} left to go — you're almost there.`
@@ -262,7 +262,7 @@ function SetupView({
           disabled
           title="Reference-mix capture isn't available yet"
           onClick={handleRecordReference}
-          className="mt-3 inline-flex items-center gap-2.5 rounded-xl border border-emerald-500 bg-emerald-500/10 px-5 py-3 text-[14.5px] font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-3 inline-flex items-center gap-2.5 rounded-xl border border-blue-500 bg-blue-500/10 px-5 py-3 text-[14.5px] font-bold text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span className="h-[11px] w-[11px] rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,.5)]" />
           {recording ? 'Recording reference mix…' : recorded ? 'Recorded — record again' : 'Record Reference Mix'}
@@ -296,7 +296,7 @@ function LiveView({ channels }: { channels: Channel[] }): JSX.Element {
       </div>
 
       <div className="mb-4 rounded-[18px] border border-slate-200 bg-white px-[30px] py-7">
-        <p className="mb-1.5 mt-0 text-xs font-bold uppercase tracking-widest text-emerald-700">Walk each mic</p>
+        <p className="mb-1.5 mt-0 text-xs font-bold uppercase tracking-widest text-blue-700">Walk each mic</p>
         <h3 className="mb-2 mt-0 text-2xl font-bold tracking-tight text-slate-900">
           Have each speaker/singer talk or sing for a few seconds
         </h3>

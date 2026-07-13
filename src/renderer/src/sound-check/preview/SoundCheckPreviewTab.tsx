@@ -46,7 +46,7 @@ function SoundCheckPreviewTab(): JSX.Element {
               title={r.hint}
               className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
                 role === r.id
-                  ? 'bg-emerald-500/20 font-semibold text-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,.4)]'
+                  ? 'bg-blue-500/20 font-semibold text-blue-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,.4)]'
                   : 'font-medium text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
               }`}
             >

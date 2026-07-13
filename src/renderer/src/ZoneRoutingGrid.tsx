@@ -22,7 +22,7 @@ export default function ZoneRoutingGrid({ routing, onChange }: {
           <select
             value={routing[zoneId]}
             onChange={(e) => onChange({ ...routing, [zoneId]: e.target.value as ZoneState['mode'] })}
-            className="flex-1 rounded border border-slate-200 bg-slate-100 py-0.5 text-[11px] text-slate-700 outline-none focus:border-emerald-500/50"
+            className="flex-1 rounded border border-slate-200 bg-slate-100 py-0.5 text-[11px] text-slate-700 outline-none focus:border-blue-500/50"
           >
             {ZONE_MODE_OPTIONS.map((m) => (
               <option key={m} value={m}>{MODE_LABELS[m]}</option>

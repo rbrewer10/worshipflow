@@ -92,7 +92,7 @@ function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, on
               onClick={() => onSelect(it.id)}
               className={`group mb-1.5 flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                 selectedId === it.id
-                  ? 'border-emerald-500/30 bg-emerald-500/[0.07] ring-1 ring-emerald-500/30'
+                  ? 'border-blue-500/30 bg-blue-500/[0.07] ring-1 ring-blue-500/30'
                   : 'border-slate-200 bg-white hover:bg-slate-100'
               } ${dragId === it.id ? 'opacity-40' : ''}`}
             >
@@ -120,15 +120,15 @@ function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, on
               </div>
               <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 {liveItemId === it.id ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                     LIVE
                   </span>
                 ) : (
                   <>
                     <button
                       onClick={() => onGoLive(it)}
-                      className="text-slate-400 opacity-0 hover:text-emerald-700 group-hover:opacity-100"
+                      className="text-slate-400 opacity-0 hover:text-blue-700 group-hover:opacity-100"
                       title="Go live"
                     ><Play size={14} /></button>
                     <button
@@ -193,7 +193,7 @@ function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, on
       ) : (
         <button
           onClick={() => setShowAdd(true)}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-500/50 hover:text-emerald-700"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-blue-500/50 hover:text-blue-700"
         >
           <Plus size={15} /> Add item
         </button>

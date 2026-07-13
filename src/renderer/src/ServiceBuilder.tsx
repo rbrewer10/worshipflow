@@ -191,7 +191,7 @@ function ServiceBuilder(): JSX.Element {
                 aria-pressed={openId === s.id}
                 className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 transition-colors min-h-10 ${
                   openId === s.id
-                    ? 'bg-emerald-500/10 ring-1 ring-emerald-500/30 text-slate-900'
+                    ? 'bg-blue-500/10 ring-1 ring-blue-500/30 text-slate-900'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}>
                 <span className="truncate text-sm font-medium">{s.name}</span>

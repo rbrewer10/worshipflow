@@ -212,7 +212,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
 
       {countdown && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="mb-[1.5cqh] text-[2.5cqw] font-semibold uppercase tracking-[0.35em] text-emerald-200">
+          <div className="mb-[1.5cqh] text-[2.5cqw] font-semibold uppercase tracking-[0.35em] text-blue-200">
             Service begins in
           </div>
           <div
@@ -291,11 +291,11 @@ function Output(): JSX.Element {
     <div className="relative h-screen w-screen overflow-hidden bg-black" style={{ cursor: 'none' }}>
       <AudienceStage model={model} />
 
-      <div className="absolute right-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-emerald-400">
+      <div className="absolute right-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-blue-400">
         {fps} fps
       </div>
       {id && (
-        <div className="absolute left-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-emerald-400">
+        <div className="absolute left-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-blue-400">
           OUT {id}
         </div>
       )}

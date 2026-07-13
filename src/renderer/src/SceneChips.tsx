@@ -59,7 +59,7 @@ export default function SceneChips({ item, onChanged }: {
               key={s.id}
               onClick={() => pick(s.id)}
               className={`flex flex-col items-start gap-1 rounded-lg border-2 px-2 py-1.5 text-[11px] font-semibold transition-colors ${
-                active ? 'border-emerald-500 bg-emerald-500/10 text-emerald-800' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                active ? 'border-blue-500 bg-blue-500/10 text-blue-800' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
               }`}
             >
               <ZoneStripBadge routing={expandScene(s, item.type)} title={s.name} />

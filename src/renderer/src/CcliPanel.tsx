@@ -61,7 +61,7 @@ function CcliPanel(): JSX.Element {
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">© CCLI</span>
         <button
           onClick={openReport}
-          className="inline-flex items-center justify-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
+          className="inline-flex items-center justify-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-semibold text-blue-700 hover:text-blue-800"
         >
           <BarChart3 size={13} /> Usage Report
         </button>
@@ -72,7 +72,7 @@ function CcliPanel(): JSX.Element {
           value={license}
           onChange={(e) => saveLicense(e.target.value)}
           placeholder="e.g. 1234567"
-          className="min-w-0 flex-1 rounded border border-slate-200 bg-slate-100 px-2 py-1 text-xs text-slate-900 outline-none focus:border-emerald-500"
+          className="min-w-0 flex-1 rounded border border-slate-200 bg-slate-100 px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-500"
         />
       </div>
       <div className="mt-1 text-[10px] text-slate-500">Shown on the projector footer for song slides.</div>
@@ -90,7 +90,7 @@ function CcliPanel(): JSX.Element {
                 <button
                   onClick={exportCsv}
                   disabled={usage.length === 0}
-                  className="inline-flex items-center justify-center gap-1.5 rounded bg-emerald-600/70 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-600 disabled:opacity-40"
+                  className="inline-flex items-center justify-center gap-1.5 rounded bg-blue-600/70 px-3 py-1 text-xs font-bold text-white hover:bg-blue-600 disabled:opacity-40"
                 >
                   <Download size={13} /> Export CSV
                 </button>

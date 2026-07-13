@@ -96,7 +96,7 @@ function Pill({ kind, children }: { kind: 'mic' | 'trk' | 'none'; children: Reac
   return (
     <span
       className={`rounded px-[7px] py-0.5 text-[9px] font-extrabold uppercase tracking-widest ${
-        kind === 'mic' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-purple-500/15 text-purple-700'
+        kind === 'mic' ? 'bg-blue-500/15 text-blue-700' : 'bg-purple-500/15 text-purple-700'
       }`}
     >
       {children}
@@ -109,7 +109,7 @@ function Head({ mode, onRefresh }: { mode: ViewMode; onRefresh: () => void }): J
     <span
       key={label}
       className={`rounded-[5px] px-3 py-1 text-[10.5px] font-bold uppercase tracking-widest ${
-        on ? 'bg-emerald-500/15 text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.35)]' : 'text-slate-500'
+        on ? 'bg-blue-500/15 text-blue-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.35)]' : 'text-slate-500'
       }`}
     >
       {label}
@@ -125,7 +125,7 @@ function Head({ mode, onRefresh }: { mode: ViewMode; onRefresh: () => void }): J
       <button
         type="button"
         onClick={onRefresh}
-        className="ml-auto rounded-[6px] border border-slate-200 bg-[#f4f6f9] px-2.5 py-1 text-[10.5px] font-semibold text-emerald-700 hover:bg-emerald-500/10"
+        className="ml-auto rounded-[6px] border border-slate-200 bg-[#f4f6f9] px-2.5 py-1 text-[10.5px] font-semibold text-blue-700 hover:bg-blue-500/10"
       >
         Refresh channels
       </button>
@@ -222,7 +222,7 @@ function draftFromRule(rule: AutomationRule): RuleDraft {
 // Field styling shared across the form's inputs/selects — matches the panel's light
 // palette. Extracted so the several controls stay visually consistent.
 const FIELD_CLASS =
-  'w-full rounded-[5px] border border-slate-200 bg-white px-2 py-1 text-[11.5px] text-slate-900 outline-none focus:border-emerald-500'
+  'w-full rounded-[5px] border border-slate-200 bg-white px-2 py-1 text-[11.5px] text-slate-900 outline-none focus:border-blue-500'
 
 function RuleForm({
   draft,
@@ -325,7 +325,7 @@ function RuleForm({
                 ]
               })
             }
-            className="ml-auto inline-flex items-center justify-center gap-1 rounded-[4px] border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-40"
+            className="ml-auto inline-flex items-center justify-center gap-1 rounded-[4px] border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-blue-700 hover:bg-blue-500/10 disabled:opacity-40"
           >
             <Plus size={11} /> Add
           </button>
@@ -389,7 +389,7 @@ function RuleForm({
           type="button"
           disabled={pending || validationError !== null}
           onClick={onSave}
-          className="rounded-[5px] bg-emerald-500/15 px-3 py-1 text-[10.5px] font-bold uppercase tracking-widest text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.35)] hover:bg-emerald-500/25 disabled:opacity-40"
+          className="rounded-[5px] bg-blue-500/15 px-3 py-1 text-[10.5px] font-bold uppercase tracking-widest text-blue-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.35)] hover:bg-blue-500/25 disabled:opacity-40"
         >
           {pending ? 'Saving…' : 'Save'}
         </button>
@@ -534,7 +534,7 @@ function AutomationRulesPanel({ channels }: { channels: Channel[] }): JSX.Elemen
                 setConfirmDeleteId(null)
                 setDraft(draftFromRule(rule))
               }}
-              className="flex-shrink-0 rounded-[4px] bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-emerald-700 hover:text-emerald-800 disabled:opacity-40"
+              className="flex-shrink-0 rounded-[4px] bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-blue-700 hover:text-blue-800 disabled:opacity-40"
             >
               Edit
             </button>
@@ -580,7 +580,7 @@ function AutomationRulesPanel({ channels }: { channels: Channel[] }): JSX.Elemen
             setConfirmDeleteId(null)
             setDraft(emptyDraft())
           }}
-          className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 py-1 text-[10.5px] font-semibold text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-40"
+          className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 py-1 text-[10.5px] font-semibold text-blue-700 hover:bg-blue-500/10 disabled:opacity-40"
         >
           <Plus size={13} /> Add rule
         </button>
@@ -902,7 +902,7 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
           <button
             onClick={toggleAudioCapture}
             disabled={!!captureError}
-            className="inline-flex items-center justify-center gap-1.5 rounded-[6px] border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 rounded-[6px] border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-blue-700 hover:bg-blue-500/10 disabled:opacity-50"
           >
             {isCapturing ? <CircleStop size={13} /> : <Play size={13} />}
             {isCapturing ? 'Stop Capture' : 'Start Capture'}

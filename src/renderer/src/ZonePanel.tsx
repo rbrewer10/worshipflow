@@ -7,7 +7,7 @@ import SceneChips from './SceneChips'
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
 const MODE_COLORS: Record<ZoneState['mode'], string> = {
-  lyrics:    'bg-emerald-600 text-white',
+  lyrics:    'bg-blue-600 text-white',
   stage:     'bg-slate-100 text-slate-900',
   black:     'bg-slate-800 text-slate-200',
   logo:      'bg-slate-100 text-slate-900',
@@ -140,7 +140,7 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
           {ZONE_IDS.map((zoneId) => (
             <div key={zoneId} className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400">Zone {zoneId} — {ZONE_NAMES[zoneId]}</span>
-              <span className="font-mono text-[11px] text-emerald-700">
+              <span className="font-mono text-[11px] text-blue-700">
                 http://{serverIp}:{port ?? '...'}/zone/{zoneId}
               </span>
             </div>

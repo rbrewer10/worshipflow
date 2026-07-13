@@ -46,7 +46,7 @@ function PptxImport({ onImported }: { onImported: () => void }): JSX.Element {
     <>
       <button
         onClick={pick}
-        className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-600/20 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-600/30"
+        className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-600/20 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-600/30"
       >
         <FileUp size={15} /> Import from PowerPoint
       </button>
@@ -78,7 +78,7 @@ function PptxImport({ onImported }: { onImported: () => void }): JSX.Element {
                     <input
                       value={titles[i]}
                       onChange={(e) => setTitles((cur) => cur.map((v, idx) => (idx === i ? e.target.value : v)))}
-                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-900 outline-none focus:border-emerald-500"
+                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-900 outline-none focus:border-blue-500"
                     />
                     <span className="shrink-0 text-xs text-slate-500">{song.slides.length} slide{song.slides.length === 1 ? '' : 's'}</span>
                   </div>
@@ -99,7 +99,7 @@ function PptxImport({ onImported }: { onImported: () => void }): JSX.Element {
               <button
                 onClick={doImport}
                 disabled={importing || includedCount === 0}
-                className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-40"
+                className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-blue-500 disabled:opacity-40"
               >
                 {importing ? 'Importing…' : `Import ${includedCount} song${includedCount === 1 ? '' : 's'}`}
               </button>

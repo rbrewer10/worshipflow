@@ -8,7 +8,7 @@ import ZoneStripBadge from './ZoneStripBadge'
 const ROLE_CYCLE: ZoneRole[] = ['content', 'logo', 'black']
 const ROLE_LABEL: Record<ZoneRole, string> = { content: 'Content', logo: 'Logo', black: 'Black' }
 const ROLE_STYLE: Record<ZoneRole, string> = {
-  content: 'bg-emerald-600 text-white',
+  content: 'bg-blue-600 text-white',
   logo: 'bg-slate-200 text-slate-600',
   black: 'bg-slate-800 text-slate-300',
 }
@@ -97,7 +97,7 @@ export default function SceneEditorModal({ onClose, onSaved }: {
                 <input
                   value={s.name}
                   onChange={(e) => updateScene(idx, { name: e.target.value })}
-                  className="w-44 rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500"
+                  className="w-44 rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500"
                 />
                 <ZoneStripBadge routing={expandScene(s, 'song')} />
                 <button onClick={() => deleteScene(idx)} className="ml-auto rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-red-500/10 hover:text-red-600">✕</button>
@@ -152,7 +152,7 @@ export default function SceneEditorModal({ onClose, onSaved }: {
 
         <div className="mt-4 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold hover:bg-slate-200">Cancel</button>
-          <button onClick={save} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500">Done</button>
+          <button onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">Done</button>
         </div>
       </div>
     </div>

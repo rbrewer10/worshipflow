@@ -64,7 +64,7 @@ export const StageMessagePanel = memo(function StageMessagePanel({
 
       <div className="mt-3 flex items-center justify-between">
         <span className="section-header inline-block">Quick Messages</span>
-        <button onClick={() => setEditingPresets((v) => !v)} className={`btn-pill ${editingPresets ? 'bg-emerald-600 text-white' : ''}`}>
+        <button onClick={() => setEditingPresets((v) => !v)} className={`btn-pill ${editingPresets ? 'bg-blue-600 text-white' : ''}`}>
           {editingPresets ? <><Check size={11} /> Done Editing</> : <><Pencil size={11} /> Edit</>}
         </button>
       </div>

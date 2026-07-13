@@ -187,12 +187,12 @@ function LiveTools(): JSX.Element {
           )}
           <div className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-xs text-slate-600">
             <div className="mb-1 font-semibold text-slate-700">Displays</div>
-            <div><b className="text-slate-900">{info?.displays.length ?? '…'}</b> display(s) · <span className={info && info.outputs > 0 ? 'text-emerald-700' : 'text-amber-700'}>{info?.outputs ?? 0} live</span></div>
-            {info?.displays.map((d) => (<div key={d.id}>• {d.bounds.width}×{d.bounds.height}{d.primary && <span className="ml-1 text-emerald-700">(primary)</span>}</div>))}
+            <div><b className="text-slate-900">{info?.displays.length ?? '…'}</b> display(s) · <span className={info && info.outputs > 0 ? 'text-blue-700' : 'text-amber-700'}>{info?.outputs ?? 0} live</span></div>
+            {info?.displays.map((d) => (<div key={d.id}>• {d.bounds.width}×{d.bounds.height}{d.primary && <span className="ml-1 text-blue-700">(primary)</span>}</div>))}
           </div>
-          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2">
+          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-2">
             <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700"><Tablet size={13} /> Tablet Remote</div>
-            <div className="break-all rounded bg-slate-100 px-2 py-1 text-center font-mono text-[11px] text-emerald-700">{tabletUrl || 'Starting server…'}</div>
+            <div className="break-all rounded bg-slate-100 px-2 py-1 text-center font-mono text-[11px] text-blue-700">{tabletUrl || 'Starting server…'}</div>
             <div className="mt-1 text-[10px] text-slate-500">Open on an iPad/phone as a wireless stage monitor + remote.</div>
           </div>
         </div>

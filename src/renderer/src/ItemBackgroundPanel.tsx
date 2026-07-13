@@ -51,7 +51,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
             className={[
               'relative flex items-center justify-center overflow-hidden rounded-lg border transition-all duration-150',
               serviceActive
-                ? 'border-emerald-400 ring-2 ring-emerald-400'
+                ? 'border-blue-400 ring-2 ring-blue-400'
                 : 'border-slate-200 hover:border-slate-300 hover:scale-[1.03]'
             ].join(' ')}
             style={{ aspectRatio: '16/9' }}
@@ -67,7 +67,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
               Use service theme
             </span>
             {serviceActive && (
-              <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
+              <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-white shadow">
                 <Check size={10} strokeWidth={3} />
               </div>
             )}
@@ -83,7 +83,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
                 className={[
                   'relative overflow-hidden rounded-lg border transition-all duration-150',
                   active
-                    ? 'border-emerald-400 ring-2 ring-emerald-400'
+                    ? 'border-blue-400 ring-2 ring-blue-400'
                     : 'border-slate-200 hover:border-slate-300 hover:scale-[1.03]'
                 ].join(' ')}
                 style={{
@@ -98,7 +98,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
                   {t.name}
                 </span>
                 {active && (
-                  <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
+                  <div className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-white shadow">
                     <Check size={10} strokeWidth={3} />
                   </div>
                 )}
@@ -168,7 +168,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
                 savePayload({ ...payload, background: r.filePaths[0] })
               }
             }}
-            className="w-full rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-500"
+            className="w-full rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-500"
           >
             Pick image/video…
           </button>

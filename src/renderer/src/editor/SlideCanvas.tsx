@@ -137,7 +137,7 @@ export default function SlideCanvas({ song, slide, onTextChange, onFontScaleChan
                   onFontScaleChange?.(s)
                 }}
                 className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-                  (song.fontScale ?? 4) === s ? 'bg-emerald-500 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                  (song.fontScale ?? 4) === s ? 'bg-blue-500 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
                 }`}
               >
                 {s}
@@ -192,7 +192,7 @@ export default function SlideCanvas({ song, slide, onTextChange, onFontScaleChan
               onKeyDown={(e) => {
                 if (e.key === 'Escape') { setEditing(false); setShowToolbar(false) }
               }}
-              className="w-full resize-none overflow-hidden rounded bg-transparent text-center font-bold leading-tight outline-none ring-2 ring-emerald-400/60"
+              className="w-full resize-none overflow-hidden rounded bg-transparent text-center font-bold leading-tight outline-none ring-2 ring-blue-400/60"
               style={{
                 fontSize: fontSizePx,
                 fontFamily,

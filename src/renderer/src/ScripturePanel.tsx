@@ -26,7 +26,7 @@ export const ScripturePanel = memo(function ScripturePanel({
       <div className="mt-2 flex gap-1">
         {([['kjv', 'KJV'], ['web', 'WEB'], ['bbe', 'BBE']] as const).map(([t, label]) => (
           <button key={t} onClick={() => onTranslationChange(t)}
-            className={`flex-1 btn text-xs ${bibleTranslation === t ? 'bg-emerald-600 border-emerald-500 text-white' : ''}`}>{label}</button>
+            className={`flex-1 btn text-xs ${bibleTranslation === t ? 'bg-blue-600 border-blue-500 text-white' : ''}`}>{label}</button>
         ))}
       </div>
       <div className="mt-1 text-[10px] text-slate-500">KJV offline · WEB & BBE need internet</div>

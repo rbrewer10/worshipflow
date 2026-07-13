@@ -53,7 +53,7 @@ export const TextEditor = memo(function TextEditor({
             value={fontScale}
             onChange={(e) => onFontScaleChange(Number(e.target.value))}
             aria-label="Font size slider from 3 to 14"
-            className="w-full accent-emerald-600" />
+            className="w-full accent-blue-600" />
         </div>
 
         {/* Text alignment */}
@@ -62,7 +62,7 @@ export const TextEditor = memo(function TextEditor({
           <div className="flex gap-1.5">
             {(['left', 'center', 'right'] as const).map((align) => (
               <button key={align} onClick={() => onTextAlignChange(align)}
-                className={`flex-1 btn text-xs capitalize ${textAlign === align ? 'bg-emerald-600 border-emerald-500 text-white' : ''}`}>
+                className={`flex-1 btn text-xs capitalize ${textAlign === align ? 'bg-blue-600 border-blue-500 text-white' : ''}`}>
                 {align}
               </button>
             ))}

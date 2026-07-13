@@ -3,7 +3,7 @@ import type { ZoneRouting, ZoneMode } from '../../shared/types'
 // Tiny truthful visual of a ZoneRouting: Z1 Z2 (back screens), Z3 (lyrics TVs),
 // narrow Z4 (stage). Emerald = the item's content is on that screen.
 const CELL_COLOR: Record<ZoneMode, string> = {
-  lyrics: 'bg-emerald-600', text: 'bg-emerald-600', countdown: 'bg-emerald-600', image: 'bg-emerald-600',
+  lyrics: 'bg-blue-600', text: 'bg-blue-600', countdown: 'bg-blue-600', image: 'bg-blue-600',
   logo: 'bg-slate-300',
   black: 'bg-slate-800',
   stage: 'bg-slate-500',

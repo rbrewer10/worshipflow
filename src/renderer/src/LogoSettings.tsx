@@ -76,7 +76,7 @@ function LogoSettings(): JSX.Element {
             value={churchName}
             onChange={(e) => saveChurchName(e.target.value)}
             placeholder="e.g. Snow Hill Church"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-emerald-400 focus:outline-none"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-400 focus:outline-none"
           />
         </div>
 
@@ -87,7 +87,7 @@ function LogoSettings(): JSX.Element {
               <div className="font-semibold text-gray-900">Church Logo</div>
               <div className="text-xs text-gray-400 mt-0.5">Displayed on logo screens between songs</div>
             </div>
-            {saved && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><Check size={13} /> Saved</span>}
+            {saved && <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600"><Check size={13} /> Saved</span>}
           </div>
 
           {/* Logo preview */}
@@ -117,7 +117,7 @@ function LogoSettings(): JSX.Element {
           <div className="flex gap-2">
             <button
               onClick={pickLogo}
-              className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+              className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
             >
               {logoPath ? 'Change logo…' : 'Choose logo image…'}
             </button>
@@ -176,7 +176,7 @@ function LogoSettings(): JSX.Element {
           <div className="flex gap-2">
             <button
               onClick={pickBg}
-              className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+              className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
             >
               {logoBg ? 'Change background…' : 'Choose background…'}
             </button>

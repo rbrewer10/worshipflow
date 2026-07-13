@@ -53,14 +53,14 @@ export function RecordingsPanel(): JSX.Element {
           {r.renderState === 'rendering' ? (
             <div className="mt-2">
               <div className="h-1.5 w-full overflow-hidden rounded bg-slate-200">
-                <div className="h-full bg-emerald-500 transition-all" style={{ width: `${Math.round((progress[r.id] ?? 0) * 100)}%` }} />
+                <div className="h-full bg-blue-500 transition-all" style={{ width: `${Math.round((progress[r.id] ?? 0) * 100)}%` }} />
               </div>
               <button onClick={() => void window.wf.cancelRender(r.id)} className="mt-1 text-rose-600 hover:underline">Cancel</button>
             </div>
           ) : r.renderState === 'done' && r.outputPath ? (
             <div className="mt-1">
               <div className="flex items-center gap-2">
-                <span className="text-emerald-600">Produced</span>
+                <span className="text-blue-600">Produced</span>
                 <button onClick={() => void window.wf.revealOutput(r.outputPath!)} className="text-slate-600 hover:underline">Reveal file</button>
                 <ProduceButton row={r} onDone={refresh} label="Re-produce" />
               </div>
@@ -98,14 +98,14 @@ function ProduceButton({ row, onDone, label }: { row: RecordingRow; onDone: () =
     onDone()
   }
 
-  if (!open) return <button onClick={() => setOpen(true)} className="text-emerald-700 hover:underline">{label}</button>
+  if (!open) return <button onClick={() => setOpen(true)} className="text-blue-700 hover:underline">{label}</button>
   return (
     <span className="flex items-center gap-1">
       <span className="text-slate-500">start</span>
       <input value={startSec} placeholder="auto" onChange={(e) => setStartSec(e.target.value)} className="w-14 rounded border border-slate-300 px-1" />
       <span className="text-slate-500">end (s)</span>
       <input value={endSec} placeholder="auto" onChange={(e) => setEndSec(e.target.value)} className="w-16 rounded border border-slate-300 px-1" />
-      <button onClick={() => void start()} className="text-emerald-700 hover:underline">Go</button>
+      <button onClick={() => void start()} className="text-blue-700 hover:underline">Go</button>
       <button onClick={() => setOpen(false)} className="text-slate-400 hover:underline">✕</button>
     </span>
   )
@@ -120,7 +120,7 @@ function AiBlock({ row, step, onChanged }: { row: RecordingRow; step?: string; o
   const save = (): void => { void window.wf.saveAi(row.id, { aiTitle: title, aiDescription: desc }) }
 
   if (row.aiState === 'generating') {
-    return <div className="mt-2 text-emerald-600">{step ?? 'Generating…'}</div>
+    return <div className="mt-2 text-blue-600">{step ?? 'Generating…'}</div>
   }
   if (row.aiState === 'done') {
     return (
@@ -132,7 +132,7 @@ function AiBlock({ row, step, onChanged }: { row: RecordingRow; step?: string; o
         <div className="flex items-center gap-2">
           {row.srtPath && <button onClick={() => void window.wf.revealPath(row.srtPath!)} className="text-slate-600 hover:underline">Reveal .srt</button>}
           {row.thumbnailPath && <button onClick={() => void window.wf.revealPath(row.thumbnailPath!)} className="text-slate-600 hover:underline">Reveal thumbnail</button>}
-          <button onClick={() => void generate()} className="text-emerald-700 hover:underline">Regenerate</button>
+          <button onClick={() => void generate()} className="text-blue-700 hover:underline">Regenerate</button>
         </div>
       </div>
     )
@@ -140,7 +140,7 @@ function AiBlock({ row, step, onChanged }: { row: RecordingRow; step?: string; o
   return (
     <div className="mt-1 flex items-center gap-2">
       {row.aiState === 'failed' && <span className="text-rose-600">AI failed</span>}
-      <button onClick={() => void generate()} className="text-emerald-700 hover:underline">Generate content</button>
+      <button onClick={() => void generate()} className="text-blue-700 hover:underline">Generate content</button>
     </div>
   )
 }

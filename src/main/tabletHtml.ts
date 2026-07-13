@@ -18,7 +18,7 @@ body{display:flex;flex-direction:column}
 #hdr-r{display:flex;align-items:center;gap:10px}
 #clock{font-family:monospace;font-size:16px;font-weight:700;color:#94a3b8}
 #dot{width:9px;height:9px;border-radius:50%;background:#ef4444;transition:background .3s;flex-shrink:0}
-#dot.ok{background:#34d399}
+#dot.ok{background:#60a5fa}
 
 #msg{display:none;align-items:center;gap:12px;padding:14px 18px;background:#fbbf24;color:#000;flex-shrink:0;animation:msgpulse 1.1s ease-in-out infinite}
 #msg.on{display:flex}
@@ -45,13 +45,13 @@ body{display:flex;flex-direction:column}
 #strip{flex-shrink:0;display:flex;gap:6px;overflow-x:auto;padding:8px 10px;border-top:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.2);scrollbar-width:none}
 #strip::-webkit-scrollbar{display:none}
 .si{flex-shrink:0;padding:6px 13px;border-radius:22px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);color:#475569;user-select:none;transition:background .1s}
-.si.live{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.25);color:#34d399}
+.si.live{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.25);color:#60a5fa}
 .si:active{opacity:.65}
 
 #ctrl{flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;padding-bottom:max(16px,env(safe-area-inset-bottom));background:#0d1420;border-top:1px solid rgba(255,255,255,.08)}
 .cb{padding:24px 10px;border-radius:16px;border:2px solid rgba(255,255,255,.1);background:rgba(255,255,255,.07);color:#fff;font-size:20px;font-weight:800;cursor:pointer;text-align:center;user-select:none;transition:transform .1s,background .1s,border-color .1s;-webkit-tap-highlight-color:transparent;min-height:60px;display:flex;align-items:center;justify-content:center}
 .cb:active{transform:scale(.96);background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.2)}
-.cb-next{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#10b981;font-weight:900}
+.cb-next{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#3b82f6;font-weight:900}
 .cb-next:active{background:rgba(52,211,153,.25);border-color:rgba(52,211,153,.4)}
 .cb-black{background:rgba(0,0,0,.6);border-color:rgba(0,0,0,.4);font-size:18px}
 .cb-black:active{background:rgba(0,0,0,.7)}

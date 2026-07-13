@@ -23,7 +23,7 @@ export default function FloatingToolbar({ style, song, onFontScaleChange }: {
             onFontScaleChange(s)
           }}
           className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
-            current === s ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            current === s ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
           }`}
         >
           {s}

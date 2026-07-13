@@ -128,7 +128,7 @@ function ObsPanel(): JSX.Element {
     setSceneMap((cur) => ({ ...cur, [ctx]: scene }))
 
   const statusPill = status.connected
-    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Connected</span>
+    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-blue-700"><span className="h-2 w-2 rounded-full bg-blue-500" /> Connected</span>
     : status.reconnecting
     ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-amber-700"><RefreshCw size={10} className="animate-spin" /> Reconnecting…</span>
     : <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-slate-500"><span className="h-2 w-2 rounded-full bg-slate-400" /> Not connected</span>
@@ -181,7 +181,7 @@ function ObsPanel(): JSX.Element {
                 placeholder="password"
                 className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
               />
-              <button onClick={connect} disabled={connecting} className="rounded bg-emerald-600/80 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-50">
+              <button onClick={connect} disabled={connecting} className="rounded bg-blue-600/80 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
                 {connecting ? 'Connecting…' : status.connected ? 'Reconnect' : 'Connect'}
               </button>
             </div>
@@ -253,7 +253,7 @@ function ObsPanel(): JSX.Element {
                   {key === 'introPath' ? 'Intro' : key === 'outroPath' ? 'Outro' : 'Output'}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-slate-600" title={asm[key] ?? ''}>{asm[key] ?? <em className="text-slate-400">none</em>}</span>
-                <button onClick={() => void pickAsm(key)} className="shrink-0 text-emerald-700 hover:underline">Choose</button>
+                <button onClick={() => void pickAsm(key)} className="shrink-0 text-blue-700 hover:underline">Choose</button>
                 {asm[key] && <button onClick={() => void clearAsm(key)} className="shrink-0 text-slate-400 hover:underline">Clear</button>}
               </div>
             ))}
@@ -284,7 +284,7 @@ function ObsPanel(): JSX.Element {
                   onClick={() => window.wf.obsSetScene(sc)}
                   className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
                     status.currentScene === sc
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-blue-600 text-white'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -329,10 +329,10 @@ function ObsPanel(): JSX.Element {
         </div>
 
         {/* Overlay URL */}
-        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-2">
+        <div className="rounded-lg border border-blue-500/25 bg-blue-500/5 p-2">
           <div className="mb-1 text-xs font-semibold text-slate-700">Lyrics overlay (Browser Source)</div>
           <div className="flex gap-1.5">
-            <div className="flex-1 rounded bg-white px-2 py-1.5 text-center font-mono text-[11px] text-emerald-700 break-all">
+            <div className="flex-1 rounded bg-white px-2 py-1.5 text-center font-mono text-[11px] text-blue-700 break-all">
               {obsUrl || '…'}
             </div>
             <button
@@ -340,8 +340,8 @@ function ObsPanel(): JSX.Element {
               disabled={!obsUrl}
               className={`inline-flex shrink-0 items-center gap-1 rounded px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-40 ${
                 copied
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-500/20 text-blue-700 hover:bg-blue-500/30'
               }`}
             >
               {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}

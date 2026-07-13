@@ -59,7 +59,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
         onChange={(e) => setA({ ...a, title: e.target.value })}
         onBlur={() => save({ title: a.title })}
         placeholder="Announcement title"
-        className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-lg font-semibold outline-none focus:border-emerald-500"
+        className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-lg font-semibold outline-none focus:border-blue-500"
       />
       <textarea
         value={a.body}
@@ -67,7 +67,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
         onBlur={() => save({ body: a.body })}
         placeholder="Announcement text…"
         rows={4}
-        className="w-full resize-none rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+        className="w-full resize-none rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none focus:border-blue-500"
       />
 
       {/* Display type */}
@@ -79,7 +79,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
               key={d}
               onClick={() => save({ display: d })}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold capitalize ${
-                a.display === d ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700' : 'border-slate-200 bg-white text-slate-500'
+                a.display === d ? 'border-blue-500 bg-blue-500/10 text-blue-700' : 'border-slate-200 bg-white text-slate-500'
               }`}
             >
               {d}
@@ -116,7 +116,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
               key={f}
               onClick={() => save({ frequency: f })}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
-                a.frequency === f ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700' : 'border-slate-200 bg-white text-slate-500'
+                a.frequency === f ? 'border-blue-500 bg-blue-500/10 text-blue-700' : 'border-slate-200 bg-white text-slate-500'
               }`}
             >
               {f === 'once' ? 'One time' : 'Recurring'}
@@ -130,7 +130,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
               type="date"
               value={a.startDate ?? ''}
               onChange={(e) => save({ startDate: e.target.value || null })}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
             />
           </label>
           {a.frequency === 'recurring' && (
@@ -140,7 +140,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
                 type="date"
                 value={a.endDate ?? ''}
                 onChange={(e) => save({ endDate: e.target.value || null })}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
               />
             </label>
           )}

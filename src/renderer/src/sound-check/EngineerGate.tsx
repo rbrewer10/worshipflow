@@ -57,11 +57,11 @@ export function EngineerPinPrompt({
               setEntry(e.target.value)
               if (error) setError(null)
             }}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-sm tracking-widest text-slate-900 placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-sm tracking-widest text-slate-900 placeholder:tracking-normal placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
           />
           <button
             type="submit"
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           >
             Unlock
           </button>
@@ -156,12 +156,12 @@ export function ManagePasscodePanel({
             setValue(e.target.value)
             if (error) setError(null)
           }}
-          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] tracking-widest text-slate-900 placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] tracking-widest text-slate-900 placeholder:tracking-normal placeholder:text-slate-400 focus:border-blue-500 focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={busy}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+          className="rounded-lg bg-blue-600 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
         >
           Save
         </button>

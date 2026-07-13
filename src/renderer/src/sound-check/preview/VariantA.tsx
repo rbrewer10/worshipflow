@@ -29,8 +29,8 @@ function TopBar({ mode }: { mode: ViewMode }): JSX.Element {
     <div className="flex items-center gap-4 border-b border-white/[0.07] bg-[#141418] px-3.5 py-2.5">
       <h2 className="m-0 text-sm font-semibold text-white">Sound Check</h2>
       <ModePills mode={mode} />
-      <div className="ml-auto flex items-center gap-1.5 rounded-lg border border-white/[0.07] bg-emerald-500/[0.07] px-2.5 py-1 text-[11.5px] text-slate-400">
-        <span className="h-[7px] w-[7px] rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,.7)]" />
+      <div className="ml-auto flex items-center gap-1.5 rounded-lg border border-white/[0.07] bg-blue-500/[0.07] px-2.5 py-1 text-[11.5px] text-slate-400">
+        <span className="h-[7px] w-[7px] rounded-full bg-blue-400 shadow-[0_0_6px_rgba(52,211,153,.7)]" />
         <b className="font-semibold text-slate-200">TF-Rack</b>· 192.168.1.100 · Connected
       </div>
     </div>
@@ -53,8 +53,8 @@ function Card({ title, right, children, className }: { title?: string; right?: J
 
 function Check({ on }: { on: boolean }): JSX.Element {
   return on ? (
-    <span className="relative inline-block h-[15px] w-[15px] -translate-y-px rounded border border-emerald-500 bg-emerald-500 align-middle">
-      <span className="absolute left-[4px] top-[1px] h-2 w-1 rotate-[42deg] border-b-2 border-r-2 border-emerald-950" />
+    <span className="relative inline-block h-[15px] w-[15px] -translate-y-px rounded border border-blue-500 bg-blue-500 align-middle">
+      <span className="absolute left-[4px] top-[1px] h-2 w-1 rotate-[42deg] border-b-2 border-r-2 border-blue-950" />
     </span>
   ) : (
     <span className="inline-block h-[15px] w-[15px] -translate-y-px rounded border border-white/[0.18] align-middle" />
@@ -64,7 +64,7 @@ function Check({ on }: { on: boolean }): JSX.Element {
 type BtnTone = 'em' | 'ghost' | 'red'
 function Btn({ tone, children, className }: { tone: BtnTone; children: ReactNode; className?: string }): JSX.Element {
   const tones: Record<BtnTone, string> = {
-    em: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300',
+    em: 'bg-blue-500/15 border-blue-500/30 text-blue-300',
     ghost: 'bg-[#1a1a1d] border-white/10 text-slate-300',
     red: 'bg-red-400/10 border-red-400/30 text-red-300'
   }
@@ -88,7 +88,7 @@ function Rule({ tag, tagClass, text }: { tag: string; tagClass: string; text: st
 type StepState = 'done' | 'cur' | 'todo'
 function Step({ state, n, title, sub }: { state: StepState; n: number; title: string; sub: string }): JSX.Element {
   const dot: Record<StepState, string> = {
-    done: 'bg-emerald-500/20 text-emerald-400',
+    done: 'bg-blue-500/20 text-blue-400',
     cur: 'bg-blue-500 text-white',
     todo: 'bg-white/[0.06] text-slate-500'
   }
@@ -171,11 +171,11 @@ function SetupBody(): JSX.Element {
           <Btn tone="em">● Record Reference Mix (5 min)</Btn>
           <p className="mb-0 mt-2.5 text-[11px] text-slate-500">
             Last recorded <span className="tabular-nums">Jun 28, 2026</span> · “Good morning mix, full band” ·{' '}
-            <span className="text-emerald-400">4 days old</span>
+            <span className="text-blue-400">4 days old</span>
           </p>
         </Card>
         <Card title="Automation rules">
-          <Rule tag="SONG" tagClass="bg-emerald-500/15 text-emerald-300" text="Recall “Worship” scene · mute click for verse 1" />
+          <Rule tag="SONG" tagClass="bg-blue-500/15 text-blue-300" text="Recall “Worship” scene · mute click for verse 1" />
           <Rule tag="ANNOUNCEMENT" tagClass="bg-amber-400/15 text-amber-300" text="Mute Tracks L/R · Pastor Mic +1 dB" />
           <Rule tag="SCRIPTURE" tagClass="bg-blue-500/15 text-blue-300" text="Recall “Speech” scene" />
           <Rule tag="PRAYER" tagClass="bg-purple-400/15 text-purple-300" text="All faders −4 dB · mute Drum OH L/R" />
@@ -213,7 +213,7 @@ function LiveBody(): JSX.Element {
             </span>
           }
         >
-          <Waveform mode="stereo" accent="#34d399" height={96} seed={11} />
+          <Waveform mode="stereo" accent="#60a5fa" height={96} seed={11} />
         </Card>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-3">

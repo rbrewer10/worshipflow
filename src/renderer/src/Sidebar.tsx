@@ -44,7 +44,7 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }):
       onClick={() => setView(v)}
       className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
         view === v
-          ? 'bg-emerald-500/12 font-medium text-emerald-800'
+          ? 'bg-blue-500/12 font-medium text-blue-800'
           : 'font-normal text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
       }`}
     >
@@ -62,9 +62,9 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }):
 
       <div className="border-b border-slate-200 p-2">
         {outputs > 0
-          ? <div className="flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-2">
-              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
-              <span className="text-xs font-semibold text-emerald-700">{outputs} screen{outputs !== 1 ? 's' : ''} live</span>
+          ? <div className="flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-2">
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
+              <span className="text-xs font-semibold text-blue-700">{outputs} screen{outputs !== 1 ? 's' : ''} live</span>
             </div>
           : <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 rounded-lg px-3 py-2">
@@ -73,7 +73,7 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }):
               </div>
               <button
                 onClick={() => window.wf.outputOpen()}
-                className="w-full rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                className="w-full rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
               >
                 Open on projector
               </button>
@@ -136,7 +136,7 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }):
           onClick={() => setView('volunteer')}
           className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
             view === 'volunteer'
-              ? 'bg-emerald-500/12 font-medium text-emerald-800'
+              ? 'bg-blue-500/12 font-medium text-blue-800'
               : 'font-normal text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
           }`}
         >

@@ -194,7 +194,7 @@ function SoundCheckTab(): JSX.Element {
               title={r.hint}
               className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
                 role === r.id
-                  ? 'bg-emerald-500/15 font-semibold text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.4)]'
+                  ? 'bg-blue-500/15 font-semibold text-blue-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,.4)]'
                   : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
@@ -279,7 +279,7 @@ function SoundCheckTab(): JSX.Element {
 function ConnectingState(): JSX.Element {
   return (
     <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-3 px-4 text-center">
-      <span className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />
+      <span className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500" />
       <p className="text-sm text-slate-600">Looking for the Yamaha TF-Rack on the network…</p>
     </div>
   )
@@ -327,12 +327,12 @@ function ConnectionErrorState({
           value={manualIp}
           onChange={(e) => setManualIp(e.target.value)}
           disabled={retrying}
-          className="w-[160px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none disabled:opacity-60"
+          className="w-[160px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={retrying}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
         >
           {retrying ? 'Connecting…' : 'Connect'}
         </button>

@@ -49,7 +49,7 @@ function AnnouncementsLibrary(): JSX.Element {
               refresh()
               setEditorId(id)
             }}
-            className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-500"
           >
             <Plus size={15} /> New Announcement
           </button>
@@ -57,7 +57,7 @@ function AnnouncementsLibrary(): JSX.Element {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search announcements…"
-            className="mb-3 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+            className="mb-3 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none focus:border-blue-500"
           />
           <div className="min-h-0 flex-1 space-y-1 overflow-auto">
             {items.length === 0 && (
@@ -66,7 +66,7 @@ function AnnouncementsLibrary(): JSX.Element {
             {items.map((it) => (
               <div
                 key={it.id}
-                className={`group flex items-center gap-2 rounded-lg px-3 py-2 ${editorId === it.id ? 'bg-emerald-500/10 ring-1 ring-emerald-500/30' : 'hover:bg-slate-100'} ${it.expired ? 'opacity-50' : ''}`}
+                className={`group flex items-center gap-2 rounded-lg px-3 py-2 ${editorId === it.id ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'hover:bg-slate-100'} ${it.expired ? 'opacity-50' : ''}`}
               >
                 <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
                   {it.display === 'ticker' ? <ScrollText size={14} /> : <Type size={14} />}

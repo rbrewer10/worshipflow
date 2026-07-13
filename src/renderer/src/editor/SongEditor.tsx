@@ -169,7 +169,7 @@ export default function SongEditor({ songId, onSaved }: {
                 if (e.key === 'Enter') commitTitle()
                 if (e.key === 'Escape') setEditingTitle(false)
               }}
-              className="w-full rounded-md border border-emerald-400/50 bg-white px-2 py-1 text-base font-semibold text-slate-900 outline-none ring-2 ring-emerald-500/30"
+              className="w-full rounded-md border border-blue-400/50 bg-white px-2 py-1 text-base font-semibold text-slate-900 outline-none ring-2 ring-blue-500/30"
             />
           ) : (
             <button
@@ -196,7 +196,7 @@ export default function SongEditor({ songId, onSaved }: {
         </button>
         <button
           onClick={() => window.wf.editorOpen(songId)}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/10 hover:text-emerald-800"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-500/10 hover:text-blue-800"
           title="Open editor in its own window"
         >
           <ExternalLink size={13} /> Pop out
@@ -254,7 +254,7 @@ export default function SongEditor({ songId, onSaved }: {
                   title={sw.label}
                   onClick={() => handleTextColorChange(sw.hex)}
                   className={`h-5 w-5 rounded-full border border-slate-200 transition ${
-                    activeColor.toLowerCase() === sw.hex.toLowerCase() ? 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-[#f4f6f9]' : ''
+                    activeColor.toLowerCase() === sw.hex.toLowerCase() ? 'ring-2 ring-blue-400 ring-offset-1 ring-offset-[#f4f6f9]' : ''
                   }`}
                   style={{ background: sw.hex }}
                 />

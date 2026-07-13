@@ -78,7 +78,7 @@ function SlideGrid(): JSX.Element {
                     key={idx}
                     onClick={() => window.wf.liveGoLiveAt(it.id, idx)}
                     aria-label={`Play slide ${idx + 1} of ${its.length}`}
-                    className={`overflow-hidden rounded-md transition-shadow min-h-10 cursor-pointer group relative ${isLiveSlide ? 'ring-2 ring-emerald-500' : 'ring-1 ring-slate-200 hover:ring-emerald-400/50'}`}
+                    className={`overflow-hidden rounded-md transition-shadow min-h-10 cursor-pointer group relative ${isLiveSlide ? 'ring-2 ring-blue-500' : 'ring-1 ring-slate-200 hover:ring-blue-400/50'}`}
                     title={`Click to play slide ${idx + 1}`}
                   >
                     <SlideThumb label={slideText} itemStyle={it.style} serviceTheme={activeService.theme} serviceColors={activeService.themeColors} bgFile={bgFile} />

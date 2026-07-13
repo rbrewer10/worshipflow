@@ -34,7 +34,7 @@ export function PresenterPanel({ liveState, liveItem }: PresenterPanelProps): JS
       <div className="mb-2 flex items-center justify-between">
         <h3 className="section-header">Presenter Notes</h3>
         {showNotes && (
-          <div className="text-sm font-mono font-bold text-emerald-700 tabular-nums">
+          <div className="text-sm font-mono font-bold text-blue-700 tabular-nums">
             {formatTime(elapsed)}
           </div>
         )}

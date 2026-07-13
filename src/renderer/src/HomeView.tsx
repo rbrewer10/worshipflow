@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import { Play, LayoutGrid, MonitorSpeaker, ListMusic, Music, BookOpen, User } from 'lucide-react'
 import type { View } from './AppShell'
 import { useService } from './ServiceContext'
+import BrandMark from './BrandMark'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
@@ -32,14 +33,21 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
 
   return (
     <div className="h-full overflow-auto bg-[#e9ecf1] p-6">
+      <div className="mb-5 flex items-center gap-3">
+        <BrandMark size={40} className="flex-shrink-0 rounded-[9px] shadow-sm" />
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-2xl font-extrabold tracking-tight text-slate-900">WorshipFlow</span>
+          <span className="text-base font-bold tracking-wide text-blue-600">PRO</span>
+        </div>
+      </div>
       <div className="mb-1 text-xl font-semibold text-slate-900">{greeting()}</div>
-      <div className="mb-6 text-sm text-slate-500">WorshipFlow is ready</div>
+      <div className="mb-6 text-sm text-slate-500">Ready when you are</div>
 
       <button
         onClick={() => setView('live')}
-        className="mb-4 flex w-full items-center gap-4 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.10] px-5 py-4 text-left transition-colors hover:bg-emerald-500/[0.16]"
+        className="mb-4 flex w-full items-center gap-4 rounded-xl border border-blue-500/30 bg-blue-500/[0.10] px-5 py-4 text-left transition-colors hover:bg-blue-500/[0.16]"
       >
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600">
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600">
           <Play size={22} />
         </div>
         <div className="min-w-0 flex-1">
@@ -50,7 +58,7 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
               : 'Open live control'}
           </div>
         </div>
-        <div className="flex-shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Start</div>
+        <div className="flex-shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Start</div>
       </button>
 
       <div className="grid grid-cols-3 gap-3">

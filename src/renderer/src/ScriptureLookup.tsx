@@ -30,12 +30,12 @@ function ScriptureLookup(): JSX.Element {
           onChange={(e) => setRef(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && lookup()}
           placeholder='Type a reference — e.g. "John 3:16", "Psalm 23", "Romans 8:28-30"'
-          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-emerald-500"
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-blue-500"
         />
         <button
           onClick={() => lookup()}
           disabled={!ref.trim() || loading}
-          className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? 'Looking…' : 'Look up'}
         </button>
@@ -68,7 +68,7 @@ function ScriptureLookup(): JSX.Element {
             <div className="space-y-2 leading-relaxed">
               {result.verses!.map((v) => (
                 <p key={v.n} className="text-slate-900">
-                  <sup className="mr-1 font-mono text-xs text-emerald-700">{v.n}</sup>
+                  <sup className="mr-1 font-mono text-xs text-blue-700">{v.n}</sup>
                   {v.text}
                 </p>
               ))}

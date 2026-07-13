@@ -163,7 +163,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         <TopBtn active={isBlack} onClick={() => send('black')} className={isBlack ? 'bg-slate-700 text-white ring-1 ring-slate-900/10' : ''}>
           <Square size={16} /> Black
         </TopBtn>
-        <TopBtn active={isLogo} onClick={() => send('logo')} className={isLogo ? 'bg-emerald-600 text-white' : ''}>
+        <TopBtn active={isLogo} onClick={() => send('logo')} className={isLogo ? 'bg-blue-600 text-white' : ''}>
           <Church size={16} /> Logo
         </TopBtn>
         <TopBtn active={!isBlack && !isLogo} onClick={() => send('lyrics')}>
@@ -173,7 +173,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         <select
           value={activeServiceId ?? ''}
           onChange={(e) => e.target.value && pickService(Number(e.target.value))}
-          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-emerald-500"
+          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-500"
         >
           {services.length === 0 && <option value="">No services</option>}
           {services.map((s) => (
@@ -205,7 +205,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-5 px-10 text-center">
           {isCountdown ? (
             <>
-              <div className="text-base font-semibold uppercase tracking-[0.35em] text-emerald-700">
+              <div className="text-base font-semibold uppercase tracking-[0.35em] text-blue-700">
                 Service begins in
               </div>
               <div className="font-mono text-9xl font-black tabular-nums text-slate-900">
@@ -215,7 +215,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
           ) : isBlack ? (
             <div className="text-2xl font-semibold text-slate-500">Screen is black</div>
           ) : isLogo ? (
-            <div className="inline-flex items-center gap-2.5 text-3xl font-bold text-emerald-700"><Church size={30} /> {churchName} — Logo screen</div>
+            <div className="inline-flex items-center gap-2.5 text-3xl font-bold text-blue-700"><Church size={30} /> {churchName} — Logo screen</div>
           ) : (
             <>
               <div className="text-5xl font-bold leading-snug text-slate-900" style={{ whiteSpace: 'pre-line' }}>
@@ -239,10 +239,10 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         {/* NEXT */}
         <button
           onClick={goNext}
-          className="flex w-44 shrink-0 flex-col items-center justify-center gap-3 border-l border-slate-200 bg-emerald-500/10 text-emerald-700 transition-all hover:bg-emerald-500/15 hover:text-emerald-800 active:bg-emerald-500/20"
+          className="flex w-44 shrink-0 flex-col items-center justify-center gap-3 border-l border-slate-200 bg-blue-500/10 text-blue-700 transition-all hover:bg-blue-500/15 hover:text-blue-800 active:bg-blue-500/20"
         >
           <ChevronRight size={64} strokeWidth={2.5} />
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Next</span>
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-blue-700">Next</span>
         </button>
       </div>
 
@@ -257,7 +257,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
               disabled={!canGoLive(item)}
               className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors ${
                 liveItemId === item.id
-                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700'
+                  ? 'border-blue-500/40 bg-blue-500/15 text-blue-700'
                   : canGoLive(item)
                   ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
                   : 'cursor-default border-transparent bg-transparent text-slate-400'
@@ -267,7 +267,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
               <span>{ICON[item.type]}</span>
               <span className="max-w-[110px] truncate">{item.title}</span>
               {liveItemId === item.id && (
-                <span className="text-[9px] font-bold text-emerald-700">LIVE</span>
+                <span className="text-[9px] font-bold text-blue-700">LIVE</span>
               )}
             </button>
           ))}

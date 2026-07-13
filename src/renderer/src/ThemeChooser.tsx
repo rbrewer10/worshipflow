@@ -24,7 +24,7 @@ function ThemeChooser({ themeId, colors, onPickTheme, onSetColor, onReset }: {
             <button
               key={t.id}
               onClick={() => onPickTheme(t.id)}
-              className={`rounded-md p-1 text-left ${t.id === active.id ? 'ring-2 ring-emerald-500' : 'ring-1 ring-slate-200'}`}
+              className={`rounded-md p-1 text-left ${t.id === active.id ? 'ring-2 ring-blue-500' : 'ring-1 ring-slate-200'}`}
             >
               <div className="h-7 w-full rounded" style={{ background: swatch }} />
               <span className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-600">

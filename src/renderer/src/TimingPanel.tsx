@@ -52,7 +52,7 @@ export const TimingPanel = memo(function TimingPanel({
           <span className="section-header inline-block">Auto-Advance</span>
           {autoAdvanceRunning && (
             <span className="inline-flex items-center gap-1 badge">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
               running{autoAdvanceLoop && <Repeat size={10} />}
             </span>
           )}
@@ -60,7 +60,7 @@ export const TimingPanel = memo(function TimingPanel({
         {autoAdvanceRunning && (
           <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full rounded-full bg-emerald-500 transition-none"
+              className="h-full rounded-full bg-blue-500 transition-none"
               style={{ width: `${Math.min(100, ((liveState?.autoAdvanceMs ?? 0) / (parseFloat(autoAdvanceSecs) * 1000)) * 100)}%` }}
             />
           </div>

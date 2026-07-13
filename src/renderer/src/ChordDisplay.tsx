@@ -80,7 +80,7 @@ export function ChordDisplay({ lyrics, showChords = true, onChordsChange }: Chor
           >
             {/* Chord line */}
             {chords.length > 0 && (
-              <div className="mb-1 min-h-5 text-emerald-700">
+              <div className="mb-1 min-h-5 text-blue-700">
                 {chords.map((chord, cidx) => (
                   <span key={cidx} className="mr-2">
                     [{chord.chord}]
@@ -94,7 +94,7 @@ export function ChordDisplay({ lyrics, showChords = true, onChordsChange }: Chor
               <span className="flex-1">{cleanLine}</span>
               <button
                 onClick={() => handleAddChordToLine(idx)}
-                className="ml-2 hidden items-center gap-1 rounded-lg bg-emerald-600/20 px-2 py-1 text-[10px] text-emerald-700 group-hover:inline-flex hover:bg-emerald-600/30"
+                className="ml-2 hidden items-center gap-1 rounded-lg bg-blue-600/20 px-2 py-1 text-[10px] text-blue-700 group-hover:inline-flex hover:bg-blue-600/30"
                 title="Click to add/edit chords"
               >
                 <Plus size={11} /> Chord
@@ -116,7 +116,7 @@ export function ChordDisplay({ lyrics, showChords = true, onChordsChange }: Chor
               value={editingChords}
               onChange={(e) => handleChordInput(e.target.value)}
               placeholder="e.g. G, D, Em"
-              className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 mb-2"
+              className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 mb-2"
               autoFocus
             />
 
@@ -127,7 +127,7 @@ export function ChordDisplay({ lyrics, showChords = true, onChordsChange }: Chor
                   <button
                     key={chord}
                     onClick={() => handleChordInput(editingChords.replace(/[^,]*$/, `${chord}`))}
-                    className="rounded-lg bg-emerald-600/30 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-600/50"
+                    className="rounded-lg bg-blue-600/30 px-2 py-1 text-xs text-blue-700 hover:bg-blue-600/50"
                   >
                     {chord}
                   </button>
@@ -158,7 +158,7 @@ export function ChordDisplay({ lyrics, showChords = true, onChordsChange }: Chor
             <div className="flex gap-2">
               <button
                 onClick={handleSaveChords}
-                className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+                className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500"
               >
                 Save
               </button>
