@@ -51,17 +51,17 @@ export default function BrandMark({
       </defs>
       <rect x="32" y="32" width="448" height="448" rx="108" fill={`url(#${tile})`} />
       <rect x="32" y="32" width="448" height="448" rx="108" fill={`url(#${glow})`} />
-      <path
-        d="M256 366 C 224 322, 168 322, 150 366 C 132 410, 224 410, 256 366 C 288 322, 380 322, 362 366 C 344 410, 288 410, 256 366 Z"
-        stroke={`url(#${infinity})`}
-        strokeWidth="30"
-        strokeLinejoin="round"
-        fill="none"
-      />
       <g fill={`url(#${cross})`}>
         <rect x="222" y="150" width="68" height="256" rx="26" />
         <rect x="164" y="232" width="184" height="68" rx="26" />
       </g>
+      <path
+        d="M256 372 C 224 328, 168 328, 150 372 C 132 416, 224 416, 256 372 C 288 328, 380 328, 362 372 C 344 416, 288 416, 256 372 Z"
+        stroke={`url(#${infinity})`}
+        strokeWidth="32"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </svg>
   )
 }

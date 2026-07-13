@@ -24,13 +24,13 @@
   <rect x="32" y="32" width="448" height="448" rx="108" fill="url(#tile)"/>
   <rect x="32" y="32" width="448" height="448" rx="108" fill="url(#glow)"/>
 
-  <!-- Infinity woven at the base of the cross (sits behind the vertical bar) -->
-  <path d="M256 366 C 224 322, 168 322, 150 366 C 132 410, 224 410, 256 366 C 288 322, 380 322, 362 366 C 344 410, 288 410, 256 366 Z"
-        stroke="url(#infinity)" stroke-width="30" stroke-linejoin="round" fill="none"/>
-
-  <!-- Cross (soft-rounded bars, in front of the infinity) -->
+  <!-- Cross (soft-rounded bars) -->
   <g fill="url(#cross)">
     <rect x="222" y="150" width="68" height="256" rx="26"/>
     <rect x="164" y="232" width="184" height="68" rx="26"/>
   </g>
+
+  <!-- Infinity in front of the cross, wrapping its base (matches the wordmark logo) -->
+  <path d="M256 372 C 224 328, 168 328, 150 372 C 132 416, 224 416, 256 372 C 288 328, 380 328, 362 372 C 344 416, 288 416, 256 372 Z"
+        stroke="url(#infinity)" stroke-width="32" stroke-linejoin="round" fill="none"/>
 </svg>
