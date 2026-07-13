@@ -137,7 +137,7 @@ export interface SongUsage {
 }
 
 // --- Service builder ---
-export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement'
+export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement' | 'sermon'
 
 export interface ServiceSummary {
   id: number
@@ -215,6 +215,7 @@ export const ZONE_ROUTING_DEFAULTS: Record<ServiceItemType, ZoneRouting> = {
   welcome:   { 1: 'countdown', 2: 'countdown', 3: 'countdown', 4: 'stage' },
   ticker:    { 1: 'text',      2: 'text',      3: 'text',      4: 'stage' },
   announcement: { 1: 'text',   2: 'text',      3: 'text',      4: 'stage' },
+  sermon:    { 1: 'logo',      2: 'logo',      3: 'logo',      4: 'stage' },
 }
 
 export const ZONE_NAMES: Record<ZoneId, string> = {
@@ -269,4 +270,36 @@ export interface AnnouncementInput {
   startDate?: string | null
   endDate?: string | null
   active?: boolean
+}
+
+// --- Service recording (Phase 1: capture & markers) ---
+export type RecordingMarkerKind = 'sermon' | 'song' | 'item'
+
+export interface RecordingRow {
+  id: number
+  serviceId: number | null
+  startedAt: number            // epoch ms (app wall clock)
+  endedAt: number | null       // epoch ms; null while open
+  filePath: string | null      // from OBS StopRecord.outputPath
+  obsRecordStartedMs: number   // epoch ms; OBS's actual record start
+  markerCount?: number         // populated by listRecordings for the UI
+}
+
+export interface RecordingMarkerInput {
+  itemId: number | null
+  kind: RecordingMarkerKind
+  label: string
+  offsetMs: number             // ms from recording start
+}
+
+export interface RecordingMarker extends RecordingMarkerInput {
+  id: number
+  recordingId: number
+}
+
+export interface RecordingSidecar {
+  worshipflowVersion: string
+  service: { id: number | null; name: string; date: string | null }
+  recording: { startedAt: number; durationMs: number; file: string }
+  markers: Array<{ kind: RecordingMarkerKind; label: string; offsetMs: number }>
 }
