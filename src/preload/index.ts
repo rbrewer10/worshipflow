@@ -105,6 +105,11 @@ const wf = {
     ipcRenderer.on('wf:notify', handler)
     return () => ipcRenderer.removeListener('wf:notify', handler)
   },
+  onRenderProgress: (cb: (p: { recordingId: number; fraction: number }) => void): (() => void) => {
+    const handler = (_e: unknown, p: { recordingId: number; fraction: number }): void => cb(p)
+    ipcRenderer.on('wf:recordings:renderProgress', handler)
+    return () => ipcRenderer.removeListener('wf:recordings:renderProgress', handler)
+  },
   liveSetItemId: (id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', id),
   liveGoLiveAt: (itemId: number, slideIndex: number): Promise<void> =>
     ipcRenderer.invoke('wf:live:goLiveAt', itemId, slideIndex),
@@ -212,6 +217,20 @@ const wf = {
     ipcRenderer.invoke('wf:recordings:markers', recordingId),
   getAutoRecord: (): Promise<boolean> => ipcRenderer.invoke('wf:recordings:getAutoRecord'),
   setAutoRecord: (on: boolean): Promise<void> => ipcRenderer.invoke('wf:recordings:setAutoRecord', on),
+
+  // Recordings — Phase 2 assembly
+  produceRecording: (recordingId: number, override?: { startMs?: number; endMs?: number }): Promise<void> =>
+    ipcRenderer.invoke('wf:recordings:produce', recordingId, override),
+  cancelRender: (recordingId: number): Promise<void> =>
+    ipcRenderer.invoke('wf:recordings:cancelRender', recordingId),
+  revealOutput: (outputPath: string): Promise<void> =>
+    ipcRenderer.invoke('wf:recordings:revealOutput', outputPath),
+  getAssemblySettings: (): Promise<{ introPath: string | null; outroPath: string | null; outputFolder: string | null }> =>
+    ipcRenderer.invoke('wf:recordings:getAssemblySettings'),
+  setAssemblySetting: (key: 'introPath' | 'outroPath' | 'outputFolder', value: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:recordings:setAssemblySetting', key, value),
+  pickAssemblyFile: (kind: 'video' | 'folder'): Promise<string | null> =>
+    ipcRenderer.invoke('wf:recordings:pickAssemblyFile', kind),
 
   // Logo settings
   logoGet: (): Promise<{ logoPath: string | null; logoBg: string | null }> =>
