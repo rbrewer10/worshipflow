@@ -21,6 +21,7 @@ function post(body: object, apiKey: string): Promise<{ content?: { type: string;
       })
     })
     req.on('error', reject)
+    req.setTimeout(90000, () => req.destroy(new Error('Anthropic request timeout')))
     req.write(data)
     req.end()
   })

@@ -22,8 +22,11 @@ export function RecordingsPanel(): JSX.Element {
     // so the progress bar + Cancel show the moment a produce starts and clear when it ends.
     const offState = window.wf.onRenderState(() => refresh())
     // AI progress isn't a render-state event, so track step labels separately.
+    // Also refresh on each step: the row's aiState only flips to 'generating' in the
+    // DB, so without this the 'generating' UI (and the poll's bootstrap) never appears.
     const offAi = window.wf.onAiProgress(({ recordingId, label }) => {
       setAiStep((s) => ({ ...s, [recordingId]: label }))
+      refresh()
     })
     // AI completion isn't pushed as an event; poll while any row is generating so the
     // finished title/description/reveal buttons appear on their own.

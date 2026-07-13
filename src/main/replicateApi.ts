@@ -131,6 +131,8 @@ function uploadFileToReplicate(filePath: string, token: string): Promise<string>
       })
     })
     req.on('error', reject)
+    // Guard against a stalled/half-open connection hanging the whole run forever.
+    req.setTimeout(120000, () => req.destroy(new Error('Replicate upload timeout')))
     req.write(body)
     req.end()
   })

@@ -302,7 +302,7 @@ const renderer = createRenderer({
 async function renderThumbnail(bgImagePath: string | null, title: string, speaker: string, outPath: string): Promise<void> {
   const win = new BrowserWindow({ width: 1280, height: 720, show: false, webPreferences: { offscreen: true } })
   try {
-    const bg = bgImagePath ? `url("file://${bgImagePath.replace(/\\/g, '/')}")` : 'linear-gradient(135deg,#0f172a,#334155)'
+    const bg = bgImagePath ? `url("file:///${bgImagePath.replace(/\\/g, '/')}")` : 'linear-gradient(135deg,#0f172a,#334155)'
     const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
     const html = `<!doctype html><html><head><meta charset="utf-8"><style>
       html,body{margin:0;width:1280px;height:720px;overflow:hidden;font-family:Arial,Helvetica,sans-serif}
