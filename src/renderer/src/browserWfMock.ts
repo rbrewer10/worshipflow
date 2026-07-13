@@ -6,6 +6,8 @@ import type {
   NewServiceItem,
   ObsStatus,
   ParsedPptxSong,
+  RecordingMarker,
+  RecordingRow,
   ScriptureResult,
   ServiceFull,
   ServiceItem,
@@ -367,6 +369,11 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     obsStopRecord: noop,
     obsSetScene: noop,
     obsSetAutoSwitch: async (_enabled: boolean, _map: Record<SceneContext, string>): Promise<void> => {},
+
+    recordingsList: async (): Promise<RecordingRow[]> => [],
+    recordingMarkers: async (_recordingId: number): Promise<RecordingMarker[]> => [],
+    getAutoRecord: async (): Promise<boolean> => true,
+    setAutoRecord: noop,
 
     logoGet: async (): Promise<{ logoPath: string | null; logoBg: string | null }> => ({ logoPath: null, logoBg: null }),
     logoSet: noop,

@@ -205,6 +205,14 @@ const wf = {
   obsSetAutoSwitch: (enabled: boolean, map: Record<SceneContext, string>): Promise<void> =>
     ipcRenderer.invoke('wf:obs:setAutoSwitch', enabled, map),
 
+  // Recordings (Phase 1)
+  recordingsList: (): Promise<import('../shared/types').RecordingRow[]> =>
+    ipcRenderer.invoke('wf:recordings:list'),
+  recordingMarkers: (recordingId: number): Promise<import('../shared/types').RecordingMarker[]> =>
+    ipcRenderer.invoke('wf:recordings:markers', recordingId),
+  getAutoRecord: (): Promise<boolean> => ipcRenderer.invoke('wf:recordings:getAutoRecord'),
+  setAutoRecord: (on: boolean): Promise<void> => ipcRenderer.invoke('wf:recordings:setAutoRecord', on),
+
   // Logo settings
   logoGet: (): Promise<{ logoPath: string | null; logoBg: string | null }> =>
     ipcRenderer.invoke('wf:logo:get'),
