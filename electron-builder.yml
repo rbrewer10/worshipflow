@@ -16,6 +16,7 @@ asar: true
 # file, not packed inside app.asar, or the database can't open.
 asarUnpack:
   - '**/node_modules/sql.js/dist/sql-wasm.wasm'
+  - '**/node_modules/ffmpeg-static/**'
 
 # Everything under out/ (the electron-vite build) plus production node_modules is included
 # by default; these exclusions keep source, tooling, and the unused serialport binding out.

@@ -63,7 +63,9 @@ import {
   finalizeRecording,
   listRecordingMarkers,
   listRecordings,
-  closeDanglingRecordings
+  closeDanglingRecordings,
+  getRecording,
+  setRecordingRender
 } from './db'
 import { listBackgrounds, copyBackground, deleteBackground } from './backgroundLib'
 import { generateBackgroundImage } from './replicateApi'
@@ -88,6 +90,8 @@ import {
 } from './obs'
 import { logInfo, logWarn, logError, getRecentLogLines, getLogsDir } from './logger'
 import { createRecordingSession } from './recording'
+import ffmpegStatic from 'ffmpeg-static'
+import { createRenderer } from './render'
 
 export { TABLET_PORT }
 
@@ -258,6 +262,37 @@ const recordingSession = createRecordingSession({
     }
   },
   toast: (msg) => notifyOperator(msg, 'warn')
+})
+
+// --- Service recording (Phase 2: assembly / produce) ---
+// ffmpeg-static resolves to a path inside app.asar when packaged; the binary is
+// asarUnpack'd, so swap to the unpacked path (mirrors the sql.js wasm handling).
+function resolveFfmpegPath(): string {
+  const p = (ffmpegStatic as unknown as string) || 'ffmpeg'
+  return p.replace('app.asar', 'app.asar.unpacked')
+}
+
+// operatorWin/notifyOperator are referenced lazily inside the deps closures (they
+// run later, when a produce/progress event fires), so this ordering is safe.
+const renderer = createRenderer({
+  ffmpegPath: resolveFfmpegPath(),
+  getRecording,
+  listMarkers: listRecordingMarkers,
+  setRenderState: (id, state, outputPath) => {
+    setRecordingRender(id, state, outputPath)
+    // Notify the panel of every transition so it can reflect rendering/done/failed
+    // live (the produce IPC only resolves at the very end, so the UI can't rely on it).
+    if (operatorWin && !operatorWin.isDestroyed()) {
+      operatorWin.webContents.send('wf:recordings:renderState', { recordingId: id, state })
+    }
+  },
+  getSetting,
+  onProgress: (id, fraction) => {
+    if (operatorWin && !operatorWin.isDestroyed()) {
+      operatorWin.webContents.send('wf:recordings:renderProgress', { recordingId: id, fraction })
+    }
+  },
+  toast: (message, level) => notifyOperator(message, level ?? 'info')
 })
 
 // Feature states
@@ -1412,6 +1447,29 @@ ipcMain.handle('wf:recordings:markers', (_e, recordingId: number) => listRecordi
 ipcMain.handle('wf:recordings:getAutoRecord', () => getSetting('autoRecord') !== 'off')
 ipcMain.handle('wf:recordings:setAutoRecord', (_e, on: boolean) => {
   setSetting('autoRecord', on ? 'on' : 'off')
+})
+ipcMain.handle('wf:recordings:produce', (_e, recordingId: number, override?: { startMs?: number; endMs?: number }) =>
+  renderer.produce(recordingId, override)
+)
+ipcMain.handle('wf:recordings:cancelRender', (_e, recordingId: number) => { renderer.cancel(recordingId) })
+ipcMain.handle('wf:recordings:revealOutput', async (_e, outputPath: string) => {
+  if (outputPath) shell.showItemInFolder(outputPath)
+})
+ipcMain.handle('wf:recordings:getAssemblySettings', () => ({
+  introPath: getSetting('assemblyIntroPath'),
+  outroPath: getSetting('assemblyOutroPath'),
+  outputFolder: getSetting('assemblyOutputFolder')
+}))
+ipcMain.handle('wf:recordings:setAssemblySetting', (_e, key: 'introPath' | 'outroPath' | 'outputFolder', value: string | null) => {
+  const map = { introPath: 'assemblyIntroPath', outroPath: 'assemblyOutroPath', outputFolder: 'assemblyOutputFolder' } as const
+  setSetting(map[key], value)
+})
+ipcMain.handle('wf:recordings:pickAssemblyFile', async (_e, kind: 'video' | 'folder'): Promise<string | null> => {
+  const res = await dialog.showOpenDialog(operatorWin!, kind === 'folder'
+    ? { properties: ['openDirectory'] }
+    : { properties: ['openFile'], filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'mkv', 'webm'] }] })
+  if (res.canceled || res.filePaths.length === 0) return null
+  return res.filePaths[0]
 })
 ipcMain.handle('wf:obs:setScene', (_e, sceneName: string) => {
   lastAutoScene = sceneName  // manual switch updates the baseline so auto-switch won't fight it

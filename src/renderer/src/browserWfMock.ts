@@ -301,6 +301,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     stageOpen: noop,
     outputOpen: noop,
     onNotify: () => () => {},
+    onRenderProgress: () => () => {},
+    onRenderState: () => () => {},
     liveSetItemId: async (id: number | null): Promise<void> => publish({ liveServiceItemId: id }),
     liveGoLiveAt: async (_itemId: number, slideIndex: number): Promise<void> => {
       const index = Math.max(0, Math.min(slideIndex, demoLines.length - 1))
@@ -374,6 +376,13 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     recordingMarkers: async (_recordingId: number): Promise<RecordingMarker[]> => [],
     getAutoRecord: async (): Promise<boolean> => true,
     setAutoRecord: noop,
+
+    produceRecording: async () => {},
+    cancelRender: async () => {},
+    revealOutput: async () => {},
+    getAssemblySettings: async () => ({ introPath: null, outroPath: null, outputFolder: null }),
+    setAssemblySetting: async () => {},
+    pickAssemblyFile: async () => null,
 
     logoGet: async (): Promise<{ logoPath: string | null; logoBg: string | null }> => ({ logoPath: null, logoBg: null }),
     logoSet: noop,

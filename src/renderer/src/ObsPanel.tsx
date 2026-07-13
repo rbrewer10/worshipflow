@@ -45,6 +45,7 @@ function ObsPanel(): JSX.Element {
   const [copied, setCopied] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [autoRecord, setAutoRecord] = useState(true)
+  const [asm, setAsm] = useState<{ introPath: string | null; outroPath: string | null; outputFolder: string | null }>({ introPath: null, outroPath: null, outputFolder: null })
 
   const copyUrl = (): void => {
     navigator.clipboard.writeText(obsUrl).then(() => {
@@ -78,6 +79,19 @@ function ObsPanel(): JSX.Element {
     const next = !autoRecord
     setAutoRecord(next)
     void window.wf.setAutoRecord(next)
+  }
+
+  // Load the video-assembly settings (intro/outro/output folder) on mount.
+  useEffect(() => { void window.wf.getAssemblySettings().then(setAsm) }, [])
+  const pickAsm = async (key: 'introPath' | 'outroPath' | 'outputFolder'): Promise<void> => {
+    const path = await window.wf.pickAssemblyFile(key === 'outputFolder' ? 'folder' : 'video')
+    if (path == null) return
+    await window.wf.setAssemblySetting(key, path)
+    setAsm((a) => ({ ...a, [key]: path }))
+  }
+  const clearAsm = async (key: 'introPath' | 'outroPath' | 'outputFolder'): Promise<void> => {
+    await window.wf.setAssemblySetting(key, null)
+    setAsm((a) => ({ ...a, [key]: null }))
   }
 
   // Persist + push auto-switch config to main whenever it changes.
@@ -228,6 +242,22 @@ function ObsPanel(): JSX.Element {
           <div className="mt-1 text-[10px] text-slate-500">
             Recording is written to OBS&rsquo;s configured record folder — point that at your NAS.
           </div>
+
+          <div className="mt-3 border-t border-slate-200 pt-2">
+            <h3 className="mb-1 text-xs font-semibold text-slate-700">Video assembly</h3>
+            {(['introPath', 'outroPath', 'outputFolder'] as const).map((key) => (
+              <div key={key} className="mb-1 flex items-center gap-2 text-[11px]">
+                <span className="w-14 shrink-0 text-slate-500">
+                  {key === 'introPath' ? 'Intro' : key === 'outroPath' ? 'Outro' : 'Output'}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-slate-600" title={asm[key] ?? ''}>{asm[key] ?? <em className="text-slate-400">none</em>}</span>
+                <button onClick={() => void pickAsm(key)} className="shrink-0 text-emerald-700 hover:underline">Choose</button>
+                {asm[key] && <button onClick={() => void clearAsm(key)} className="shrink-0 text-slate-400 hover:underline">Clear</button>}
+              </div>
+            ))}
+            <p className="text-[10px] text-slate-500">Intro/outro are optional bumper videos. Output defaults to each recording&rsquo;s own folder.</p>
+          </div>
+
           <div className="mt-2 mb-1 text-xs font-semibold text-slate-700">Recent recordings</div>
           <RecordingsPanel />
         </div>
