@@ -20,10 +20,16 @@ function elapsed(startedAt: number | null, now: number): string {
 
 function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }): JSX.Element {
   const [outputs, setOutputs] = useState(0)
+  const [build, setBuild] = useState<{ version: string; isPackaged: boolean } | null>(null)
   const [obs, setObs] = useState<ObsStatus | null>(null)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    const load = (): void => { window.wf.getInfo().then((i: AppInfo) => setOutputs(i.outputs)) }
+    const load = (): void => {
+      window.wf.getInfo().then((i: AppInfo) => {
+        setOutputs(i.outputs)
+        setBuild({ version: i.appVersion, isPackaged: i.isPackaged })
+      })
+    }
     load()
     const t = setInterval(load, 2000)
     window.wf.obsGetStatus().then(setObs)
@@ -57,7 +63,16 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }):
     <aside className="flex w-44 flex-shrink-0 flex-col border-r border-slate-200 bg-[#f4f6f9]">
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-3">
         <BrandMark size={28} className="flex-shrink-0" />
-        <span className="text-sm font-medium text-slate-900">WorshipFlow <span className="font-normal text-slate-500">Pro</span></span>
+        <div className="min-w-0">
+          <div className="text-sm font-medium leading-tight text-slate-900">WorshipFlow <span className="font-normal text-slate-500">Pro</span></div>
+          {/* Version + a DEV badge, so it's obvious which copy of the app is open. */}
+          <div className="flex items-center gap-1 text-[10px] leading-tight text-slate-500">
+            <span>v{build?.version ?? '…'}</span>
+            {build && !build.isPackaged && (
+              <span className="rounded bg-amber-100 px-1 font-bold text-amber-700">DEV</span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="border-b border-slate-200 p-2">

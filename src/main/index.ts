@@ -1323,7 +1323,9 @@ ipcMain.handle('wf:getInfo', (): AppInfo => ({
   state: renderState(),
   displays: describeDisplays(),
   outputs: outputWins.size,
-  startupMs: Date.now() - startTime
+  startupMs: Date.now() - startTime,
+  appVersion: app.getVersion(),
+  isPackaged: app.isPackaged
 }))
 
 // --- Live engine ---

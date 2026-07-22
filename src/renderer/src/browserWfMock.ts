@@ -150,7 +150,9 @@ function appInfo(): AppInfo {
     state: clone(liveState),
     displays,
     outputs: 0,
-    startupMs: 0
+    startupMs: 0,
+    appVersion: '0.0.0-browser',
+    isPackaged: false
   }
 }
 

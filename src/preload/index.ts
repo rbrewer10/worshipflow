@@ -29,7 +29,8 @@ import type { SceneConfig } from '../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 
 const wf = {
-  version: '0.6.3',
+  // The real build version comes from the main process via getInfo() — don't
+  // hardcode it here (it silently went stale at 0.6.3).
   sendIntent: (type: Intent): void => ipcRenderer.send('wf:intent', type),
   onState: (cb: (s: LiveState) => void): (() => void) => {
     const handler = (_e: unknown, s: LiveState): void => cb(s)

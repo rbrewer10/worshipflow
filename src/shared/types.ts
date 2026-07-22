@@ -69,6 +69,8 @@ export interface AppInfo {
   displays: DisplayInfo[]
   outputs: number
   startupMs: number
+  appVersion: string   // package.json version of the running build
+  isPackaged: boolean  // false when running via `npm run dev`
 }
 
 // --- Song library ---
