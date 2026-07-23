@@ -8,14 +8,21 @@ export default function SongsDrawerTab({ onDone }: { onDone: () => void }): JSX.
   const { activeServiceId, reloadActiveService } = useService()
   const [search, setSearch] = useState('')
   const [songs, setSongs] = useState<SongSummary[]>([])
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     window.wf.songsList(search).then(setSongs)
   }, [search])
 
   const pick = async (songId: number): Promise<void> => {
-    const ok = await addAndGoLive(activeServiceId, { type: 'song', ref_id: songId }, reloadActiveService)
-    if (ok) onDone()
+    if (busy) return
+    setBusy(true)
+    try {
+      const ok = await addAndGoLive(activeServiceId, { type: 'song', ref_id: songId }, reloadActiveService)
+      if (ok) onDone()
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -33,7 +40,8 @@ export default function SongsDrawerTab({ onDone }: { onDone: () => void }): JSX.
           <button
             key={s.id}
             onClick={() => void pick(s.id)}
-            className="flex items-center justify-between gap-2 rounded border border-slate-200 px-2 py-1.5 text-left text-sm hover:border-blue-400 hover:bg-blue-50"
+            disabled={busy}
+            className="flex items-center justify-between gap-2 rounded border border-slate-200 px-2 py-1.5 text-left text-sm hover:border-blue-400 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="truncate">
               {s.title}
