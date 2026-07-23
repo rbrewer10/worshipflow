@@ -23,6 +23,10 @@ export default function BackgroundsDrawerTab({ onDone }: { onDone: () => void })
 
   useEffect(() => {
     window.wf.bgList().then(setBackgrounds)
+    // onState only pushes future broadcasts — seed the current state too, or this
+    // tab thinks nothing is live until the next unrelated state change (matches
+    // the same getState()+onState() pattern ServiceRail.tsx already uses).
+    window.wf.getState().then(setLive)
     const off = window.wf.onState(setLive)
     return off
   }, [])
