@@ -140,6 +140,8 @@ const wf = {
   // Song background + file dialog
   songSetBackground: (id: number, path: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:songs:setBackground', id, path),
+  liveSetBackground: (path: string): Promise<void> =>
+    ipcRenderer.invoke('wf:live:setBackground', path),
   songSetFontScale: (id: number, scale: number): Promise<void> =>
     ipcRenderer.invoke('wf:songs:setFontScale', id, scale),
   dialogOpenFile: (): Promise<{ canceled: boolean; filePaths: string[] }> =>

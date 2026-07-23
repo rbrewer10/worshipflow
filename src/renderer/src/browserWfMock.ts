@@ -324,6 +324,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     liveLoadMedia: async (_filePath: string, title: string): Promise<void> => publish({ songTitle: title || 'Media', line: '', next: '', total: 1, index: 0 }),
 
     songSetBackground: noop,
+    liveSetBackground: noop,
     songSetFontScale: noop,
     dialogOpenFile: async (): Promise<{ canceled: boolean; filePaths: string[] }> => ({ canceled: true, filePaths: [] }),
     bgList: async (): Promise<{ filename: string; path: string; kind: 'upload' | 'generated'; isVideo: boolean }[]> => [],

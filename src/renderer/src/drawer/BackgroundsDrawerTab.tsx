@@ -46,8 +46,11 @@ export default function BackgroundsDrawerTab({ onDone }: { onDone: () => void })
         notifyLocal(`Backgrounds aren't supported on ${action.itemType} items.`, 'warn')
         return
       }
+      await window.wf.liveSetBackground(action.path)
       reloadActiveService()
       onDone()
+    } catch {
+      notifyLocal('Could not apply that background.', 'error')
     } finally {
       setBusy(false)
     }
