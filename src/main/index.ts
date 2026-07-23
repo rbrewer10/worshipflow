@@ -1841,6 +1841,14 @@ ipcMain.handle('wf:songs:setBackground', (_e, id: number, path: string | null) =
   setSongBackground(id, path)
 )
 
+// Push a background update to whatever's currently live, without resetting slide
+// index/timer/other live state (used by the Live-tab drawer's Backgrounds tab so
+// a background change mid-service doesn't jump back to the first slide/reset a timer).
+ipcMain.handle('wf:live:setBackground', (_e, path: string) => {
+  liveSong = { ...liveSong, background: path }
+  broadcast()
+})
+
 // Background library
 ipcMain.handle('wf:bg:list', () => listBackgrounds())
 

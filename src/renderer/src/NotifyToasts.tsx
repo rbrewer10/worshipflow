@@ -7,22 +7,34 @@ interface Toast {
   level: 'info' | 'warn' | 'error'
 }
 
-// Listens for operator notifications from the main process (wf:notify) and shows
-// transient banners — used for save failures, scripture fallbacks, etc. so the
-// operator is never left guessing when something went wrong behind the scenes.
+// Renderer-only toast trigger for client-detected conditions (e.g. "no active
+// service") that don't need a main-process round trip. Dispatches the same
+// { message, level } shape onNotify delivers, so NotifyToasts renders both
+// main-driven and local toasts through one code path.
+export function notifyLocal(message: string, level: 'info' | 'warn' | 'error' = 'warn'): void {
+  window.dispatchEvent(new CustomEvent('wf:localNotify', { detail: { message, level } }))
+}
+
+// Listens for operator notifications from the main process (wf:notify) AND
+// local renderer-triggered ones (wf:localNotify) — used for save failures,
+// scripture fallbacks, drawer validation, etc. so the operator is never left
+// guessing when something went wrong.
 function NotifyToasts(): JSX.Element {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   useEffect(() => {
     let seq = 0
-    const off = window.wf.onNotify((n) => {
+    const push = (n: { message: string; level: 'info' | 'warn' | 'error' }): void => {
       const id = ++seq
       setToasts((prev) => [...prev, { id, ...n }])
       // Errors linger longer so they can't be missed mid-service.
       const ttl = n.level === 'error' ? 12000 : 6000
       setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), ttl)
-    })
-    return off
+    }
+    const off = window.wf.onNotify(push)
+    const onLocal = (e: Event): void => push((e as CustomEvent<{ message: string; level: 'info' | 'warn' | 'error' }>).detail)
+    window.addEventListener('wf:localNotify', onLocal)
+    return () => { off(); window.removeEventListener('wf:localNotify', onLocal) }
   }, [])
 
   if (toasts.length === 0) return <></>
