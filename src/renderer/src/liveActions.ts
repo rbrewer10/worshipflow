@@ -25,16 +25,16 @@ export function canGoLive(item: ServiceItem): boolean {
   )
 }
 
-export async function sendItemLive(item: ServiceItem): Promise<void> {
+export async function sendItemLive(item: ServiceItem): Promise<boolean> {
   if (item.type === 'song' && item.ref_id != null) {
     await window.wf.liveLoadSong(item.ref_id)
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
-    if (!ref) return
+    if (!ref) return false
     // A failed lookup must NOT mark the item live — that would leave the previous
     // content on screen re-themed as scripture while the deck says scripture is live.
     const ok = await window.wf.liveLoadScripture(ref)
-    if (!ok) return
+    if (!ok) return false
   } else if (item.type === 'text') {
     await window.wf.liveLoadText(
       (item.payload.title as string) ?? '',
@@ -43,26 +43,27 @@ export async function sendItemLive(item: ServiceItem): Promise<void> {
     )
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
-    if (secs <= 0) return
+    if (secs <= 0) return false
     await window.wf.liveLoadCountdown(secs)
   } else if (item.type === 'image') {
     const p = item.payload.path as string
-    if (!p) return
+    if (!p) return false
     await window.wf.liveLoadMedia(p, item.title)
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
-    if (secs <= 0) return
+    if (secs <= 0) return false
     await window.wf.liveLoadCountdown(secs)
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
-    if (!txt) return
+    if (!txt) return false
     await window.wf.liveLoadText('Announcement', txt)
   } else if (item.type === 'announcement' && item.ref_id != null) {
     await window.wf.liveLoadAnnouncement(item.ref_id)
   } else if (item.type === 'sermon') {
     window.wf.sendIntent('logo')
   } else {
-    return
+    return false
   }
-  window.wf.liveSetItemId(item.id)
+  await window.wf.liveSetItemId(item.id)
+  return true
 }

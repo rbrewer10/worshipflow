@@ -21,15 +21,28 @@ export async function addAndGoLive(
     notifyLocal('Load a service first (Build Service).', 'warn')
     return false
   }
-  const itemId = await window.wf.serviceAddItem(serviceId, newItem)
-  await window.wf.serviceRefreshActiveItems(serviceId)
-  const fresh = await window.wf.serviceGet(serviceId)
-  const item = fresh?.items.find((it) => it.id === itemId) ?? null
-  if (!item) {
-    notifyLocal('Could not load the new item.', 'error')
+  try {
+    const itemId = await window.wf.serviceAddItem(serviceId, newItem)
+    await window.wf.serviceRefreshActiveItems(serviceId)
+    const fresh = await window.wf.serviceGet(serviceId)
+    const item = fresh?.items.find((it) => it.id === itemId) ?? null
+    if (!item) {
+      notifyLocal('Could not load the new item.', 'error')
+      return false
+    }
+    const wentLive = await sendItemLive(item)
+    if (!wentLive) {
+      // The item was already added to the service — deliberately left in place
+      // (matches existing Build Service behavior for a bad reference) so the
+      // operator can see it and fix/delete it. Don't clear the drawer input or
+      // close the drawer on this path so they can see what happened and retry.
+      notifyLocal('Could not go live — check the item and try again.', 'warn')
+      return false
+    }
+    reloadActiveService()
+    return true
+  } catch {
+    notifyLocal('Something went wrong adding that item.', 'error')
     return false
   }
-  await sendItemLive(item)
-  reloadActiveService()
-  return true
 }
