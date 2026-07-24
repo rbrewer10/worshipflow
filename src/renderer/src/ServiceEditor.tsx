@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary, AnnouncementSummary } from '../../shared/types'
+import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
 import ThemePicker from './ThemePicker'
 import ServiceDeck from './ServiceDeck'
 import CardEditPanel from './CardEditPanel'
@@ -18,10 +18,11 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const [service, setService] = useState<ServiceFull | null>(null)
   const [songs, setSongs] = useState<SongSummary[]>([])
   const [announcements, setAnnouncements] = useState<AnnouncementSummary[]>([])
-  const [live, setLive] = useState<LiveState | null>(null)
+  const [live, setLive] = useState<{ main: LiveState; second: LiveState | null } | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [selectedSongFull, setSelectedSongFull] = useState<SongFull | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<ServiceItem | null>(null)
+  const [track, setTrack] = useState<TrackId>('main')
 
   const reload = async (): Promise<void> => {
     const s = await window.wf.serviceGet(serviceId)
@@ -39,12 +40,13 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     window.wf.songsList().then(setSongs)
     window.wf.announcementsList().then(setAnnouncements)
     setSelectedId(null)
+    setTrack('main')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceId])
 
   useEffect(() => {
     const off = window.wf.onState(setLive)
-    window.wf.getState().then(setLive)
+    window.wf.getState('main').then((s) => setLive({ main: s, second: null }))
     return off
   }, [])
 
@@ -63,25 +65,25 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     if (type === 'image') {
       const result = await window.wf.dialogOpenFile()
       if (result.canceled || !result.filePaths[0]) return
-      const id = await window.wf.serviceAddItem(serviceId, { type: 'image', payload: { path: result.filePaths[0] } })
+      const id = await window.wf.serviceAddItem(serviceId, { type: 'image', payload: { path: result.filePaths[0] }, track })
       await reload()
       setSelectedId(id)
       return
     }
     const payload: Record<string, unknown> = (type === 'countdown' || type === 'welcome') ? { seconds: 300 } : {}
-    const id = await window.wf.serviceAddItem(serviceId, { type, payload })
+    const id = await window.wf.serviceAddItem(serviceId, { type, payload, track })
     await reload()
     setSelectedId(id)
   }
 
   const addSong = async (songId: number): Promise<void> => {
-    const id = await window.wf.serviceAddItem(serviceId, { type: 'song', ref_id: songId })
+    const id = await window.wf.serviceAddItem(serviceId, { type: 'song', ref_id: songId, track })
     await reload()
     setSelectedId(id)
   }
 
   const addAnnouncement = async (announcementId: number): Promise<void> => {
-    const id = await window.wf.serviceAddItem(serviceId, { type: 'announcement', ref_id: announcementId })
+    const id = await window.wf.serviceAddItem(serviceId, { type: 'announcement', ref_id: announcementId, track })
     await reload()
     setSelectedId(id)
   }
@@ -121,15 +123,17 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
           />
           <ServiceDeck
             service={service}
+            track={track}
+            onTrackChange={setTrack}
             songs={songs}
             announcements={announcements}
-            liveItemId={live?.liveServiceItemId ?? null}
+            liveItemId={live?.main.liveServiceItemId ?? null}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onAdd={addCard}
             onAddSong={addSong}
             onAddAnnouncement={addAnnouncement}
-            onGoLive={(it) => sendItemLive(it)}
+            onGoLive={(it) => sendItemLive(it, it.track)}
             onDelete={delItem}
             onReordered={reload}
           />
