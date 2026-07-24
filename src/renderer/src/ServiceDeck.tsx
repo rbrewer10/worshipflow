@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic } from 'lucide-react'
-import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary } from '../../shared/types'
+import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
 import { effectiveRouting, matchScene } from '../../shared/zoneScenes'
 import ZoneStripBadge from './ZoneStripBadge'
@@ -39,8 +39,10 @@ function itemPreview(it: ServiceItem): string {
   return ''
 }
 
-function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onGoLive, onDelete, onReordered }: {
+function ServiceDeck({ service, track, onTrackChange, songs, announcements, liveItemId, selectedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onGoLive, onDelete, onReordered }: {
   service: ServiceFull
+  track: TrackId
+  onTrackChange: (track: TrackId) => void
   songs: SongSummary[]
   announcements: AnnouncementSummary[]
   liveItemId: number | null
@@ -57,7 +59,8 @@ function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, on
   const [showAdd, setShowAdd] = useState(false)
   const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
   useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [service])
-  const items = service.items
+  const items = service.items.filter((it) => it.track === track)
+  const hasSecond = service.items.some((it) => it.track === 'second')
 
   const onDrop = (targetId: number): void => {
     if (dragId == null || dragId === targetId) return
@@ -66,16 +69,34 @@ function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, on
     const to = ids.indexOf(targetId)
     ids.splice(to, 0, ids.splice(from, 1)[0])
     setDragId(null)
-    window.wf.serviceReorder(service.id, ids).then(onReordered)
+    window.wf.serviceReorder(service.id, track, ids).then(onReordered)
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* Track tabs — Second only appears once the service actually has second-track items,
+          or once you're currently viewing it (so you can still see/empty it). */}
+      {(hasSecond || track === 'second') && (
+        <div className="mb-2 flex gap-1 rounded-lg bg-slate-100 p-1">
+          {(['main', 'second'] as TrackId[]).map((tb) => (
+            <button
+              key={tb}
+              onClick={() => onTrackChange(tb)}
+              className={`flex-1 rounded-md py-1 text-xs font-semibold transition-colors ${
+                track === tb ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tb === 'main' ? 'Main' : 'Second'}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-auto pr-1">
         {items.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <ListMusic size={28} className="mb-3 text-slate-400" />
-            <p className="text-sm text-slate-500">Your service is empty</p>
+            <p className="text-sm text-slate-500">{track === 'main' ? 'Your service is empty' : 'No second-track items yet'}</p>
             <p className="mt-1 text-xs text-slate-400">Click &quot;Add item&quot; below to get started</p>
           </div>
         )}
@@ -189,6 +210,14 @@ function ServiceDeck({ service, songs, announcements, liveItemId, selectedId, on
               </button>
             ))}
           </div>
+          {track === 'main' && !hasSecond && (
+            <button
+              onClick={() => { onTrackChange('second'); setShowAdd(false) }}
+              className="mt-3 w-full text-center text-xs font-medium text-blue-700 hover:underline"
+            >
+              + Start a Second track (independent second screen)
+            </button>
+          )}
         </div>
       ) : (
         <button
