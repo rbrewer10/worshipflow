@@ -1238,7 +1238,10 @@ function createStageWindow(): void {
     webPreferences: { preload: PRELOAD, sandbox: false }
   })
   stageWin.webContents.on('did-finish-load', () => {
-    if (stageWin && !stageWin.isDestroyed()) stageWin.webContents.send('wf:state', renderState())
+    if (stageWin && !stageWin.isDestroyed()) {
+      const secondActive = activeServiceItems.some((it) => it.track === 'second')
+      stageWin.webContents.send('wf:state', { main: renderState('main'), second: secondActive ? renderState('second') : null })
+    }
   })
   stageWin.on('closed', () => { stageWin = null })
   loadRoute(stageWin, '/stage')
@@ -1330,7 +1333,10 @@ function createOutput(label: string, opts: OutputOpts): void {
     webPreferences: { preload: PRELOAD, sandbox: false }
   })
   win.webContents.on('did-finish-load', () => {
-    if (!win.isDestroyed()) win.webContents.send('wf:state', renderState())
+    if (!win.isDestroyed()) {
+      const secondActive = activeServiceItems.some((it) => it.track === 'second')
+      win.webContents.send('wf:state', { main: renderState('main'), second: secondActive ? renderState('second') : null })
+    }
   })
   win.on('closed', () => outputWins.delete(label))
   outputWins.set(label, win)
