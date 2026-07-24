@@ -519,6 +519,9 @@ function renderState(track: TrackId = 'main'): LiveState {
 function computeZoneStates(): Record<ZoneId, ZoneState> {
   const result = {} as Record<ZoneId, ZoneState>
   const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
+  // Zone- and track-agnostic — read once per broadcast rather than once per zone,
+  // since this hits the DB and computeZoneStates can fire every 100ms during auto-advance.
+  const sceneConfig = parseSceneConfig(getSetting('zone_scenes'))
   for (const zoneId of ZONE_IDS) {
     const zoneTrack = activeZoneTrackAssignment[zoneId]
     const live = renderState(zoneTrack)
@@ -530,7 +533,6 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     if (t.serviceItemId != null) {
       const item = activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === zoneTrack)
       if (item) {
-        const sceneConfig = parseSceneConfig(getSetting('zone_scenes'))
         const stored = getItemZoneRouting(item.id)
         if (stored) {
           try {
