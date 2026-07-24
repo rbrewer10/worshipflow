@@ -1,12 +1,17 @@
 import Store from 'electron-store'
 
-// Crash recovery: persist the actual service item being played, restore on launch.
+// Crash recovery: persist the actual service item being played, per track, restore on launch.
 // Stores the live service item ID so we can restore the exact item after a crash,
 // not just a mystery black screen.
-export interface RecoverySnapshot {
+export interface TrackSnapshot {
   liveServiceItemId: number | null
   slideIndex: number
   mode: string
+}
+
+export interface RecoverySnapshot {
+  main: TrackSnapshot
+  second: TrackSnapshot | null
 }
 
 const recoveryStore = new Store<{ lastState: RecoverySnapshot | null }>({ name: 'recovery' })
