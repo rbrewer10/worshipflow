@@ -680,21 +680,27 @@ function maybeAutoSwitchScene(): void {
   }
 }
 
-function broadcast(): void {
-  const mainPayload = renderState('main')
+// Single source of truth for the { main, second } wf:state payload — used by
+// broadcast() and by every window's did-finish-load initial paint, so the
+// "is Second active" rule can never drift out of sync between call sites
+// (that drift is exactly what caused the stale-shape bug this helper fixes).
+function buildStatePayload(): { main: LiveState; second: LiveState | null } {
   const secondActive = activeServiceItems.some((it) => it.track === 'second')
-  const secondPayload = secondActive ? renderState('second') : null
-  const payload = { main: mainPayload, second: secondPayload }
+  return { main: renderState('main'), second: secondActive ? renderState('second') : null }
+}
+
+function broadcast(): void {
+  const payload = buildStatePayload()
   for (const w of [operatorWin, stageWin, ...outputWins.values()]) {
     if (w && !w.isDestroyed()) w.webContents.send('wf:state', payload)
   }
   writeRecovery({
     main: { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode },
-    second: secondActive
+    second: payload.second
       ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
       : null
   })
-  tabletBroadcast(mainPayload)
+  tabletBroadcast(payload.main)
   zoneBroadcast()
   maybeAutoSwitchScene()
 }
@@ -1238,10 +1244,7 @@ function createStageWindow(): void {
     webPreferences: { preload: PRELOAD, sandbox: false }
   })
   stageWin.webContents.on('did-finish-load', () => {
-    if (stageWin && !stageWin.isDestroyed()) {
-      const secondActive = activeServiceItems.some((it) => it.track === 'second')
-      stageWin.webContents.send('wf:state', { main: renderState('main'), second: secondActive ? renderState('second') : null })
-    }
+    if (stageWin && !stageWin.isDestroyed()) stageWin.webContents.send('wf:state', buildStatePayload())
   })
   stageWin.on('closed', () => { stageWin = null })
   loadRoute(stageWin, '/stage')
@@ -1333,10 +1336,7 @@ function createOutput(label: string, opts: OutputOpts): void {
     webPreferences: { preload: PRELOAD, sandbox: false }
   })
   win.webContents.on('did-finish-load', () => {
-    if (!win.isDestroyed()) {
-      const secondActive = activeServiceItems.some((it) => it.track === 'second')
-      win.webContents.send('wf:state', { main: renderState('main'), second: secondActive ? renderState('second') : null })
-    }
+    if (!win.isDestroyed()) win.webContents.send('wf:state', buildStatePayload())
   })
   win.on('closed', () => outputWins.delete(label))
   outputWins.set(label, win)
