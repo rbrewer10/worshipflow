@@ -4,6 +4,7 @@ import TopBar from './TopBar'
 import ServiceRail from './ServiceRail'
 import HomeView from './HomeView'
 import LiveView from './LiveView'
+import LiveDrawer from './LiveDrawer'
 import ServiceBuilder from './ServiceBuilder'
 import SongLibrary from './SongLibrary'
 import AnnouncementsLibrary from './AnnouncementsLibrary'
@@ -126,6 +127,7 @@ function AppShell(): JSX.Element {
             <ScriptureLookup />
           )}
         </div>
+        <LiveDrawer key={view} />
       </div>
     </ServiceProvider>
   )

@@ -16,11 +16,12 @@ const TABS: { id: DrawerTabId; label: string; Icon: typeof Music }[] = [
 
 const OPEN_HEIGHT = 280
 
-// A FreeShow-inspired docked drawer for the Live tab: a tab strip that's always
-// visible, collapsed by default so SlideGrid keeps full height mid-service.
-// Clicking a tab slides the drawer open over the bottom of the grid (smooth
-// max-height transition); clicking it again, picking an item, or Escape slides
-// it closed.
+// A FreeShow-inspired docked drawer available on every screen (except
+// Volunteer mode): a tab strip that's always visible, collapsed by default.
+// Clicking a tab slides the drawer open (smooth max-height transition);
+// clicking it again, picking an item, or Escape slides it closed. Remounted
+// (via a `key` at the call site, in AppShell.tsx) whenever the active screen
+// changes, so it resets closed rather than carrying state across screens.
 function LiveDrawer(): JSX.Element {
   const [open, setOpen] = useState<DrawerTabId | null>(null)
   const close = (): void => setOpen(null)
