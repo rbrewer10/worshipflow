@@ -231,8 +231,9 @@ export const ZONE_NAMES: Record<ZoneId, string> = {
 }
 
 // Which track a zone follows when a service has no explicit zone_track_assignment.
-// Back Right defaults to Second (the natural "extra screen"); trivially overridden per service.
-export const DEFAULT_ZONE_TRACK: Record<ZoneId, TrackId> = { 1: 'main', 2: 'second', 3: 'main', 4: 'main' }
+// All zones default to Main so an existing (pre-dual-track) service's screens are
+// byte-for-byte unchanged after upgrading — Second is opt-in per zone, per service.
+export const DEFAULT_ZONE_TRACK: Record<ZoneId, TrackId> = { 1: 'main', 2: 'main', 3: 'main', 4: 'main' }
 
 // --- Scripture / KJV ---
 export interface ScriptureVerse {

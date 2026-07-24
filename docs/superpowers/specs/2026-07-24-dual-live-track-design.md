@@ -40,9 +40,9 @@ ALTER TABLE service ADD COLUMN zone_track_assignment TEXT;   -- nullable JSON
 
 Built-in default (`src/shared/types.ts`):
 ```ts
-export const DEFAULT_ZONE_TRACK: Record<ZoneId, TrackId> = { 1: 'main', 2: 'second', 3: 'main', 4: 'main' }
+export const DEFAULT_ZONE_TRACK: Record<ZoneId, TrackId> = { 1: 'main', 2: 'main', 3: 'main', 4: 'main' }
 ```
-(Back Right defaults to Second since that's the natural "extra screen"; trivially changed per service.)
+(All zones default to Main so an existing service's screens are byte-for-byte unchanged after upgrading — Second is opt-in per zone, per service. Revised from an earlier draft that defaulted Back Right to Second; that broke the byte-for-byte compatibility goal for any pre-existing service already routing content to Zone 2.)
 
 ## Shared types (`src/shared/types.ts`)
 
