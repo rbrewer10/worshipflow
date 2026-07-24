@@ -8,9 +8,12 @@ import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, re
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, AnnouncementInput } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput } from '../shared/types'
+import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
+import { parseZoneTrackAssignment } from '../shared/zoneTrack'
+import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -196,30 +199,77 @@ if (!gotSingleInstanceLock) {
   })
 }
 
-// Canonical live state.
-let liveSong: { title: string; lines: string[]; background?: string | null; bgMotion?: string | null } = DEMO_SONG
-let liveSongId: number | null = null
-const state: { mode: Mode; index: number } = { mode: 'lyrics', index: 0 }
-let liveServiceItemId: number | null = null
-let liveFontScale = 6
-let liveSongTextColor: string | null = null
-let liveSongFont: string | null = null
-let liveBgFit: 'cover' | 'contain' = 'cover'  // whole-slide images use 'contain'
-let liveStageMessage: string | null = null
+// Canonical live state — one LiveTrackState per track (Main always exists;
+// Second is created eagerly too but stays empty/unused until a service has
+// track:'second' items). See docs/superpowers/specs/2026-07-24-dual-live-track-design.md.
+interface LiveTrackState {
+  song: { title: string; lines: string[]; background?: string | null; bgMotion?: string | null }
+  songId: number | null
+  mode: Mode
+  index: number
+  serviceItemId: number | null
+  fontScale: number
+  songTextColor: string | null
+  songFont: string | null
+  bgFit: 'cover' | 'contain'
+  stageMessage: string | null
+  songMeta: { author: string | null; copyright: string | null; ccli: string | null }
+  slideTheme: string
+  slideThemeColors: ThemeColors | null
+  itemNotes: string | null
+  hmsLoadedAt: number | null
+  autoAdvanceMs: number | null
+  scriptureRef: string | null
+  verseNumber: number | null
+  countdownTimer: ReturnType<typeof setInterval> | null
+  autoAdvanceTimer: ReturnType<typeof setInterval> | null
+  autoAdvanceDuration: number
+  autoAdvanceLoop: boolean
+}
+
+function createTrackState(song: LiveTrackState['song']): LiveTrackState {
+  return {
+    song,
+    songId: null,
+    mode: 'lyrics',
+    index: 0,
+    serviceItemId: null,
+    fontScale: 6,
+    songTextColor: null,
+    songFont: null,
+    bgFit: 'cover',
+    stageMessage: null,
+    songMeta: { author: null, copyright: null, ccli: null },
+    slideTheme: DEFAULT_THEME_ID,
+    slideThemeColors: null,
+    itemNotes: null,
+    hmsLoadedAt: null,
+    autoAdvanceMs: null,
+    scriptureRef: null,
+    verseNumber: null,
+    countdownTimer: null,
+    autoAdvanceTimer: null,
+    autoAdvanceDuration: 0,
+    autoAdvanceLoop: false
+  }
+}
+
+const tracks: Record<TrackId, LiveTrackState> = {
+  main: createTrackState(DEMO_SONG),
+  second: createTrackState({ title: '', lines: [], background: null })
+}
+
 // Zone state: manual overrides set by the operator; null = auto-route from service item routing.
 const zoneOverrides: Map<ZoneId, ZoneState['mode']> = new Map()
-// CCLI copyright info for the live song (for on-screen footer + usage log).
-let liveSongMeta: { author: string | null; copyright: string | null; ccli: string | null } = {
-  author: null, copyright: null, ccli: null
-}
 let ccliLicense: string | null = null  // church CCLI license number (loaded from settings)
 let logoPath: string | null = null     // church logo image path for logo zones
 let logoBg: string | null = null       // motion background (video/image) for logo zones
 const loggedSongIds = new Set<number>()  // songs already counted this service (CCLI: once per service)
-let liveSlideTheme: string = DEFAULT_THEME_ID  // effective projector slide theme (broadcast)
-let liveSlideThemeColors: ThemeColors | null = null
 let serviceSlideTheme: string = DEFAULT_THEME_ID  // service-level baseline
 let serviceSlideThemeColors: ThemeColors | null = null
+// Which track each zone follows for the active service; refreshed by
+// refreshActiveServiceItems() and by wf:service:zoneTrackAssignment:set.
+let activeZoneTrackAssignment: ZoneTrackAssignment = { ...DEFAULT_ZONE_TRACK }
 
 // Tablet state — cached by wf:setActiveService so the WS server can serve them.
 const tabletClients = new Set<WsSocket>()
@@ -233,7 +283,6 @@ let activeServiceItems: ServiceItem[] = []
 let activeServiceId: number | null = null  // which service is currently active (for Volunteer mode to honor)
 let activeServiceName = ''
 let activeServiceDate: string | null = null
-let liveItemNotes: string | null = null
 
 // --- Service recording (Phase 1: capture & markers) ---
 // The session is driven by two live chokepoints: wf:live:setItemId (first live
@@ -337,12 +386,8 @@ const contentRunner = createContentRunner({
 })
 
 // Feature states
-let hmsLoadedAt: number | null = null  // Hymn timer: when song was loaded
-let autoAdvanceMs: number | null = null  // Auto-advance: remaining time in ms
 let currentTheme: Theme = 'modern-church'
 let bibleTranslation: BibleTranslation = 'kjv'
-let liveScriptureRef: string | null = null  // last scripture loaded, for re-translation
-let verseNumber: number | null = null  // Current verse being shown
 const serviceLog: Array<{ ts: number; event: string }> = []  // Service recording
 
 // OBS auto-switch: map a service "context" to an OBS scene name.
@@ -350,10 +395,6 @@ let obsAutoSwitch = false
 let obsSceneMap: Record<SceneContext, string> = { worship: '', word: '', countdown: '' }
 let lastAutoScene: string | null = null
 
-let countdownTimer: ReturnType<typeof setInterval> | null = null
-let autoAdvanceTimer: ReturnType<typeof setInterval> | null = null
-let autoAdvanceDuration = 0  // configured interval, so we can re-arm after each advance
-let autoAdvanceLoop = false  // when true, jump back to the start at the end
 function clearCountdown(): void {
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
 }
