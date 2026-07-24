@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { ZoneId, ZoneState, ServiceItem } from '../../shared/types'
-import { ZONE_NAMES } from '../../shared/types'
+import type { ZoneId, ZoneState, ServiceItem, TrackId } from '../../shared/types'
+import { ZONE_NAMES, DEFAULT_ZONE_TRACK } from '../../shared/types'
+import type { ZoneTrackAssignment } from '../../shared/zoneTrack'
 import { MODE_LABELS } from './ZoneRoutingGrid'
 import SceneChips from './SceneChips'
+import { useService } from './ServiceContext'
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
@@ -18,10 +20,13 @@ const MODE_COLORS: Record<ZoneState['mode'], string> = {
 }
 
 function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | null; reloadActiveService: () => void }): JSX.Element {
+  const { activeService } = useService()
   const [zoneStates, setZoneStates] = useState<Record<ZoneId, ZoneState> | null>(null)
   const [serverIp, setServerIp] = useState<string>('...')
   const [port, setPort] = useState<number | null>(null)
   const [overridden, setOverridden] = useState<Set<ZoneId>>(new Set())
+  const [trackAssignment, setTrackAssignment] = useState<ZoneTrackAssignment>(DEFAULT_ZONE_TRACK)
+  const hasSecond = activeService?.items.some((it) => it.track === 'second') ?? false
 
   // Load zone states on mount and whenever live item changes.
   useEffect(() => {
@@ -41,6 +46,11 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
     return () => clearInterval(t)
   }, [])
 
+  useEffect(() => {
+    if (activeService == null) return
+    void window.wf.zoneTrackAssignmentGet(activeService.id).then(setTrackAssignment)
+  }, [activeService?.id])
+
   const setOverride = (zoneId: ZoneId, mode: ZoneState['mode'] | null): void => {
     setOverridden((prev) => {
       const next = new Set(prev)
@@ -55,6 +65,15 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
   const clearOverrides = (): void => {
     setOverridden(new Set())
     void window.wf.zoneClearOverrides().then(() =>
+      window.wf.zoneGetStates().then(setZoneStates)
+    )
+  }
+
+  const setZoneTrack = (zoneId: ZoneId, track: TrackId): void => {
+    if (activeService == null) return
+    const next = { ...trackAssignment, [zoneId]: track }
+    setTrackAssignment(next)
+    void window.wf.zoneTrackAssignmentSet(activeService.id, next).then(() =>
       window.wf.zoneGetStates().then(setZoneStates)
     )
   }
@@ -93,6 +112,22 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
                   </span>
                 </span>
               </div>
+              {/* Track assignment — only shown once the service has a Second track */}
+              {hasSecond && (
+                <div className="mb-1.5 flex gap-1">
+                  {(['main', 'second'] as TrackId[]).map((tb) => (
+                    <button
+                      key={tb}
+                      onClick={() => setZoneTrack(zoneId, tb)}
+                      className={`rounded px-2 py-0.5 text-[10px] font-semibold ring-1 ring-slate-200 transition-colors ${
+                        trackAssignment[zoneId] === tb ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {tb === 'main' ? 'Main' : 'Second'}
+                    </button>
+                  ))}
+                </div>
+              )}
               {/* Quick mode override buttons */}
               <div className="flex flex-wrap gap-1">
                 <button
