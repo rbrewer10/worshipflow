@@ -52,8 +52,20 @@ light theme with lucide icons — not restored as-is.
   non-technical operator, not a "screen," so it keeps a distinct treatment,
   matching how it's already set apart today.
 - **Layout:** brand mark + name anchor the far left; the 8 nav tabs sit
-  center-left; the live-output status indicator and the Volunteer button anchor
-  the far right, separated by a divider.
+  center-left; a status cluster (live-output indicator + the OBS on-air
+  badges) and the Volunteer button anchor the far right, separated by a
+  divider.
+- **OBS on-air indicator** (the existing "● Live" / "● Rec" badges with
+  elapsed time, shown only while actually streaming/recording): grouped into
+  the same far-right status cluster as the live-output indicator — one place
+  for "what's currently happening."
+- **"Zone screens" / "Stage monitor"** (the sidebar's current quick-launch
+  buttons that call `window.wf.multiviewOpen()` / `window.wf.stageOpen()`
+  directly — these are actions, not `setView` navigation destinations): they
+  are **dropped from the top bar entirely**. They're already duplicated as
+  cards on the Home screen (`HomeView.tsx`'s `CARDS` array), so removing them
+  here shrinks the top bar instead of growing it, at the cost of needing one
+  extra click through Home if you're not already there.
 - **Everything below the top bar is unchanged.** `ServiceRail` (the loaded
   service list + output preview + Black/Logo/Clear, currently rendered by
   `AppShell.tsx` alongside `LiveView`, not by `Sidebar.tsx`) is untouched — it
@@ -67,9 +79,13 @@ light theme with lucide icons — not restored as-is.
 
 **New:**
 - `TopBar.tsx` — replaces `Sidebar.tsx` as the app's navigation chrome. Renders
-  the brand mark, the 8 flat nav tabs, the live-output status badge, and the
-  set-apart Volunteer button. Same `{ view, setView }` prop contract
-  `Sidebar.tsx` already has, so it's a drop-in swap in `AppShell.tsx`.
+  the brand mark, the 8 flat nav tabs, the far-right status cluster (live-output
+  badge + OBS on-air indicator), and the set-apart Volunteer button. Same
+  `{ view, setView }` prop contract `Sidebar.tsx` already has, so it's a
+  drop-in swap in `AppShell.tsx`. Carries over `Sidebar.tsx`'s existing
+  `elapsed()` helper and OBS-status polling (`obsGetStatus`/`obsOnStatus`)
+  unchanged — only the layout around them changes. Does **not** carry over the
+  "Zone screens"/"Stage monitor" buttons (dropped, see above).
 
 **Removed:**
 - `Sidebar.tsx` — fully replaced by `TopBar.tsx`. No remaining callers once
@@ -94,8 +110,11 @@ light theme with lucide icons — not restored as-is.
    Active tab uses the existing blue-accent treatment; inactive tabs are
    slate-grey with a hover state.
 3. **Spacer** (flex-grow) pushes the remaining items to the right edge.
-4. **Live-output status badge** — "● N screen(s) live" / "No output", the same
-   data `Sidebar.tsx` already polls via `getInfo()`.
+4. **Status cluster** — the live-output badge ("● N screen(s) live" / "No
+   output", from `getInfo()`, same as today) plus, only while actually
+   streaming/recording, the existing OBS on-air badges ("● Live" with stream
+   elapsed time, "● Rec" with record elapsed time, from `obsGetStatus`/
+   `obsOnStatus`). All in one right-aligned cluster.
 5. **Divider**, then **Volunteer mode button** — visually distinct (bordered
    button, not a plain tab), switches `view` to `'volunteer'` exactly as today.
 
@@ -127,8 +146,11 @@ differently here).
 Matches the existing convention for this codebase's UI work: no component-test
 infrastructure exists, so this is verified by hand in `npm run dev` — clicking
 every tab, confirming Volunteer mode still enters/exits correctly, confirming
-the live-output badge still updates, and confirming nothing on the Live tab
-(ServiceRail, SlideGrid, LiveTools, the bottom drawer) changed.
+the live-output badge still updates, confirming the OBS on-air badges still
+appear/disappear and count up correctly while streaming/recording (toggle it
+in OBS to check), confirming Home's "Zone screens"/"Stage monitor" cards still
+work, and confirming nothing on the Live tab (ServiceRail, SlideGrid,
+LiveTools, the bottom drawer) changed.
 
 ## Non-goals for this phase
 
@@ -142,9 +164,12 @@ the live-output badge still updates, and confirming nothing on the Live tab
 ## Success criteria
 
 The left sidebar is gone. A top bar spans the full width with the brand at the
-far left, all 8 destinations as flat, clickable tabs, and the live-output
-status + a visually set-apart Volunteer button at the far right. Clicking any
-tab navigates exactly as it does today. Volunteer mode still enters/exits via
-its button. The Live tab's `ServiceRail`, `SlideGrid`, `LiveTools`, and the
-bottom drawer are pixel-for-pixel unchanged except for having more vertical
-space now that the horizontal rail is gone.
+far left, all 8 destinations as flat, clickable tabs, and a status cluster
+(live-output + OBS on-air) + a visually set-apart Volunteer button at the far
+right. Clicking any tab navigates exactly as it does today. Volunteer mode
+still enters/exits via its button. OBS on-air badges still appear only while
+actually streaming/recording, with correct elapsed time. "Zone screens" and
+"Stage monitor" are gone from the top bar but still reachable from Home. The
+Live tab's `ServiceRail`, `SlideGrid`, `LiveTools`, and the bottom drawer are
+pixel-for-pixel unchanged except for having more vertical space now that the
+horizontal rail is gone.
