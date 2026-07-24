@@ -57,38 +57,44 @@ function ServiceRail(): JSX.Element {
         )}
       </div>
       <div className="min-h-0 flex-1 space-y-0.5 overflow-auto p-2">
-        {!activeService || activeService.items.length === 0 ? (
-          <p className="px-2 py-4 text-center text-sm text-slate-400">No items — pick a service in the Services tab.</p>
-        ) : (
-          activeService.items.map((it) => (
-            <button
-              key={it.id}
-              onClick={() => handleItemClick(it)}
-              aria-label={`Go live: ${it.title}`}
-              className={`relative flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-left transition-colors min-h-10 ${
-                liveId === it.id
-                  ? 'bg-blue-600/15 ring-1 ring-blue-500/50'
-                  : pendingId === it.id
-                  ? 'bg-amber-500/20 ring-2 ring-amber-500/60'
-                  : 'hover:bg-slate-100'
-              }`}
-            >
-              {pendingId === it.id && (
-                <div className="absolute inset-0 rounded-md border-2 border-amber-400 animate-pulse" />
-              )}
-              <div className="w-10 shrink-0">
-                <SlideThumb label="" itemStyle={it.style} serviceTheme={activeService.theme} serviceColors={activeService.themeColors} bgFile={itemThumbBackground(it, songBg)} />
-              </div>
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{it.title}</span>
-              {pendingId === it.id
-                ? <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-amber-700"><Hourglass size={11} /> tap to cancel</span>
-                : liveId === it.id
-                ? <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                : null
-              }
-            </button>
-          ))
-        )}
+        {(() => {
+          // This rail is Main-only (same scope as the OutputPreview it's pinned
+          // above) — without this filter, Second-track items would interleave by
+          // per-track ordinal and tapping one would incorrectly go live on Main.
+          const mainItems = activeService?.items.filter((it) => it.track === 'main') ?? []
+          return mainItems.length === 0 ? (
+            <p className="px-2 py-4 text-center text-sm text-slate-400">No items — pick a service in the Services tab.</p>
+          ) : (
+            mainItems.map((it) => (
+              <button
+                key={it.id}
+                onClick={() => handleItemClick(it)}
+                aria-label={`Go live: ${it.title}`}
+                className={`relative flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-left transition-colors min-h-10 ${
+                  liveId === it.id
+                    ? 'bg-blue-600/15 ring-1 ring-blue-500/50'
+                    : pendingId === it.id
+                    ? 'bg-amber-500/20 ring-2 ring-amber-500/60'
+                    : 'hover:bg-slate-100'
+                }`}
+              >
+                {pendingId === it.id && (
+                  <div className="absolute inset-0 rounded-md border-2 border-amber-400 animate-pulse" />
+                )}
+                <div className="w-10 shrink-0">
+                  <SlideThumb label="" itemStyle={it.style} serviceTheme={activeService?.theme ?? null} serviceColors={activeService?.themeColors ?? null} bgFile={itemThumbBackground(it, songBg)} />
+                </div>
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{it.title}</span>
+                {pendingId === it.id
+                  ? <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-amber-700"><Hourglass size={11} /> tap to cancel</span>
+                  : liveId === it.id
+                  ? <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                  : null
+                }
+              </button>
+            ))
+          )
+        })()}
       </div>
       <div className="border-t border-slate-200">
         <OutputPreview />
