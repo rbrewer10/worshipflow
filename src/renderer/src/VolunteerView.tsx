@@ -132,7 +132,10 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
     const cur = liveRef.current
     const isAtEnd = cur?.mode === 'lyrics' && cur.total > 0 && cur.index >= cur.total - 1
     if (isAtEnd && serviceRef.current && liveItemIdRef.current != null) {
-      const items = serviceRef.current.items
+      // Volunteer mode is Main-only — filter out Second-track items so
+      // auto-advance-to-next-item can't cross tracks or land on an id
+      // loadItem's hardcoded 'main' calls can't correctly resolve.
+      const items = serviceRef.current.items.filter((it) => it.track === 'main')
       const idx = items.findIndex((it) => it.id === liveItemIdRef.current)
       const next = idx >= 0 ? items.slice(idx + 1).find(canGoLive) : undefined
       if (next) { loadItem(next); return }
@@ -247,11 +250,11 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         </button>
       </div>
 
-      {/* ── Bottom: service item strip ── */}
-      {service && service.items.length > 0 && (
+      {/* ── Bottom: service item strip (Main-only — see goNext's filter) ── */}
+      {service && service.items.some((it) => it.track === 'main') && (
         <div className="flex items-center gap-2 overflow-x-auto border-t border-slate-200 bg-[#f4f6f9] px-3 py-2">
           <span className="shrink-0 text-xs text-slate-500">Jump:</span>
-          {service.items.map((item, i) => (
+          {service.items.filter((it) => it.track === 'main').map((item, i) => (
             <button
               key={item.id}
               onClick={() => canGoLive(item) && loadItem(item)}
