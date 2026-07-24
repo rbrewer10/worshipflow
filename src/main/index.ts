@@ -1215,8 +1215,13 @@ function createOperator(): void {
   operatorWin = new BrowserWindow({
     x: primary.bounds.x + 60,
     y: oy,
-    width: 1100,
+    width: 1600,
     height: 760,
+    // TopBar's 8 flat nav tabs + brand + live-output/OBS status cluster need
+    // real horizontal room (measured: needs ~1440px with zero margin just for
+    // the idle-status state, more once OBS on-air badges are showing) — keep
+    // the default and the floor comfortably above that.
+    minWidth: 1300,
     show: false,
     title: 'WorshipFlow Pro — Operator',
     icon: APP_ICON,
