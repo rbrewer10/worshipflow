@@ -517,32 +517,35 @@ function renderState(track: TrackId = 'main'): LiveState {
 }
 
 function computeZoneStates(): Record<ZoneId, ZoneState> {
-  const live = renderState()
-  // Get routing for the active item (or defaults: scene palette typeDefault,
-  // falling back to the built-in ZONE_ROUTING_DEFAULTS).
-  let routing: ZoneRouting | null = null
-  if (liveServiceItemId != null) {
-    const item = activeServiceItems.find((it) => it.id === liveServiceItemId)
-    if (item) {
-      const sceneConfig = parseSceneConfig(getSetting('zone_scenes'))
-      const stored = getItemZoneRouting(item.id)
-      if (stored) {
-        try {
-          routing = JSON.parse(stored) as ZoneRouting
-        } catch (err) {
-          console.error(`Failed to parse zone routing for item id=${item.id}:`, err)
-          routing = defaultRoutingFor(item.type, sceneConfig)
-        }
-      } else {
-        routing = defaultRoutingFor(item.type, sceneConfig)
-      }
-    }
-  }
-
   const result = {} as Record<ZoneId, ZoneState>
   const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
   for (const zoneId of ZONE_IDS) {
-    // Manual override takes precedence over auto-routing.
+    const zoneTrack = activeZoneTrackAssignment[zoneId]
+    const live = renderState(zoneTrack)
+    const t = tracks[zoneTrack]
+
+    // Get routing for the active item on this zone's track (or defaults: scene
+    // palette typeDefault, falling back to the built-in ZONE_ROUTING_DEFAULTS).
+    let routing: ZoneRouting | null = null
+    if (t.serviceItemId != null) {
+      const item = activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === zoneTrack)
+      if (item) {
+        const sceneConfig = parseSceneConfig(getSetting('zone_scenes'))
+        const stored = getItemZoneRouting(item.id)
+        if (stored) {
+          try {
+            routing = JSON.parse(stored) as ZoneRouting
+          } catch (err) {
+            console.error(`Failed to parse zone routing for item id=${item.id}:`, err)
+            routing = defaultRoutingFor(item.type, sceneConfig)
+          }
+        } else {
+          routing = defaultRoutingFor(item.type, sceneConfig)
+        }
+      }
+    }
+
+    // Manual override takes precedence over auto-routing (global, track-agnostic).
     const override = zoneOverrides.get(zoneId)
     const idleDefault: ZoneMode = (zoneId === 1 || zoneId === 2) ? 'logo' : 'off'
     const routedMode = override ?? (routing ? routing[zoneId] : idleDefault)
@@ -580,8 +583,8 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       base.background = isThemeBg ? null : live.background
       base.themeColors = resolveColors(getTheme(themeId), live.slideThemeColors)
       // For text-type items, pull per-item style overrides from payload
-      if (liveServiceItemId != null) {
-        const liveItem = activeServiceItems.find((it) => it.id === liveServiceItemId && it.type === 'text')
+      if (t.serviceItemId != null) {
+        const liveItem = activeServiceItems.find((it) => it.id === t.serviceItemId && it.type === 'text')
         if (liveItem) {
           const pl = liveItem.payload
           if (pl.bgOverlay != null) base.bgOverlay = pl.bgOverlay as number
@@ -605,7 +608,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       base.secondsLeft = (isNaN(mins) ? 0 : mins) * 60 + (isNaN(secs) ? 0 : secs)
       base.title = live.songTitle
     } else if (mode === 'image') {
-      const item = activeServiceItems.find((it) => it.id === liveServiceItemId)
+      const item = activeServiceItems.find((it) => it.id === t.serviceItemId)
       base.imagePath = item ? ((item.payload.path as string) ?? null) : null
     } else if (mode === 'logo') {
       // Logo zones (Back Left/Right) stay on their own static backdrop — they do
@@ -643,25 +646,26 @@ function tabletBroadcast(statePayload?: LiveState): void {
   if (tabletClients.size === 0) return
   const payload = JSON.stringify({
     type: 'state',
-    state: statePayload ?? renderState(),
-    notes: liveItemNotes,
-    items: activeServiceItems.map((it) => ({ id: it.id, type: it.type, title: it.title }))
+    state: statePayload ?? renderState('main'),
+    notes: tracks.main.itemNotes,
+    items: activeServiceItems.filter((it) => it.track === 'main').map((it) => ({ id: it.id, type: it.type, title: it.title }))
   })
   for (const client of tabletClients) {
     if ((client as WsSocket).readyState === 1) (client as WsSocket).send(payload)
   }
 }
 
-// Derive the current scene context from live state, then switch OBS if it changed.
+// Derive the current scene context from Main-track live state, then switch OBS if it changed.
 function maybeAutoSwitchScene(): void {
   if (!obsAutoSwitch || !getObsStatus().connected) return
+  const t = tracks.main
   // Don't switch while operator has blanked the screen.
-  if (state.mode === 'black' || state.mode === 'logo') return
+  if (t.mode === 'black' || t.mode === 'logo') return
   let ctx: SceneContext
-  if (state.mode === 'countdown') ctx = 'countdown'
+  if (t.mode === 'countdown') ctx = 'countdown'
   else {
-    const item = liveServiceItemId != null
-      ? activeServiceItems.find((it) => it.id === liveServiceItemId)
+    const item = t.serviceItemId != null
+      ? activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === 'main')
       : undefined
     ctx = item?.type === 'song' ? 'worship' : 'word'
   }
@@ -673,12 +677,20 @@ function maybeAutoSwitchScene(): void {
 }
 
 function broadcast(): void {
-  const payload = renderState()
+  const mainPayload = renderState('main')
+  const secondActive = activeServiceItems.some((it) => it.track === 'second')
+  const secondPayload = secondActive ? renderState('second') : null
+  const payload = { main: mainPayload, second: secondPayload }
   for (const w of [operatorWin, stageWin, ...outputWins.values()]) {
     if (w && !w.isDestroyed()) w.webContents.send('wf:state', payload)
   }
-  writeRecovery({ liveServiceItemId, slideIndex: state.index, mode: state.mode })
-  tabletBroadcast(payload)
+  writeRecovery({
+    main: { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode },
+    second: secondActive
+      ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
+      : null
+  })
+  tabletBroadcast(mainPayload)
   zoneBroadcast()
   maybeAutoSwitchScene()
 }
