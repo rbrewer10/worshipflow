@@ -5,7 +5,7 @@ import type { ServiceItem } from '../../../shared/types'
 function makeItem(overrides: Partial<ServiceItem>): ServiceItem {
   return {
     id: 1, ordinal: 0, type: 'text', ref_id: null, payload: {}, title: 'x',
-    notes: null, style: null, zoneRouting: null, ...overrides
+    notes: null, style: null, zoneRouting: null, track: 'main', ...overrides
   }
 }
 

@@ -3,7 +3,7 @@ import { createRecordingSession, type RecordingDeps } from './recording'
 import type { ServiceItem } from '../shared/types'
 
 function makeItem(id: number, type: ServiceItem['type'], title: string): ServiceItem {
-  return { id, ordinal: id, type, ref_id: null, payload: {}, title, notes: null, style: null, zoneRouting: null }
+  return { id, ordinal: id, type, ref_id: null, payload: {}, title, notes: null, style: null, zoneRouting: null, track: 'main' }
 }
 
 function makeDeps(over: Partial<RecordingDeps> = {}): { deps: RecordingDeps; markers: Array<{ recId: number; kind: string; label: string; offsetMs: number }>; sidecars: unknown[]; toasts: string[] } {

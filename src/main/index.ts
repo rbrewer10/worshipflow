@@ -12,7 +12,7 @@ import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
-import { parseZoneTrackAssignment } from '../shared/zoneTrack'
+import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
@@ -52,6 +52,8 @@ import {
   reorderServiceItems,
   getItemZoneRouting,
   setItemZoneRouting,
+  getZoneTrackAssignment,
+  setZoneTrackAssignment,
   setSongBgMotion,
   setSongTextColor,
   setSongFont,
@@ -1143,23 +1145,25 @@ function startTabletServer(): void {
     // Send current state immediately on connect.
     ws.send(JSON.stringify({
       type: 'state',
-      state: renderState(),
-      notes: liveItemNotes,
+      state: renderState('main'),
+      notes: tracks.main.itemNotes,
       items: activeServiceItems.map((it) => ({ id: it.id, type: it.type, title: it.title }))
     }))
     // Send zone states so zone pages render immediately on connect.
     ws.send(JSON.stringify({ type: 'zones', states: computeZoneStates() }))
 
+    // The tablet remote is Main-only (see design's non-goals) — always operates
+    // on the 'main' track, same reasoning as tabletBroadcast/maybeAutoSwitchScene.
     ws.on('message', (data) => {
       try {
         const msg = JSON.parse(data.toString()) as { type: string; intent?: string; itemId?: number }
         if (msg.type === 'intent' && msg.intent) {
-          processIntent(msg.intent as Intent)
+          processIntent('main', msg.intent as Intent)
         } else if (msg.type === 'loadItem' && msg.itemId != null) {
-          void handleTabletLoadItem(msg.itemId)
+          void handleTabletLoadItem('main', msg.itemId)
         } else if (msg.type === 'clearStageMessage') {
           // Pastor tapped "Got it" — clear the message everywhere.
-          liveStageMessage = null
+          tracks.main.stageMessage = null
           broadcast()
         }
       } catch { /* ignore malformed messages */ }
@@ -1393,11 +1397,11 @@ function layoutOutputs(): void {
 }
 
 // --- IPC: intents ---
-ipcMain.on('wf:intent', (_e, type: Intent) => processIntent(type))
+ipcMain.on('wf:intent', (_e, track: TrackId, type: Intent) => processIntent(track, type))
 
 ipcMain.handle('wf:getInfo', (): AppInfo => ({
-  song: liveSong,
-  state: renderState(),
+  song: tracks.main.song,
+  state: renderState('main'),
   displays: describeDisplays(),
   outputs: outputWins.size,
   startupMs: Date.now() - startTime,
@@ -1406,33 +1410,33 @@ ipcMain.handle('wf:getInfo', (): AppInfo => ({
 }))
 
 // --- Live engine ---
-ipcMain.handle('wf:live:loadText', (_e, title: string, body: string, background?: string | null) => {
-  doLoadText(title, body, background ?? null); broadcast()
+ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: string, background?: string | null) => {
+  doLoadText(track, title, body, background ?? null); broadcast()
 })
 
-ipcMain.handle('wf:live:loadCountdown', (_e, seconds: number) => {
-  doLoadCountdown(seconds); broadcast()
+ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number) => {
+  doLoadCountdown(track, seconds); broadcast()
 })
 
-ipcMain.handle('wf:live:loadScripture', async (_e, reference: string): Promise<boolean> => {
-  const ok = await doLoadScripture(reference)
+ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string): Promise<boolean> => {
+  const ok = await doLoadScripture(track, reference)
   if (ok) broadcast()
   return ok
 })
 
-ipcMain.handle('wf:live:loadSong', async (_e, id: number) => {
-  await doLoadSong(id); broadcast()
+ipcMain.handle('wf:live:loadSong', async (_e, track: TrackId, id: number) => {
+  await doLoadSong(track, id); broadcast()
 })
 
-ipcMain.handle('wf:live:loadMedia', (_e, filePath: string, title: string) => {
-  doLoadMedia(filePath, title); broadcast()
+ipcMain.handle('wf:live:loadMedia', (_e, track: TrackId, filePath: string, title: string) => {
+  doLoadMedia(track, filePath, title); broadcast()
 })
 
-ipcMain.handle('wf:live:loadAnnouncement', async (_e, id: number) => {
-  await doLoadAnnouncement(id); broadcast()
+ipcMain.handle('wf:live:loadAnnouncement', async (_e, track: TrackId, id: number) => {
+  await doLoadAnnouncement(track, id); broadcast()
 })
 
-ipcMain.handle('wf:getState', (): LiveState => renderState())
+ipcMain.handle('wf:getState', (_e, track?: TrackId): LiveState => renderState(track ?? 'main'))
 
 ipcMain.handle('wf:stage:open', () => { createStageWindow() })
 ipcMain.handle('wf:multiview:open', () => { createMultiviewWindow() })
@@ -1440,29 +1444,31 @@ ipcMain.handle('wf:multiview:open', () => { createMultiviewWindow() })
 // opened because the projector was connected before launch with no display event).
 ipcMain.handle('wf:output:open', () => { layoutOutputs(); broadcast() })
 
-ipcMain.handle('wf:live:setItemId', (_e, id: number | null) => {
-  liveServiceItemId = id
-  const item = id != null ? activeServiceItems.find((it) => it.id === id) : undefined
-  liveItemNotes = item?.notes ?? null
-  applyItemTheme(item)
+ipcMain.handle('wf:live:setItemId', (_e, track: TrackId, id: number | null) => {
+  const t = tracks[track]
+  t.serviceItemId = id
+  const item = id != null ? activeServiceItems.find((it) => it.id === id && it.track === track) : undefined
+  t.itemNotes = item?.notes ?? null
+  applyItemTheme(track, item)
   broadcast()
-  if (item) {
+  if (item && track === 'main') {
     void recordingSession.onItemLive(item, activeServiceId, activeServiceName, activeServiceDate)
   }
 })
 
-ipcMain.handle('wf:live:setFontScale', (_e, scale: number) => {
-  liveFontScale = Math.min(14, Math.max(3, scale))
+ipcMain.handle('wf:live:setFontScale', (_e, track: TrackId, scale: number) => {
+  tracks[track].fontScale = Math.min(14, Math.max(3, scale))
   broadcast()
 })
 
-ipcMain.handle('wf:live:saveFontScale', () => {
-  if (liveSongId == null) return
-  setSongFontScale(liveSongId, liveFontScale)
+ipcMain.handle('wf:live:saveFontScale', (_e, track: TrackId) => {
+  const t = tracks[track]
+  if (t.songId == null) return
+  setSongFontScale(t.songId, t.fontScale)
 })
 
-ipcMain.handle('wf:live:setStageMessage', (_e, msg: string | null) => {
-  liveStageMessage = msg || null
+ipcMain.handle('wf:live:setStageMessage', (_e, track: TrackId, msg: string | null) => {
+  tracks[track].stageMessage = msg || null
   broadcast()
 })
 
@@ -1504,11 +1510,15 @@ function refreshActiveServiceItems(serviceId: number): void {
   activeServiceDate = (svc as { service_date?: string | null } | null)?.service_date ?? null
   serviceSlideTheme = (svc as { theme?: string | null } | null)?.theme || DEFAULT_THEME_ID
   serviceSlideThemeColors = (svc as { themeColors?: ThemeColors | null } | null)?.themeColors ?? null
-  if (liveServiceItemId != null) {
-    const item = activeServiceItems.find((it) => it.id === liveServiceItemId)
-    liveItemNotes = item?.notes ?? null
+  activeZoneTrackAssignment = parseZoneTrackAssignment(getZoneTrackAssignment(serviceId))
+  for (const track of ['main', 'second'] as TrackId[]) {
+    const t = tracks[track]
+    if (t.serviceItemId != null) {
+      const item = activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === track)
+      t.itemNotes = item?.notes ?? null
+      applyItemTheme(track, item)
+    }
   }
-  applyItemTheme(activeServiceItems.find((it) => it.id === liveServiceItemId))
   broadcast()  // projector needs the new theme, not just the tablet
 }
 
@@ -1519,7 +1529,9 @@ ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
     activeServiceItems = []
     activeServiceName = ''
     activeServiceDate = null
-    liveItemNotes = null
+    activeZoneTrackAssignment = { ...DEFAULT_ZONE_TRACK }
+    tracks.main.itemNotes = null
+    tracks.second.itemNotes = null
     void recordingSession.onServiceEnded()  // stop OBS + write the marker sidecar
     broadcast()  // push the cleared service to tablet/zones/projector
     return
@@ -1537,10 +1549,15 @@ ipcMain.handle('wf:services:refreshActiveItems', (_e, serviceId: number) => {
 
 ipcMain.handle('wf:service:setTheme', (_e, serviceId: number, themeId: string | null, colors: ThemeColors | null) => {
   setServiceTheme(serviceId, themeId, colors)
-  // Update the baseline and re-resolve the live item (its override still wins).
+  // Update the baseline and re-resolve whichever track(s) have a live item (their override still wins).
   serviceSlideTheme = themeId || DEFAULT_THEME_ID
   serviceSlideThemeColors = colors
-  applyItemTheme(activeServiceItems.find((it) => it.id === liveServiceItemId))
+  for (const track of ['main', 'second'] as TrackId[]) {
+    const t = tracks[track]
+    if (t.serviceItemId != null) {
+      applyItemTheme(track, activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === track))
+    }
+  }
   broadcast()
 })
 
@@ -1610,14 +1627,16 @@ ipcMain.handle('wf:obs:setAutoSwitch', (_e, enabled: boolean, map: Record<SceneC
 })
 
 // --- Feature IPCs ---
+// Auto-advance/Bible-translation/verse-number remain Main-only for now — no UI
+// surface exists yet for driving these per-track (see SecondTrackTools, later task).
 ipcMain.handle('wf:features:startAutoAdvance', (_e, durationMs: number, loop?: boolean) => {
   logServiceEvent(`auto-advance: ${durationMs}ms${loop ? ' (loop)' : ''}`)
-  armAutoAdvance(durationMs, !!loop)
+  armAutoAdvance('main', durationMs, !!loop)
   broadcast()
 })
 
 ipcMain.handle('wf:features:stopAutoAdvance', () => {
-  clearAutoAdvance()
+  clearAutoAdvance('main')
   broadcast()
 })
 
@@ -1630,18 +1649,19 @@ ipcMain.handle('wf:features:setTheme', (_e, theme: Theme) => {
 ipcMain.handle('wf:features:setBibleTranslation', async (_e, trans: BibleTranslation) => {
   bibleTranslation = trans
   logServiceEvent(`bible-translation: ${trans}`)
-  // If a scripture is currently live, reload it in the new translation.
-  if (liveScriptureRef) {
-    const ref = liveScriptureRef
-    const keepIndex = state.index
-    await doLoadScripture(ref)
-    state.index = Math.min(keepIndex, liveSong.lines.length - 1)
+  // If a scripture is currently live on Main, reload it in the new translation.
+  const t = tracks.main
+  if (t.scriptureRef) {
+    const ref = t.scriptureRef
+    const keepIndex = t.index
+    await doLoadScripture('main', ref)
+    t.index = Math.min(keepIndex, t.song.lines.length - 1)
     broadcast()
   }
 })
 
 ipcMain.handle('wf:features:setVerseNumber', (_e, v: number | null) => {
-  verseNumber = v
+  tracks.main.verseNumber = v
   broadcast()
 })
 
@@ -1670,11 +1690,21 @@ ipcMain.handle('wf:announcements:scheduled', (_e, serviceDate: string) => listSc
 ipcMain.handle('wf:songs:setFontScale', (_e, id: number, scale: number) => setSongFontScale(id, scale))
 ipcMain.handle('wf:songs:setTextColor', (_e: unknown, id: number, color: string | null) => {
   setSongTextColor(id, color)
-  if (liveSongId === id) { liveSongTextColor = color; broadcast() }
+  let changed = false
+  for (const track of ['main', 'second'] as TrackId[]) {
+    const t = tracks[track]
+    if (t.songId === id) { t.songTextColor = color; changed = true }
+  }
+  if (changed) broadcast()
 })
 ipcMain.handle('wf:songs:setFont', (_e: unknown, id: number, font: string | null) => {
   setSongFont(id, font)
-  if (liveSongId === id) { liveSongFont = font; broadcast() }
+  let changed = false
+  for (const track of ['main', 'second'] as TrackId[]) {
+    const t = tracks[track]
+    if (t.songId === id) { t.songFont = font; changed = true }
+  }
+  if (changed) broadcast()
 })
 
 // --- Service builder IPC ---
@@ -1698,9 +1728,9 @@ ipcMain.handle('wf:services:setItemStyle', (_e, itemId: number, style: ItemStyle
 ipcMain.handle('wf:services:setItemPayload', (_e, itemId: number, payload: Record<string, unknown>) =>
   setServiceItemPayload(itemId, payload)
 )
-ipcMain.handle('wf:services:reorder', (_e, serviceId: number, orderedIds: number[]) =>
-  reorderServiceItems(serviceId, orderedIds)
-)
+ipcMain.handle('wf:services:reorder', (_e, serviceId: number, track: TrackId, orderedIds: number[]) => {
+  reorderServiceItems(serviceId, track, orderedIds)
+})
 
 // ── Service Templates IPC ─────────────────────────────────────────────────────
 ipcMain.handle('wf:templates:list', () => {
@@ -1773,6 +1803,20 @@ ipcMain.handle('wf:zone:getIp', (): string => {
   return getLocalIp()
 })
 
+// --- Per-service zone→track assignment ---
+ipcMain.handle('wf:service:zoneTrackAssignment:get', (_e, serviceId: number): ZoneTrackAssignment => {
+  return parseZoneTrackAssignment(getZoneTrackAssignment(serviceId))
+})
+
+ipcMain.handle('wf:service:zoneTrackAssignment:set', (_e, serviceId: number, assignment: ZoneTrackAssignment): void => {
+  if (!validateZoneTrackAssignment(assignment)) throw new Error('Invalid zone track assignment')
+  setZoneTrackAssignment(serviceId, JSON.stringify(assignment))
+  if (serviceId === activeServiceId) {
+    activeZoneTrackAssignment = assignment
+    zoneBroadcast()
+  }
+})
+
 // --- Scene palette (Build Service screen scenes) ---
 ipcMain.handle('wf:scenes:get', () => parseSceneConfig(getSetting('zone_scenes')))
 ipcMain.handle('wf:scenes:set', (_e, config: SceneConfig) => {
@@ -1788,29 +1832,36 @@ ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {
 ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => {
   // At this point, the renderer has been created and activeServiceItems is populated
   const recovered = readRecovery()
-  if (recovered?.liveServiceItemId) {
-    const item = activeServiceItems.find(i => i.id === recovered.liveServiceItemId)
+  if (!recovered) return { ok: true, restored: false }
+
+  let restoredAny = false
+  let fallbackAny = false
+
+  const restoreTrack = async (track: TrackId, snap: { liveServiceItemId: number | null; slideIndex: number } | null): Promise<void> => {
+    if (!snap?.liveServiceItemId) return
+    const item = activeServiceItems.find((i) => i.id === snap.liveServiceItemId && i.track === track)
     if (item) {
-      // Load the actual recovered item
-      await handleTabletLoadItem(item.id)
-      // Restore slide index if valid
-      if (recovered.slideIndex >= 0 && recovered.slideIndex < liveSong.lines.length) {
-        state.index = recovered.slideIndex
+      await handleTabletLoadItem(track, item.id)
+      const t = tracks[track]
+      if (snap.slideIndex >= 0 && snap.slideIndex < t.song.lines.length) {
+        t.index = snap.slideIndex
       }
-      broadcast()
-      return { ok: true, restored: true }
+      restoredAny = true
     } else {
-      // Item was deleted; load first service item as fallback
-      const firstItem = activeServiceItems[0]
+      // Item was deleted; load first same-track item as fallback
+      const firstItem = activeServiceItems.find((i) => i.track === track)
       if (firstItem) {
-        await handleTabletLoadItem(firstItem.id)
-        state.index = 0
-        broadcast()
-        return { ok: true, restored: false, fallback: true }
+        await handleTabletLoadItem(track, firstItem.id)
+        tracks[track].index = 0
+        fallbackAny = true
       }
     }
   }
-  return { ok: true, restored: false }
+
+  await restoreTrack('main', recovered.main)
+  await restoreTrack('second', recovered.second)
+  broadcast()
+  return { ok: true, restored: restoredAny, fallback: fallbackAny }
 })
 
 ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {
@@ -1903,10 +1954,11 @@ ipcMain.handle('wf:service:slides', async (_e, serviceId: number): Promise<{ id:
   }
   return out
 })
-ipcMain.handle('wf:live:goLiveAt', async (_e, itemId: number, slideIndex: number) => {
-  await handleTabletLoadItem(itemId)  // loads the item live (index 0) + broadcasts + resolves theme
-  const last = liveSong.lines.length - 1
-  state.index = Math.max(0, Math.min(slideIndex, last < 0 ? 0 : last))
+ipcMain.handle('wf:live:goLiveAt', async (_e, track: TrackId, itemId: number, slideIndex: number) => {
+  await handleTabletLoadItem(track, itemId)  // loads the item live (index 0) + broadcasts + resolves theme
+  const t = tracks[track]
+  const last = t.song.lines.length - 1
+  t.index = Math.max(0, Math.min(slideIndex, last < 0 ? 0 : last))
   broadcast()
 })
 
@@ -1921,8 +1973,9 @@ ipcMain.handle('wf:songs:setBackground', (_e, id: number, path: string | null) =
 // Push a background update to whatever's currently live, without resetting slide
 // index/timer/other live state (used by the Live-tab drawer's Backgrounds tab so
 // a background change mid-service doesn't jump back to the first slide/reset a timer).
-ipcMain.handle('wf:live:setBackground', (_e, path: string) => {
-  liveSong = { ...liveSong, background: path }
+ipcMain.handle('wf:live:setBackground', (_e, track: TrackId, path: string) => {
+  const t = tracks[track]
+  t.song = { ...t.song, background: path }
   broadcast()
 })
 
