@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MonitorOff, Image as ImageIcon, Play, Timer, ChevronUp, ChevronDown, Keyboard, FileText, Tablet, FolderOpen } from 'lucide-react'
-import type { AppInfo, LiveState } from '../../shared/types'
+import type { AppInfo, LiveState, TrackId } from '../../shared/types'
 import ObsPanel from './ObsPanel'
 import ZonePanel from './ZonePanel'
 import { useService } from './ServiceContext'
@@ -9,9 +9,10 @@ import { StageMessagePanel } from './StageMessagePanel'
 import { ScripturePanel } from './ScripturePanel'
 import { TimingPanel } from './TimingPanel'
 
-// The Live tab's right-hand control panel: stage message, scripture, font,
-// auto-advance, OBS, and a collapsible "More" with the rarely-used controls.
-function LiveTools(): JSX.Element {
+// The Live tab's right-hand control panel for the Main track: stage message,
+// scripture, font, auto-advance, OBS, and a collapsible "More" with the
+// rarely-used controls. (Second track gets the leaner SecondTrackTools.)
+function LiveTools({ track }: { track: TrackId }): JSX.Element {
   const { activeService, reloadActiveService } = useService()
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [live, setLive] = useState<LiveState | null>(null)
@@ -29,14 +30,14 @@ function LiveTools(): JSX.Element {
   useEffect(() => {
     window.wf.getInfo().then(setInfo)
     const t = setTimeout(() => window.wf.getInfo().then(setInfo), 900)
-    const off = window.wf.onState(setLive)
+    const off = window.wf.onState((s) => setLive(track === 'main' ? s.main : s.second))
     window.wf.getTabletUrl().then(setTabletUrl)
     return () => { clearTimeout(t); off() }
-  }, [])
+  }, [track])
   useEffect(() => { if (live?.songTitle) window.wf.getInfo().then(setInfo) }, [live?.songTitle])
   useEffect(() => { if (!live?.stageMessage) setStageMsg('') }, [live?.stageMessage])
 
-  const liveItem = activeService?.items.find((it) => it.id === live?.liveServiceItemId) ?? null
+  const liveItem = activeService?.items.find((it) => it.id === live?.liveServiceItemId && it.track === track) ?? null
 
   const hmsElapsedSecs = live?.hmsLoadedAt ? Math.floor((Date.now() - live.hmsLoadedAt) / 1000) : 0
   const autoAdvanceRunning = live?.autoAdvanceMs != null && live.autoAdvanceMs > 0
@@ -46,37 +47,37 @@ function LiveTools(): JSX.Element {
     if (!ref) return
     // On a failed lookup keep the typed reference and leave the current item live
     // rather than clearing both silently.
-    const ok = await window.wf.liveLoadScripture(ref)
+    const ok = await window.wf.liveLoadScripture(track, ref)
     if (!ok) return
-    window.wf.liveSetItemId(null)
+    window.wf.liveSetItemId(track, null)
     setScriptureRef('')
   }
   const sendStageMessage = (preset?: string): void => {
     const msg = (preset ?? stageMsg).trim()
     if (!msg) return
-    window.wf.liveSetStageMessage(msg)
+    window.wf.liveSetStageMessage(track, msg)
     setMsgSent(true); setTimeout(() => setMsgSent(false), 3000)
   }
-  const clearStageMessage = (): void => { setStageMsg(''); window.wf.liveSetStageMessage(null) }
+  const clearStageMessage = (): void => { setStageMsg(''); window.wf.liveSetStageMessage(track, null) }
 
   return (
     <aside className="flex w-96 shrink-0 flex-col gap-4 overflow-auto border-l border-slate-200 bg-[#f4f6f9] p-4">
       {/* Emergency controls */}
       <div className="flex gap-2">
         <button
-          onClick={() => window.wf.sendIntent('black')}
+          onClick={() => window.wf.sendIntent(track, 'black')}
           className="flex-1 btn bg-black text-white border-white/20"
         >
           <MonitorOff size={14} /> Black
         </button>
         <button
-          onClick={() => window.wf.sendIntent('logo')}
+          onClick={() => window.wf.sendIntent(track, 'logo')}
           className="flex-1 btn"
         >
           <ImageIcon size={14} /> Logo
         </button>
         <button
-          onClick={() => window.wf.sendIntent('lyrics')}
+          onClick={() => window.wf.sendIntent(track, 'lyrics')}
           className="flex-1 btn-primary"
         >
           <Play size={14} /> Live
@@ -129,9 +130,9 @@ function LiveTools(): JSX.Element {
         autoAdvanceRunning={autoAdvanceRunning}
         autoAdvanceLoop={autoAdvanceLoop}
         liveState={live}
-        onFontScaleDecrease={() => window.wf.liveSetFontScale((live?.fontScale ?? 6) - 0.5)}
-        onFontScaleIncrease={() => window.wf.liveSetFontScale((live?.fontScale ?? 6) + 0.5)}
-        onFontScaleSave={() => window.wf.liveSaveFontScale()}
+        onFontScaleDecrease={() => window.wf.liveSetFontScale(track, (live?.fontScale ?? 6) - 0.5)}
+        onFontScaleIncrease={() => window.wf.liveSetFontScale(track, (live?.fontScale ?? 6) + 0.5)}
+        onFontScaleSave={() => window.wf.liveSaveFontScale(track)}
         onAutoAdvanceSecsChange={setAutoAdvanceSecs}
         onAutoAdvanceStart={() => {
           const secs = parseFloat(autoAdvanceSecs)

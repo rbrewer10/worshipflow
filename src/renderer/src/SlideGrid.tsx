@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play, Mic } from 'lucide-react'
-import type { LiveState, ServiceItem } from '../../shared/types'
+import type { LiveState, ServiceItem, TrackId } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
 import { canGoLive, itemThumbBackground } from './liveActions'
@@ -13,7 +13,9 @@ const ICON: Record<ServiceItem['type'], IconType> = {
 }
 
 // The Live tab's main area: each item a panel of clickable slide thumbnails.
-function SlideGrid(): JSX.Element {
+// Used for both the Main and Second columns — `track` selects which live
+// cursor/state this instance follows and drives.
+function SlideGrid({ track }: { track: TrackId }): JSX.Element {
   const { activeService } = useService()
   const [live, setLive] = useState<LiveState | null>(null)
   const [slides, setSlides] = useState<Record<number, string[]>>({})
@@ -21,10 +23,10 @@ function SlideGrid(): JSX.Element {
   const liveRowRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const off = window.wf.onState(setLive)
-    window.wf.getState().then(setLive)
+    const off = window.wf.onState((s) => setLive(track === 'main' ? s.main : s.second))
+    window.wf.getState(track).then(setLive)
     return off
-  }, [])
+  }, [track])
 
   useEffect(() => {
     window.wf.songsList().then((list) => {
@@ -54,11 +56,15 @@ function SlideGrid(): JSX.Element {
     return <div className="flex h-full min-w-0 flex-1 items-center justify-center text-sm text-slate-500">No service loaded — pick one in the Services tab.</div>
   }
 
-  const items = activeService.items.filter(canGoLive)
+  const items = activeService.items.filter((it) => it.track === track).filter(canGoLive)
 
   return (
     <div className="h-full min-h-0 min-w-0 flex-1 space-y-3 overflow-auto p-3">
-      {items.length === 0 && <p className="py-8 text-center text-sm text-slate-500">This service has no go-live items yet.</p>}
+      {items.length === 0 && (
+        <p className="py-8 text-center text-sm text-slate-500">
+          {track === 'main' ? 'This service has no go-live items yet.' : 'No second-track items yet — add some in Build Service.'}
+        </p>
+      )}
       {items.map((it) => {
         const its = slides[it.id] ?? ['']
         const isLiveItem = liveItemId === it.id
@@ -76,7 +82,7 @@ function SlideGrid(): JSX.Element {
                 return (
                   <button
                     key={idx}
-                    onClick={() => window.wf.liveGoLiveAt(it.id, idx)}
+                    onClick={() => window.wf.liveGoLiveAt(track, it.id, idx)}
                     aria-label={`Play slide ${idx + 1} of ${its.length}`}
                     className={`overflow-hidden rounded-md transition-shadow min-h-10 cursor-pointer group relative ${isLiveSlide ? 'ring-2 ring-blue-500' : 'ring-1 ring-slate-200 hover:ring-blue-400/50'}`}
                     title={`Click to play slide ${idx + 1}`}
