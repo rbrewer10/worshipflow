@@ -15,6 +15,7 @@ import type {
   ThemeColors,
   ItemStyle,
   ZoneRouting,
+  TrackId,
   AnnouncementSummary,
   Announcement,
   AnnouncementInput,
@@ -164,6 +165,8 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN style TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN zone_routing TEXT') } catch { /* already exists */ }
+  try { db.run("ALTER TABLE service_item ADD COLUMN track TEXT NOT NULL DEFAULT 'main'") } catch { /* already exists */ }
+  try { db.run('ALTER TABLE service ADD COLUMN zone_track_assignment TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN output_path TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN render_state TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN transcript TEXT') } catch { /* already exists */ }
@@ -596,7 +599,7 @@ export function getService(id: number): ServiceFull | null {
   }
 
   const stmt = db.prepare(
-    'SELECT id, ordinal, type, ref_id, payload_json, notes, style, zone_routing FROM service_item WHERE service_id = ? ORDER BY ordinal'
+    'SELECT id, ordinal, type, ref_id, payload_json, notes, style, zone_routing, track FROM service_item WHERE service_id = ? ORDER BY ordinal'
   )
   stmt.bind([id])
   const items: ServiceItem[] = []
@@ -610,6 +613,7 @@ export function getService(id: number): ServiceFull | null {
       notes: string | null
       style: string | null
       zone_routing: string | null
+      track: string
     }
 
     let payload: Record<string, unknown> = {}
@@ -645,7 +649,8 @@ export function getService(id: number): ServiceFull | null {
       title: itemTitle(r.type, r.ref_id, payload),
       notes: r.notes ?? null,
       style,
-      zoneRouting
+      zoneRouting,
+      track: (r.track === 'second' ? 'second' : 'main') as TrackId
     })
   }
   stmt.free()
@@ -653,16 +658,19 @@ export function getService(id: number): ServiceFull | null {
 }
 
 export function addServiceItem(serviceId: number, item: NewServiceItem): number {
-  const next = db.exec('SELECT COALESCE(MAX(ordinal), -1) + 1 AS n FROM service_item WHERE service_id = ?', [
-    serviceId
+  const track: TrackId = item.track ?? 'main'
+  const next = db.exec('SELECT COALESCE(MAX(ordinal), -1) + 1 AS n FROM service_item WHERE service_id = ? AND track = ?', [
+    serviceId,
+    track
   ])
   const ordinal = (next.length ? (next[0].values[0][0] as number) : 0) || 0
-  db.run('INSERT INTO service_item (service_id, ordinal, type, ref_id, payload_json) VALUES (?,?,?,?,?)', [
+  db.run('INSERT INTO service_item (service_id, ordinal, type, ref_id, payload_json, track) VALUES (?,?,?,?,?,?)', [
     serviceId,
     ordinal,
     item.type,
     item.ref_id ?? null,
-    JSON.stringify(item.payload ?? {})
+    JSON.stringify(item.payload ?? {}),
+    track
   ])
   const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number
   persist()
@@ -675,21 +683,21 @@ export function removeServiceItem(itemId: number): void {
 }
 
 export function moveServiceItem(itemId: number, dir: 'up' | 'down'): void {
-  const cur = db.prepare('SELECT ordinal, service_id FROM service_item WHERE id = ?')
+  const cur = db.prepare('SELECT ordinal, service_id, track FROM service_item WHERE id = ?')
   cur.bind([itemId])
   if (!cur.step()) {
     cur.free()
     return
   }
-  const { ordinal, service_id } = cur.getAsObject() as { ordinal: number; service_id: number }
+  const { ordinal, service_id, track } = cur.getAsObject() as { ordinal: number; service_id: number; track: string }
   cur.free()
 
   const nb = db.prepare(
     dir === 'up'
-      ? 'SELECT id, ordinal FROM service_item WHERE service_id = ? AND ordinal < ? ORDER BY ordinal DESC LIMIT 1'
-      : 'SELECT id, ordinal FROM service_item WHERE service_id = ? AND ordinal > ? ORDER BY ordinal ASC LIMIT 1'
+      ? 'SELECT id, ordinal FROM service_item WHERE service_id = ? AND track = ? AND ordinal < ? ORDER BY ordinal DESC LIMIT 1'
+      : 'SELECT id, ordinal FROM service_item WHERE service_id = ? AND track = ? AND ordinal > ? ORDER BY ordinal ASC LIMIT 1'
   )
-  nb.bind([service_id, ordinal])
+  nb.bind([service_id, track, ordinal])
   if (!nb.step()) {
     nb.free()
     return
@@ -737,11 +745,24 @@ export function setItemZoneRouting(itemId: number, routing: string | null): void
   persist()
 }
 
-export function reorderServiceItems(serviceId: number, orderedIds: number[]): void {
+// Raw JSON string, same convention as getItemZoneRouting/setItemZoneRouting —
+// parsing/defaulting happens in main/index.ts via the shared parseZoneTrackAssignment.
+export function getZoneTrackAssignment(serviceId: number): string | null {
+  const rows = db.exec('SELECT zone_track_assignment FROM service WHERE id = ?', [serviceId])
+  if (!rows.length || !rows[0].values.length) return null
+  return (rows[0].values[0][0] as string | null) ?? null
+}
+
+export function setZoneTrackAssignment(serviceId: number, json: string | null): void {
+  db.run('UPDATE service SET zone_track_assignment = ? WHERE id = ?', [json, serviceId])
+  persist()
+}
+
+export function reorderServiceItems(serviceId: number, track: string, orderedIds: number[]): void {
   db.run('BEGIN')
   try {
     orderedIds.forEach((id, i) => {
-      db.run('UPDATE service_item SET ordinal = ? WHERE id = ? AND service_id = ?', [i, id, serviceId])
+      db.run('UPDATE service_item SET ordinal = ? WHERE id = ? AND service_id = ? AND track = ?', [i, id, serviceId, track])
     })
     db.run('COMMIT')
     persist()
