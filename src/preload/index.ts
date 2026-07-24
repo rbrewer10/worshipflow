@@ -23,22 +23,24 @@ import type {
   ZoneRouting,
   AnnouncementSummary,
   Announcement,
-  AnnouncementInput
+  AnnouncementInput,
+  TrackId
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
+import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 
 const wf = {
   // The real build version comes from the main process via getInfo() — don't
   // hardcode it here (it silently went stale at 0.6.3).
-  sendIntent: (type: Intent): void => ipcRenderer.send('wf:intent', type),
-  onState: (cb: (s: LiveState) => void): (() => void) => {
-    const handler = (_e: unknown, s: LiveState): void => cb(s)
+  sendIntent: (track: TrackId, type: Intent): void => ipcRenderer.send('wf:intent', track, type),
+  onState: (cb: (s: { main: LiveState; second: LiveState | null }) => void): (() => void) => {
+    const handler = (_e: unknown, s: { main: LiveState; second: LiveState | null }): void => cb(s)
     ipcRenderer.on('wf:state', handler)
     return () => ipcRenderer.removeListener('wf:state', handler)
   },
   getInfo: (): Promise<AppInfo> => ipcRenderer.invoke('wf:getInfo'),
-  getState: (): Promise<LiveState> => ipcRenderer.invoke('wf:getState'),
+  getState: (track?: TrackId): Promise<LiveState> => ipcRenderer.invoke('wf:getState', track),
 
   // Song library
   songsList: (search?: string): Promise<SongSummary[]> => ipcRenderer.invoke('wf:songs:list', search),
@@ -55,7 +57,7 @@ const wf = {
   announcementUpdate: (id: number, input: AnnouncementInput): Promise<void> => ipcRenderer.invoke('wf:announcements:update', id, input),
   announcementDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:announcements:delete', id),
   announcementsScheduled: (serviceDate: string): Promise<AnnouncementSummary[]> => ipcRenderer.invoke('wf:announcements:scheduled', serviceDate),
-  liveLoadAnnouncement: (id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadAnnouncement', id),
+  liveLoadAnnouncement: (track: TrackId, id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadAnnouncement', track, id),
 
   // Service builder
   servicesList: (): Promise<ServiceSummary[]> => ipcRenderer.invoke('wf:services:list'),
@@ -79,8 +81,8 @@ const wf = {
     ipcRenderer.invoke('wf:services:setItemStyle', itemId, style),
   serviceSetItemPayload: (itemId: number, payload: Record<string, unknown>): Promise<void> =>
     ipcRenderer.invoke('wf:services:setItemPayload', itemId, payload),
-  serviceReorder: (serviceId: number, orderedIds: number[]): Promise<void> =>
-    ipcRenderer.invoke('wf:services:reorder', serviceId, orderedIds),
+  serviceReorder: (serviceId: number, track: TrackId, orderedIds: number[]): Promise<void> =>
+    ipcRenderer.invoke('wf:services:reorder', serviceId, track, orderedIds),
   serviceSlides: (serviceId: number): Promise<{ id: number; slides: string[] }[]> =>
     ipcRenderer.invoke('wf:service:slides', serviceId),
 
@@ -121,27 +123,27 @@ const wf = {
     ipcRenderer.on('wf:recordings:aiProgress', handler)
     return () => ipcRenderer.removeListener('wf:recordings:aiProgress', handler)
   },
-  liveSetItemId: (id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', id),
-  liveGoLiveAt: (itemId: number, slideIndex: number): Promise<void> =>
-    ipcRenderer.invoke('wf:live:goLiveAt', itemId, slideIndex),
-  liveSetFontScale: (scale: number): Promise<void> => ipcRenderer.invoke('wf:live:setFontScale', scale),
-  liveSaveFontScale: (): Promise<void> => ipcRenderer.invoke('wf:live:saveFontScale'),
-  liveSetStageMessage: (msg: string | null): Promise<void> => ipcRenderer.invoke('wf:live:setStageMessage', msg),
-  liveLoadSong: (id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', id),
-  liveLoadScripture: (reference: string): Promise<boolean> =>
-    ipcRenderer.invoke('wf:live:loadScripture', reference),
-  liveLoadText: (title: string, body: string, background?: string | null): Promise<void> =>
-    ipcRenderer.invoke('wf:live:loadText', title, body, background ?? null),
-  liveLoadCountdown: (seconds: number): Promise<void> =>
-    ipcRenderer.invoke('wf:live:loadCountdown', seconds),
-  liveLoadMedia: (filePath: string, title: string): Promise<void> =>
-    ipcRenderer.invoke('wf:live:loadMedia', filePath, title),
+  liveSetItemId: (track: TrackId, id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', track, id),
+  liveGoLiveAt: (track: TrackId, itemId: number, slideIndex: number): Promise<void> =>
+    ipcRenderer.invoke('wf:live:goLiveAt', track, itemId, slideIndex),
+  liveSetFontScale: (track: TrackId, scale: number): Promise<void> => ipcRenderer.invoke('wf:live:setFontScale', track, scale),
+  liveSaveFontScale: (track: TrackId): Promise<void> => ipcRenderer.invoke('wf:live:saveFontScale', track),
+  liveSetStageMessage: (track: TrackId, msg: string | null): Promise<void> => ipcRenderer.invoke('wf:live:setStageMessage', track, msg),
+  liveLoadSong: (track: TrackId, id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', track, id),
+  liveLoadScripture: (track: TrackId, reference: string): Promise<boolean> =>
+    ipcRenderer.invoke('wf:live:loadScripture', track, reference),
+  liveLoadText: (track: TrackId, title: string, body: string, background?: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadText', track, title, body, background ?? null),
+  liveLoadCountdown: (track: TrackId, seconds: number): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadCountdown', track, seconds),
+  liveLoadMedia: (track: TrackId, filePath: string, title: string): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadMedia', track, filePath, title),
 
   // Song background + file dialog
   songSetBackground: (id: number, path: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:songs:setBackground', id, path),
-  liveSetBackground: (path: string): Promise<void> =>
-    ipcRenderer.invoke('wf:live:setBackground', path),
+  liveSetBackground: (track: TrackId, path: string): Promise<void> =>
+    ipcRenderer.invoke('wf:live:setBackground', track, path),
   songSetFontScale: (id: number, scale: number): Promise<void> =>
     ipcRenderer.invoke('wf:songs:setFontScale', id, scale),
   dialogOpenFile: (): Promise<{ canceled: boolean; filePaths: string[] }> =>
@@ -279,6 +281,10 @@ const wf = {
     ipcRenderer.invoke('wf:zone:getStates'),
   zoneGetIp: (): Promise<string> =>
     ipcRenderer.invoke('wf:zone:getIp'),
+  zoneTrackAssignmentGet: (serviceId: number): Promise<ZoneTrackAssignment> =>
+    ipcRenderer.invoke('wf:service:zoneTrackAssignment:get', serviceId),
+  zoneTrackAssignmentSet: (serviceId: number, assignment: ZoneTrackAssignment): Promise<void> =>
+    ipcRenderer.invoke('wf:service:zoneTrackAssignment:set', serviceId, assignment),
   scenesGet: (): Promise<SceneConfig> => ipcRenderer.invoke('wf:scenes:get'),
   scenesSet: (config: SceneConfig): Promise<void> => ipcRenderer.invoke('wf:scenes:set', config),
   getTabletPort: (): Promise<number> =>
