@@ -34,49 +34,49 @@ function AppShell(): JSX.Element {
       // B = black screen
       if (key === 'b') {
         e.preventDefault()
-        window.wf.sendIntent('black')
+        window.wf.sendIntent('main', 'black')
         return
       }
 
       // L = logo screen
       if (key === 'l') {
         e.preventDefault()
-        window.wf.sendIntent('logo')
+        window.wf.sendIntent('main', 'logo')
         return
       }
 
       // N = next slide/item
       if (key === 'n') {
         e.preventDefault()
-        window.wf.sendIntent('next')
+        window.wf.sendIntent('main', 'next')
         return
       }
 
       // P = previous slide/item
       if (key === 'p') {
         e.preventDefault()
-        window.wf.sendIntent('prev')
+        window.wf.sendIntent('main', 'prev')
         return
       }
 
       // S = toggle lyrics/slides display
       if (key === 's') {
         e.preventDefault()
-        window.wf.sendIntent('lyrics')
+        window.wf.sendIntent('main', 'lyrics')
         return
       }
 
       // Space or ArrowRight = next slide
       if (key === ' ' || key === 'arrowright') {
         e.preventDefault()
-        window.wf.sendIntent('next')
+        window.wf.sendIntent('main', 'next')
         return
       }
 
       // ArrowLeft = previous slide
       if (key === 'arrowleft') {
         e.preventDefault()
-        window.wf.sendIntent('prev')
+        window.wf.sendIntent('main', 'prev')
         return
       }
     }
