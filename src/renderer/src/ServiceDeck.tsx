@@ -73,7 +73,16 @@ function ServiceDeck({ service, track, onTrackChange, songs, announcements, live
   const popoverRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    void window.wf.zoneTrackAssignmentGet(service.id).then(setTrackAssignment)
+    // Close the popover on every service switch too — without this, switching to
+    // a service with no Second track (which unmounts the trigger/popover, so the
+    // outside-click handler's popoverRef.current goes null and can never close it
+    // again) then back to one with a Second track re-renders it already open.
+    setShowZonePopover(false)
+    let ignore = false
+    void window.wf.zoneTrackAssignmentGet(service.id).then((next) => {
+      if (!ignore) setTrackAssignment(next)
+    })
+    return () => { ignore = true }
   }, [service.id])
 
   useEffect(() => {
@@ -81,8 +90,15 @@ function ServiceDeck({ service, track, onTrackChange, songs, announcements, live
     const onClickOutside = (e: MouseEvent): void => {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) setShowZonePopover(false)
     }
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setShowZonePopover(false)
+    }
     document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [showZonePopover])
 
   const onDrop = (targetId: number): void => {
