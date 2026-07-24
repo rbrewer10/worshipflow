@@ -23,7 +23,8 @@ import type {
   ItemStyle,
   ZoneId,
   ZoneRouting,
-  ZoneState
+  ZoneState,
+  TrackId
 } from '../../shared/types'
 import { starterConfig } from '../../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
@@ -112,7 +113,8 @@ const services: ServiceFull[] = [
         title: 'Amazing Grace',
         notes: null,
         style: null,
-        zoneRouting: null
+        zoneRouting: null,
+        track: 'main'
       }
     ]
   }
@@ -194,7 +196,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
   const noop = async (): Promise<void> => {}
   const api = {
     version: 'browser-preview',
-    sendIntent: (type: Intent): void => {
+    sendIntent: (_track: TrackId, type: Intent): void => {
       if (type === 'next') {
         const index = Math.min(liveState.index + 1, liveState.total - 1)
         publish({ index, line: demoLines[index] ?? '', next: demoLines[index + 1] ?? '' })
@@ -205,13 +207,14 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
         publish({ mode: type })
       }
     },
-    onState: (cb: (s: LiveState) => void): (() => void) => {
-      stateListeners.add(cb)
-      cb(clone(liveState))
-      return () => stateListeners.delete(cb)
+    onState: (cb: (s: { main: LiveState; second: LiveState | null }) => void): (() => void) => {
+      const wrapped = (main: LiveState): void => cb({ main, second: null })
+      stateListeners.add(wrapped)
+      wrapped(clone(liveState))
+      return () => stateListeners.delete(wrapped)
     },
     getInfo: async (): Promise<AppInfo> => appInfo(),
-    getState: async (): Promise<LiveState> => clone(liveState),
+    getState: async (_track?: TrackId): Promise<LiveState> => clone(liveState),
 
     songsList: async (search?: string): Promise<SongSummary[]> =>
       songs
@@ -272,7 +275,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
         title: itemTitle(item),
         notes: null,
         style: null,
-        zoneRouting: null
+        zoneRouting: null,
+        track: item.track ?? 'main'
       }
       service?.items.push(nextItem)
       return id
@@ -306,22 +310,22 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     onRenderProgress: () => () => {},
     onRenderState: () => () => {},
     onAiProgress: () => () => {},
-    liveSetItemId: async (id: number | null): Promise<void> => publish({ liveServiceItemId: id }),
-    liveGoLiveAt: async (_itemId: number, slideIndex: number): Promise<void> => {
+    liveSetItemId: async (_track: TrackId, id: number | null): Promise<void> => publish({ liveServiceItemId: id }),
+    liveGoLiveAt: async (_track: TrackId, _itemId: number, slideIndex: number): Promise<void> => {
       const index = Math.max(0, Math.min(slideIndex, demoLines.length - 1))
       publish({ index, line: demoLines[index] ?? '', next: demoLines[index + 1] ?? '' })
     },
-    liveSetFontScale: async (scale: number): Promise<void> => publish({ fontScale: scale }),
+    liveSetFontScale: async (_track: TrackId, scale: number): Promise<void> => publish({ fontScale: scale }),
     liveSaveFontScale: noop,
-    liveSetStageMessage: async (msg: string | null): Promise<void> => publish({ stageMessage: msg }),
-    liveLoadSong: async (id: number): Promise<void> => {
+    liveSetStageMessage: async (_track: TrackId, msg: string | null): Promise<void> => publish({ stageMessage: msg }),
+    liveLoadSong: async (_track: TrackId, id: number): Promise<void> => {
       const song = songs.find((s) => s.id === id)
       if (song) publish({ songTitle: song.title, index: 0, line: demoLines[0], next: demoLines[1], total: demoLines.length })
     },
-    liveLoadScripture: async (reference: string): Promise<boolean> => { publish({ songTitle: reference, line: 'Browser preview scripture text.', next: '', total: 1, index: 0 }); return true },
-    liveLoadText: async (title: string, body: string): Promise<void> => publish({ songTitle: title || 'Announcement', line: body || title, next: '', total: 1, index: 0 }),
-    liveLoadCountdown: async (seconds: number): Promise<void> => publish({ mode: 'countdown', songTitle: 'Countdown', line: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, next: '', total: 1, index: 0 }),
-    liveLoadMedia: async (_filePath: string, title: string): Promise<void> => publish({ songTitle: title || 'Media', line: '', next: '', total: 1, index: 0 }),
+    liveLoadScripture: async (_track: TrackId, reference: string): Promise<boolean> => { publish({ songTitle: reference, line: 'Browser preview scripture text.', next: '', total: 1, index: 0 }); return true },
+    liveLoadText: async (_track: TrackId, title: string, body: string): Promise<void> => publish({ songTitle: title || 'Announcement', line: body || title, next: '', total: 1, index: 0 }),
+    liveLoadCountdown: async (_track: TrackId, seconds: number): Promise<void> => publish({ mode: 'countdown', songTitle: 'Countdown', line: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, next: '', total: 1, index: 0 }),
+    liveLoadMedia: async (_track: TrackId, _filePath: string, title: string): Promise<void> => publish({ songTitle: title || 'Media', line: '', next: '', total: 1, index: 0 }),
 
     songSetBackground: noop,
     liveSetBackground: noop,
@@ -412,6 +416,9 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       4: clone(emptyZone)
     }),
     zoneGetIp: async (): Promise<string> => '127.0.0.1',
+    zoneTrackAssignmentGet: async (): Promise<import('../../shared/zoneTrack').ZoneTrackAssignment> =>
+      ({ 1: 'main', 2: 'second', 3: 'main', 4: 'main' }),
+    zoneTrackAssignmentSet: noop,
     scenesGet: async () => starterConfig(),
     scenesSet: noop,
     getTabletPort: async (): Promise<number> => 3691,

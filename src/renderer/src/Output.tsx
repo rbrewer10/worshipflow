@@ -86,8 +86,8 @@ export function useLiveModel(): AudienceModel {
         setTickerText(s.line || '')
       }
     }
-    const off = window.wf.onState(apply)
-    window.wf.getState().then(apply)
+    const off = window.wf.onState((s) => apply(s.main))
+    window.wf.getState('main').then(apply)
     return off
   }, [])
 

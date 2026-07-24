@@ -12,11 +12,11 @@ function Stage(): JSX.Element {
 
   useEffect(() => {
     const off = window.wf.onState((s) => {
-      setLive(s)
+      setLive(s.main)
       // Auto-show new messages (clear dismissed state when message changes).
-      setMsgDismissed((prev) => (prev !== s.stageMessage ? null : prev))
+      setMsgDismissed((prev) => (prev !== s.main.stageMessage ? null : prev))
     })
-    window.wf.getState().then(setLive)
+    window.wf.getState('main').then(setLive)
 
     const tick = (): void => {
       const now = new Date()

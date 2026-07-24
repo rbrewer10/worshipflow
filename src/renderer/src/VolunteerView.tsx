@@ -45,14 +45,15 @@ function canGoLive(item: ServiceItem): boolean {
 
 async function loadItem(item: ServiceItem): Promise<void> {
   if (item.type === 'song' && item.ref_id != null) {
-    await window.wf.liveLoadSong(item.ref_id)
+    await window.wf.liveLoadSong('main', item.ref_id)
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    const ok = await window.wf.liveLoadScripture(ref)
+    const ok = await window.wf.liveLoadScripture('main', ref)
     if (!ok) return
   } else if (item.type === 'text') {
     await window.wf.liveLoadText(
+      'main',
       (item.payload.title as string) ?? '',
       (item.payload.body as string) ?? '',
       (item.payload.background as string) ?? null
@@ -60,25 +61,25 @@ async function loadItem(item: ServiceItem): Promise<void> {
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    await window.wf.liveLoadCountdown(secs)
+    await window.wf.liveLoadCountdown('main', secs)
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return
-    await window.wf.liveLoadMedia(p, item.title)
+    await window.wf.liveLoadMedia('main', p, item.title)
   } else if (item.type === 'welcome') {
-    await window.wf.liveLoadCountdown((item.payload.seconds as number) ?? 300)
+    await window.wf.liveLoadCountdown('main', (item.payload.seconds as number) ?? 300)
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return
-    await window.wf.liveLoadText('Announcement', txt)
+    await window.wf.liveLoadText('main', 'Announcement', txt)
   } else if (item.type === 'announcement' && item.ref_id != null) {
-    await window.wf.liveLoadAnnouncement(item.ref_id)
+    await window.wf.liveLoadAnnouncement('main', item.ref_id)
   } else if (item.type === 'sermon') {
-    window.wf.sendIntent('logo')
+    window.wf.sendIntent('main', 'logo')
   } else {
     return
   }
-  window.wf.liveSetItemId(item.id)
+  window.wf.liveSetItemId('main', item.id)
 }
 
 // Simplified, touch-friendly operator surface for volunteers.
@@ -102,8 +103,8 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
   useEffect(() => { liveItemIdRef.current = liveItemId }, [liveItemId])
 
   useEffect(() => {
-    const off = window.wf.onState(setLive)
-    window.wf.getState().then(setLive)
+    const off = window.wf.onState((s) => setLive(s.main))
+    window.wf.getState('main').then(setLive)
     window.wf.servicesList().then(async (list) => {
       setServices(list)
       if (list.length === 0) return
@@ -124,7 +125,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
     window.wf.serviceGet(id).then(setService)
   }
 
-  const send = (type: Intent): void => window.wf.sendIntent(type)
+  const send = (type: Intent): void => window.wf.sendIntent('main', type)
 
   // Advance to next item when at the last slide of the current one.
   const goNext = (): void => {

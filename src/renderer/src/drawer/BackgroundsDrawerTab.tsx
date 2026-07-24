@@ -26,8 +26,8 @@ export default function BackgroundsDrawerTab({ onDone }: { onDone: () => void })
     // onState only pushes future broadcasts — seed the current state too, or this
     // tab thinks nothing is live until the next unrelated state change (matches
     // the same getState()+onState() pattern ServiceRail.tsx already uses).
-    window.wf.getState().then(setLive)
-    const off = window.wf.onState(setLive)
+    window.wf.getState('main').then(setLive)
+    const off = window.wf.onState((s) => setLive(s.main))
     return off
   }, [])
 
@@ -50,7 +50,7 @@ export default function BackgroundsDrawerTab({ onDone }: { onDone: () => void })
         notifyLocal(`Backgrounds aren't supported on ${action.itemType} items.`, 'warn')
         return
       }
-      await window.wf.liveSetBackground(action.path)
+      await window.wf.liveSetBackground('main', action.path)
       reloadActiveService()
       onDone()
     } catch {

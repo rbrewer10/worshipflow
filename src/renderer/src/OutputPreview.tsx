@@ -8,8 +8,8 @@ import { useChurchName } from './useChurchName'
 function OutputPreview(): JSX.Element {
   const [s, setS] = useState<LiveState | null>(null)
   useEffect(() => {
-    const off = window.wf.onState(setS)
-    window.wf.getState().then(setS)
+    const off = window.wf.onState((s) => setS(s.main))
+    window.wf.getState('main').then(setS)
     return off
   }, [])
 
@@ -37,9 +37,9 @@ function OutputPreview(): JSX.Element {
         </span>
       </div>
       <div className="mt-1.5 flex justify-center gap-4 text-slate-600">
-        <button onClick={() => window.wf.sendIntent('black')} title="Black" className="hover:text-slate-900"><MonitorOff size={14} /></button>
-        <button onClick={() => window.wf.sendIntent('logo')} title="Logo" className="hover:text-slate-900"><ImageIcon size={14} /></button>
-        <button onClick={() => window.wf.sendIntent('lyrics')} title="Clear / lyrics" className="hover:text-slate-900"><Play size={14} /></button>
+        <button onClick={() => window.wf.sendIntent('main', 'black')} title="Black" className="hover:text-slate-900"><MonitorOff size={14} /></button>
+        <button onClick={() => window.wf.sendIntent('main', 'logo')} title="Logo" className="hover:text-slate-900"><ImageIcon size={14} /></button>
+        <button onClick={() => window.wf.sendIntent('main', 'lyrics')} title="Clear / lyrics" className="hover:text-slate-900"><Play size={14} /></button>
       </div>
     </div>
   )

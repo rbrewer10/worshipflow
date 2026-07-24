@@ -14,8 +14,8 @@ function ServiceRail(): JSX.Element {
   const [songBg, setSongBg] = useState<Record<number, string | null>>({})
   const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    const off = window.wf.onState(setLive)
-    window.wf.getState().then(setLive)
+    const off = window.wf.onState((s) => setLive(s.main))
+    window.wf.getState('main').then(setLive)
     // Also cancel a pending tap-to-confirm on unmount so it can't fire the
     // wrong item live after the operator navigates away from the Live tab.
     return () => { off(); if (pendingTimer.current) clearTimeout(pendingTimer.current) }
