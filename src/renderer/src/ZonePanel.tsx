@@ -38,13 +38,17 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
     })
   }, [])
 
-  // Poll zone states every 2 seconds.
+  // Poll zone states + track assignment every 2 seconds. Track assignment also
+  // needs polling (not just zoneStates) because ZonePanel is mounted twice at
+  // once (Main's LiveTools + Second's SecondTrackTools) — without this, clicking
+  // a track button in one column would never update the other column's highlight.
   useEffect(() => {
     const t = setInterval(() => {
       void window.wf.zoneGetStates().then(setZoneStates)
+      if (activeService != null) void window.wf.zoneTrackAssignmentGet(activeService.id).then(setTrackAssignment)
     }, 2000)
     return () => clearInterval(t)
-  }, [])
+  }, [activeService?.id])
 
   useEffect(() => {
     if (activeService == null) return
@@ -70,12 +74,15 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
   }
 
   const setZoneTrack = (zoneId: ZoneId, track: TrackId): void => {
-    if (activeService == null) return
-    const next = { ...trackAssignment, [zoneId]: track }
-    setTrackAssignment(next)
-    void window.wf.zoneTrackAssignmentSet(activeService.id, next).then(() =>
-      window.wf.zoneGetStates().then(setZoneStates)
-    )
+    const serviceId = activeService?.id
+    if (serviceId == null) return
+    setTrackAssignment((prev) => {
+      const next = { ...prev, [zoneId]: track }
+      void window.wf.zoneTrackAssignmentSet(serviceId, next).then(() =>
+        window.wf.zoneGetStates().then(setZoneStates)
+      )
+      return next
+    })
   }
 
   return (
