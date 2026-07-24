@@ -395,58 +395,66 @@ let obsAutoSwitch = false
 let obsSceneMap: Record<SceneContext, string> = { worship: '', word: '', countdown: '' }
 let lastAutoScene: string | null = null
 
-function clearCountdown(): void {
-  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+function clearCountdown(track: TrackId): void {
+  const t = tracks[track]
+  if (t.countdownTimer) { clearInterval(t.countdownTimer); t.countdownTimer = null }
 }
-function clearAutoAdvance(): void {
-  if (autoAdvanceTimer) { clearInterval(autoAdvanceTimer); autoAdvanceTimer = null }
-  autoAdvanceMs = null
-  autoAdvanceDuration = 0
-  autoAdvanceLoop = false
+function clearAutoAdvance(track: TrackId): void {
+  const t = tracks[track]
+  if (t.autoAdvanceTimer) { clearInterval(t.autoAdvanceTimer); t.autoAdvanceTimer = null }
+  t.autoAdvanceMs = null
+  t.autoAdvanceDuration = 0
+  t.autoAdvanceLoop = false
+}
+// Clear CCLI song metadata when a non-song goes live.
+function clearSongMeta(track: TrackId): void {
+  tracks[track].songMeta = { author: null, copyright: null, ccli: null }
 }
 
 // Are we on the last slide of the last go-live item (nothing further to advance to)?
-function atEndOfContent(): boolean {
-  const atLastSlide = state.mode === 'lyrics' ? state.index >= liveSong.lines.length - 1 : true
-  return atLastSlide && !adjacentLiveItem(1)
+function atEndOfContent(track: TrackId): boolean {
+  const t = tracks[track]
+  const atLastSlide = t.mode === 'lyrics' ? t.index >= t.song.lines.length - 1 : true
+  return atLastSlide && !adjacentLiveItem(track, 1)
 }
 
 // Jump back to the first slide of the first go-live item (loop restart).
-function goToStart(): void {
-  const first = activeServiceItems.find(itemCanGoLive)
-  if (first) void handleTabletLoadItem(first.id)
-  else { state.index = 0; broadcast() }
+function goToStart(track: TrackId): void {
+  const first = activeServiceItems.filter((it) => it.track === track).find(itemCanGoLive)
+  if (first) void handleTabletLoadItem(track, first.id)
+  else { tracks[track].index = 0; broadcast() }
 }
 
 // Start (or re-arm) the auto-advance countdown. Each time it elapses it advances
 // one slide and re-arms itself, so it keeps going until the operator hits Stop.
 // When `loop` is set, it restarts from the beginning instead of stopping at the end.
-function armAutoAdvance(durationMs: number, loop: boolean): void {
+function armAutoAdvance(track: TrackId, durationMs: number, loop: boolean): void {
   if (durationMs <= 100 || durationMs > 3600000) {
     console.error(`Invalid auto-advance duration: ${durationMs}ms`)
     return
   }
-  if (autoAdvanceTimer) clearInterval(autoAdvanceTimer)
-  autoAdvanceDuration = durationMs
-  autoAdvanceLoop = loop
-  autoAdvanceMs = durationMs
-  autoAdvanceTimer = setInterval(() => {
-    if (autoAdvanceMs == null) return
-    autoAdvanceMs -= 100
-    if (autoAdvanceMs <= 0) {
-      const dur = autoAdvanceDuration
-      const lp = autoAdvanceLoop
-      if (lp && atEndOfContent()) goToStart()
-      else if (atEndOfContent()) {
+  const t = tracks[track]
+  if (t.autoAdvanceTimer) clearInterval(t.autoAdvanceTimer)
+  t.autoAdvanceDuration = durationMs
+  t.autoAdvanceLoop = loop
+  t.autoAdvanceMs = durationMs
+  t.autoAdvanceTimer = setInterval(() => {
+    if (t.autoAdvanceMs == null) return
+    t.autoAdvanceMs -= 100
+    if (t.autoAdvanceMs <= 0) {
+      const dur = t.autoAdvanceDuration
+      const lp = t.autoAdvanceLoop
+      if (lp && atEndOfContent(track)) goToStart(track)
+      else if (atEndOfContent(track)) {
         // At end of service and not looping — stop auto-advance to prevent runaway
-        clearAutoAdvance()
+        clearAutoAdvance(track)
         logServiceEvent('auto-advance stopped at end of service')
         broadcast()
         return
       } else {
-        processIntent('next')  // advances (note: doesn't clear auto-advance since it's a 'next' intent)
+        processIntent(track, 'next')  // advances (note: doesn't clear auto-advance since it's a 'next' intent)
       }
-      armAutoAdvance(dur, lp)      // …so re-arm to keep the cycle going
+      armAutoAdvance(track, dur, lp)      // …so re-arm to keep the cycle going
       return
     }
     broadcast()
@@ -476,34 +484,35 @@ function getLocalIp(): string {
 }
 
 
-function renderState(): LiveState {
-  const lines = liveSong.lines
+function renderState(track: TrackId = 'main'): LiveState {
+  const t = tracks[track]
+  const lines = t.song.lines
   return {
-    mode: state.mode,
-    index: state.index,
-    line: lines[state.index] ?? '',
-    next: lines[state.index + 1] ?? '',
+    mode: t.mode,
+    index: t.index,
+    line: lines[t.index] ?? '',
+    next: lines[t.index + 1] ?? '',
     total: lines.length,
-    songTitle: liveSong.title,
-    background: liveSong.background ?? null,
-    bgMotion: (liveSong.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null,
-    bgFit: liveBgFit,
-    liveServiceItemId,
-    fontScale: liveFontScale,
-    stageMessage: liveStageMessage,
+    songTitle: t.song.title,
+    background: t.song.background ?? null,
+    bgMotion: (t.song.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null,
+    bgFit: t.bgFit,
+    liveServiceItemId: t.serviceItemId,
+    fontScale: t.fontScale,
+    stageMessage: t.stageMessage,
     ts: Date.now(),
-    hmsLoadedAt,
-    autoAdvanceMs,
+    hmsLoadedAt: t.hmsLoadedAt,
+    autoAdvanceMs: t.autoAdvanceMs,
     theme: currentTheme,
-    verseNumber,
-    songAuthor: liveSongMeta.author,
-    songCopyright: liveSongMeta.copyright,
-    songCcli: liveSongMeta.ccli,
+    verseNumber: t.verseNumber,
+    songAuthor: t.songMeta.author,
+    songCopyright: t.songMeta.copyright,
+    songCcli: t.songMeta.ccli,
     ccliLicense,
-    slideTheme: liveSlideTheme,
-    slideThemeColors: liveSlideThemeColors,
-    songTextColor: liveSongTextColor,
-    songFont: liveSongFont
+    slideTheme: t.slideTheme,
+    slideThemeColors: t.slideThemeColors,
+    songTextColor: t.songTextColor,
+    songFont: t.songFont
   }
 }
 
@@ -688,14 +697,16 @@ function itemCanGoLive(item: ServiceItem): boolean {
   )
 }
 
-// Find the next/previous go-live service item relative to the current one.
-function adjacentLiveItem(dir: 1 | -1): ServiceItem | undefined {
-  if (liveServiceItemId == null || activeServiceItems.length === 0) return undefined
-  const idx = activeServiceItems.findIndex((it) => it.id === liveServiceItemId)
+// Find the next/previous go-live service item relative to the current one, within the same track.
+function adjacentLiveItem(track: TrackId, dir: 1 | -1): ServiceItem | undefined {
+  const t = tracks[track]
+  if (t.serviceItemId == null) return undefined
+  const trackItems = activeServiceItems.filter((it) => it.track === track)
+  const idx = trackItems.findIndex((it) => it.id === t.serviceItemId)
   if (idx < 0) return undefined
   const rest = dir === 1
-    ? activeServiceItems.slice(idx + 1)
-    : activeServiceItems.slice(0, idx).reverse()
+    ? trackItems.slice(idx + 1)
+    : trackItems.slice(0, idx).reverse()
   return rest.find(itemCanGoLive)
 }
 
@@ -707,82 +718,85 @@ function notifyOperator(message: string, level: 'info' | 'warn' | 'error' = 'inf
 }
 
 // --- Extracted intent processing (used by both IPC and WebSocket) ---
-function processIntent(type: Intent): void {
+function processIntent(track: TrackId, type: Intent): void {
+  const t = tracks[track]
   // Only clear auto-advance for mode-changing intents (black/logo/lyrics), not for navigation (next/prev)
   if (type !== 'next' && type !== 'prev') {
-    clearAutoAdvance()
+    clearAutoAdvance(track)
   }
-  const last = liveSong.lines.length - 1
+  const last = t.song.lines.length - 1
   if (type === 'next') {
-    if (state.mode === 'countdown') {
+    if (t.mode === 'countdown') {
       // A live countdown/welcome is a single view — Next moves to the next item.
-      const nextItem = adjacentLiveItem(1)
-      if (nextItem) { void handleTabletLoadItem(nextItem.id); return }
+      const nextItem = adjacentLiveItem(track, 1)
+      if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
       // Nothing after the countdown — go to the logo hold screen instead of
       // stranding the frozen timer value (e.g. "0:42") as a lyric slide.
-      clearCountdown(); liveSong = { title: '', lines: [], background: null }; state.mode = 'logo'
-    } else if (state.mode !== 'lyrics') {
+      clearCountdown(track); t.song = { title: '', lines: [], background: null }; t.mode = 'logo'
+    } else if (t.mode !== 'lyrics') {
       // Black/logo were operator-blanked — Next un-blanks back to the slide.
-      clearCountdown(); state.mode = 'lyrics'
-    } else if (state.index < last) {
-      state.index++; logServiceEvent(`next: ${state.index}/${last}`)
+      clearCountdown(track); t.mode = 'lyrics'
+    } else if (t.index < last) {
+      t.index++; logServiceEvent(`next: ${t.index}/${last}`)
     } else {
       // At the last slide of this item — advance to the next service item.
-      const nextItem = adjacentLiveItem(1)
-      if (nextItem) { void handleTabletLoadItem(nextItem.id); return }
+      const nextItem = adjacentLiveItem(track, 1)
+      if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
     }
   } else if (type === 'prev') {
-    if (state.mode !== 'lyrics') { clearCountdown(); state.mode = 'lyrics' }
-    else if (state.index > 0) { state.index--; logServiceEvent(`prev: ${state.index}/${last}`) }
+    if (t.mode !== 'lyrics') { clearCountdown(track); t.mode = 'lyrics' }
+    else if (t.index > 0) { t.index--; logServiceEvent(`prev: ${t.index}/${last}`) }
     else {
       // At the first slide — step back to the previous service item.
-      const prevItem = adjacentLiveItem(-1)
-      if (prevItem) { void handleTabletLoadItem(prevItem.id); return }
+      const prevItem = adjacentLiveItem(track, -1)
+      if (prevItem) { void handleTabletLoadItem(track, prevItem.id); return }
     }
-  } else if (type === 'black') { clearCountdown(); state.mode = 'black'; logServiceEvent('black') }
-  else if (type === 'logo') { clearCountdown(); state.mode = 'logo'; logServiceEvent('logo') }
-  else if (type === 'lyrics') { clearCountdown(); state.mode = 'lyrics'; logServiceEvent('lyrics') }
+  } else if (type === 'black') { clearCountdown(track); t.mode = 'black'; logServiceEvent('black') }
+  else if (type === 'logo') { clearCountdown(track); t.mode = 'logo'; logServiceEvent('logo') }
+  else if (type === 'lyrics') { clearCountdown(track); t.mode = 'lyrics'; logServiceEvent('lyrics') }
   broadcast()
 }
 
 // --- Extracted load functions (used by IPC handlers and tablet loadItem) ---
-function doLoadText(title: string, body: string, background: string | null = null): void {
-  clearCountdown()
-  liveSongId = null
-  liveScriptureRef = null
-  clearSongMeta()
-  liveBgFit = 'cover'
+function doLoadText(track: TrackId, title: string, body: string, background: string | null = null): void {
+  const t = tracks[track]
+  clearCountdown(track)
+  t.songId = null
+  t.scriptureRef = null
+  clearSongMeta(track)
+  t.bgFit = 'cover'
   const lines: string[] = []
   if (title) lines.push(title)
   body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
-  liveSong = { title: title || 'Announcement', lines: lines.length ? lines : [title], background }
-  liveSongTextColor = null; liveSongFont = null
-  state.mode = 'lyrics'
-  state.index = 0
+  t.song = { title: title || 'Announcement', lines: lines.length ? lines : [title], background }
+  t.songTextColor = null; t.songFont = null
+  t.mode = 'lyrics'
+  t.index = 0
 }
 
-function doLoadCountdown(seconds: number): void {
-  clearCountdown()
-  liveSongId = null
-  liveScriptureRef = null
-  clearSongMeta()
-  liveBgFit = 'cover'
+function doLoadCountdown(track: TrackId, seconds: number): void {
+  const t = tracks[track]
+  clearCountdown(track)
+  t.songId = null
+  t.scriptureRef = null
+  clearSongMeta(track)
+  t.bgFit = 'cover'
   const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   let remaining = seconds
-  liveSong = { title: 'Countdown', lines: [fmt(remaining)], background: null }
-  liveSongTextColor = null; liveSongFont = null
-  state.mode = 'countdown' as Mode
-  state.index = 0
-  countdownTimer = setInterval(() => {
+  t.song = { title: 'Countdown', lines: [fmt(remaining)], background: null }
+  t.songTextColor = null; t.songFont = null
+  t.mode = 'countdown' as Mode
+  t.index = 0
+  t.countdownTimer = setInterval(() => {
     remaining--
     if (remaining <= 0) {
-      clearCountdown()
-      liveSong = { title: 'Countdown', lines: ['0:00'], background: null }
-      state.mode = 'black'
+      clearCountdown(track)
+      t.song = { title: 'Countdown', lines: ['0:00'], background: null }
+      t.mode = 'black'
       broadcast()
       return
     }
-    liveSong = { title: 'Countdown', lines: [fmt(remaining)], background: null }
+    t.song = { title: 'Countdown', lines: [fmt(remaining)], background: null }
     broadcast()
   }, 1000)
 }
@@ -815,7 +829,7 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
 // Returns false (leaving the current slide untouched) when the reference can't be
 // resolved, so callers don't mark a failed scripture "live" and strand the wrong
 // content on the projector.
-async function doLoadScripture(reference: string): Promise<boolean> {
+async function doLoadScripture(track: TrackId, reference: string): Promise<boolean> {
   const result = bibleTranslation === 'kjv'
     ? lookupScripture(reference)
     : await fetchScripture(reference, bibleTranslation)
@@ -826,19 +840,20 @@ async function doLoadScripture(reference: string): Promise<boolean> {
   if (result.usedFallback) {
     notifyOperator(`Online lookup failed — showing KJV for "${reference}"`, 'warn')
   }
-  clearCountdown()
-  liveSongId = null
-  liveScriptureRef = reference
-  clearSongMeta()
-  liveBgFit = 'cover'
+  const t = tracks[track]
+  clearCountdown(track)
+  t.songId = null
+  t.scriptureRef = reference
+  clearSongMeta(track)
+  t.bgFit = 'cover'
   const lines =
     result.verses.length === 1
       ? [result.verses[0].text]
       : result.verses.map((v) => `${v.n}  ${v.text}`)
-  liveSong = { title: result.reference!, lines, background: null }
-  liveSongTextColor = null; liveSongFont = null
-  state.mode = 'lyrics'
-  state.index = 0
+  t.song = { title: result.reference!, lines, background: null }
+  t.songTextColor = null; t.songFont = null
+  t.mode = 'lyrics'
+  t.index = 0
   return true
 }
 
@@ -860,39 +875,42 @@ function songLines(full: SongFull): string[] {
   return slides
 }
 
-async function doLoadSong(id: number): Promise<void> {
-  clearCountdown()
-  clearAutoAdvance()
+async function doLoadSong(track: TrackId, id: number): Promise<void> {
+  clearCountdown(track)
+  clearAutoAdvance(track)
   const full = await getSong(id)
   if (!full) return
-  liveSongId = id
-  liveScriptureRef = null
-  liveBgFit = 'cover'
-  liveSong = { title: full.title, lines: songLines(full), background: full.background ?? null, bgMotion: full.bgMotion ?? null }
-  liveFontScale = full.fontScale ?? 6
-  liveSongTextColor = full.textColor ?? null
-  liveSongFont = full.font ?? null
-  liveSongMeta = { author: full.author, copyright: full.copyright, ccli: full.ccli }
-  hmsLoadedAt = Date.now()  // Start hymn timer
-  verseNumber = 1
-  state.mode = 'lyrics'
-  state.index = 0
+  const t = tracks[track]
+  t.songId = id
+  t.scriptureRef = null
+  t.bgFit = 'cover'
+  t.song = { title: full.title, lines: songLines(full), background: full.background ?? null, bgMotion: full.bgMotion ?? null }
+  t.fontScale = full.fontScale ?? 6
+  t.songTextColor = full.textColor ?? null
+  t.songFont = full.font ?? null
+  t.songMeta = { author: full.author, copyright: full.copyright, ccli: full.ccli }
+  t.hmsLoadedAt = Date.now()  // Start hymn timer
+  t.verseNumber = 1
+  t.mode = 'lyrics'
+  t.index = 0
   logServiceEvent(`load-song: ${full.title}`)
   // Record CCLI usage once per service (reset when the active service changes).
+  // Dedup key is the song id, not the track — playing the same song on both
+  // tracks in one service still only logs it once, which is correct.
   if (!loggedSongIds.has(id)) {
     loggedSongIds.add(id)
     recordSongUsage({ songId: id, title: full.title, author: full.author, ccli: full.ccli, copyright: full.copyright })
   }
 }
 
-async function doLoadAnnouncement(id: number): Promise<void> {
+async function doLoadAnnouncement(track: TrackId, id: number): Promise<void> {
   const a = getAnnouncement(id)
   if (!a) return
   if (a.display === 'ticker') {
     // Title literally 'Announcement' triggers the ticker renderer (existing mechanism).
-    doLoadText('Announcement', a.body)
+    doLoadText(track, 'Announcement', a.body)
   } else {
-    doLoadText(a.title, a.body, a.background ?? null)
+    doLoadText(track, a.title, a.body, a.background ?? null)
   }
 }
 
@@ -934,46 +952,44 @@ async function computeItemSlides(item: ServiceItem): Promise<string[]> {
   return []
 }
 
-// Clear CCLI song metadata when a non-song goes live.
-function clearSongMeta(): void {
-  liveSongMeta = { author: null, copyright: null, ccli: null }
-}
-
 // Effective projector theme = the live item's override, else the service baseline.
-function applyItemTheme(item: ServiceItem | undefined): void {
+function applyItemTheme(track: TrackId, item: ServiceItem | undefined): void {
+  const t = tracks[track]
   if (item?.style?.theme) {
-    liveSlideTheme = item.style.theme
-    liveSlideThemeColors = item.style.colors ?? null
+    t.slideTheme = item.style.theme
+    t.slideThemeColors = item.style.colors ?? null
   } else {
-    liveSlideTheme = serviceSlideTheme
-    liveSlideThemeColors = serviceSlideThemeColors
+    t.slideTheme = serviceSlideTheme
+    t.slideThemeColors = serviceSlideThemeColors
   }
 }
 
-function doLoadMedia(filePath: string, title: string): void {
-  clearCountdown()
-  liveSongId = null
-  liveScriptureRef = null
-  clearSongMeta()
-  liveBgFit = 'contain'  // a whole-slide image — fit it entirely on screen
-  liveSong = { title: title || 'Media', lines: [''], background: filePath }
-  liveSongTextColor = null; liveSongFont = null
-  state.mode = 'lyrics'
-  state.index = 0
+function doLoadMedia(track: TrackId, filePath: string, title: string): void {
+  const t = tracks[track]
+  clearCountdown(track)
+  t.songId = null
+  t.scriptureRef = null
+  clearSongMeta(track)
+  t.bgFit = 'contain'  // a whole-slide image — fit it entirely on screen
+  t.song = { title: title || 'Media', lines: [''], background: filePath }
+  t.songTextColor = null; t.songFont = null
+  t.mode = 'lyrics'
+  t.index = 0
 }
 
-// Load any service item to live (used by tablet loadItem messages).
-async function handleTabletLoadItem(itemId: number): Promise<void> {
-  const item = activeServiceItems.find((it) => it.id === itemId)
+// Load any service item to live (used by tablet loadItem messages and the goLiveAt IPC).
+async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<void> {
+  const item = activeServiceItems.find((it) => it.id === itemId && it.track === track)
   if (!item) return
   if (item.type === 'song' && item.ref_id != null) {
-    await doLoadSong(item.ref_id)
+    await doLoadSong(track, item.ref_id)
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    if (!(await doLoadScripture(ref))) return  // lookup failed → don't mark it live
+    if (!(await doLoadScripture(track, ref))) return  // lookup failed → don't mark it live
   } else if (item.type === 'text') {
     doLoadText(
+      track,
       (item.payload.title as string) ?? '',
       (item.payload.body as string) ?? '',
       (item.payload.background as string) ?? null
@@ -981,27 +997,28 @@ async function handleTabletLoadItem(itemId: number): Promise<void> {
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    doLoadCountdown(secs)
+    doLoadCountdown(track, secs)
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return
-    doLoadMedia(p, item.title)
+    doLoadMedia(track, p, item.title)
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    doLoadCountdown(secs)
+    doLoadCountdown(track, secs)
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return
-    doLoadText('Announcement', txt)
+    doLoadText(track, 'Announcement', txt)
   } else if (item.type === 'announcement' && item.ref_id != null) {
-    await doLoadAnnouncement(item.ref_id)
+    await doLoadAnnouncement(track, item.ref_id)
   } else {
     return
   }
-  liveServiceItemId = item.id
-  liveItemNotes = item.notes ?? null
-  applyItemTheme(item)
+  const t = tracks[track]
+  t.serviceItemId = item.id
+  t.itemNotes = item.notes ?? null
+  applyItemTheme(track, item)
   broadcast()
 }
 
@@ -2246,6 +2263,8 @@ app.on('before-quit', () => {
   // writes its sidecar (fire-and-forget; the app is shutting down regardless).
   if (recordingSession.isActive()) void recordingSession.onServiceEnded()
   stopTabletServer()
-  clearCountdown()
-  clearAutoAdvance()
+  clearCountdown('main')
+  clearAutoAdvance('main')
+  clearCountdown('second')
+  clearAutoAdvance('second')
 })
