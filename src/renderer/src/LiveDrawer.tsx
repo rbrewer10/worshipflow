@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Music, BookOpen, Megaphone, Image as ImageIcon } from 'lucide-react'
+import Clock from './Clock'
 import SongsDrawerTab from './drawer/SongsDrawerTab'
 import ScriptureDrawerTab from './drawer/ScriptureDrawerTab'
 import AnnouncementsDrawerTab from './drawer/AnnouncementsDrawerTab'
@@ -37,7 +38,7 @@ function LiveDrawer(): JSX.Element {
 
   return (
     <div className="flex flex-shrink-0 flex-col border-t border-slate-200 bg-white">
-      <div className="flex items-center border-b border-slate-200">
+      <div className="flex items-center border-b border-slate-200 pr-3">
         {TABS.map(({ id, label, Icon }) => {
           const active = open === id
           return (
@@ -53,6 +54,8 @@ function LiveDrawer(): JSX.Element {
             </button>
           )
         })}
+        <div className="flex-1" />
+        <Clock />
       </div>
       <div
         className="overflow-hidden transition-[max-height] duration-200 ease-out"
