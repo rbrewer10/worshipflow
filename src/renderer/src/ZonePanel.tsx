@@ -111,7 +111,13 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
               {/* Track assignment — only shown once the service has a Second track */}
               {hasSecond && activeService && (
                 <div className="mb-1.5">
-                  <ZoneTrackToggle serviceId={activeService.id} zoneId={zoneId} assignment={trackAssignment} onChanged={setTrackAssignment} />
+                  <ZoneTrackToggle
+                    serviceId={activeService.id}
+                    zoneId={zoneId}
+                    assignment={trackAssignment}
+                    onChanged={setTrackAssignment}
+                    onPersisted={() => window.wf.zoneGetStates().then(setZoneStates)}
+                  />
                 </div>
               )}
               {/* Quick mode override buttons */}
