@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ServiceProvider } from './ServiceContext'
-import Sidebar from './Sidebar'
+import TopBar from './TopBar'
 import ServiceRail from './ServiceRail'
 import HomeView from './HomeView'
 import LiveView from './LiveView'
@@ -102,9 +102,9 @@ function AppShell(): JSX.Element {
   return (
     <ServiceProvider>
       <NotifyToasts />
-      <div className="flex h-screen flex-row overflow-hidden bg-[#e9ecf1] text-slate-900">
-        <Sidebar view={view} setView={setView} />
-        <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-screen flex-col overflow-hidden bg-[#e9ecf1] text-slate-900">
+        <TopBar view={view} setView={setView} />
+        <div className="flex min-h-0 flex-1 flex-col">
           {view === 'home' ? (
             <HomeView setView={setView} />
           ) : view === 'live' ? (
