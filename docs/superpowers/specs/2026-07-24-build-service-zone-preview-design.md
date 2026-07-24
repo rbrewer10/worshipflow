@@ -24,9 +24,11 @@ The strip badge itself needs the current assignment too (to color its cells) —
 
 ## Component changes
 
-- **New `src/renderer/src/ZoneTrackAssignmentPanel.tsx`** — the 4 zone rows + Main/Second buttons, extracted verbatim from `ZonePanel.tsx`. Props: `serviceId: number`, `assignment: ZoneTrackAssignment`, `onChanged: (next: ZoneTrackAssignment) => void` (so the caller can update its own local copy/badge without a full re-fetch).
-- **`ZonePanel.tsx`** — replaces its inline zone-track buttons with `<ZoneTrackAssignmentPanel .../>`. No behavior change; this is a pure extraction.
-- **New small strip badge in `ServiceDeck.tsx`** — sits next to the Main/Second tab strip, only when `hasSecond`. Click opens a popover (simple absolutely-positioned panel, closes on outside click — matches the existing "Add item" panel's show/hide pattern in the same file) containing `ZoneTrackAssignmentPanel`.
+*(As implemented, the shared component is `ZoneTrackToggle.tsx` — one zone's button pair, not a 4-row panel. `ZonePanel.tsx`'s rows interleave the toggle with mode-override buttons in a way a monolithic panel couldn't reuse cleanly, so each consumer builds its own row loop around the shared per-zone toggle instead. Functionally equivalent to this section's original intent.)*
+
+- **New `src/renderer/src/ZoneTrackToggle.tsx`** — the Main/Second button pair for one zone, extracted verbatim from `ZonePanel.tsx`. Props: `serviceId: number`, `zoneId: ZoneId`, `assignment: ZoneTrackAssignment`, `onChanged: (next: ZoneTrackAssignment) => void`, plus an optional `onPersisted?: () => void` (fired after the IPC set resolves, so `ZonePanel` can refresh its zone-mode badges at the same point the pre-extraction inline code did — `ServiceDeck` omits it, since Build Service has no mode badges to refresh).
+- **`ZonePanel.tsx`** — replaces its inline zone-track buttons with `<ZoneTrackToggle .../>` per zone, in the same position. No behavior/layout change; this is a pure extraction.
+- **New small strip badge in `ServiceDeck.tsx`** (`ZoneTrackStripBadge.tsx`) — sits next to the Main/Second tab strip, only when `hasSecond`. Click opens a popover (closes on outside click or Escape) listing all 4 zones, each with a `ZoneTrackToggle`.
 
 ## Non-goals
 
