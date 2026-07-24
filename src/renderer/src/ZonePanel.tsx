@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { ZoneId, ZoneState, ServiceItem, TrackId } from '../../shared/types'
+import type { ZoneId, ZoneState, ServiceItem } from '../../shared/types'
 import { ZONE_NAMES, DEFAULT_ZONE_TRACK } from '../../shared/types'
 import type { ZoneTrackAssignment } from '../../shared/zoneTrack'
 import { MODE_LABELS } from './ZoneRoutingGrid'
 import SceneChips from './SceneChips'
+import ZoneTrackToggle from './ZoneTrackToggle'
 import { useService } from './ServiceContext'
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
@@ -73,18 +74,6 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
     )
   }
 
-  const setZoneTrack = (zoneId: ZoneId, track: TrackId): void => {
-    const serviceId = activeService?.id
-    if (serviceId == null) return
-    setTrackAssignment((prev) => {
-      const next = { ...prev, [zoneId]: track }
-      void window.wf.zoneTrackAssignmentSet(serviceId, next).then(() =>
-        window.wf.zoneGetStates().then(setZoneStates)
-      )
-      return next
-    })
-  }
-
   return (
     <div className="space-y-3">
       {/* Section header */}
@@ -120,19 +109,9 @@ function ZonePanel({ liveItem, reloadActiveService }: { liveItem: ServiceItem | 
                 </span>
               </div>
               {/* Track assignment — only shown once the service has a Second track */}
-              {hasSecond && (
-                <div className="mb-1.5 flex gap-1">
-                  {(['main', 'second'] as TrackId[]).map((tb) => (
-                    <button
-                      key={tb}
-                      onClick={() => setZoneTrack(zoneId, tb)}
-                      className={`rounded px-2 py-0.5 text-[10px] font-semibold ring-1 ring-slate-200 transition-colors ${
-                        trackAssignment[zoneId] === tb ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {tb === 'main' ? 'Main' : 'Second'}
-                    </button>
-                  ))}
+              {hasSecond && activeService && (
+                <div className="mb-1.5">
+                  <ZoneTrackToggle serviceId={activeService.id} zoneId={zoneId} assignment={trackAssignment} onChanged={setTrackAssignment} />
                 </div>
               )}
               {/* Quick mode override buttons */}
