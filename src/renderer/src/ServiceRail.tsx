@@ -39,7 +39,7 @@ function ServiceRail(): JSX.Element {
     }
     setPendingId(it.id)
     pendingTimer.current = setTimeout(() => {
-      sendItemLive(it)
+      sendItemLive(it, 'main')
       setPendingId(null)
     }, 1500)
   }

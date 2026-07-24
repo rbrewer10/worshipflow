@@ -30,7 +30,7 @@ export async function addAndGoLive(
       notifyLocal('Could not load the new item.', 'error')
       return false
     }
-    const wentLive = await sendItemLive(item)
+    const wentLive = await sendItemLive(item, 'main')
     if (!wentLive) {
       // The item was already added to the service — deliberately left in place
       // (matches existing Build Service behavior for a bad reference) so the

@@ -1,4 +1,4 @@
-import type { ServiceItem } from '../../shared/types'
+import type { ServiceItem, TrackId } from '../../shared/types'
 
 // Shared live-load helpers used by both LiveView and the service deck builder.
 
@@ -25,18 +25,19 @@ export function canGoLive(item: ServiceItem): boolean {
   )
 }
 
-export async function sendItemLive(item: ServiceItem): Promise<boolean> {
+export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<boolean> {
   if (item.type === 'song' && item.ref_id != null) {
-    await window.wf.liveLoadSong(item.ref_id)
+    await window.wf.liveLoadSong(track, item.ref_id)
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return false
     // A failed lookup must NOT mark the item live — that would leave the previous
     // content on screen re-themed as scripture while the deck says scripture is live.
-    const ok = await window.wf.liveLoadScripture(ref)
+    const ok = await window.wf.liveLoadScripture(track, ref)
     if (!ok) return false
   } else if (item.type === 'text') {
     await window.wf.liveLoadText(
+      track,
       (item.payload.title as string) ?? '',
       (item.payload.body as string) ?? '',
       (item.payload.background as string) ?? null
@@ -44,26 +45,26 @@ export async function sendItemLive(item: ServiceItem): Promise<boolean> {
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return false
-    await window.wf.liveLoadCountdown(secs)
+    await window.wf.liveLoadCountdown(track, secs)
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return false
-    await window.wf.liveLoadMedia(p, item.title)
+    await window.wf.liveLoadMedia(track, p, item.title)
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return false
-    await window.wf.liveLoadCountdown(secs)
+    await window.wf.liveLoadCountdown(track, secs)
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return false
-    await window.wf.liveLoadText('Announcement', txt)
+    await window.wf.liveLoadText(track, 'Announcement', txt)
   } else if (item.type === 'announcement' && item.ref_id != null) {
-    await window.wf.liveLoadAnnouncement(item.ref_id)
+    await window.wf.liveLoadAnnouncement(track, item.ref_id)
   } else if (item.type === 'sermon') {
-    window.wf.sendIntent('logo')
+    window.wf.sendIntent(track, 'logo')
   } else {
     return false
   }
-  await window.wf.liveSetItemId(item.id)
+  await window.wf.liveSetItemId(track, item.id)
   return true
 }
