@@ -5,6 +5,7 @@ export type { ThemeColors } from './themes'
 
 export type Mode = 'lyrics' | 'black' | 'logo' | 'countdown'
 export type Intent = 'next' | 'prev' | 'black' | 'logo' | 'lyrics'
+export type TrackId = 'main' | 'second'
 export type Theme = 'modern-church' | 'minimalist' | 'vibrant' | 'dark-premium'
 export type BibleTranslation = 'kjv' | 'web' | 'bbe'
 
@@ -163,6 +164,7 @@ export interface ServiceItem {
   notes: string | null
   style: ItemStyle | null
   zoneRouting: ZoneRouting | null
+  track: TrackId
 }
 
 export interface ServiceFull extends ServiceSummary {
@@ -175,6 +177,7 @@ export interface NewServiceItem {
   type: ServiceItemType
   ref_id?: number | null
   payload?: Record<string, unknown>
+  track?: TrackId
 }
 
 // --- Multi-zone display system ---
@@ -226,6 +229,10 @@ export const ZONE_NAMES: Record<ZoneId, string> = {
   3: 'Lyrics TVs',
   4: 'Stage Monitors',
 }
+
+// Which track a zone follows when a service has no explicit zone_track_assignment.
+// Back Right defaults to Second (the natural "extra screen"); trivially overridden per service.
+export const DEFAULT_ZONE_TRACK: Record<ZoneId, TrackId> = { 1: 'main', 2: 'second', 3: 'main', 4: 'main' }
 
 // --- Scripture / KJV ---
 export interface ScriptureVerse {
