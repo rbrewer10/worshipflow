@@ -39,7 +39,7 @@ export default function ServiceSlidePreview({
 
   // Resolve a file/image background by item type (else fall back to gradient).
   let bgFile: string | null = null
-  if (item.type === 'text') {
+  if (item.type === 'text' || item.type === 'scripture' || item.type === 'countdown' || item.type === 'welcome') {
     const b = payload.background as string | undefined
     if (b) bgFile = b
   } else if (item.type === 'image') {
