@@ -49,6 +49,7 @@ export interface LiveState {
   slideThemeColors?: ThemeColors | null
   songTextColor?: string | null
   songFont?: string | null
+  blurBehindText?: boolean       // draw a blurred/tinted band behind the live text
 }
 
 export interface DisplayInfo {
@@ -103,6 +104,7 @@ export interface SongFull extends SongSummary {
   bgMotion: 'pan' | 'zoom' | 'shimmer' | null
   textColor: string | null
   font: FontKey | null
+  blurBehindText?: boolean
 }
 
 export interface SongInput {
@@ -119,6 +121,7 @@ export interface SongInput {
   bgMotion?: 'pan' | 'zoom' | 'shimmer' | null
   textColor?: string | null
   font?: FontKey | null
+  blurBehindText?: boolean
 }
 
 // A song parsed from a PowerPoint (.pptx) file, pending import.
@@ -206,6 +209,7 @@ export interface ZoneState {
   bgOverlay: number | null      // 0-1 opacity of readability overlay
   textAlign: string | null      // 'left' | 'center' | 'right'
   textPosition: string | null   // 'top' | 'center' | 'bottom'
+  blurBehindText?: boolean      // blurred/tinted band behind the main line/content
 }
 
 // Per-service-item zone routing: what each zone shows when this item is live.
@@ -269,6 +273,7 @@ export interface AnnouncementSummary {
 export interface Announcement extends AnnouncementSummary {
   body: string
   background: string | null // image/video file path (slide only); null = service theme
+  blurBehindText?: boolean  // slide-display only
 }
 
 export interface AnnouncementInput {
@@ -276,6 +281,7 @@ export interface AnnouncementInput {
   body: string
   display: AnnouncementDisplay
   background?: string | null
+  blurBehindText?: boolean
   frequency: AnnouncementFrequency
   startDate?: string | null
   endDate?: string | null
