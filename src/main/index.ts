@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
-import { join, basename, dirname, resolve, relative } from 'path'
+import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
 import { randomUUID } from 'crypto'
 import { createServer } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
@@ -157,8 +157,11 @@ function validateMediaPath(requestedPath: string): string | null {
     // Check if REAL path is within any allowed root
     for (const root of allowedRoots) {
       const rel = relative(root, realPath)
-      // relative() returns ".." prefix if outside the root
-      if (!rel.startsWith('..') && existsSync(realPath)) {
+      // relative() returns ".." prefix if outside the root. On Windows, relative()
+      // between paths on different drives (or a UNC path) returns an ABSOLUTE path
+      // instead of a ".."-prefixed one, since there's no relative form across drives —
+      // reject that case too, or it would incorrectly pass containment.
+      if (!rel.startsWith('..') && !isAbsolute(rel) && existsSync(realPath)) {
         return realPath
       }
     }
