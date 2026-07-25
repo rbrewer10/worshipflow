@@ -10,7 +10,7 @@ import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
 import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput } from '../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
-import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
+import { parseSceneConfig, validateSceneConfig, defaultRoutingFor, contentModeFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
@@ -559,8 +559,9 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     // Get routing for the active item on this zone's track (or defaults: scene
     // palette typeDefault, falling back to the built-in ZONE_ROUTING_DEFAULTS).
     let routing: ZoneRouting | null = null
+    let item: ServiceItem | undefined
     if (t.serviceItemId != null) {
-      const item = activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === zoneTrack)
+      item = activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === zoneTrack)
       if (item) {
         const stored = getItemZoneRouting(item.id)
         if (stored) {
@@ -590,8 +591,19 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     const idleDefault: ZoneMode = (zoneId === 1 || zoneId === 2)
       ? (trackShowingContent ? (t.mode === 'countdown' ? 'countdown' : 'text') : 'logo')
       : 'off'
-    const routedMode = override ?? (routing ? routing[zoneId] : idleDefault)
-    const mode = routedMode ?? 'off'
+    // A zone the operator has manually reassigned away from its default track
+    // (via the Screens strip / ZonePanel Main-Second toggle) is a deliberate,
+    // explicit choice — it should show that track's actual content regardless
+    // of the live item's own per-item Screens preset (e.g. "Back screens only"
+    // excluding zone 3), which was authored without this reassignment in mind.
+    // Scoped to zones 1-3 (the content zones STARTER_SCENES covers) — zone 4
+    // stays governed by its own routing/idleDefault as before, since Stage
+    // Monitors is a distinct physical function, not an audience content zone.
+    const isReassigned = zoneId !== 4 && zoneTrack !== DEFAULT_ZONE_TRACK[zoneId]
+    const autoMode = isReassigned
+      ? (item ? contentModeFor(item.type) : idleDefault)
+      : (routing ? routing[zoneId] : idleDefault)
+    const mode = override ?? autoMode ?? 'off'
 
     const base: ZoneState = {
       mode,
