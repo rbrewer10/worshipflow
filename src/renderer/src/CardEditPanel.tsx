@@ -63,7 +63,11 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
       sections,
       arrangement: validArr.length ? validArr : null,
       fontScale: songFull.fontScale,
-      linesPerSlide: songFull.linesPerSlide
+      linesPerSlide: songFull.linesPerSlide,
+      bgMotion: songFull.bgMotion,
+      textColor: songFull.textColor,
+      font: songFull.font,
+      blurBehindText: songFull.blurBehindText
     }
     window.wf.songUpdate(songFull.id, input).then(() => {
       setSongSaved(true)
