@@ -30,7 +30,7 @@ describe('resolveBackgroundApply', () => {
     expect(resolveBackgroundApply(item, '/bg/c.jpg')).toEqual({ kind: 'unsupported', itemType: 'song' })
   })
 
-  it.each(['scripture', 'countdown', 'welcome'] as const)('targets the item payload for a %s item', (type) => {
+  it.each(['scripture', 'countdown', 'welcome', 'sermon'] as const)('targets the item payload for a %s item', (type) => {
     const item = makeItem({ type, payload: { seconds: 300 } })
     expect(resolveBackgroundApply(item, '/bg/d.jpg')).toEqual({
       kind: 'payload',
