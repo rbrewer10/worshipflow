@@ -229,6 +229,11 @@ interface LiveTrackState {
   autoAdvanceTimer: ReturnType<typeof setInterval> | null
   autoAdvanceDuration: number
   autoAdvanceLoop: boolean
+  // Bumped synchronously at the start of every load* function. Lets an async
+  // loader (doLoadScripture's network fetch) detect, after its await resolves,
+  // that something else has since loaded onto this track — so it can bail out
+  // instead of clobbering newer live content. See doLoadScripture.
+  loadGeneration: number
 }
 
 function createTrackState(song: LiveTrackState['song']): LiveTrackState {
@@ -255,7 +260,8 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     countdownTimer: null,
     autoAdvanceTimer: null,
     autoAdvanceDuration: 0,
-    autoAdvanceLoop: false
+    autoAdvanceLoop: false,
+    loadGeneration: 0
   }
 }
 
@@ -796,6 +802,7 @@ function processIntent(track: TrackId, type: Intent): void {
 // --- Extracted load functions (used by IPC handlers and tablet loadItem) ---
 function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number, blurBehindText?: boolean): void {
   const t = tracks[track]
+  t.loadGeneration++
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -818,6 +825,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
 
 function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): void {
   const t = tracks[track]
+  t.loadGeneration++
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -875,11 +883,22 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
 // resolved, so callers don't mark a failed scripture "live" and strand the wrong
 // content on the projector.
 async function doLoadScripture(track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> {
+  // Bump the generation synchronously, before the (possibly slow, non-KJV)
+  // network await, and remember our value. If anything else loads onto this
+  // track while we're waiting — including another scripture lookup — that call
+  // bumps the generation again, so when we resolve we can tell we've been
+  // superseded and bail out without touching live state. See
+  // LiveTrackState.loadGeneration.
+  const generation = ++tracks[track].loadGeneration
   const result = bibleTranslation === 'kjv'
     ? lookupScripture(reference)
     : await fetchScripture(reference, bibleTranslation)
   if (!result.ok || !result.verses) {
     logWarn(`[scripture] lookup failed for reference="${reference}" translation=${bibleTranslation}`)
+    return false
+  }
+  if (tracks[track].loadGeneration !== generation) {
+    logWarn(`[scripture] discarding stale lookup for reference="${reference}" — track "${track}" moved on while fetching`)
     return false
   }
   if (result.usedFallback) {
@@ -923,11 +942,12 @@ function songLines(full: SongFull): string[] {
 }
 
 async function doLoadSong(track: TrackId, id: number): Promise<void> {
+  const t = tracks[track]
+  t.loadGeneration++
   clearCountdown(track)
   clearAutoAdvance(track)
   const full = await getSong(id)
   if (!full) return
-  const t = tracks[track]
   t.songId = id
   t.scriptureRef = null
   t.bgFit = 'cover'
@@ -1014,6 +1034,7 @@ function applyItemTheme(track: TrackId, item: ServiceItem | undefined): void {
 
 function doLoadMedia(track: TrackId, filePath: string, title: string): void {
   const t = tracks[track]
+  t.loadGeneration++
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -1690,9 +1711,13 @@ ipcMain.handle('wf:features:setBibleTranslation', async (_e, trans: BibleTransla
   if (t.scriptureRef) {
     const ref = t.scriptureRef
     const keepIndex = t.index
-    await doLoadScripture('main', ref)
-    t.index = Math.min(keepIndex, t.song.lines.length - 1)
-    broadcast()
+    // doLoadScripture can bail out (returning false, leaving t.song untouched) if
+    // the track moved on to something else while this translation-reload fetch
+    // was in flight — don't clobber whatever loaded in the meantime.
+    if (await doLoadScripture('main', ref)) {
+      t.index = Math.min(keepIndex, t.song.lines.length - 1)
+      broadcast()
+    }
   }
 })
 
