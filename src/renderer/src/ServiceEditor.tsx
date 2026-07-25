@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
 import ThemePicker from './ThemePicker'
 import ServiceDeck from './ServiceDeck'
@@ -6,6 +6,7 @@ import CardEditPanel from './CardEditPanel'
 import ServiceSlidePreview from './ServiceSlidePreview'
 import { sendItemLive } from './liveActions'
 import ScheduledAnnouncements from './ScheduledAnnouncements'
+import { useOptionalService } from './ServiceContext'
 
 function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   serviceId: number
@@ -23,6 +24,24 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const [selectedSongFull, setSelectedSongFull] = useState<SongFull | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<ServiceItem | null>(null)
   const [track, setTrack] = useState<TrackId>('main')
+
+  const optionalSvc = useOptionalService()
+
+  // Mirror this component's selection outward so the Live Drawer (a sibling in
+  // the tree, only reachable via ServiceContext) knows what's selected when
+  // Build Service is the active screen. No-op in the standalone pop-out window,
+  // which has no ServiceProvider — optionalSvc is null there.
+  useEffect(() => {
+    optionalSvc?.setSelectedItemId(selectedId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+
+  // Clear the mirrored selection on unmount (e.g. navigating away from Build
+  // Service), so a stale id doesn't linger once this screen isn't showing.
+  useEffect(() => {
+    return () => { optionalSvc?.setSelectedItemId(null) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const reload = async (): Promise<void> => {
     const s = await window.wf.serviceGet(serviceId)
@@ -43,6 +62,18 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     setTrack('main')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceId])
+
+  // Re-fetch this component's own copy of the service whenever something
+  // outside it (e.g. the Live Drawer applying a background to the selected
+  // item) calls the shared context's reloadActiveService(). ServiceEditor
+  // fetches its own data independently of ServiceContext's activeService, so
+  // without this its on-screen preview would go stale after such an edit.
+  const skipFirstTick = useRef(true)
+  useEffect(() => {
+    if (skipFirstTick.current) { skipFirstTick.current = false; return }
+    if (optionalSvc) reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionalSvc?.itemsChangedTick])
 
   useEffect(() => {
     const off = window.wf.onState(setLive)
