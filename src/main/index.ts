@@ -611,6 +611,14 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       const secs = parseInt(parts[1] ?? '0', 10)
       base.secondsLeft = (isNaN(mins) ? 0 : mins) * 60 + (isNaN(secs) ? 0 : secs)
       base.title = live.songTitle
+      // Same background resolution the lyrics/text branch already does — a real
+      // file background passes through as-is; a `theme:<id>` background can't be
+      // loaded as a file by the zone page, so resolve it to colors for the
+      // animated gradient instead.
+      const isThemeBg = live.background?.startsWith('theme:') ?? false
+      const themeId = isThemeBg ? live.background!.slice(6) : (live.slideTheme ?? null)
+      base.background = isThemeBg ? null : live.background
+      base.themeColors = resolveColors(getTheme(themeId), live.slideThemeColors)
     } else if (mode === 'image') {
       const item = activeServiceItems.find((it) => it.id === t.serviceItemId)
       base.imagePath = item ? ((item.payload.path as string) ?? null) : null
