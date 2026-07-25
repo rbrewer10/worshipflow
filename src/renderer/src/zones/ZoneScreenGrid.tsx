@@ -8,6 +8,7 @@ import ScenePresetRow from '../ScenePresetRow'
 import ZoneRoutingGrid from '../ZoneRoutingGrid'
 import ZoneRolePalette from './ZoneRolePalette'
 import ZoneScreenCard from './ZoneScreenCard'
+import ZoneSlideFilmstrip from './ZoneSlideFilmstrip'
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
@@ -15,24 +16,30 @@ const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 // 2x2 grid of live previews, and the raw-mode Advanced escape hatch. Writes the
 // same per-item zone_routing the scene chips always have, through the existing
 // zoneSetRouting IPC — no new persistence.
-export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceColors, songFull, onChanged }: {
+export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceColors, songFull, slides, onChanged }: {
   item: ServiceItem
   serviceId: number
   serviceTheme: string | null
   serviceColors: ThemeColors | null
   songFull: SongFull | null
+  slides: string[]
   onChanged: () => void
 }): JSX.Element {
   const [config, setConfig] = useState<SceneConfig | null>(null)
   const [logoPath, setLogoPath] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [trackAssignment, setTrackAssignment] = useState<ZoneTrackAssignment>(DEFAULT_ZONE_TRACK)
+  const [selectedSlide, setSelectedSlide] = useState(0)
 
   useEffect(() => { void window.wf.scenesGet().then(setConfig) }, [])
   useEffect(() => { void window.wf.logoGet().then(({ logoPath: p }) => setLogoPath(p)) }, [])
   useEffect(() => {
     void window.wf.zoneTrackAssignmentGet(serviceId).then(setTrackAssignment)
   }, [serviceId])
+
+  // A different item (or an edit that changes the slide count) must not leave
+  // the strip pointing past the end of the new slide list.
+  useEffect(() => { setSelectedSlide(0) }, [item.id, slides.length])
 
   if (!config) return <></>
 
@@ -88,11 +95,14 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
               logoPath={logoPath}
               offTrack={offTrack}
               offTrackLabel={trackAssignment[zoneId] === 'main' ? 'Follows Main' : 'Follows Second'}
+              slideText={slides[selectedSlide]}
               onRoleChange={(role) => setRole(zoneId, role)}
             />
           )
         })}
       </div>
+
+      <ZoneSlideFilmstrip slides={slides} selected={selectedSlide} onSelect={setSelectedSlide} />
 
       <div>
         <button
