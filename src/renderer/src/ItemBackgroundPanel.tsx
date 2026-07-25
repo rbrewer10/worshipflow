@@ -11,8 +11,8 @@ import BackgroundLibraryGrid from './BackgroundLibraryGrid'
 
 // Item types whose live rendering actually shows a custom file background —
 // Song has its own separate background system, Image's payload.path already
-// IS the background, and Sermon/Ticker/Announcement don't support one yet.
-const FILE_BACKGROUND_TYPES: ServiceItemType[] = ['text', 'scripture', 'countdown', 'welcome']
+// IS the background, and Ticker/Announcement don't support one yet.
+const FILE_BACKGROUND_TYPES: ServiceItemType[] = ['text', 'scripture', 'countdown', 'welcome', 'sermon']
 
 export interface ItemBackgroundPanelProps {
   item: ServiceItem

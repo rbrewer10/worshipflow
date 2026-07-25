@@ -39,7 +39,7 @@ export default function ServiceSlidePreview({
 
   // Resolve a file/image background by item type (else fall back to gradient).
   let bgFile: string | null = null
-  if (item.type === 'text' || item.type === 'scripture' || item.type === 'countdown' || item.type === 'welcome') {
+  if (item.type === 'text' || item.type === 'scripture' || item.type === 'countdown' || item.type === 'welcome' || item.type === 'sermon') {
     const b = payload.background as string | undefined
     if (b) bgFile = b
   } else if (item.type === 'image') {
@@ -54,7 +54,7 @@ export default function ServiceSlidePreview({
   // same dual-source split as `bgFile` above: payload for the four style-driven
   // types, the referenced song's own field for Song.
   const blurBehindText =
-    item.type === 'text' || item.type === 'scripture' || item.type === 'countdown' || item.type === 'welcome'
+    item.type === 'text' || item.type === 'scripture' || item.type === 'countdown' || item.type === 'welcome' || item.type === 'sermon'
       ? !!(payload.blurBehindText as boolean | undefined)
       : item.type === 'song'
         ? !!songFull?.blurBehindText
@@ -185,6 +185,24 @@ export default function ServiceSlidePreview({
             <div className="text-2xl font-bold leading-tight" style={baseTextStyle}>
               {item.title}
             </div>
+          </div>
+        )
+      }
+      case 'sermon': {
+        const title = (payload.title as string | undefined) || 'Sermon'
+        const speaker = payload.speaker as string | undefined
+        const passage = payload.passage as string | undefined
+        const sub = [speaker, passage].filter(Boolean).join('  ·  ')
+        return (
+          <div className="flex flex-col items-center gap-2 px-6 text-center">
+            <div className="text-2xl font-bold leading-tight" style={baseTextStyle}>
+              {title}
+            </div>
+            {sub && (
+              <div className="text-xs" style={{ ...baseTextStyle, opacity: 0.7 }}>
+                {sub}
+              </div>
+            )}
           </div>
         )
       }
