@@ -18,7 +18,7 @@ describe('resolveBackgroundApply', () => {
   it('targets the item payload for a text item, preserving existing fields', () => {
     const item = makeItem({ type: 'text', payload: { title: 'Welcome', body: 'Hi' } })
     expect(resolveBackgroundApply(item, '/bg/b.jpg')).toEqual({
-      kind: 'text',
+      kind: 'payload',
       itemId: item.id,
       payload: { title: 'Welcome', body: 'Hi', background: '/bg/b.jpg' },
       path: '/bg/b.jpg'
@@ -30,8 +30,18 @@ describe('resolveBackgroundApply', () => {
     expect(resolveBackgroundApply(item, '/bg/c.jpg')).toEqual({ kind: 'unsupported', itemType: 'song' })
   })
 
+  it.each(['scripture', 'countdown', 'welcome'] as const)('targets the item payload for a %s item', (type) => {
+    const item = makeItem({ type, payload: { seconds: 300 } })
+    expect(resolveBackgroundApply(item, '/bg/d.jpg')).toEqual({
+      kind: 'payload',
+      itemId: item.id,
+      payload: { seconds: 300, background: '/bg/d.jpg' },
+      path: '/bg/d.jpg'
+    })
+  })
+
   it('is unsupported for item types with no background concept', () => {
-    const item = makeItem({ type: 'scripture' })
-    expect(resolveBackgroundApply(item, '/bg/d.jpg')).toEqual({ kind: 'unsupported', itemType: 'scripture' })
+    const item = makeItem({ type: 'image' })
+    expect(resolveBackgroundApply(item, '/bg/e.jpg')).toEqual({ kind: 'unsupported', itemType: 'image' })
   })
 })
