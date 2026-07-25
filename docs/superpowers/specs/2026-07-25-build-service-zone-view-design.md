@@ -2,6 +2,9 @@
 
 **Date:** 2026-07-25
 **Status:** Approved, pending implementation plan
+**Phase 1 of 2.** Phase 2 is `2026-07-25-multi-zone-slide-composer-design.md`,
+which adds authored per-slide, per-zone content decks for sermon and text items
+and reuses the `ZoneScreenCard` this phase builds.
 
 ## Goal
 
@@ -165,10 +168,10 @@ Every zone card is therefore editable, and all four behave identically.
 
 ## Out of scope
 
-- Per-slide zone routing (verse 1 everywhere, chorus lyrics-only). Slides have
-  no persistent identity — `computeItemSlides()` derives `string[]` on the fly
-  from lyrics, `linesPerSlide`, and arrangement — so this needs a storage model
-  that survives lyric edits. Explicitly deferred.
+- Per-slide, per-zone content authoring. Deferred to Phase 2, which adds a
+  `service_item.zone_slides` deck for sermon and text items — see
+  `2026-07-25-multi-zone-slide-composer-design.md`. It is out of scope here
+  because this phase deliberately makes no data-model change.
 - Independent per-zone slide cursors (Back Left on slide 3 while Lyrics TVs are
   on slide 7). The Main/Second track pair already covers the real use case.
 - Dragging backgrounds or images onto a zone. The Backgrounds drawer already
