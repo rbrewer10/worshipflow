@@ -173,6 +173,21 @@ export default function ServiceSlidePreview({
           </div>
         )
       }
+      case 'announcement': {
+        return (
+          <div className="flex flex-col items-center gap-2 px-6 text-center">
+            <div
+              className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+              style={{ ...baseTextStyle, opacity: 0.6 }}
+            >
+              Announcement
+            </div>
+            <div className="text-2xl font-bold leading-tight" style={baseTextStyle}>
+              {item.title}
+            </div>
+          </div>
+        )
+      }
       default:
         return <></>
     }
