@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ZoneId, ZoneMode, ServiceItem, ThemeColors, SongFull } from '../../../shared/types'
 import { ZONE_NAMES } from '../../../shared/types'
 import type { ZoneRole } from '../../../shared/zoneScenes'
@@ -30,6 +30,15 @@ export default function ZoneScreenCard({
   const role = roleForMode(mode)
   const editable = role !== null
 
+  // dragend fires on the drag SOURCE, so a cancelled drag (Esc, or a drop
+  // outside any target) never reaches this card's own dragleave/drop handlers
+  // and would leave the highlight stuck on. Clear it globally instead.
+  useEffect(() => {
+    const clear = (): void => setDragOver(false)
+    window.addEventListener('dragend', clear)
+    return () => window.removeEventListener('dragend', clear)
+  }, [])
+
   const cycle = (): void => {
     if (role === null) return
     onRoleChange(ROLES[(ROLES.indexOf(role) + 1) % ROLES.length])
@@ -38,6 +47,7 @@ export default function ZoneScreenCard({
   const handleDrop = (e: React.DragEvent): void => {
     e.preventDefault()
     setDragOver(false)
+    if (!editable) return
     const dropped = e.dataTransfer.getData(ROLE_DND_TYPE)
     if (dropped === 'content' || dropped === 'logo' || dropped === 'black') onRoleChange(dropped)
   }
