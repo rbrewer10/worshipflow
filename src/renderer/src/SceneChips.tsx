@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Pencil, Wrench } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import type { ServiceItem } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
 import { expandScene, effectiveRouting, matchScene } from '../../shared/zoneScenes'
-import ZoneStripBadge from './ZoneStripBadge'
 import ZoneRoutingGrid from './ZoneRoutingGrid'
 import SceneEditorModal from './SceneEditorModal'
+import ScenePresetRow from './ScenePresetRow'
 
 // One-tap scene chips for an item's zone routing, with "Edit scenes" and an
 // Advanced disclosure exposing the raw per-zone grid. Tapping a chip STAMPS the
@@ -51,29 +51,14 @@ export default function SceneChips({ item, onChanged }: {
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {config.scenes.map((s) => {
-          const active = matched === s.id
-          return (
-            <button
-              key={s.id}
-              onClick={() => pick(s.id)}
-              className={`flex flex-col items-start gap-1 rounded-lg border-2 px-2 py-1.5 text-[11px] font-semibold transition-colors ${
-                active ? 'border-blue-500 bg-blue-500/10 text-blue-800' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-              }`}
-            >
-              <ZoneStripBadge routing={expandScene(s, item.type)} title={s.name} />
-              <span>{s.name}{active && isDefault ? ' (default)' : ''}</span>
-            </button>
-          )
-        })}
-        {matched === 'custom' && (
-          <span className="flex flex-col items-start gap-1 rounded-lg border-2 border-slate-300 bg-slate-100 px-2 py-1.5 text-[11px] font-semibold text-slate-600">
-            <ZoneStripBadge routing={routing} />
-            <span className="inline-flex items-center gap-1"><Wrench size={10} /> Custom</span>
-          </span>
-        )}
-      </div>
+      <ScenePresetRow
+        config={config}
+        itemType={item.type}
+        routing={routing}
+        matched={matched}
+        isDefault={isDefault}
+        onPick={pick}
+      />
 
       {showAdvanced && (
         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-100/70 p-2.5">
