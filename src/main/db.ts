@@ -347,7 +347,7 @@ export function updateSong(id: number, input: SongInput): void {
   db.run('BEGIN')
   try {
     db.run(
-      'UPDATE song SET title = ?, author = ?, ccli = ?, copyright = ?, publisher = ?, arrangement = ?, font_scale = ?, lines_per_slide = ?, bg_motion = ?, text_color = ?, font = ? WHERE id = ?',
+      'UPDATE song SET title = ?, author = ?, ccli = ?, copyright = ?, publisher = ?, arrangement = ?, font_scale = ?, lines_per_slide = ?, bg_motion = ?, text_color = ?, font = ?, blur_behind_text = ? WHERE id = ?',
       [
         input.title,
         input.author ?? null,
@@ -360,6 +360,7 @@ export function updateSong(id: number, input: SongInput): void {
         input.bgMotion ?? null,
         input.textColor ?? null,
         input.font ?? null,
+        input.blurBehindText ? 1 : 0,
         id
       ]
     )

@@ -20,10 +20,11 @@ const TAB_LABELS: Record<'uploads' | 'presets' | 'ai', string> = {
   ai: 'AI Generate',
 }
 
-export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
+export default function BackgroundPanel({ song, onApply, onBgMotionChange, onBlurBehindTextChange }: {
   song: SongFull
   onApply: (bgPath: string) => void
   onBgMotionChange: (motion: SongFull['bgMotion']) => void
+  onBlurBehindTextChange: (value: boolean) => void
 }): JSX.Element {
   const [tab, setTab] = useState<'uploads' | 'presets' | 'ai'>('presets')
   const [aiPrompt, setAiPrompt] = useState('')
@@ -100,6 +101,21 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange }: {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ── Blur behind text ── */}
+      <div className="shrink-0 px-3 pt-2">
+        <button
+          onClick={() => onBlurBehindTextChange(!song.blurBehindText)}
+          className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
+            song.blurBehindText ? 'border-blue-400 bg-blue-500/10' : 'border-slate-200 bg-white'
+          }`}
+        >
+          <span className="text-[11px] font-semibold text-slate-700">Blur behind text</span>
+          <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${song.blurBehindText ? 'bg-blue-600' : 'bg-slate-300'}`}>
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${song.blurBehindText ? 'translate-x-4' : 'translate-x-1'}`} />
+          </span>
+        </button>
       </div>
 
       {/* ── Scrollable body ── */}

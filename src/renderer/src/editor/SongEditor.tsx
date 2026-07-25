@@ -52,7 +52,8 @@ export default function SongEditor({ songId, onSaved }: {
       linesPerSlide: updated.linesPerSlide,
       bgMotion: updated.bgMotion,
       textColor: updated.textColor,
-      font: updated.font
+      font: updated.font,
+      blurBehindText: updated.blurBehindText
     }
     await window.wf.songUpdate(songId, input)
     setSaving(false)
@@ -123,6 +124,13 @@ export default function SongEditor({ songId, onSaved }: {
     const updated = { ...song, bgMotion: motion }
     setSong(updated)
     await window.wf.songSetBgMotion(songId, motion)
+  }
+
+  const handleBlurBehindTextChange = async (value: boolean): Promise<void> => {
+    if (!song) return
+    const updated = { ...song, blurBehindText: value }
+    setSong(updated)
+    await window.wf.songSetBlurBehindText(songId, value)
   }
 
   const handleFontScaleChange = async (scale: number): Promise<void> => {
@@ -279,6 +287,7 @@ export default function SongEditor({ songId, onSaved }: {
           song={song}
           onApply={handleApplyBackground}
           onBgMotionChange={handleBgMotionChange}
+          onBlurBehindTextChange={handleBlurBehindTextChange}
         />
       </div>
     </div>
