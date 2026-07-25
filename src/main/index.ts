@@ -78,7 +78,7 @@ import { listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolde
 import { generateBackgroundImage } from './replicateApi'
 import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
-import { TABLET_PORT, TABLET_HTML } from './tabletHtml'
+import { TABLET_PORT, tabletHtml } from './tabletHtml'
 import { OBS_HTML } from './obsHtml'
 import { ZONE_HTML } from './zoneHtml'
 import { MULTIVIEW_HTML } from './multiviewHtml'
@@ -1157,7 +1157,7 @@ function startTabletServer(): void {
       }
     } else {
       res.writeHead(200, htmlHeaders)
-      res.end(TABLET_HTML)
+      res.end(tabletHtml(getSetting('church_name')?.trim() || 'Snow Hill Church'))
     }
   })
 

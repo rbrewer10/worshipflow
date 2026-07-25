@@ -1,6 +1,15 @@
 export const TABLET_PORT = 3691
 
-export const TABLET_HTML = `<!DOCTYPE html>
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// A function (not a static string) so it can bake in the church's own name —
+// set in Logo & Background settings — instead of a hardcoded one, matching
+// every other screen (projector, stage monitor, Volunteer view) which all
+// read the same setting via useChurchName().
+export function tabletHtml(churchName: string): string {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -63,7 +72,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="hdr-l">
-    <div id="hdr-title">Snow Hill Church</div>
+    <div id="hdr-title">${escHtml(churchName)}</div>
     <div id="hdr-sub">WorshipFlow</div>
   </div>
   <div id="hdr-r">
@@ -237,3 +246,4 @@ connect()
 </script>
 </body>
 </html>`
+}
