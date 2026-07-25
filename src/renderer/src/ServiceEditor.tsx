@@ -3,7 +3,7 @@ import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary, Announ
 import ThemePicker from './ThemePicker'
 import ServiceDeck from './ServiceDeck'
 import CardEditPanel from './CardEditPanel'
-import ServiceSlidePreview from './ServiceSlidePreview'
+import ZoneScreenGrid from './zones/ZoneScreenGrid'
 import { sendItemLive } from './liveActions'
 import ScheduledAnnouncements from './ScheduledAnnouncements'
 import { useOptionalService } from './ServiceContext'
@@ -174,23 +174,16 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
           />
         </div>
 
-        {/* Center: big preview */}
-        <div className="flex min-w-0 flex-1 items-center justify-center p-2">
+        {/* Center: the four zone screens for the selected item */}
+        <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto p-2">
           {selectedItem ? (
-            <div className="flex w-full flex-col items-center gap-3">
-              <ServiceSlidePreview
-                item={selectedItem}
-                serviceTheme={service.theme}
-                serviceColors={service.themeColors}
-                songFull={selectedSongFull}
-                className="max-w-3xl"
-              />
-              <div className="text-center text-xs text-slate-600">
-                <span className="capitalize">{selectedItem.type}</span>
-                <span className="px-1.5 text-slate-400">·</span>
-                <span className="text-slate-700">{selectedItem.title}</span>
-              </div>
-            </div>
+            <ZoneScreenGrid
+              item={selectedItem}
+              serviceTheme={service.theme}
+              serviceColors={service.themeColors}
+              songFull={selectedSongFull}
+              onChanged={reload}
+            />
           ) : (
             <div className="text-sm text-slate-500">Select an item to preview &amp; style it</div>
           )}

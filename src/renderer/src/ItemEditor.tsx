@@ -3,7 +3,6 @@ import { Trash2, X } from 'lucide-react'
 import type { ServiceItem, SongFull, ThemeColors } from '../../shared/types'
 import ServiceSlidePreview from './ServiceSlidePreview'
 import ItemBackgroundPanel from './ItemBackgroundPanel'
-import SceneChips from './SceneChips'
 import { SongEditor } from './editors/SongEditor'
 import { ScriptureEditor } from './editors/ScriptureEditor'
 import { TextEditor } from './editors/TextEditor'
@@ -177,11 +176,6 @@ export const ItemEditor = memo(function ItemEditor({
       {item.type === 'announcement' && (
         <AnnouncementItemEditor refId={item.ref_id} />
       )}
-
-      {/* ── Screens (zone scenes) ── */}
-      <div className="border-t border-slate-200 pt-3">
-        <SceneChips item={item} onChanged={onChanged} />
-      </div>
 
       {/* ── Background & Color ── */}
       <div className="border-t border-slate-200 pt-3">
