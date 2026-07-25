@@ -576,6 +576,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       bgOverlay: null,
       textAlign: null,
       textPosition: null,
+      blurBehindText: live.blurBehindText ?? false,
     }
 
     // Populate fields based on mode.
