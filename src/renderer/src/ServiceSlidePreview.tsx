@@ -19,6 +19,10 @@ export interface ServiceSlidePreviewProps {
   serviceColors: ThemeColors | null
   songFull?: SongFull | null
   className?: string
+  // Real resolved slide text for this item, when the caller has it (scripture
+  // verses come from a Bible lookup that can't run during render, so without
+  // this the scripture case can only show a placeholder).
+  overrideLine?: string
 }
 
 export default function ServiceSlidePreview({
@@ -26,7 +30,8 @@ export default function ServiceSlidePreview({
   serviceTheme,
   serviceColors,
   songFull,
-  className
+  className,
+  overrideLine
 }: ServiceSlidePreviewProps): JSX.Element {
   const payload = (item.payload ?? {}) as Record<string, unknown>
 
@@ -75,12 +80,21 @@ export default function ServiceSlidePreview({
         const reference = (payload.reference as string | undefined) || 'Reference'
         return (
           <div className="flex flex-col items-center gap-2 px-6 text-center">
-            <div className="text-3xl font-bold leading-tight" style={baseTextStyle}>
+            <div
+              className={overrideLine ? 'text-[10px] font-semibold uppercase tracking-[0.2em]' : 'text-3xl font-bold leading-tight'}
+              style={overrideLine ? { ...baseTextStyle, opacity: 0.8 } : baseTextStyle}
+            >
               {reference}
             </div>
-            <div className="text-xs" style={{ ...baseTextStyle, opacity: 0.6 }}>
-              Verse text appears on the projector when live
-            </div>
+            {overrideLine ? (
+              <div className="text-xl font-bold leading-tight" style={baseTextStyle}>
+                {overrideLine}
+              </div>
+            ) : (
+              <div className="text-xs" style={{ ...baseTextStyle, opacity: 0.6 }}>
+                Verse text appears on the projector when live
+              </div>
+            )}
           </div>
         )
       }
@@ -183,7 +197,7 @@ export default function ServiceSlidePreview({
               Announcement
             </div>
             <div className="text-2xl font-bold leading-tight" style={baseTextStyle}>
-              {item.title}
+              {overrideLine || item.title}
             </div>
           </div>
         )
