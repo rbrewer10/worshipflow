@@ -213,6 +213,7 @@ interface LiveTrackState {
   fontScale: number
   songTextColor: string | null
   songFont: string | null
+  blurBehindText: boolean
   bgFit: 'cover' | 'contain'
   stageMessage: string | null
   songMeta: { author: string | null; copyright: string | null; ccli: string | null }
@@ -239,6 +240,7 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     fontScale: 6,
     songTextColor: null,
     songFont: null,
+    blurBehindText: false,
     bgFit: 'cover',
     stageMessage: null,
     songMeta: { author: null, copyright: null, ccli: null },
@@ -514,7 +516,8 @@ function renderState(track: TrackId = 'main'): LiveState {
     slideTheme: t.slideTheme,
     slideThemeColors: t.slideThemeColors,
     songTextColor: t.songTextColor,
-    songFont: t.songFont
+    songFont: t.songFont,
+    blurBehindText: t.blurBehindText
   }
 }
 
@@ -789,7 +792,7 @@ function processIntent(track: TrackId, type: Intent): void {
 }
 
 // --- Extracted load functions (used by IPC handlers and tablet loadItem) ---
-function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number): void {
+function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number, blurBehindText?: boolean): void {
   const t = tracks[track]
   clearCountdown(track)
   t.songId = null
@@ -801,6 +804,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
   t.song = { title: title || 'Announcement', lines: lines.length ? lines : [title], background }
   t.songTextColor = null; t.songFont = null
+  t.blurBehindText = blurBehindText ?? false
   // Only a text item's own saved font size overrides the live size — tickers/
   // announcements (which pass no fontScale) leave whatever's currently set
   // untouched, same as before this per-item override existed.
@@ -809,7 +813,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   t.index = 0
 }
 
-function doLoadCountdown(track: TrackId, seconds: number, background?: string | null): void {
+function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): void {
   const t = tracks[track]
   clearCountdown(track)
   t.songId = null
@@ -821,6 +825,7 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
   const bg = background ?? null
   t.song = { title: 'Countdown', lines: [fmt(remaining)], background: bg }
   t.songTextColor = null; t.songFont = null
+  t.blurBehindText = blurBehindText ?? false
   t.mode = 'countdown' as Mode
   t.index = 0
   t.countdownTimer = setInterval(() => {
@@ -865,7 +870,7 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
 // Returns false (leaving the current slide untouched) when the reference can't be
 // resolved, so callers don't mark a failed scripture "live" and strand the wrong
 // content on the projector.
-async function doLoadScripture(track: TrackId, reference: string, background?: string | null): Promise<boolean> {
+async function doLoadScripture(track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> {
   const result = bibleTranslation === 'kjv'
     ? lookupScripture(reference)
     : await fetchScripture(reference, bibleTranslation)
@@ -888,6 +893,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
       : result.verses.map((v) => `${v.n}  ${v.text}`)
   t.song = { title: result.reference!, lines, background: background ?? null }
   t.songTextColor = null; t.songFont = null
+  t.blurBehindText = blurBehindText ?? false
   t.mode = 'lyrics'
   t.index = 0
   return true
@@ -1009,6 +1015,7 @@ function doLoadMedia(track: TrackId, filePath: string, title: string): void {
   t.bgFit = 'contain'  // a whole-slide image — fit it entirely on screen
   t.song = { title: title || 'Media', lines: [''], background: filePath }
   t.songTextColor = null; t.songFont = null
+  t.blurBehindText = false
   t.mode = 'lyrics'
   t.index = 0
 }
@@ -1022,19 +1029,20 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined))) return  // lookup failed → don't mark it live
+    if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined))) return  // lookup failed → don't mark it live
   } else if (item.type === 'text') {
     doLoadText(
       track,
       (item.payload.title as string) ?? '',
       (item.payload.body as string) ?? '',
       (item.payload.background as string) ?? null,
-      item.payload.fontScale as number | undefined
+      item.payload.fontScale as number | undefined,
+      item.payload.blurBehindText as boolean | undefined
     )
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    doLoadCountdown(track, secs, item.payload.background as string | null | undefined)
+    doLoadCountdown(track, secs, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return
@@ -1042,7 +1050,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    doLoadCountdown(track, secs, item.payload.background as string | null | undefined)
+    doLoadCountdown(track, secs, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return
@@ -1431,16 +1439,16 @@ ipcMain.handle('wf:getInfo', (): AppInfo => ({
 }))
 
 // --- Live engine ---
-ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: string, background?: string | null, fontScale?: number) => {
-  doLoadText(track, title, body, background ?? null, fontScale); broadcast()
+ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: string, background?: string | null, fontScale?: number, blurBehindText?: boolean) => {
+  doLoadText(track, title, body, background ?? null, fontScale, blurBehindText); broadcast()
 })
 
-ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, background?: string | null) => {
-  doLoadCountdown(track, seconds, background); broadcast()
+ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean) => {
+  doLoadCountdown(track, seconds, background, blurBehindText); broadcast()
 })
 
-ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string, background?: string | null): Promise<boolean> => {
-  const ok = await doLoadScripture(track, reference, background)
+ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> => {
+  const ok = await doLoadScripture(track, reference, background, blurBehindText)
   if (ok) broadcast()
   return ok
 })

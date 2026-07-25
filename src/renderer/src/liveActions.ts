@@ -33,7 +33,7 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
     if (!ref) return false
     // A failed lookup must NOT mark the item live — that would leave the previous
     // content on screen re-themed as scripture while the deck says scripture is live.
-    const ok = await window.wf.liveLoadScripture(track, ref, item.payload.background as string | null | undefined)
+    const ok = await window.wf.liveLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
     if (!ok) return false
   } else if (item.type === 'text') {
     await window.wf.liveLoadText(
@@ -41,12 +41,13 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
       (item.payload.title as string) ?? '',
       (item.payload.body as string) ?? '',
       (item.payload.background as string) ?? null,
-      item.payload.fontScale as number | undefined
+      item.payload.fontScale as number | undefined,
+      item.payload.blurBehindText as boolean | undefined
     )
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return false
-    await window.wf.liveLoadCountdown(track, secs, item.payload.background as string | null | undefined)
+    await window.wf.liveLoadCountdown(track, secs, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return false
@@ -54,7 +55,7 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return false
-    await window.wf.liveLoadCountdown(track, secs, item.payload.background as string | null | undefined)
+    await window.wf.liveLoadCountdown(track, secs, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return false

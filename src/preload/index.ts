@@ -130,12 +130,12 @@ const wf = {
   liveSaveFontScale: (track: TrackId): Promise<void> => ipcRenderer.invoke('wf:live:saveFontScale', track),
   liveSetStageMessage: (track: TrackId, msg: string | null): Promise<void> => ipcRenderer.invoke('wf:live:setStageMessage', track, msg),
   liveLoadSong: (track: TrackId, id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', track, id),
-  liveLoadScripture: (track: TrackId, reference: string, background?: string | null): Promise<boolean> =>
-    ipcRenderer.invoke('wf:live:loadScripture', track, reference, background),
-  liveLoadText: (track: TrackId, title: string, body: string, background?: string | null, fontScale?: number): Promise<void> =>
-    ipcRenderer.invoke('wf:live:loadText', track, title, body, background ?? null, fontScale),
-  liveLoadCountdown: (track: TrackId, seconds: number, background?: string | null): Promise<void> =>
-    ipcRenderer.invoke('wf:live:loadCountdown', track, seconds, background),
+  liveLoadScripture: (track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> =>
+    ipcRenderer.invoke('wf:live:loadScripture', track, reference, background, blurBehindText),
+  liveLoadText: (track: TrackId, title: string, body: string, background?: string | null, fontScale?: number, blurBehindText?: boolean): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadText', track, title, body, background ?? null, fontScale, blurBehindText),
+  liveLoadCountdown: (track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadCountdown', track, seconds, background, blurBehindText),
   liveLoadMedia: (track: TrackId, filePath: string, title: string): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadMedia', track, filePath, title),
 
