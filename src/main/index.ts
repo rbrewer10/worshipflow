@@ -73,7 +73,7 @@ import {
   setRecordingRender,
   setRecordingAi
 } from './db'
-import { listBackgrounds, copyBackground, deleteBackground } from './backgroundLib'
+import { listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder } from './backgroundLib'
 import { generateBackgroundImage } from './replicateApi'
 import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
@@ -2002,6 +2002,8 @@ ipcMain.handle('wf:live:setBackground', (_e, track: TrackId, path: string) => {
 
 // Background library
 ipcMain.handle('wf:bg:list', () => listBackgrounds())
+
+ipcMain.handle('wf:bg:openFolder', () => openBackgroundsFolder())
 
 ipcMain.handle('wf:bg:upload', async (_e: unknown, srcPath: string) => {
   return copyBackground(srcPath)

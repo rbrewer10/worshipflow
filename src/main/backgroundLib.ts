@@ -1,6 +1,6 @@
 // src/main/backgroundLib.ts
 // Manages the local background library: uploads + generated images.
-import { app } from 'electron'
+import { app, shell } from 'electron'
 import { join, extname } from 'path'
 import { mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync, createWriteStream } from 'fs'
 import { createHash } from 'crypto'
@@ -10,6 +10,16 @@ function uploadsDir(): string {
   const d = join(app.getPath('userData'), 'backgrounds', 'uploads')
   mkdirSync(d, { recursive: true })
   return d
+}
+
+// Opens the uploads folder in the OS file manager so images can be dropped in
+// directly instead of one at a time through the app's dialog. uploadsDir()
+// already creates the directory if it doesn't exist yet, so this never fails
+// on a fresh install with no uploads.
+export async function openBackgroundsFolder(): Promise<void> {
+  const dir = uploadsDir()
+  const err = await shell.openPath(dir)
+  if (err) throw new Error(err)
 }
 
 function generatedDir(): string {

@@ -336,6 +336,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     bgDelete: noop,
     bgGenerate: async (): Promise<string> => '',
     bgOpenDialog: async (): Promise<{ canceled: boolean; filePaths: string[] }> => ({ canceled: true, filePaths: [] }),
+    bgOpenFolder: noop,
     bgGetTags: async (): Promise<string[]> => [],
     bgSetTags: async (): Promise<void> => {},
     bgSearch: async (): Promise<string[]> => [],

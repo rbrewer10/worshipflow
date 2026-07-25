@@ -152,6 +152,7 @@ const wf = {
   // Background library
   bgList: (): Promise<{ filename: string; path: string; kind: 'upload' | 'generated'; isVideo: boolean }[]> =>
     ipcRenderer.invoke('wf:bg:list'),
+  bgOpenFolder: (): Promise<void> => ipcRenderer.invoke('wf:bg:openFolder'),
   bgUpload: (srcPath: string): Promise<string> => ipcRenderer.invoke('wf:bg:upload', srcPath),
   bgDelete: (filePath: string): Promise<void> => ipcRenderer.invoke('wf:bg:delete', filePath),
   bgGenerate: (prompt: string): Promise<string> => ipcRenderer.invoke('wf:bg:generate', prompt),
