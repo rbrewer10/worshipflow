@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Film, Image as ImageIcon, X } from 'lucide-react'
 import type { Announcement, AnnouncementInput } from '../../shared/types'
 import { announcementExpired } from '../../shared/announcementSchedule'
+import BackgroundLibraryGrid from './BackgroundLibraryGrid'
 
 // Edits one announcement. Loads the full record by id, saves via announcementUpdate
 // (dates/toggles save immediately; text fields save on blur to avoid a DB write per
@@ -23,6 +23,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
       body: next.body,
       display: next.display,
       background: next.background,
+      blurBehindText: next.blurBehindText,
       frequency: next.frequency,
       startDate: next.startDate,
       endDate: next.endDate,
@@ -31,18 +32,6 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
     window.wf.announcementUpdate(id, input).then(onSaved)
   }
 
-  const pickBg = async (): Promise<void> => {
-    const result = await window.wf.dialogOpenFile()
-    if (result.canceled || !result.filePaths[0]) return
-    // Copy into the managed backgrounds directory (like song backgrounds do) —
-    // zone pages fetch media through /file, which only serves files under
-    // userData (plus the configured logo). An arbitrary picked path (e.g. from
-    // Downloads) would 403 there and silently fail to render on the zones.
-    const dest = await window.wf.bgUpload(result.filePaths[0])
-    save({ background: dest })
-  }
-
-  const isVid = a.background ? /\.(mp4|webm|mov|m4v)$/i.test(a.background) : false
   const expired = announcementExpired(a, new Date().toISOString().slice(0, 10))
 
   const summary = ((): string => {
@@ -88,22 +77,25 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
         </div>
       </div>
 
-      {/* Background (slide only) */}
+      {/* Background + blur (slide only) */}
       {a.display === 'slide' && (
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-600">Background (optional)</label>
-          {a.background ? (
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700">
-                {isVid ? <Film size={13} /> : <ImageIcon size={13} />}{isVid ? 'video' : 'image'}
-              </span>
-              <button onClick={() => save({ background: null })} className="rounded px-1 text-slate-500 hover:text-red-600" title="Remove background"><X size={13} /></button>
-            </div>
-          ) : (
-            <button onClick={pickBg} className="rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-700">
-              Choose image or video…
-            </button>
-          )}
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-semibold text-slate-600">Background (optional)</label>
+          <button
+            onClick={() => save({ blurBehindText: !a.blurBehindText })}
+            className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
+              a.blurBehindText ? 'border-blue-400 bg-blue-500/10' : 'border-slate-200 bg-white'
+            }`}
+          >
+            <span className="text-[11px] font-semibold text-slate-700">Blur behind text</span>
+            <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${a.blurBehindText ? 'bg-blue-600' : 'bg-slate-300'}`}>
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${a.blurBehindText ? 'translate-x-4' : 'translate-x-1'}`} />
+            </span>
+          </button>
+          <BackgroundLibraryGrid
+            activePath={a.background ?? null}
+            onApply={(path) => save({ background: path || null })}
+          />
         </div>
       )}
 
