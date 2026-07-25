@@ -8,6 +8,7 @@ import { PresenterPanel } from './PresenterPanel'
 import { StageMessagePanel } from './StageMessagePanel'
 import { ScripturePanel } from './ScripturePanel'
 import { TimingPanel } from './TimingPanel'
+import { notifyLocal } from './NotifyToasts'
 
 // The Live tab's right-hand control panel for the Main track: stage message,
 // scripture, font, auto-advance, OBS, and a collapsible "More" with the
@@ -137,7 +138,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
         onAutoAdvanceStart={() => {
           const secs = parseFloat(autoAdvanceSecs)
           if (isNaN(secs) || secs <= 0 || secs > 3600) {
-            alert('Auto-advance must be between 1 and 3600 seconds')
+            notifyLocal('Auto-advance must be between 1 and 3600 seconds', 'warn')
             return
           }
           window.wf.featuresStartAutoAdvance(secs * 1000, autoAdvanceLoop)
