@@ -44,7 +44,7 @@ export default function BackgroundsDrawerTab({ onDone }: { onDone: () => void })
       const action = resolveBackgroundApply(liveItem, path)
       if (action.kind === 'song') {
         await window.wf.songSetBackground(action.songId, action.path)
-      } else if (action.kind === 'text') {
+      } else if (action.kind === 'payload') {
         await window.wf.serviceSetItemPayload(action.itemId, action.payload)
       } else {
         notifyLocal(`Backgrounds aren't supported on ${action.itemType} items.`, 'warn')
