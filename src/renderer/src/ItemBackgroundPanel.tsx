@@ -6,16 +6,20 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { THEMES, getTheme, resolveColors } from '../../shared/themes'
-import type { ServiceItem, ItemStyle, ThemeColors } from '../../shared/types'
+import type { ServiceItem, ItemStyle, ThemeColors, SongFull } from '../../shared/types'
 import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 import BackgroundLibraryGrid from './BackgroundLibraryGrid'
+import { resolveBackgroundApply } from './drawer/resolveBackgroundApply'
 
 export interface ItemBackgroundPanelProps {
   item: ServiceItem
+  // A song's background lives on the song record, not the item payload, so the
+  // panel needs the loaded song to show which one is currently selected.
+  songFull?: SongFull | null
   onChanged: () => void
 }
 
-export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundPanelProps): JSX.Element {
+export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemBackgroundPanelProps): JSX.Element {
   const [tab, setTab] = useState<'library' | 'presets'>('library')
 
   const apply = (style: ItemStyle): Promise<void> =>
@@ -29,9 +33,41 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
   const serviceActive = !overrideThemeId
 
   const payload = (item.payload ?? {}) as Record<string, unknown>
-  const fileBg = payload.background as string | undefined
-  const supportsFileBackground = PAYLOAD_BACKGROUND_TYPES.includes(item.type)
-  const blurBehindText = !!(payload.blurBehindText as boolean | undefined)
+
+  // Songs keep their background and blur on the song record rather than the
+  // item payload, so they're excluded from PAYLOAD_BACKGROUND_TYPES — but they
+  // should still offer the same library. Without this a song showed only the
+  // theme swatches, which reads as "my uploaded backgrounds disappeared".
+  const isSong = item.type === 'song' && item.ref_id != null
+  const supportsFileBackground = PAYLOAD_BACKGROUND_TYPES.includes(item.type) || isSong
+
+  // A `theme:<id>` value is a motion theme, not a real file — only the
+  // projector renders those, so the library shows nothing as selected.
+  const songBg = songFull?.background && !songFull.background.startsWith('theme:') ? songFull.background : undefined
+  const fileBg = isSong ? songBg : (payload.background as string | undefined)
+  const blurBehindText = isSong
+    ? !!songFull?.blurBehindText
+    : !!(payload.blurBehindText as boolean | undefined)
+
+  // Routes a pick to wherever this item type actually stores its background —
+  // the same split the Live drawer's Backgrounds tab already goes through.
+  const applyBackground = (path: string | null): Promise<void> => {
+    if (isSong && item.ref_id != null) {
+      return window.wf.songSetBackground(item.ref_id, path).then(onChanged)
+    }
+    const action = resolveBackgroundApply(item, path ?? '')
+    if (action.kind === 'payload') {
+      return savePayload({ ...payload, background: path })
+    }
+    return Promise.resolve()
+  }
+
+  const toggleBlur = (): Promise<void> => {
+    if (isSong && item.ref_id != null) {
+      return window.wf.songSetBlurBehindText(item.ref_id, !blurBehindText).then(onChanged)
+    }
+    return savePayload({ ...payload, blurBehindText: !blurBehindText })
+  }
 
   // Current resolved colors for the override theme (if any), used as <input> values.
   const colorValues = overrideThemeId
@@ -168,7 +204,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
 
       {/* ── Blur behind text ── */}
       <button
-        onClick={() => savePayload({ ...payload, blurBehindText: !blurBehindText })}
+        onClick={() => void toggleBlur()}
         className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
           blurBehindText ? 'border-blue-400 bg-blue-500/10' : 'border-slate-200 bg-white'
         }`}
@@ -205,7 +241,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
                 {fileBg.split(/[\\/]/).pop()}
               </span>
               <button
-                onClick={() => savePayload({ ...payload, background: null })}
+                onClick={() => void applyBackground(null)}
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600/90 text-white hover:bg-red-500"
                 title="Remove background"
               >
@@ -215,7 +251,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
           )}
           <BackgroundLibraryGrid
             activePath={fileBg ?? null}
-            onApply={(path) => savePayload({ ...payload, background: path || null })}
+            onApply={(path) => void applyBackground(path || null)}
           />
         </div>
       )}

@@ -179,7 +179,7 @@ export const ItemEditor = memo(function ItemEditor({
 
       {/* ── Background & Color ── */}
       <div className="border-t border-slate-200 pt-3">
-        <ItemBackgroundPanel item={item} onChanged={onChanged} />
+        <ItemBackgroundPanel item={item} songFull={songFull} onChanged={onChanged} />
       </div>
 
       {/* Notes */}
