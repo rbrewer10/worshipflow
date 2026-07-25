@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
+import { DEFAULT_ZONE_TRACK } from '../../shared/types'
+import type { ZoneTrackAssignment } from '../../shared/zoneTrack'
 import ThemePicker from './ThemePicker'
 import ServiceDeck from './ServiceDeck'
 import CardEditPanel from './CardEditPanel'
@@ -25,6 +27,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<ServiceItem | null>(null)
   const [track, setTrack] = useState<TrackId>('main')
   const [itemSlides, setItemSlides] = useState<Record<number, string[]>>({})
+  const [trackAssignment, setTrackAssignment] = useState<ZoneTrackAssignment>(DEFAULT_ZONE_TRACK)
 
   const optionalSvc = useOptionalService()
 
@@ -85,6 +88,10 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     window.wf.getState('main').then((s) => setLive({ main: s, second: null }))
     return off
   }, [])
+
+  useEffect(() => {
+    void window.wf.zoneTrackAssignmentGet(serviceId).then(setTrackAssignment)
+  }, [serviceId])
 
   // Slide text depends only on each item's type/payload/ref, never on its zone
   // routing — so key the fetch on those. Without this, every zone-card click
@@ -181,6 +188,8 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
             service={service}
             track={track}
             onTrackChange={setTrack}
+            trackAssignment={trackAssignment}
+            onTrackAssignmentChange={setTrackAssignment}
             songs={songs}
             announcements={announcements}
             liveItemId={live?.main.liveServiceItemId ?? null}
@@ -205,6 +214,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
               serviceColors={service.themeColors}
               songFull={selectedSongFull}
               slides={itemSlides[selectedItem.id] ?? []}
+              trackAssignment={trackAssignment}
               onChanged={reload}
             />
           ) : (

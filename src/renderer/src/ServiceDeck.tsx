@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId, ZoneId } from '../../shared/types'
-import { ZONE_NAMES, DEFAULT_ZONE_TRACK } from '../../shared/types'
+import { ZONE_NAMES } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
 import { effectiveRouting, matchScene } from '../../shared/zoneScenes'
 import ZoneStripBadge from './ZoneStripBadge'
@@ -45,10 +45,12 @@ function itemPreview(it: ServiceItem): string {
   return ''
 }
 
-function ServiceDeck({ service, track, onTrackChange, songs, announcements, liveItemId, selectedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onGoLive, onDelete, onReordered }: {
+function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAssignmentChange, songs, announcements, liveItemId, selectedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onGoLive, onDelete, onReordered }: {
   service: ServiceFull
   track: TrackId
   onTrackChange: (track: TrackId) => void
+  trackAssignment: ZoneTrackAssignment
+  onTrackAssignmentChange: (next: ZoneTrackAssignment) => void
   songs: SongSummary[]
   announcements: AnnouncementSummary[]
   liveItemId: number | null
@@ -68,7 +70,6 @@ function ServiceDeck({ service, track, onTrackChange, songs, announcements, live
   const items = service.items.filter((it) => it.track === track)
   const hasSecond = service.items.some((it) => it.track === 'second')
 
-  const [trackAssignment, setTrackAssignment] = useState<ZoneTrackAssignment>(DEFAULT_ZONE_TRACK)
   const [showZonePopover, setShowZonePopover] = useState(false)
   const popoverRef = useRef<HTMLDivElement | null>(null)
 
@@ -78,11 +79,6 @@ function ServiceDeck({ service, track, onTrackChange, songs, announcements, live
     // outside-click handler's popoverRef.current goes null and can never close it
     // again) then back to one with a Second track re-renders it already open.
     setShowZonePopover(false)
-    let ignore = false
-    void window.wf.zoneTrackAssignmentGet(service.id).then((next) => {
-      if (!ignore) setTrackAssignment(next)
-    })
-    return () => { ignore = true }
   }, [service.id])
 
   useEffect(() => {
@@ -147,7 +143,7 @@ function ServiceDeck({ service, track, onTrackChange, songs, announcements, live
                     {ZONE_IDS.map((zoneId) => (
                       <div key={zoneId} className="flex items-center justify-between">
                         <span className="text-xs text-slate-700">{ZONE_NAMES[zoneId]}</span>
-                        <ZoneTrackToggle serviceId={service.id} zoneId={zoneId} assignment={trackAssignment} onChanged={setTrackAssignment} />
+                        <ZoneTrackToggle serviceId={service.id} zoneId={zoneId} assignment={trackAssignment} onChanged={onTrackAssignmentChange} />
                       </div>
                     ))}
                   </div>
