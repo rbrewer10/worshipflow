@@ -954,7 +954,7 @@ async function doLoadAnnouncement(track: TrackId, id: number): Promise<void> {
     // Title literally 'Announcement' triggers the ticker renderer (existing mechanism).
     doLoadText(track, 'Announcement', a.body)
   } else {
-    doLoadText(track, a.title, a.body, a.background ?? null)
+    doLoadText(track, a.title, a.body, a.background ?? null, undefined, a.blurBehindText)
   }
 }
 
