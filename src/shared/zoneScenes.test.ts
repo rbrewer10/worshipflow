@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  STARTER_SCENES, starterConfig, contentModeFor, expandScene,
+  STARTER_SCENES, starterConfig, contentModeFor, expandScene, roleForMode, modeForRole,
   defaultRoutingFor, effectiveRouting, matchScene, parseSceneConfig, validateSceneConfig
 } from './zoneScenes'
 import { ZONE_ROUTING_DEFAULTS } from './types'
@@ -32,6 +32,47 @@ describe('expandScene', () => {
   it('treats a missing zone key as logo (safe filler)', () => {
     const partial = { id: 'p', name: 'P', zones: { '3': 'content' } } as unknown as SceneDef
     expect(expandScene(partial, 'song')).toEqual({ 1: 'logo', 2: 'logo', 3: 'lyrics', 4: 'stage' })
+  })
+})
+
+describe('roleForMode', () => {
+  it('maps filler modes to their own role', () => {
+    expect(roleForMode('logo')).toBe('logo')
+    expect(roleForMode('black')).toBe('black')
+  })
+  it('maps every content-bearing mode to content', () => {
+    expect(roleForMode('lyrics')).toBe('content')
+    expect(roleForMode('text')).toBe('content')
+    expect(roleForMode('countdown')).toBe('content')
+    expect(roleForMode('image')).toBe('content')
+  })
+  it('returns null for modes with no role equivalent', () => {
+    expect(roleForMode('off')).toBeNull()
+    expect(roleForMode('stage')).toBeNull()
+  })
+  it('round-trips every starter scene role for zones 1-3', () => {
+    for (const scene of STARTER_SCENES) {
+      const routing = expandScene(scene, 'song')
+      for (const z of ['1', '2', '3'] as const) {
+        expect(roleForMode(routing[Number(z) as 1 | 2 | 3])).toBe(scene.zones[z])
+      }
+    }
+  })
+})
+
+describe('modeForRole', () => {
+  it('content resolves against the item type', () => {
+    expect(modeForRole('content', 'song')).toBe('lyrics')
+    expect(modeForRole('content', 'countdown')).toBe('countdown')
+    expect(modeForRole('content', 'image')).toBe('image')
+    expect(modeForRole('content', 'sermon')).toBe('text')
+  })
+  it('logo and black ignore the item type', () => {
+    expect(modeForRole('logo', 'song')).toBe('logo')
+    expect(modeForRole('black', 'image')).toBe('black')
+  })
+  it('a missing role falls back to logo (safe filler)', () => {
+    expect(modeForRole(undefined, 'song')).toBe('logo')
   })
 })
 

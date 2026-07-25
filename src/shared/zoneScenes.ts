@@ -48,13 +48,28 @@ export function contentModeFor(type: ServiceItemType): ZoneMode {
   return 'text' // scripture, text, ticker, announcement
 }
 
+// Role -> mode. The single place that decides what "show the content" means for
+// a given item type; expandScene and the Build Service zone grid both go
+// through it so they can never disagree.
+export function modeForRole(role: ZoneRole | undefined, type: ServiceItemType): ZoneMode {
+  return role === 'content' ? contentModeFor(type) : role === 'black' ? 'black' : 'logo'
+}
+
+// Mode -> role, the inverse of modeForRole. Returns null for modes no role can
+// express ('off', and 'stage' which only zone 4 renders) — callers show those
+// read-only and leave the Advanced grid as the way to change them.
+export function roleForMode(mode: ZoneMode): ZoneRole | null {
+  if (mode === 'logo') return 'logo'
+  if (mode === 'black') return 'black'
+  if (mode === 'lyrics' || mode === 'text' || mode === 'countdown' || mode === 'image') return 'content'
+  return null
+}
+
 export function expandScene(scene: SceneDef, type: ServiceItemType): ZoneRouting {
-  const roleToMode = (role: ZoneRole | undefined): ZoneMode =>
-    role === 'content' ? contentModeFor(type) : role === 'black' ? 'black' : 'logo'
   return {
-    1: roleToMode(scene.zones?.['1']),
-    2: roleToMode(scene.zones?.['2']),
-    3: roleToMode(scene.zones?.['3']),
+    1: modeForRole(scene.zones?.['1'], type),
+    2: modeForRole(scene.zones?.['2'], type),
+    3: modeForRole(scene.zones?.['3'], type),
     4: 'stage',
   }
 }
