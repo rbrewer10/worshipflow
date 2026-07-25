@@ -541,6 +541,7 @@ function itemTitle(type: string, refId: number | null, payload: Record<string, u
   if (type === 'scripture') return (payload.reference as string) || 'Scripture'
   if (type === 'countdown') return `Countdown ${fmtSeconds((payload.seconds as number) || 0)}`
   if (type === 'welcome') return `Countdown ${fmtSeconds((payload.seconds as number) || 0)}`
+  if (type === 'sermon') return (payload.title as string) || 'Sermon'
   if (type === 'image') {
     const p = (payload.path as string) || ''
     return p.split(/[/\\]/).pop() || 'Image'
