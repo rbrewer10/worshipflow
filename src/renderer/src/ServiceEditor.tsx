@@ -43,14 +43,18 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const reload = async (): Promise<void> => {
+  const reload = async (notify = true): Promise<void> => {
     const s = await window.wf.serviceGet(serviceId)
     setService(s)
     // Also refresh the main process's live-routing item cache — it's separate
     // from this component's local state and from ServiceContext, and nothing
     // else keeps it in sync after an edit (see wf:services:refreshActiveItems).
     void window.wf.serviceRefreshActiveItems(serviceId)
-    onServiceChanged?.()
+    // notify=false when this reload was ITSELF triggered by the shared
+    // context (the itemsChangedTick effect below) — calling onServiceChanged
+    // here would be ServiceBuilder's reloadActiveService, which bumps the
+    // tick again and spins forever.
+    if (notify) onServiceChanged?.()
   }
 
   useEffect(() => {
@@ -71,7 +75,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const skipFirstTick = useRef(true)
   useEffect(() => {
     if (skipFirstTick.current) { skipFirstTick.current = false; return }
-    if (optionalSvc) reload()
+    if (optionalSvc) reload(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [optionalSvc?.itemsChangedTick])
 
