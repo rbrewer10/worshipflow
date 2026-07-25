@@ -15,7 +15,7 @@ function toAssetUrl(p: string): string {
 // equivalent ('off', 'stage') renders read-only — the Advanced grid remains the
 // way to change those.
 export default function ZoneScreenCard({
-  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, onRoleChange
+  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, onRoleChange
 }: {
   zoneId: ZoneId
   mode: ZoneMode
@@ -24,11 +24,13 @@ export default function ZoneScreenCard({
   serviceColors: ThemeColors | null
   songFull: SongFull | null
   logoPath: string | null
+  offTrack?: boolean
+  offTrackLabel?: string
   onRoleChange: (role: ZoneRole) => void
 }): JSX.Element {
   const [dragOver, setDragOver] = useState(false)
   const role = roleForMode(mode)
-  const editable = role !== null
+  const editable = role !== null && !offTrack
 
   // dragend fires on the drag SOURCE, so a cancelled drag (Esc, or a drop
   // outside any target) never reaches this card's own dragleave/drop handlers
@@ -87,11 +89,11 @@ export default function ZoneScreenCard({
       title={editable ? `${ZONE_NAMES[zoneId]} — click to cycle, or drop a role here` : ZONE_NAMES[zoneId]}
       className={`rounded-xl border-2 p-2 transition-colors ${
         dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-slate-200 bg-white'
-      } ${editable ? 'cursor-pointer hover:border-slate-300' : 'cursor-default'}`}
+      } ${editable ? 'cursor-pointer hover:border-slate-300' : 'cursor-default'} ${offTrack ? 'opacity-50' : ''}`}
     >
       <div className="mb-1.5 flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{ZONE_NAMES[zoneId]}</span>
-        <span className="text-[10px] font-semibold text-slate-400">{role ? ROLE_LABEL[role] : mode}</span>
+        <span className="text-[10px] font-semibold text-slate-400">{offTrack ? offTrackLabel : role ? ROLE_LABEL[role] : mode}</span>
       </div>
       {body()}
     </div>

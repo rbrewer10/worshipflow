@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { ServiceItem, ThemeColors, SongFull, ZoneId, ZoneRouting } from '../../../shared/types'
+import { DEFAULT_ZONE_TRACK } from '../../../shared/types'
 import type { SceneConfig, ZoneRole } from '../../../shared/zoneScenes'
 import { effectiveRouting, matchScene, expandScene, modeForRole } from '../../../shared/zoneScenes'
+import type { ZoneTrackAssignment } from '../../../shared/zoneTrack'
 import ScenePresetRow from '../ScenePresetRow'
 import ZoneRoutingGrid from '../ZoneRoutingGrid'
 import ZoneRolePalette from './ZoneRolePalette'
@@ -13,8 +15,9 @@ const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 // 2x2 grid of live previews, and the raw-mode Advanced escape hatch. Writes the
 // same per-item zone_routing the scene chips always have, through the existing
 // zoneSetRouting IPC — no new persistence.
-export default function ZoneScreenGrid({ item, serviceTheme, serviceColors, songFull, onChanged }: {
+export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceColors, songFull, onChanged }: {
   item: ServiceItem
+  serviceId: number
   serviceTheme: string | null
   serviceColors: ThemeColors | null
   songFull: SongFull | null
@@ -23,9 +26,13 @@ export default function ZoneScreenGrid({ item, serviceTheme, serviceColors, song
   const [config, setConfig] = useState<SceneConfig | null>(null)
   const [logoPath, setLogoPath] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [trackAssignment, setTrackAssignment] = useState<ZoneTrackAssignment>(DEFAULT_ZONE_TRACK)
 
   useEffect(() => { void window.wf.scenesGet().then(setConfig) }, [])
   useEffect(() => { void window.wf.logoGet().then(({ logoPath: p }) => setLogoPath(p)) }, [])
+  useEffect(() => {
+    void window.wf.zoneTrackAssignmentGet(serviceId).then(setTrackAssignment)
+  }, [serviceId])
 
   if (!config) return <></>
 
@@ -62,20 +69,29 @@ export default function ZoneScreenGrid({ item, serviceTheme, serviceColors, song
 
       <ZoneRolePalette />
 
+      {/* An item only ever reaches zones tuned to its own track — a zone
+          assigned to the other track will never actually show this item's
+          content, no matter what role gets set here. Dim and lock those cards
+          instead of rendering something that would never appear there. */}
       <div className="grid grid-cols-2 gap-3">
-        {ZONE_IDS.map((zoneId) => (
-          <ZoneScreenCard
-            key={zoneId}
-            zoneId={zoneId}
-            mode={routing[zoneId]}
-            item={item}
-            serviceTheme={serviceTheme}
-            serviceColors={serviceColors}
-            songFull={songFull}
-            logoPath={logoPath}
-            onRoleChange={(role) => setRole(zoneId, role)}
-          />
-        ))}
+        {ZONE_IDS.map((zoneId) => {
+          const offTrack = trackAssignment[zoneId] !== item.track
+          return (
+            <ZoneScreenCard
+              key={zoneId}
+              zoneId={zoneId}
+              mode={routing[zoneId]}
+              item={item}
+              serviceTheme={serviceTheme}
+              serviceColors={serviceColors}
+              songFull={songFull}
+              logoPath={logoPath}
+              offTrack={offTrack}
+              offTrackLabel={trackAssignment[zoneId] === 'main' ? 'Follows Main' : 'Follows Second'}
+              onRoleChange={(role) => setRole(zoneId, role)}
+            />
+          )
+        })}
       </div>
 
       <div>

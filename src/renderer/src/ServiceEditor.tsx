@@ -179,6 +179,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
           {selectedItem ? (
             <ZoneScreenGrid
               item={selectedItem}
+              serviceId={service.id}
               serviceTheme={service.theme}
               serviceColors={service.themeColors}
               songFull={selectedSongFull}
