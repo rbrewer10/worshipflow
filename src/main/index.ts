@@ -1047,6 +1047,12 @@ async function computeItemSlides(item: ServiceItem): Promise<string[]> {
     a.body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
     return lines.length ? lines : (a.title ? [a.title] : [])
   }
+  if (item.type === 'sermon') {
+    const speaker = (item.payload.speaker as string) ?? ''
+    const passage = (item.payload.passage as string) ?? ''
+    const line = [speaker, passage].filter(Boolean).join('\n')
+    return line ? [line] : []
+  }
   return []
 }
 
@@ -1115,6 +1121,15 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
     doLoadText(track, 'Announcement', txt)
   } else if (item.type === 'announcement' && item.ref_id != null) {
     await doLoadAnnouncement(track, item.ref_id)
+  } else if (item.type === 'sermon') {
+    doLoadSermon(
+      track,
+      (item.payload.title as string) ?? '',
+      (item.payload.speaker as string) ?? '',
+      (item.payload.passage as string) ?? '',
+      item.payload.background as string | null | undefined,
+      item.payload.blurBehindText as boolean | undefined
+    )
   } else {
     return
   }
