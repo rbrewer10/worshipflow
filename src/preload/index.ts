@@ -172,6 +172,8 @@ const wf = {
     ipcRenderer.invoke('wf:songs:setTextColor', id, color),
   songSetFont: (id: number, font: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:songs:setFont', id, font),
+  songSetBlurBehindText: (id: number, value: boolean): Promise<void> =>
+    ipcRenderer.invoke('wf:songs:setBlurBehindText', id, value),
   settingGet: (key: string): Promise<string | null> => ipcRenderer.invoke('wf:setting:get', key),
   settingSet: (key: string, value: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:setting:set', key, value),

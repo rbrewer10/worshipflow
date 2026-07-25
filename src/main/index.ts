@@ -57,6 +57,7 @@ import {
   setSongBgMotion,
   setSongTextColor,
   setSongFont,
+  setSongBlurBehindText,
   listServiceTemplates,
   saveServiceTemplate,
   deleteServiceTemplate,
@@ -930,6 +931,7 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
   t.fontScale = full.fontScale ?? 6
   t.songTextColor = full.textColor ?? null
   t.songFont = full.font ?? null
+  t.blurBehindText = full.blurBehindText ?? false
   t.songMeta = { author: full.author, copyright: full.copyright, ccli: full.ccli }
   t.hmsLoadedAt = Date.now()  // Start hymn timer
   t.verseNumber = 1
@@ -1732,6 +1734,15 @@ ipcMain.handle('wf:songs:setFont', (_e: unknown, id: number, font: string | null
   for (const track of ['main', 'second'] as TrackId[]) {
     const t = tracks[track]
     if (t.songId === id) { t.songFont = font; changed = true }
+  }
+  if (changed) broadcast()
+})
+ipcMain.handle('wf:songs:setBlurBehindText', (_e: unknown, id: number, value: boolean) => {
+  setSongBlurBehindText(id, value)
+  let changed = false
+  for (const track of ['main', 'second'] as TrackId[]) {
+    const t = tracks[track]
+    if (t.songId === id) { t.blurBehindText = value; changed = true }
   }
   if (changed) broadcast()
 })

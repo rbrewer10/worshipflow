@@ -344,6 +344,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     songSetBgMotion: noop,
     songSetTextColor: noop,
     songSetFont: noop,
+    songSetBlurBehindText: noop,
     settingGet: async (key: string): Promise<string | null> => settings.get(key) ?? null,
     settingSet: async (key: string, value: string | null): Promise<void> => {
       if (value === null) settings.delete(key)

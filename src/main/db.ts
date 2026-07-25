@@ -160,6 +160,7 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE song ADD COLUMN bg_motion TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE song ADD COLUMN text_color TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE song ADD COLUMN font TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE song ADD COLUMN blur_behind_text INTEGER') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN notes TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
@@ -241,7 +242,7 @@ export function listSongs(search = ''): SongSummary[] {
 
 export function getSong(id: number): SongFull | null {
   const head = db.prepare(
-    'SELECT id, title, author, ccli, copyright, publisher, background, arrangement, font_scale, lines_per_slide, bg_motion, text_color, font FROM song WHERE id = ?'
+    'SELECT id, title, author, ccli, copyright, publisher, background, arrangement, font_scale, lines_per_slide, bg_motion, text_color, font, blur_behind_text FROM song WHERE id = ?'
   )
   head.bind([id])
   if (!head.step()) {
@@ -262,6 +263,7 @@ export function getSong(id: number): SongFull | null {
     bg_motion: string | null
     text_color: string | null
     font: string | null
+    blur_behind_text: number | null
   }
   head.free()
 
@@ -294,6 +296,7 @@ export function getSong(id: number): SongFull | null {
     bgMotion: (row.bg_motion as SongFull['bgMotion']) ?? null,
     textColor: row.text_color ?? null,
     font: (row.font as SongFull['font']) ?? null,
+    blurBehindText: row.blur_behind_text === 1,
     sections
   }
 }
@@ -399,6 +402,10 @@ export function setSongTextColor(id: number, color: string | null): void {
 
 export function setSongFont(id: number, font: string | null): void {
   db.run('UPDATE song SET font = ? WHERE id = ?', [font, id]); persist()
+}
+
+export function setSongBlurBehindText(id: number, value: boolean): void {
+  db.run('UPDATE song SET blur_behind_text = ? WHERE id = ?', [value ? 1 : 0, id]); persist()
 }
 
 // --- Services ---
