@@ -801,7 +801,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   t.index = 0
 }
 
-function doLoadCountdown(track: TrackId, seconds: number): void {
+function doLoadCountdown(track: TrackId, seconds: number, background?: string | null): void {
   const t = tracks[track]
   clearCountdown(track)
   t.songId = null
@@ -810,7 +810,8 @@ function doLoadCountdown(track: TrackId, seconds: number): void {
   t.bgFit = 'cover'
   const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   let remaining = seconds
-  t.song = { title: 'Countdown', lines: [fmt(remaining)], background: null }
+  const bg = background ?? null
+  t.song = { title: 'Countdown', lines: [fmt(remaining)], background: bg }
   t.songTextColor = null; t.songFont = null
   t.mode = 'countdown' as Mode
   t.index = 0
@@ -818,12 +819,12 @@ function doLoadCountdown(track: TrackId, seconds: number): void {
     remaining--
     if (remaining <= 0) {
       clearCountdown(track)
-      t.song = { title: 'Countdown', lines: ['0:00'], background: null }
+      t.song = { title: 'Countdown', lines: ['0:00'], background: bg }
       t.mode = 'black'
       broadcast()
       return
     }
-    t.song = { title: 'Countdown', lines: [fmt(remaining)], background: null }
+    t.song = { title: 'Countdown', lines: [fmt(remaining)], background: bg }
     broadcast()
   }, 1000)
 }
@@ -856,7 +857,7 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
 // Returns false (leaving the current slide untouched) when the reference can't be
 // resolved, so callers don't mark a failed scripture "live" and strand the wrong
 // content on the projector.
-async function doLoadScripture(track: TrackId, reference: string): Promise<boolean> {
+async function doLoadScripture(track: TrackId, reference: string, background?: string | null): Promise<boolean> {
   const result = bibleTranslation === 'kjv'
     ? lookupScripture(reference)
     : await fetchScripture(reference, bibleTranslation)
@@ -877,7 +878,7 @@ async function doLoadScripture(track: TrackId, reference: string): Promise<boole
     result.verses.length === 1
       ? [result.verses[0].text]
       : result.verses.map((v) => `${v.n}  ${v.text}`)
-  t.song = { title: result.reference!, lines, background: null }
+  t.song = { title: result.reference!, lines, background: background ?? null }
   t.songTextColor = null; t.songFont = null
   t.mode = 'lyrics'
   t.index = 0
@@ -1013,7 +1014,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    if (!(await doLoadScripture(track, ref))) return  // lookup failed → don't mark it live
+    if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined))) return  // lookup failed → don't mark it live
   } else if (item.type === 'text') {
     doLoadText(
       track,
@@ -1025,7 +1026,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    doLoadCountdown(track, secs)
+    doLoadCountdown(track, secs, item.payload.background as string | null | undefined)
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return
@@ -1033,7 +1034,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    doLoadCountdown(track, secs)
+    doLoadCountdown(track, secs, item.payload.background as string | null | undefined)
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return
@@ -1426,12 +1427,12 @@ ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: str
   doLoadText(track, title, body, background ?? null, fontScale); broadcast()
 })
 
-ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number) => {
-  doLoadCountdown(track, seconds); broadcast()
+ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, background?: string | null) => {
+  doLoadCountdown(track, seconds, background); broadcast()
 })
 
-ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string): Promise<boolean> => {
-  const ok = await doLoadScripture(track, reference)
+ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string, background?: string | null): Promise<boolean> => {
+  const ok = await doLoadScripture(track, reference, background)
   if (ok) broadcast()
   return ok
 })
