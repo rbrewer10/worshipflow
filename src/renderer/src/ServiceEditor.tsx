@@ -86,6 +86,14 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     return off
   }, [])
 
+  // Slide text depends only on each item's type/payload/ref, never on its zone
+  // routing — so key the fetch on those. Without this, every zone-card click
+  // calls reload(), which replaces `service` and would re-run a Bible lookup
+  // for every scripture item in the service (a network call each, on WEB/BBE).
+  const slidesKey = service
+    ? service.items.map((i) => `${i.id}:${i.type}:${i.ref_id ?? ''}:${JSON.stringify(i.payload ?? {})}`).join('|')
+    : ''
+
   // Resolved slide text (e.g. scripture verses) for the zone grid's filmstrip
   // and previews — same IPC the Live tab's SlideGrid already uses. Re-fetches
   // on every reload() so an edit to the selected item's content stays in sync.
@@ -96,7 +104,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
       for (const r of rows) map[r.id] = r.slides
       setItemSlides(map)
     })
-  }, [service])
+  }, [service?.id, slidesKey])
 
   const selectedItem = service?.items.find((it) => it.id === selectedId) ?? null
 
