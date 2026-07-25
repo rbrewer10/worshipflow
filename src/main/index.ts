@@ -797,6 +797,7 @@ function processIntent(track: TrackId, type: Intent): void {
 function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number, blurBehindText?: boolean): void {
   const t = tracks[track]
   clearCountdown(track)
+  clearAutoAdvance(track)
   t.songId = null
   t.scriptureRef = null
   clearSongMeta(track)
@@ -818,6 +819,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
 function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): void {
   const t = tracks[track]
   clearCountdown(track)
+  clearAutoAdvance(track)
   t.songId = null
   t.scriptureRef = null
   clearSongMeta(track)
@@ -885,6 +887,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   }
   const t = tracks[track]
   clearCountdown(track)
+  clearAutoAdvance(track)
   t.songId = null
   t.scriptureRef = reference
   clearSongMeta(track)
@@ -1012,6 +1015,7 @@ function applyItemTheme(track: TrackId, item: ServiceItem | undefined): void {
 function doLoadMedia(track: TrackId, filePath: string, title: string): void {
   const t = tracks[track]
   clearCountdown(track)
+  clearAutoAdvance(track)
   t.songId = null
   t.scriptureRef = null
   clearSongMeta(track)
