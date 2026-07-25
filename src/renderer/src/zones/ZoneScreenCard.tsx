@@ -15,7 +15,7 @@ function toAssetUrl(p: string): string {
 // equivalent ('off', 'stage') renders read-only — the Advanced grid remains the
 // way to change those.
 export default function ZoneScreenCard({
-  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, onRoleChange
+  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, slideText, onRoleChange
 }: {
   zoneId: ZoneId
   mode: ZoneMode
@@ -26,6 +26,7 @@ export default function ZoneScreenCard({
   logoPath: string | null
   offTrack?: boolean
   offTrackLabel?: string
+  slideText?: string
   onRoleChange: (role: ZoneRole) => void
 }): JSX.Element {
   const [dragOver, setDragOver] = useState(false)
@@ -56,7 +57,7 @@ export default function ZoneScreenCard({
 
   const body = (): JSX.Element => {
     if (role === 'content') {
-      return <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} />
+      return <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} overrideLine={slideText} />
     }
     // Same 16:9 box shape ServiceSlidePreview uses, so all four cards line up.
     return (
