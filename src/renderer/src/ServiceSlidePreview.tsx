@@ -50,6 +50,16 @@ export default function ServiceSlidePreview({
     if (sb && !sb.startsWith('theme:')) bgFile = sb
   }
 
+  // Resolve whether this item's live rendering would show the blurred band —
+  // same dual-source split as `bgFile` above: payload for the four style-driven
+  // types, the referenced song's own field for Song.
+  const blurBehindText =
+    item.type === 'text' || item.type === 'scripture' || item.type === 'countdown' || item.type === 'welcome'
+      ? !!(payload.blurBehindText as boolean | undefined)
+      : item.type === 'song'
+        ? !!songFull?.blurBehindText
+        : false
+
   const seconds = (payload.seconds as number | undefined) ?? 300
   const mm = String(Math.floor(seconds / 60)).padStart(2, '0')
 
@@ -199,7 +209,23 @@ export default function ServiceSlidePreview({
         <div className="absolute inset-0 bg-black/25" />
 
         {/* Content layer */}
-        <div className="absolute inset-0 flex items-center justify-center">{renderContent()}</div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          {blurBehindText ? (
+            <div
+              className="w-full text-center"
+              style={{
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                background: 'rgba(20,20,30,.3)',
+                padding: '16px 0'
+              }}
+            >
+              {renderContent()}
+            </div>
+          ) : (
+            renderContent()
+          )}
+        </div>
       </div>
     </div>
   )
