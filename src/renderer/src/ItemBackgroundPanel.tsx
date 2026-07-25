@@ -35,6 +35,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
   const payload = (item.payload ?? {}) as Record<string, unknown>
   const fileBg = payload.background as string | undefined
   const supportsFileBackground = FILE_BACKGROUND_TYPES.includes(item.type)
+  const blurBehindText = !!(payload.blurBehindText as boolean | undefined)
 
   // Current resolved colors for the override theme (if any), used as <input> values.
   const colorValues = overrideThemeId
@@ -168,6 +169,19 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
       <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
         Background &amp; Color
       </label>
+
+      {/* ── Blur behind text ── */}
+      <button
+        onClick={() => savePayload({ ...payload, blurBehindText: !blurBehindText })}
+        className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
+          blurBehindText ? 'border-blue-400 bg-blue-500/10' : 'border-slate-200 bg-white'
+        }`}
+      >
+        <span className="text-[11px] font-semibold text-slate-700">Blur behind text</span>
+        <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${blurBehindText ? 'bg-blue-600' : 'bg-slate-300'}`}>
+          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${blurBehindText ? 'translate-x-4' : 'translate-x-1'}`} />
+        </span>
+      </button>
 
       {/* ── Tab strip ── */}
       <div className="flex rounded-lg bg-slate-100 p-0.5">
