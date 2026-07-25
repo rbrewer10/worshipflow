@@ -127,7 +127,7 @@ function AppShell(): JSX.Element {
             <ScriptureLookup />
           )}
         </div>
-        <LiveDrawer key={view} />
+        <LiveDrawer key={view} isBuildService={view === 'service'} />
       </div>
     </ServiceProvider>
   )

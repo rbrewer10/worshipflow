@@ -15,8 +15,8 @@ function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
 }
 
-export default function BackgroundsDrawerTab({ onDone }: { onDone: () => void }): JSX.Element {
-  const { activeService, reloadActiveService } = useService()
+export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDone: () => void; isBuildService: boolean }): JSX.Element {
+  const { activeService, reloadActiveService, selectedItemId } = useService()
   const [backgrounds, setBackgrounds] = useState<BgEntry[]>([])
   const [live, setLive] = useState<LiveState | null>(null)
   const [busy, setBusy] = useState(false)
@@ -33,15 +33,27 @@ export default function BackgroundsDrawerTab({ onDone }: { onDone: () => void })
 
   const pick = async (path: string): Promise<void> => {
     if (busy) return
-    const liveItem = activeService?.items.find((it) => it.id === live?.liveServiceItemId) ?? null
-    if (!liveItem) {
-      notifyLocal('Nothing is live yet — send something live first.', 'warn')
+
+    // On Build Service, target whatever's selected in the builder — never the
+    // live item, which may be something unrelated the operator hasn't touched.
+    // Everywhere else, target the live item, exactly as before this feature.
+    const targetItem = isBuildService
+      ? (activeService?.items.find((it) => it.id === selectedItemId) ?? null)
+      : (activeService?.items.find((it) => it.id === live?.liveServiceItemId) ?? null)
+
+    if (!targetItem) {
+      notifyLocal(
+        isBuildService
+          ? 'Select an item in the builder first.'
+          : 'Nothing is live yet — send something live first.',
+        'warn'
+      )
       return
     }
 
     setBusy(true)
     try {
-      const action = resolveBackgroundApply(liveItem, path)
+      const action = resolveBackgroundApply(targetItem, path)
       if (action.kind === 'song') {
         await window.wf.songSetBackground(action.songId, action.path)
       } else if (action.kind === 'payload') {
@@ -50,7 +62,11 @@ export default function BackgroundsDrawerTab({ onDone }: { onDone: () => void })
         notifyLocal(`Backgrounds aren't supported on ${action.itemType} items.`, 'warn')
         return
       }
-      await window.wf.liveSetBackground('main', action.path)
+      // Only push the live projector when we're actually targeting the live
+      // item (i.e. not building) — building shouldn't change what's on air.
+      if (!isBuildService) {
+        await window.wf.liveSetBackground('main', action.path)
+      }
       reloadActiveService()
       onDone()
     } catch {

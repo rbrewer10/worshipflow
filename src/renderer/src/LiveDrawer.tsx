@@ -23,7 +23,7 @@ const OPEN_HEIGHT = 280
 // clicking it again, picking an item, or Escape slides it closed. Remounted
 // (via a `key` at the call site, in AppShell.tsx) whenever the active screen
 // changes, so it resets closed rather than carrying state across screens.
-function LiveDrawer(): JSX.Element {
+function LiveDrawer({ isBuildService }: { isBuildService: boolean }): JSX.Element {
   const [open, setOpen] = useState<DrawerTabId | null>(null)
   const close = (): void => setOpen(null)
 
@@ -65,7 +65,7 @@ function LiveDrawer(): JSX.Element {
           {open === 'songs' && <SongsDrawerTab onDone={close} />}
           {open === 'scripture' && <ScriptureDrawerTab onDone={close} />}
           {open === 'announcements' && <AnnouncementsDrawerTab onDone={close} />}
-          {open === 'backgrounds' && <BackgroundsDrawerTab onDone={close} />}
+          {open === 'backgrounds' && <BackgroundsDrawerTab onDone={close} isBuildService={isBuildService} />}
         </div>
       </div>
     </div>
