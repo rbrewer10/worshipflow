@@ -6,13 +6,9 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { THEMES, getTheme, resolveColors } from '../../shared/themes'
-import type { ServiceItem, ItemStyle, ThemeColors, ServiceItemType } from '../../shared/types'
+import type { ServiceItem, ItemStyle, ThemeColors } from '../../shared/types'
+import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 import BackgroundLibraryGrid from './BackgroundLibraryGrid'
-
-// Item types whose live rendering actually shows a custom file background —
-// Song has its own separate background system, Image's payload.path already
-// IS the background, and Ticker/Announcement don't support one yet.
-const FILE_BACKGROUND_TYPES: ServiceItemType[] = ['text', 'scripture', 'countdown', 'welcome', 'sermon']
 
 export interface ItemBackgroundPanelProps {
   item: ServiceItem
@@ -34,7 +30,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
 
   const payload = (item.payload ?? {}) as Record<string, unknown>
   const fileBg = payload.background as string | undefined
-  const supportsFileBackground = FILE_BACKGROUND_TYPES.includes(item.type)
+  const supportsFileBackground = PAYLOAD_BACKGROUND_TYPES.includes(item.type)
   const blurBehindText = !!(payload.blurBehindText as boolean | undefined)
 
   // Current resolved colors for the override theme (if any), used as <input> values.

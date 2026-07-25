@@ -1,13 +1,10 @@
-import type { ServiceItem, ServiceItemType } from '../../../shared/types'
+import type { ServiceItem } from '../../../shared/types'
+import { PAYLOAD_BACKGROUND_TYPES } from '../../../shared/types'
 
 export type BackgroundApplyAction =
   | { kind: 'song'; songId: number; path: string }
   | { kind: 'payload'; itemId: number; payload: Record<string, unknown>; path: string }
   | { kind: 'unsupported'; itemType: string }
-
-// Item types whose live rendering supports a custom file background via
-// payload.background — mirrors ItemBackgroundPanel.tsx's FILE_BACKGROUND_TYPES.
-const PAYLOAD_BACKGROUND_TYPES: ServiceItemType[] = ['text', 'scripture', 'countdown', 'welcome', 'sermon']
 
 // Pure decision: given a service item and a background file path, decide what
 // update to make. Songs store their background on the song record; Text/

@@ -145,6 +145,16 @@ export interface SongUsage {
 // --- Service builder ---
 export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement' | 'sermon'
 
+// Item types whose live rendering supports a custom file background stored
+// directly on the item's own payload (payload.background) — Song has its own
+// separate background system (SongFull.background), Image's payload.path
+// already IS the background, and Ticker/Announcement don't support one.
+// SINGLE SOURCE OF TRUTH: every place that needs to know "does this item type
+// support a background" must import this instead of hardcoding its own copy
+// of the list — three separate copies have already drifted out of sync once
+// each as new types gained support (Scripture/Countdown/Welcome, then Sermon).
+export const PAYLOAD_BACKGROUND_TYPES: ServiceItemType[] = ['text', 'scripture', 'countdown', 'welcome', 'sermon']
+
 export interface ServiceSummary {
   id: number
   name: string

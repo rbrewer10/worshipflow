@@ -5,6 +5,7 @@
 
 import { getTheme, resolveColors, FONT_FAMILY } from '../../shared/themes'
 import type { ServiceItem, ThemeColors, SongFull } from '../../shared/types'
+import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -39,7 +40,7 @@ export default function ServiceSlidePreview({
 
   // Resolve a file/image background by item type (else fall back to gradient).
   let bgFile: string | null = null
-  if (item.type === 'text' || item.type === 'scripture' || item.type === 'countdown' || item.type === 'welcome' || item.type === 'sermon') {
+  if (PAYLOAD_BACKGROUND_TYPES.includes(item.type)) {
     const b = payload.background as string | undefined
     if (b) bgFile = b
   } else if (item.type === 'image') {
@@ -51,14 +52,13 @@ export default function ServiceSlidePreview({
   }
 
   // Resolve whether this item's live rendering would show the blurred band —
-  // same dual-source split as `bgFile` above: payload for the four style-driven
+  // same dual-source split as `bgFile` above: payload for the style-driven
   // types, the referenced song's own field for Song.
-  const blurBehindText =
-    item.type === 'text' || item.type === 'scripture' || item.type === 'countdown' || item.type === 'welcome' || item.type === 'sermon'
-      ? !!(payload.blurBehindText as boolean | undefined)
-      : item.type === 'song'
-        ? !!songFull?.blurBehindText
-        : false
+  const blurBehindText = PAYLOAD_BACKGROUND_TYPES.includes(item.type)
+    ? !!(payload.blurBehindText as boolean | undefined)
+    : item.type === 'song'
+      ? !!songFull?.blurBehindText
+      : false
 
   const seconds = (payload.seconds as number | undefined) ?? 300
   const mm = String(Math.floor(seconds / 60)).padStart(2, '0')

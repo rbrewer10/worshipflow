@@ -1,12 +1,14 @@
 import type { ServiceItem, TrackId } from '../../shared/types'
+import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 
 // Shared live-load helpers used by both LiveView and the service deck builder.
 
-// Resolves the background file an item's slide thumbnail should show. Text-item
-// backgrounds live on the item itself; song backgrounds live on the referenced
-// song record, so callers must supply a songId -> background lookup for those.
+// Resolves the background file an item's slide thumbnail should show.
+// Text/Scripture/Countdown/Welcome/Sermon backgrounds live on the item itself;
+// song backgrounds live on the referenced song record, so callers must supply
+// a songId -> background lookup for those.
 export function itemThumbBackground(item: ServiceItem, songBg: Record<number, string | null>): string | null {
-  if (item.type === 'text') return (item.payload?.background as string | undefined) ?? null
+  if (PAYLOAD_BACKGROUND_TYPES.includes(item.type)) return (item.payload?.background as string | undefined) ?? null
   if (item.type === 'song' && item.ref_id != null) return songBg[item.ref_id] ?? null
   return null
 }
