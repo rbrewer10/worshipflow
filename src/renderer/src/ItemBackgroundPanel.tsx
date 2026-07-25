@@ -1,11 +1,18 @@
 // src/renderer/src/ItemBackgroundPanel.tsx
 // Dark vertical panel for styling a single service item: pick a per-item theme,
-// override colors, and (text items only) choose a file background. Matches the
-// song editor's BackgroundPanel look.
+// override colors, and (for types whose live rendering supports it) choose a
+// background from your own library. Matches the song editor's BackgroundPanel look.
 
+import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { THEMES, getTheme, resolveColors } from '../../shared/themes'
-import type { ServiceItem, ItemStyle, ThemeColors } from '../../shared/types'
+import type { ServiceItem, ItemStyle, ThemeColors, ServiceItemType } from '../../shared/types'
+import BackgroundLibraryGrid from './BackgroundLibraryGrid'
+
+// Item types whose live rendering actually shows a custom file background —
+// Song has its own separate background system, Image's payload.path already
+// IS the background, and Sermon/Ticker/Announcement don't support one yet.
+const FILE_BACKGROUND_TYPES: ServiceItemType[] = ['text', 'scripture', 'countdown', 'welcome']
 
 export interface ItemBackgroundPanelProps {
   item: ServiceItem
@@ -13,6 +20,8 @@ export interface ItemBackgroundPanelProps {
 }
 
 export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundPanelProps): JSX.Element {
+  const [tab, setTab] = useState<'library' | 'presets'>('library')
+
   const apply = (style: ItemStyle): Promise<void> =>
     window.wf.serviceSetItemStyle(item.id, style).then(onChanged)
   const clearStyle = (): Promise<void> => window.wf.serviceSetItemStyle(item.id, null).then(onChanged)
@@ -25,6 +34,7 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
 
   const payload = (item.payload ?? {}) as Record<string, unknown>
   const fileBg = payload.background as string | undefined
+  const supportsFileBackground = FILE_BACKGROUND_TYPES.includes(item.type)
 
   // Current resolved colors for the override theme (if any), used as <input> values.
   const colorValues = overrideThemeId
@@ -37,13 +47,15 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
     { key: 'text', label: 'Text' }
   ]
 
-  return (
-    <div className="flex flex-col gap-3 bg-[#f4f6f9] text-slate-900">
+  const presetsContent = (
+    <>
       {/* ── Theme gallery ── */}
       <div className="flex flex-col gap-2">
-        <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-          Background &amp; Color
-        </label>
+        {!supportsFileBackground && (
+          <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+            Background &amp; Color
+          </label>
+        )}
         <div className="grid grid-cols-2 gap-2">
           {/* Use service theme (clear/none) */}
           <button
@@ -140,13 +152,43 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
           ))}
         </div>
       )}
+    </>
+  )
 
-      {/* ── File background (text items only) ── */}
-      {item.type === 'text' && (
-        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-            File Background
-          </span>
+  if (!supportsFileBackground) {
+    return (
+      <div className="flex flex-col gap-3 bg-[#f4f6f9] text-slate-900">
+        {presetsContent}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 bg-[#f4f6f9] text-slate-900">
+      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+        Background &amp; Color
+      </label>
+
+      {/* ── Tab strip ── */}
+      <div className="flex rounded-lg bg-slate-100 p-0.5">
+        {(['library', 'presets'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={[
+              'flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-all duration-150',
+              tab === t
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-slate-600 hover:text-slate-900',
+            ].join(' ')}
+          >
+            {t === 'library' ? 'My Backgrounds' : 'Presets'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'library' && (
+        <div className="flex flex-col gap-2">
           {fileBg && (
             <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-2.5 py-1.5">
               <span className="truncate text-xs text-slate-700" title={fileBg}>
@@ -161,19 +203,14 @@ export default function ItemBackgroundPanel({ item, onChanged }: ItemBackgroundP
               </button>
             </div>
           )}
-          <button
-            onClick={async () => {
-              const r = await window.wf.dialogOpenFile()
-              if (!r.canceled && r.filePaths[0]) {
-                savePayload({ ...payload, background: r.filePaths[0] })
-              }
-            }}
-            className="w-full rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-500"
-          >
-            Pick image/video…
-          </button>
+          <BackgroundLibraryGrid
+            activePath={fileBg ?? null}
+            onApply={(path) => savePayload({ ...payload, background: path || null })}
+          />
         </div>
       )}
+
+      {tab === 'presets' && presetsContent}
     </div>
   )
 }
