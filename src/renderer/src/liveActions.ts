@@ -63,7 +63,14 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
   } else if (item.type === 'announcement' && item.ref_id != null) {
     await window.wf.liveLoadAnnouncement(track, item.ref_id)
   } else if (item.type === 'sermon') {
-    window.wf.sendIntent(track, 'logo')
+    await window.wf.liveLoadSermon(
+      track,
+      (item.payload.title as string) ?? '',
+      (item.payload.speaker as string) ?? '',
+      (item.payload.passage as string) ?? '',
+      item.payload.background as string | null | undefined,
+      item.payload.blurBehindText as boolean | undefined
+    )
   } else {
     return false
   }

@@ -77,7 +77,14 @@ async function loadItem(item: ServiceItem): Promise<void> {
   } else if (item.type === 'announcement' && item.ref_id != null) {
     await window.wf.liveLoadAnnouncement('main', item.ref_id)
   } else if (item.type === 'sermon') {
-    window.wf.sendIntent('main', 'logo')
+    await window.wf.liveLoadSermon(
+      'main',
+      (item.payload.title as string) ?? '',
+      (item.payload.speaker as string) ?? '',
+      (item.payload.passage as string) ?? '',
+      item.payload.background as string | null | undefined,
+      item.payload.blurBehindText as boolean | undefined
+    )
   } else {
     return
   }
