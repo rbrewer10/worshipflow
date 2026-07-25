@@ -42,7 +42,7 @@ export default function ZoneScreenCard({
   }, [])
 
   const cycle = (): void => {
-    if (role === null) return
+    if (role === null || !editable) return
     onRoleChange(ROLES[(ROLES.indexOf(role) + 1) % ROLES.length])
   }
 
