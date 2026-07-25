@@ -831,6 +831,28 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   t.index = 0
 }
 
+function doLoadSermon(track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean): void {
+  const t = tracks[track]
+  t.loadGeneration++
+  clearCountdown(track)
+  clearAutoAdvance(track)
+  t.songId = null
+  t.scriptureRef = null
+  clearSongMeta(track)
+  t.bgFit = 'cover'
+  const line = [speaker, passage].filter(Boolean).join('\n')
+  t.song = { title, lines: [line], background: background ?? null }
+  t.songTextColor = null; t.songFont = null
+  t.blurBehindText = blurBehindText ?? false
+  // Unlike every other loader, mode stays 'logo' — the main projector's
+  // sermon behavior (show the church logo) is intentional and unchanged.
+  // Zone routing reads t.song/t.blurBehindText independently of t.mode, so a
+  // zone manually routed to Text/Lyrics mode still picks up this content —
+  // only the main projector's own mode-driven rendering is unaffected.
+  t.mode = 'logo'
+  t.index = 0
+}
+
 function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): void {
   const t = tracks[track]
   t.loadGeneration++
@@ -1485,6 +1507,9 @@ ipcMain.handle('wf:getInfo', (): AppInfo => ({
 // --- Live engine ---
 ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: string, background?: string | null, fontScale?: number, blurBehindText?: boolean) => {
   doLoadText(track, title, body, background ?? null, fontScale, blurBehindText); broadcast()
+})
+ipcMain.handle('wf:live:loadSermon', (_e, track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean) => {
+  doLoadSermon(track, title, speaker, passage, background ?? null, blurBehindText); broadcast()
 })
 
 ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean) => {

@@ -134,6 +134,8 @@ const wf = {
     ipcRenderer.invoke('wf:live:loadScripture', track, reference, background, blurBehindText),
   liveLoadText: (track: TrackId, title: string, body: string, background?: string | null, fontScale?: number, blurBehindText?: boolean): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadText', track, title, body, background ?? null, fontScale, blurBehindText),
+  liveLoadSermon: (track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadSermon', track, title, speaker, passage, background ?? null, blurBehindText),
   liveLoadCountdown: (track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadCountdown', track, seconds, background, blurBehindText),
   liveLoadMedia: (track: TrackId, filePath: string, title: string): Promise<void> =>

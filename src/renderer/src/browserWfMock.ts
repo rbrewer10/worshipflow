@@ -324,6 +324,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     },
     liveLoadScripture: async (_track: TrackId, reference: string): Promise<boolean> => { publish({ songTitle: reference, line: 'Browser preview scripture text.', next: '', total: 1, index: 0 }); return true },
     liveLoadText: async (_track: TrackId, title: string, body: string): Promise<void> => publish({ songTitle: title || 'Announcement', line: body || title, next: '', total: 1, index: 0 }),
+    liveLoadSermon: async (_track: TrackId, title: string, speaker: string, passage: string): Promise<void> => publish({ songTitle: title || 'Sermon', line: [speaker, passage].filter(Boolean).join('\n'), next: '', total: 1, index: 0 }),
     liveLoadCountdown: async (_track: TrackId, seconds: number): Promise<void> => publish({ mode: 'countdown', songTitle: 'Countdown', line: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, next: '', total: 1, index: 0 }),
     liveLoadMedia: async (_track: TrackId, _filePath: string, title: string): Promise<void> => publish({ songTitle: title || 'Media', line: '', next: '', total: 1, index: 0 }),
 
