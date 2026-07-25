@@ -29,6 +29,7 @@ export interface AudienceModel {
   slideThemeColors: ThemeColors | null
   songTextColor: string | null
   songFont: string | null
+  blurBehindText: boolean
   ccli: { author: string | null; copyright: string | null; ccli: string | null; license: string | null }
 }
 
@@ -47,6 +48,7 @@ export function useLiveModel(): AudienceModel {
   const [slideThemeColors, setSlideThemeColors] = useState<ThemeColors | null>(null)
   const [songTextColor, setSongTextColor] = useState<string | null>(null)
   const [songFont, setSongFont] = useState<string | null>(null)
+  const [blurBehindText, setBlurBehindText] = useState(false)
   const [ccli, setCcli] = useState<{
     author: string | null
     copyright: string | null
@@ -64,6 +66,7 @@ export function useLiveModel(): AudienceModel {
       setSlideThemeColors(s.slideThemeColors ?? null)
       setSongTextColor(s.songTextColor ?? null)
       setSongFont(s.songFont ?? null)
+      setBlurBehindText(s.blurBehindText ?? false)
       setFontScale(s.fontScale ?? 6)
       setCcli({
         author: s.songAuthor ?? null,
@@ -93,7 +96,7 @@ export function useLiveModel(): AudienceModel {
 
   return {
     mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
-    slideThemeId, slideThemeColors, songTextColor, songFont, ccli
+    slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli
   }
 }
 
@@ -105,7 +108,7 @@ export function useLiveModel(): AudienceModel {
 export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element {
   const {
     mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
-    slideThemeId, slideThemeColors, songTextColor, songFont, ccli
+    slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli
   } = model
   const [bgReady, setBgReady] = useState(false)
   const [logoImg, setLogoImg] = useState<string | null>(null)
@@ -127,6 +130,20 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
   const theme = getTheme(resolvedThemeId)
   const colors = resolveColors(theme, slideThemeColors)
   const posAlign = theme.position === 'top' ? 'flex-start' : theme.position === 'bottom' ? 'flex-end' : 'center'
+
+  const countdownContent = (
+    <>
+      <div className="mb-[1.5cqh] text-[2.5cqw] font-semibold uppercase tracking-[0.35em] text-blue-200">
+        Service begins in
+      </div>
+      <div
+        className="font-mono text-[20cqw] font-black leading-none tabular-nums text-white"
+        style={{ textShadow: '0 4px 40px rgba(0,0,0,.9)' }}
+      >
+        {clockLine}
+      </div>
+    </>
+  )
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black" style={{ containerType: 'size' }}>
@@ -185,9 +202,9 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
       {!black && !logo && !countdown && (
         <>
           <LyricLayer text={layers.a} show={layers.front === 0} fontScale={fontScale}
-            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} />
+            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText} />
           <LyricLayer text={layers.b} show={layers.front === 1} fontScale={fontScale}
-            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} />
+            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText} />
         </>
       )}
 
@@ -212,15 +229,21 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
 
       {countdown && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="mb-[1.5cqh] text-[2.5cqw] font-semibold uppercase tracking-[0.35em] text-blue-200">
-            Service begins in
-          </div>
-          <div
-            className="font-mono text-[20cqw] font-black leading-none tabular-nums text-white"
-            style={{ textShadow: '0 4px 40px rgba(0,0,0,.9)' }}
-          >
-            {clockLine}
-          </div>
+          {blurBehindText ? (
+            <div
+              className="flex w-full flex-col items-center"
+              style={{
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                background: 'rgba(20,20,30,.3)',
+                padding: '2cqh 0'
+              }}
+            >
+              {countdownContent}
+            </div>
+          ) : (
+            countdownContent
+          )}
         </div>
       )}
 
@@ -312,26 +335,44 @@ export function LiveMirror(): JSX.Element {
   return <AudienceStage model={model} />
 }
 
-function LyricLayer({ text, show, fontScale, fontFamily, color, align }: {
-  text: string; show: boolean; fontScale: number; fontFamily: string; color: string; align: string
+function LyricLayer({ text, show, fontScale, fontFamily, color, align, blurBehindText }: {
+  text: string; show: boolean; fontScale: number; fontFamily: string; color: string; align: string; blurBehindText: boolean
 }): JSX.Element {
+  const textSpan = (
+    <span
+      className="font-bold leading-tight"
+      style={{
+        fontSize: `${fontScale}cqw`,
+        fontFamily,
+        color,
+        textShadow: '0 3px 24px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)',
+        whiteSpace: 'pre-line'
+      }}
+    >
+      {text}
+    </span>
+  )
   return (
     <div
-      className="absolute inset-0 flex justify-center px-[8cqw] py-[6cqh] text-center transition-opacity duration-500"
+      className={`absolute inset-0 flex justify-center py-[6cqh] text-center transition-opacity duration-500 ${blurBehindText ? '' : 'px-[8cqw]'}`}
       style={{ opacity: show ? 1 : 0, alignItems: align }}
     >
-      <span
-        className="font-bold leading-tight"
-        style={{
-          fontSize: `${fontScale}cqw`,
-          fontFamily,
-          color,
-          textShadow: '0 3px 24px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)',
-          whiteSpace: 'pre-line'
-        }}
-      >
-        {text}
-      </span>
+      {blurBehindText ? (
+        <div
+          className="w-full px-[8cqw]"
+          style={{
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            background: 'rgba(20,20,30,.3)',
+            paddingTop: '2cqh',
+            paddingBottom: '2cqh'
+          }}
+        >
+          {textSpan}
+        </div>
+      ) : (
+        textSpan
+      )}
     </div>
   )
 }
