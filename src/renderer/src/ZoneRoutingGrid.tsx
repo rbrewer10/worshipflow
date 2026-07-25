@@ -9,6 +9,13 @@ export const MODE_LABELS: Record<ZoneState['mode'], string> = {
 const ZONE_MODE_OPTIONS: ZoneState['mode'][] = ['lyrics', 'stage', 'black', 'logo', 'countdown', 'text', 'image', 'off']
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
+// Only Zone 4's physical template (STAGE_SCRIPT in zoneHtml.ts) actually
+// renders 'stage' mode — zones 1-3 fall through to a blank or wrong-looking
+// screen if routed there, so it's not offered as a choice for them.
+function modeOptionsFor(zoneId: ZoneId): ZoneState['mode'][] {
+  return zoneId === 4 ? ZONE_MODE_OPTIONS : ZONE_MODE_OPTIONS.filter((m) => m !== 'stage')
+}
+
 // The raw per-zone mode grid (the "Advanced" escape hatch). Fully controlled.
 export default function ZoneRoutingGrid({ routing, onChange }: {
   routing: ZoneRouting
@@ -24,7 +31,7 @@ export default function ZoneRoutingGrid({ routing, onChange }: {
             onChange={(e) => onChange({ ...routing, [zoneId]: e.target.value as ZoneState['mode'] })}
             className="flex-1 rounded border border-slate-200 bg-slate-100 py-0.5 text-[11px] text-slate-700 outline-none focus:border-blue-500/50"
           >
-            {ZONE_MODE_OPTIONS.map((m) => (
+            {modeOptionsFor(zoneId).map((m) => (
               <option key={m} value={m}>{MODE_LABELS[m]}</option>
             ))}
           </select>
