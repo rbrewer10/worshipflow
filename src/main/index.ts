@@ -237,6 +237,14 @@ interface LiveTrackState {
   // that something else has since loaded onto this track — so it can bail out
   // instead of clobbering newer live content. See doLoadScripture.
   loadGeneration: number
+  // Set true by every load* function the first time real content (a service
+  // item OR an ad-hoc Quick Scripture/Quick Countdown lookup) is loaded onto
+  // this track — distinguishes "genuinely nothing loaded yet, still on the
+  // pristine startup state" from "something's actually live here." Lets
+  // computeZoneStates() show ad-hoc content (which has no service item, so
+  // normal per-item zone routing can't find it) on zones assigned to this
+  // track, instead of silently falling back to the idle Logo/Off default.
+  hasLiveContent: boolean
 }
 
 function createTrackState(song: LiveTrackState['song']): LiveTrackState {
@@ -264,7 +272,8 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     autoAdvanceTimer: null,
     autoAdvanceDuration: 0,
     autoAdvanceLoop: false,
-    loadGeneration: 0
+    loadGeneration: 0,
+    hasLiveContent: false
   }
 }
 
@@ -569,7 +578,18 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
 
     // Manual override takes precedence over auto-routing (global, track-agnostic).
     const override = zoneOverrides.get(zoneId)
-    const idleDefault: ZoneMode = (zoneId === 1 || zoneId === 2) ? 'logo' : 'off'
+    // No service item is live on this track (routing is null) — e.g. nothing's
+    // loaded yet, OR ad-hoc content (Quick Scripture / Quick Countdown) is live,
+    // which deliberately has no service item for per-item routing to key off.
+    // Show that ad-hoc content on zones 1/2 (which otherwise default to the
+    // Logo backdrop) instead of silently hiding it — but only once something
+    // real has actually loaded on this track (hasLiveContent), and only while
+    // the track itself is actively displaying it (not black/logo'd out), so a
+    // pristine, never-touched track still shows the safe Logo/Off default.
+    const trackShowingContent = t.hasLiveContent && (t.mode === 'lyrics' || t.mode === 'countdown')
+    const idleDefault: ZoneMode = (zoneId === 1 || zoneId === 2)
+      ? (trackShowingContent ? (t.mode === 'countdown' ? 'countdown' : 'text') : 'logo')
+      : 'off'
     const routedMode = override ?? (routing ? routing[zoneId] : idleDefault)
     const mode = routedMode ?? 'off'
 
@@ -811,6 +831,7 @@ function processIntent(track: TrackId, type: Intent): void {
 function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number, blurBehindText?: boolean): void {
   const t = tracks[track]
   t.loadGeneration++
+  t.hasLiveContent = true
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -834,6 +855,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
 function doLoadSermon(track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean): void {
   const t = tracks[track]
   t.loadGeneration++
+  t.hasLiveContent = true
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -856,6 +878,7 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
 function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): void {
   const t = tracks[track]
   t.loadGeneration++
+  t.hasLiveContent = true
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -935,6 +958,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
     notifyOperator(`Online lookup failed — showing KJV for "${reference}"`, 'warn')
   }
   const t = tracks[track]
+  t.hasLiveContent = true
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -978,6 +1002,7 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
   clearAutoAdvance(track)
   const full = await getSong(id)
   if (!full) return
+  t.hasLiveContent = true
   t.songId = id
   t.scriptureRef = null
   t.bgFit = 'cover'
@@ -1071,6 +1096,7 @@ function applyItemTheme(track: TrackId, item: ServiceItem | undefined): void {
 function doLoadMedia(track: TrackId, filePath: string, title: string): void {
   const t = tracks[track]
   t.loadGeneration++
+  t.hasLiveContent = true
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
