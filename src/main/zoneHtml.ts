@@ -46,7 +46,7 @@ ${body}
 <script>
 (function(){
   var ZONE=${zoneId};
-  var state={mode:'off',line:'',next:'',title:'',index:0,total:0,background:null,themeColors:null,fontScale:6,secondsLeft:0,stageMessage:null,imagePath:null,bgColor:null,bgOverlay:null,textAlign:null,textPosition:null};
+  var state={mode:'off',line:'',next:'',title:'',index:0,total:0,background:null,themeColors:null,fontScale:6,secondsLeft:0,stageMessage:null,imagePath:null,bgColor:null,bgOverlay:null,textAlign:null,textPosition:null,blurBehindText:false};
   var ws,reconnectTimer;
   function connect(){
     ws=new WebSocket('ws://'+location.host);
@@ -155,6 +155,7 @@ const LYRICS_SCRIPT = `
 
   function render(){
     var m=state.mode;
+    lineEl.style.backdropFilter='none';lineEl.style.webkitBackdropFilter='none';lineEl.style.background='transparent';lineEl.style.padding='0 8vw';
     if(m==='black'||m==='off'){
       document.body.style.background='#000';
       bgvid.style.opacity='0';bgimg.style.opacity='0';gradient.style.opacity='0';
@@ -176,6 +177,7 @@ const LYRICS_SCRIPT = `
       document.body.style.background='#050a14';
       bgvid.style.opacity='0';bgimg.style.opacity='0';gradient.style.opacity='1';
       blob1.style.opacity='0';blob2.style.opacity='0';
+      if(state.blurBehindText){lineEl.style.backdropFilter='blur(10px)';lineEl.style.webkitBackdropFilter='blur(10px)';lineEl.style.background='rgba(20,20,30,.3)';lineEl.style.padding='2vh 8vw';}
       var mins=Math.floor(state.secondsLeft/60),secs=state.secondsLeft%60;
       lineEl.innerHTML='<div style="font-size:25vw;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-0.03em">'+mins+':'+(secs<10?'0':'')+secs+'</div>';
       titleEl.innerHTML=state.title?'<span style="font-size:2.5vw;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.2em">'+esc(state.title)+'</span>':'';
@@ -190,6 +192,7 @@ const LYRICS_SCRIPT = `
     // lyrics / text
     document.body.style.background='#000';
     applyBg(state.background);
+    if(state.blurBehindText){lineEl.style.backdropFilter='blur(10px)';lineEl.style.webkitBackdropFilter='blur(10px)';lineEl.style.background='rgba(20,20,30,.3)';lineEl.style.padding='2vh 8vw';}
     // Solid bg color when no file background
     if(!state.background && state.bgColor){
       document.body.style.background=state.bgColor;
@@ -274,6 +277,7 @@ const FLEX_SCRIPT = `
 
   function render(){
     var m=state.mode;
+    content.style.backdropFilter='none';content.style.webkitBackdropFilter='none';content.style.background='transparent';content.style.width='';content.style.maxWidth='';content.style.padding='';
     if(m==='black'||m==='off'){
       root.style.background='#000';bgvid.style.opacity='0';bgimg.style.opacity='0';overlay.style.opacity='0';
       blob1.style.opacity='0';blob2.style.opacity='0';
@@ -314,6 +318,7 @@ const FLEX_SCRIPT = `
     }
     if(m==='lyrics'||m==='text'){
       applyBg(state.background,true);
+      if(state.blurBehindText){content.style.backdropFilter='blur(10px)';content.style.webkitBackdropFilter='blur(10px)';content.style.background='rgba(20,20,30,.3)';content.style.width='100%';content.style.maxWidth='100%';content.style.padding='24px 48px';}
       var tc=state.themeColors;
       if(!state.background) root.style.background=(tc&&tc.primary)||'#0a1628';
       var textColor=state.background?'#fff':(tc&&tc.text)||'#fff';
@@ -330,6 +335,7 @@ const FLEX_SCRIPT = `
     }
     if(m==='countdown'){
       root.style.background='#050a14';bgvid.style.opacity='0';bgimg.style.opacity='0';overlay.style.opacity='0';
+      if(state.blurBehindText){content.style.backdropFilter='blur(10px)';content.style.webkitBackdropFilter='blur(10px)';content.style.background='rgba(20,20,30,.3)';content.style.width='100%';content.style.maxWidth='100%';content.style.padding='24px 48px';}
       var mins=Math.floor(state.secondsLeft/60),secs=state.secondsLeft%60;
       content.innerHTML='<div style="font-size:22vw;font-weight:900;font-variant-numeric:tabular-nums;color:#fff;letter-spacing:-0.04em">'+mins+':'+(secs<10?'0':'')+secs+'</div>'
         +(state.title?'<div style="font-size:3vw;color:rgba(255,255,255,0.4);margin-top:1vw;text-transform:uppercase;letter-spacing:0.2em">'+esc(state.title)+'</div>':'');
