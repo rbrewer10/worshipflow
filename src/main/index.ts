@@ -296,11 +296,16 @@ let activeServiceName = ''
 let activeServiceDate: string | null = null
 
 // --- Service recording (Phase 1: capture & markers) ---
-// The session is driven by two live chokepoints: wf:live:setItemId (first live
-// item starts the recording + every live item stamps a marker) and
-// wf:setActiveService(null)/quit (stops + writes the sidecar). All side-effects
-// are injected so recording.ts stays unit-testable. notifyOperator below is a
-// hoisted function declaration, so it is safe to reference here at module load.
+// The session is driven by two live chokepoints: wf:live:setItemId (the explicit
+// "Go Live" button) and handleTabletLoadItem (Next/Prev, the tablet remote, and
+// slide-thumbnail clicks) — every item that goes live on the main track, via
+// either path, starts the recording on the first call and stamps a marker on
+// every call. The two paths never fire for the same transition (setItemId's
+// callers don't route through handleTabletLoadItem and vice versa), so markers
+// are never double-stamped. Recording stops via wf:setActiveService(null)/quit
+// (stops + writes the sidecar). All side-effects are injected so recording.ts
+// stays unit-testable. notifyOperator below is a hoisted function declaration,
+// so it is safe to reference here at module load.
 const recordingSession = createRecordingSession({
   now: () => Date.now(),
   appVersion: app.getVersion(),
@@ -1093,6 +1098,14 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   t.itemNotes = item.notes ?? null
   applyItemTheme(track, item)
   broadcast()
+  // Mirrors wf:live:setItemId's recording hook (main-track only) — this is the
+  // path Next/Prev, the tablet remote, and slide-thumbnail clicks actually run
+  // through during a live service, so it must stamp markers too, not just the
+  // explicit "Go Live" button. See the recordingSession comment near the top
+  // of this file for why both chokepoints must call onItemLive.
+  if (track === 'main') {
+    void recordingSession.onItemLive(item, activeServiceId, activeServiceName, activeServiceDate)
+  }
 }
 
 // --- Tablet HTTP + WebSocket server ---
