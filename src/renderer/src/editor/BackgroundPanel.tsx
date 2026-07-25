@@ -2,7 +2,7 @@
 // Right-side panel for selecting/uploading/generating slide backgrounds.
 
 import { useState, useEffect } from 'react'
-import { Check, X, Sparkles, Dices, MoveHorizontal, ZoomIn, Minus } from 'lucide-react'
+import { Check, Sparkles, Dices, MoveHorizontal, ZoomIn, Minus } from 'lucide-react'
 import { THEMES } from '../../../shared/themes'
 import type { SongFull } from '../../../shared/types'
 import BackgroundLibraryGrid from '../BackgroundLibraryGrid'
