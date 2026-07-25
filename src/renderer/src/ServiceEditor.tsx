@@ -24,6 +24,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const [selectedSongFull, setSelectedSongFull] = useState<SongFull | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<ServiceItem | null>(null)
   const [track, setTrack] = useState<TrackId>('main')
+  const [itemSlides, setItemSlides] = useState<Record<number, string[]>>({})
 
   const optionalSvc = useOptionalService()
 
@@ -84,6 +85,18 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     window.wf.getState('main').then((s) => setLive({ main: s, second: null }))
     return off
   }, [])
+
+  // Resolved slide text (e.g. scripture verses) for the zone grid's filmstrip
+  // and previews — same IPC the Live tab's SlideGrid already uses. Re-fetches
+  // on every reload() so an edit to the selected item's content stays in sync.
+  useEffect(() => {
+    if (!service) return
+    void window.wf.serviceSlides(service.id).then((rows) => {
+      const map: Record<number, string[]> = {}
+      for (const r of rows) map[r.id] = r.slides
+      setItemSlides(map)
+    })
+  }, [service])
 
   const selectedItem = service?.items.find((it) => it.id === selectedId) ?? null
 
@@ -183,6 +196,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
               serviceTheme={service.theme}
               serviceColors={service.themeColors}
               songFull={selectedSongFull}
+              slides={itemSlides[selectedItem.id] ?? []}
               onChanged={reload}
             />
           ) : (
