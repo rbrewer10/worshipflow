@@ -79,6 +79,10 @@ export default function ServiceSlidePreview({
         const body = payload.body as string | undefined
         const textAlign = ((payload.textAlign as string | undefined) ?? 'center') as 'left' | 'center' | 'right'
         const textPosition = ((payload.textPosition as string | undefined) ?? 'center') as 'top' | 'center' | 'bottom'
+        // Same unit the live projector uses (cqw, off the preview box's own
+        // width via container-type below) — so this slider actually moves
+        // something here, not just in the saved payload.
+        const fontScale = (payload.fontScale as number | undefined) ?? 6
         const justify =
           textPosition === 'top' ? 'flex-start' : textPosition === 'bottom' ? 'flex-end' : 'center'
         const align =
@@ -97,11 +101,11 @@ export default function ServiceSlidePreview({
               </div>
             )}
             {body ? (
-              <div className="text-2xl font-bold leading-tight" style={baseTextStyle}>
+              <div className="font-bold leading-tight" style={{ ...baseTextStyle, fontSize: `${fontScale}cqw` }}>
                 {body}
               </div>
             ) : (
-              <div className="text-2xl font-bold leading-tight" style={{ ...baseTextStyle, opacity: 0.4 }}>
+              <div className="font-bold leading-tight" style={{ ...baseTextStyle, fontSize: `${fontScale}cqw`, opacity: 0.4 }}>
                 Type your text…
               </div>
             )}
@@ -168,7 +172,7 @@ export default function ServiceSlidePreview({
     // padding-bottom keeps a true 16:9 box even as a stretched flex item
     // (aspect-ratio can collapse to 0 height in that context).
     <div className={`relative w-full${className ? ` ${className}` : ''}`} style={{ paddingBottom: '56.25%' }}>
-      <div className="absolute inset-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
+      <div className="absolute inset-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10" style={{ containerType: 'inline-size' }}>
         {/* Background layer — CSS background-image can only ever show a still
             image, so a video file needs an actual <video> element or it
             silently fails to render (showing nothing behind it). */}

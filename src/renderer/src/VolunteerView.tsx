@@ -56,7 +56,8 @@ async function loadItem(item: ServiceItem): Promise<void> {
       'main',
       (item.payload.title as string) ?? '',
       (item.payload.body as string) ?? '',
-      (item.payload.background as string) ?? null
+      (item.payload.background as string) ?? null,
+      item.payload.fontScale as number | undefined
     )
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number

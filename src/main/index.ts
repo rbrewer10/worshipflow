@@ -781,7 +781,7 @@ function processIntent(track: TrackId, type: Intent): void {
 }
 
 // --- Extracted load functions (used by IPC handlers and tablet loadItem) ---
-function doLoadText(track: TrackId, title: string, body: string, background: string | null = null): void {
+function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number): void {
   const t = tracks[track]
   clearCountdown(track)
   t.songId = null
@@ -793,6 +793,10 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
   t.song = { title: title || 'Announcement', lines: lines.length ? lines : [title], background }
   t.songTextColor = null; t.songFont = null
+  // Only a text item's own saved font size overrides the live size — tickers/
+  // announcements (which pass no fontScale) leave whatever's currently set
+  // untouched, same as before this per-item override existed.
+  if (fontScale != null) t.fontScale = fontScale
   t.mode = 'lyrics'
   t.index = 0
 }
@@ -1015,7 +1019,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
       track,
       (item.payload.title as string) ?? '',
       (item.payload.body as string) ?? '',
-      (item.payload.background as string) ?? null
+      (item.payload.background as string) ?? null,
+      item.payload.fontScale as number | undefined
     )
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
@@ -1417,8 +1422,8 @@ ipcMain.handle('wf:getInfo', (): AppInfo => ({
 }))
 
 // --- Live engine ---
-ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: string, background?: string | null) => {
-  doLoadText(track, title, body, background ?? null); broadcast()
+ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: string, background?: string | null, fontScale?: number) => {
+  doLoadText(track, title, body, background ?? null, fontScale); broadcast()
 })
 
 ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number) => {

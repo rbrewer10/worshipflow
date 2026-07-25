@@ -132,8 +132,8 @@ const wf = {
   liveLoadSong: (track: TrackId, id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', track, id),
   liveLoadScripture: (track: TrackId, reference: string): Promise<boolean> =>
     ipcRenderer.invoke('wf:live:loadScripture', track, reference),
-  liveLoadText: (track: TrackId, title: string, body: string, background?: string | null): Promise<void> =>
-    ipcRenderer.invoke('wf:live:loadText', track, title, body, background ?? null),
+  liveLoadText: (track: TrackId, title: string, body: string, background?: string | null, fontScale?: number): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadText', track, title, body, background ?? null, fontScale),
   liveLoadCountdown: (track: TrackId, seconds: number): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadCountdown', track, seconds),
   liveLoadMedia: (track: TrackId, filePath: string, title: string): Promise<void> =>
