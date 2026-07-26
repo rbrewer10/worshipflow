@@ -1807,7 +1807,17 @@ function scheduleLayoutOutputs(): void {
   }, 500)
 }
 
-function layoutOutputs(): void {
+/**
+ * `windowedFallback` controls the no-projector case only.
+ *
+ * With no external display there is no congregation screen to fill, so the old
+ * behaviour — popping a 960x540 "Output 1" window on the primary — just put a
+ * window in the operator's way that changed with every slide. Automatic callers
+ * pass false and get the zone multiview instead, which is what you actually want
+ * to watch. The manual "open the output" action passes true, so the escape hatch
+ * still works when a projector is attached but never got a hotplug event.
+ */
+function layoutOutputs(windowedFallback = false): void {
   lastDisplaySig = displaySignature()
   for (const w of outputWins.values()) if (!w.isDestroyed()) w.destroy()
   outputWins.clear()
@@ -1830,6 +1840,11 @@ function layoutOutputs(): void {
 
   const externals = screen.getAllDisplays().filter((d) => d.id !== primary.id)
   if (externals.length === 0) {
+    if (!windowedFallback) {
+      // Nothing to fill, so show the four zones rather than a stray output window.
+      if (!multiviewWin) createMultiviewWindow()
+      return
+    }
     createOutput('main', {
       x: primary.bounds.x + 120, y: primary.bounds.y + 120,
       width: 960, height: 540, fullscreen: false, id: 1
@@ -1897,7 +1912,7 @@ ipcMain.handle('wf:stage:open', () => { createStageWindow() })
 ipcMain.handle('wf:multiview:open', () => { createMultiviewWindow() })
 // Manual re-open of the audience output (e.g. operator closed it, or it never
 // opened because the projector was connected before launch with no display event).
-ipcMain.handle('wf:output:open', () => { layoutOutputs(); broadcast() })
+ipcMain.handle('wf:output:open', () => { layoutOutputs(true); broadcast() })
 
 ipcMain.handle('wf:live:setItemId', (_e, track: TrackId, id: number | null) => {
   const t = tracks[track]
@@ -2835,9 +2850,9 @@ app.whenReady().then(async () => {
 
   startTabletServer()
   createOperator()
-  // Open the audience output automatically at launch (fullscreen on an external
-  // display / projector, or a large window on the primary when there is none) so
-  // the congregation screen is never left dark waiting for a hotplug event.
+  // Fullscreen the audience output on a projector at launch, so the congregation
+  // screen is never left dark waiting for a hotplug event. With no projector
+  // attached this opens the zone multiview instead of a stray output window.
   layoutOutputs()
   broadcast()
   // Reconnect to OBS in the background if the operator connected before (non-blocking).
