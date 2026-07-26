@@ -14,8 +14,8 @@ import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../sha
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
-import { parseZoneSlides } from '../shared/zoneSlides'
-import type { ZoneSlide } from '../shared/zoneSlides'
+import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides'
+import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -249,6 +249,19 @@ interface LiveTrackState {
   // normal per-item zone routing can't find it) on zones assigned to this
   // track, instead of silently falling back to the idle Logo/Off default.
   hasLiveContent: boolean
+  // An authored per-zone slide deck, when the live item has one — null means
+  // "no deck, use normal per-item zone routing." Populated by loadDeckOnto,
+  // which resolves it once at load time (never from computeZoneStates, which
+  // must stay synchronous). t.index doubles as the deck cursor, so existing
+  // next/prev/auto-advance code needs no deck-specific branch.
+  deckSlides: ZoneSlide[] | null
+  // The live item's OWN resolved source slides, for 'slide' slots (an index
+  // into the item's normal content, not into the deck itself).
+  deckSource: string[]
+  // Pre-resolved scripture text for every deck slot of kind 'scripture', keyed
+  // `${slideIndex}:${zoneId}`. Populated once at load time by loadDeckOnto —
+  // computeZoneStates only ever reads this map, never triggers a lookup.
+  deckScripture: Map<string, string>
 }
 
 function createTrackState(song: LiveTrackState['song']): LiveTrackState {
@@ -277,7 +290,10 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     autoAdvanceDuration: 0,
     autoAdvanceLoop: false,
     loadGeneration: 0,
-    hasLiveContent: false
+    hasLiveContent: false,
+    deckSlides: null,
+    deckSource: [],
+    deckScripture: new Map()
   }
 }
 
@@ -549,6 +565,31 @@ function renderState(track: TrackId = 'main'): LiveState {
   }
 }
 
+// The all-blank ZoneState every rendering path (normal routing, and the deck
+// path below) starts from and fills in — kept as one function so the two
+// paths can never drift apart on a field neither of them meant to set.
+function emptyZoneState(live: LiveState): ZoneState {
+  return {
+    mode: 'off',
+    line: '',
+    next: '',
+    title: '',
+    index: live.index,
+    total: live.total,
+    background: null,
+    themeColors: null,
+    fontScale: live.fontScale,
+    secondsLeft: 0,
+    stageMessage: live.stageMessage,
+    imagePath: null,
+    bgColor: null,
+    bgOverlay: null,
+    textAlign: null,
+    textPosition: null,
+    blurBehindText: live.blurBehindText ?? false,
+  }
+}
+
 function computeZoneStates(): Record<ZoneId, ZoneState> {
   const result = {} as Record<ZoneId, ZoneState>
   const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
@@ -559,6 +600,14 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     const zoneTrack = activeZoneTrackAssignment[zoneId]
     const live = renderState(zoneTrack)
     const t = tracks[zoneTrack]
+
+    // An authored deck says explicitly what every zone shows on the current
+    // slide — that's its whole purpose, so it wins outright over manual zone
+    // overrides and per-item auto-routing alike, not just the idle default.
+    if (t.deckSlides && t.index < t.deckSlides.length) {
+      result[zoneId] = zoneStateFromSlot(resolveSlot(t.deckSlides, t.index, zoneId), t, zoneId, live)
+      continue
+    }
 
     // Get routing for the active item on this zone's track (or defaults: scene
     // palette typeDefault, falling back to the built-in ZONE_ROUTING_DEFAULTS).
@@ -597,25 +646,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     const routedMode = override ?? (routing ? routing[zoneId] : idleDefault)
     const mode = routedMode ?? 'off'
 
-    const base: ZoneState = {
-      mode,
-      line: '',
-      next: '',
-      title: '',
-      index: live.index,
-      total: live.total,
-      background: null,
-      themeColors: null,
-      fontScale: live.fontScale,
-      secondsLeft: 0,
-      stageMessage: live.stageMessage,
-      imagePath: null,
-      bgColor: null,
-      bgOverlay: null,
-      textAlign: null,
-      textPosition: null,
-      blurBehindText: live.blurBehindText ?? false,
-    }
+    const base: ZoneState = { ...emptyZoneState(live), mode }
 
     // Populate fields based on mode.
     if (mode === 'lyrics' || mode === 'text') {
@@ -676,6 +707,38 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     result[zoneId] = base
   }
   return result
+}
+
+// The deck-path counterpart to computeZoneStates' per-item routing branch: a
+// resolved ZoneSlot (already walked back through any 'same' chain by the
+// caller) becomes the ZoneState for one zone. Synchronous and cache-only — no
+// lookups happen here, see loadDeckOnto.
+function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, live: LiveState): ZoneState {
+  const base = emptyZoneState(live)
+  if (slot.kind === 'slide') {
+    base.mode = 'text'
+    base.line = t.deckSource[slot.index ?? -1] ?? ''
+  } else if (slot.kind === 'text') {
+    base.mode = 'text'
+    base.line = slot.text ?? ''
+  } else if (slot.kind === 'scripture') {
+    // Keyed by the CURRENT slide's own index, not wherever the slot was
+    // originally authored — loadDeckOnto pre-populates the cache for every
+    // resolved index (including ones only reached via a 'same' chain), so
+    // this always has a matching entry when a lookup for this reference
+    // succeeded at load time.
+    const verse = t.deckScripture.get(`${t.index}:${zoneId}`)
+    if (verse) { base.mode = 'text'; base.line = verse; base.title = slot.reference ?? '' }
+    else base.mode = 'black'   // lookup failed — better blank than a stale verse
+  } else if (slot.kind === 'image') {
+    base.mode = 'image'
+    base.imagePath = slot.path ?? null
+  } else if (slot.kind === 'logo') {
+    base.mode = 'logo'
+  } else {
+    base.mode = 'black'
+  }
+  return base
 }
 
 function zoneBroadcast(): void {
@@ -832,7 +895,10 @@ function processIntent(track: TrackId, type: Intent): void {
 }
 
 // --- Extracted load functions (used by IPC handlers and tablet loadItem) ---
-function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number, blurBehindText?: boolean): void {
+// `item`, when given, is the live ServiceItem this text came from — used to
+// look up and load its authored zone-slide deck (if any). Ad-hoc loads (Quick
+// Text, tickers, announcements) pass no item, so they never carry a deck.
+function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number, blurBehindText?: boolean, item?: ServiceItem | null): void {
   const t = tracks[track]
   t.loadGeneration++
   t.hasLiveContent = true
@@ -842,6 +908,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   t.scriptureRef = null
   clearSongMeta(track)
   t.bgFit = 'cover'
+  t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
   const lines: string[] = []
   if (title) lines.push(title)
   body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
@@ -854,9 +921,11 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   if (fontScale != null) t.fontScale = fontScale
   t.mode = 'lyrics'
   t.index = 0
+  if (item) void loadDeckOnto(track, item, t.loadGeneration)
 }
 
-function doLoadSermon(track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean): void {
+// See doLoadText's `item` comment — same deal here.
+function doLoadSermon(track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean, item?: ServiceItem | null): void {
   const t = tracks[track]
   t.loadGeneration++
   t.hasLiveContent = true
@@ -866,6 +935,7 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
   t.scriptureRef = null
   clearSongMeta(track)
   t.bgFit = 'cover'
+  t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
   const line = [speaker, passage].filter(Boolean).join('\n')
   t.song = { title, lines: [line], background: background ?? null }
   t.songTextColor = null; t.songFont = null
@@ -877,6 +947,53 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
   // only the main projector's own mode-driven rendering is unaffected.
   t.mode = 'logo'
   t.index = 0
+  if (item) void loadDeckOnto(track, item, t.loadGeneration)
+}
+
+// Fills t.song.lines with one summary per deck slide, so the EXISTING cursor,
+// next/prev and auto-advance all work unchanged — the deck needs no second
+// cursor. Pre-resolves every scripture slot because computeZoneStates is
+// synchronous and fires as often as every 100ms. Returns false if no deck.
+async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: number): Promise<boolean> {
+  const slides = parseZoneSlides(getItemZoneSlides(item.id))
+  if (!slides) return false
+  const source = await computeItemSourceSlides(item)
+  if (tracks[track].loadGeneration !== generation) return true
+  const t = tracks[track]
+  t.deckSlides = slides
+  t.deckSource = source
+  t.deckScripture = new Map()
+  t.song = { ...t.song, lines: slides.map((s) => slideSummary(s, source)) }
+  t.index = 0
+
+  // Memoized by reference, not by slide index: resolveSlot walks a 'same'
+  // chain back to its nearest real slot, so every slide in that chain resolves
+  // to the SAME scripture slot and would otherwise trigger the identical
+  // network lookup once per slide. One fetch per distinct reference is enough;
+  // the cache below is still populated per resolved slide index, so the
+  // render-time read (keyed by the live t.index) always has a matching entry.
+  const lookedUp = new Map<string, ScriptureResult>()
+  for (let i = 0; i < slides.length; i++) {
+    for (const zoneId of [1, 2, 3, 4] as ZoneId[]) {
+      const slot = resolveSlot(slides, i, zoneId)
+      if (slot.kind !== 'scripture' || !slot.reference) continue
+      let result = lookedUp.get(slot.reference)
+      if (!result) {
+        result = bibleTranslation === 'kjv'
+          ? lookupScripture(slot.reference)
+          : await fetchScripture(slot.reference, bibleTranslation)
+        lookedUp.set(slot.reference, result)
+      }
+      // The await may have let something newer load onto this track.
+      if (tracks[track].loadGeneration !== generation) return true
+      if (result.ok && result.verses) {
+        tracks[track].deckScripture.set(`${i}:${zoneId}`, result.verses.map((v) => v.text).join(' '))
+      } else {
+        logWarn(`[deck] scripture lookup failed for "${slot.reference}" on slide ${i + 1} zone ${zoneId}`)
+      }
+    }
+  }
+  return true
 }
 
 function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): void {
@@ -889,6 +1006,7 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
   t.scriptureRef = null
   clearSongMeta(track)
   t.bgFit = 'cover'
+  t.deckSlides = null  // countdowns never carry a deck
   const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   let remaining = seconds
   const bg = background ?? null
@@ -969,6 +1087,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   t.scriptureRef = reference
   clearSongMeta(track)
   t.bgFit = 'cover'
+  t.deckSlides = null  // ad-hoc scripture loads never carry a deck
   const lines =
     result.verses.length === 1
       ? [result.verses[0].text]
@@ -1010,6 +1129,7 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
   t.songId = id
   t.scriptureRef = null
   t.bgFit = 'cover'
+  t.deckSlides = null  // songs never carry a deck
   t.song = { title: full.title, lines: songLines(full), background: full.background ?? null, bgMotion: full.bgMotion ?? null }
   t.fontScale = full.fontScale ?? 6
   t.songTextColor = full.textColor ?? null
@@ -1041,8 +1161,22 @@ async function doLoadAnnouncement(track: TrackId, id: number): Promise<void> {
   }
 }
 
-// Pure: the slides an item would show, without going live (for the slide grid).
+// Pure: the slides an item would show, without going live (for the slide
+// grid). Checks for an authored deck first — when one exists, ITS summaries
+// are what the item "shows". Otherwise delegates to computeItemSourceSlides.
 async function computeItemSlides(item: ServiceItem): Promise<string[]> {
+  const deck = parseZoneSlides(getItemZoneSlides(item.id))
+  if (deck) return deck.map((s) => slideSummary(s))
+  return computeItemSourceSlides(item)
+}
+
+// The item's own resolved content slides — what computeItemSlides used to
+// compute unconditionally before decks existed. loadDeckOnto calls this
+// directly (never computeItemSlides) to get the source an authored 'slide'
+// slot indexes into: that source must always be the item's ORIGINAL content,
+// never another deck's summaries, or a deck referencing its own summaries
+// would be circular.
+async function computeItemSourceSlides(item: ServiceItem): Promise<string[]> {
   if (item.type === 'song' && item.ref_id != null) {
     const full = await getSong(item.ref_id)
     return full ? songLines(full) : []
@@ -1107,6 +1241,7 @@ function doLoadMedia(track: TrackId, filePath: string, title: string): void {
   t.scriptureRef = null
   clearSongMeta(track)
   t.bgFit = 'contain'  // a whole-slide image — fit it entirely on screen
+  t.deckSlides = null  // media loads never carry a deck
   t.song = { title: title || 'Media', lines: [''], background: filePath }
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = false
@@ -1131,7 +1266,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
       (item.payload.body as string) ?? '',
       (item.payload.background as string) ?? null,
       item.payload.fontScale as number | undefined,
-      item.payload.blurBehindText as boolean | undefined
+      item.payload.blurBehindText as boolean | undefined,
+      item
     )
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
@@ -1158,7 +1294,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
       (item.payload.speaker as string) ?? '',
       (item.payload.passage as string) ?? '',
       item.payload.background as string | null | undefined,
-      item.payload.blurBehindText as boolean | undefined
+      item.payload.blurBehindText as boolean | undefined,
+      item
     )
   } else {
     return
@@ -1593,6 +1730,16 @@ ipcMain.handle('wf:live:setItemId', (_e, track: TrackId, id: number | null) => {
   const item = id != null ? activeServiceItems.find((it) => it.id === id && it.track === track) : undefined
   t.itemNotes = item?.notes ?? null
   applyItemTheme(track, item)
+  // The explicit "Go Live" path (sendItemLive) calls wf:live:loadText/loadSermon
+  // with bare primitives, not the ServiceItem, so doLoadText/doLoadSermon's own
+  // deck load never fires for it — it finishes here with the item id instead.
+  // This handler is the only place in that path where the ServiceItem is
+  // available, so it's the deck-load chokepoint for "Go Live". (The other path,
+  // Next/Prev via handleTabletLoadItem, never calls wf:live:setItemId — it
+  // already loaded the deck itself, straight from the ServiceItem it has.)
+  if (item && (item.type === 'text' || item.type === 'sermon')) {
+    void loadDeckOnto(track, item, t.loadGeneration)
+  }
   broadcast()
   if (item && track === 'main') {
     void recordingSession.onItemLive(item, activeServiceId, activeServiceName, activeServiceDate)
@@ -1946,7 +2093,22 @@ ipcMain.handle('wf:zone:setSlides', (_e, itemId: number, slides: ZoneSlide[] | n
   // Zone states are computed from the deck, so an edit while this item is live
   // must push fresh state to the screens. Unlike zone_routing, the deck isn't
   // (yet) part of the ServiceItem type/activeServiceItems cache, so there's no
-  // cache entry to refresh here — just rebroadcast.
+  // cache entry to refresh there — but t.deckSlides/deckSource/deckScripture
+  // are their own snapshot, taken at load time, and broadcast() alone would
+  // just keep re-sending that stale snapshot. Re-run the load for any track
+  // this item is currently live on, same loadGeneration discipline as every
+  // other loader (bump first, so an in-flight scripture lookup from a
+  // previous edit can't clobber this one when it resolves).
+  for (const track of ['main', 'second'] as TrackId[]) {
+    const t = tracks[track]
+    if (t.serviceItemId !== itemId) continue
+    t.loadGeneration++
+    t.deckSlides = null  // covers the deck-just-got-removed case too (slides === null)
+    if (slides) {
+      const item = activeServiceItems.find((it) => it.id === itemId && it.track === track)
+      if (item) void loadDeckOnto(track, item, t.loadGeneration)
+    }
+  }
   broadcast()
 })
 
