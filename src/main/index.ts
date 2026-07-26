@@ -330,6 +330,9 @@ const tabletClients = new Set<WsSocket>()
 // that port was taken and we fell back to the next one).
 let tabletHttpServer: ReturnType<typeof createServer> | null = null
 let tabletWss: WebSocketServer | null = null
+// Live Call signaling runs on the same port under /livecall, but in its own
+// WebSocketServer with its own client set — see the upgrade router below.
+let livecallWss: WebSocketServer | null = null
 let tabletHeartbeat: ReturnType<typeof setInterval> | null = null
 let boundTabletPort = TABLET_PORT
 let activeServiceItems: ServiceItem[] = []
@@ -1497,7 +1500,17 @@ function startTabletServer(): void {
     }
   })
 
-  const wss = new WebSocketServer({ server })
+  // Two protocols share this port and must not mix: tablet/zone/OBS clients get
+  // broadcast service state on connect, and a livecall client (the preacher's
+  // phone, off-site) must never receive that. Routing by URL path at the upgrade
+  // keeps them in separate WebSocketServers with separate client sets.
+  const wss = new WebSocketServer({ noServer: true })
+  livecallWss = new WebSocketServer({ noServer: true })
+  server.on('upgrade', (req, socket, head) => {
+    const path = (req.url ?? '').split('?')[0].replace(/\/+$/, '')
+    const target = path === '/livecall' ? livecallWss! : wss
+    target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req))
+  })
   tabletHttpServer = server
   tabletWss = wss
 
