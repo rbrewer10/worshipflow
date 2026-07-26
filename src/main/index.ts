@@ -965,6 +965,11 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
   t.deckScripture = new Map()
   t.song = { ...t.song, lines: slides.map((s) => slideSummary(s, source)) }
   t.index = 0
+  // Every caller fires this async and broadcasts immediately — BEFORE the deck
+  // exists (the awaits above land on a later turn). Without a broadcast here
+  // the zones keep rendering the pre-deck state and are never told about the
+  // deck at all: screens sat on logo/black while the operator saw nothing.
+  broadcast()
 
   // Memoized by reference, not by slide index: resolveSlot walks a 'same'
   // chain back to its nearest real slot, so every slide in that chain resolves
@@ -993,6 +998,9 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
       }
     }
   }
+  // Verse text arrived after the initial deck broadcast above — push it out,
+  // or scripture slots stay black until the next unrelated state change.
+  if (tracks[track].loadGeneration === generation) broadcast()
   return true
 }
 

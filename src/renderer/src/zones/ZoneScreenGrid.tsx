@@ -63,8 +63,19 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
     void window.wf.zoneSetSlides(item.id, next).then(onChanged)
   }
 
-  const blankSlide = (): ZoneSlide => ({
-    zones: { 1: { kind: 'same' }, 2: { kind: 'same' }, 3: { kind: 'same' }, 4: { kind: 'black' } },
+  // The FIRST slide is seeded with real content — the sermon/text title on
+  // Back Left, logo on the Lyrics TVs. An all-'same' first slide has nothing
+  // earlier to hold, so every zone resolved to black and a fresh deck showed
+  // literally nothing, which read as "it's broken." (Slides ADDED after this
+  // one are all-'same' on purpose — there, holding the previous slide is the
+  // whole point; see ZoneDeckComposer's blankSlide.)
+  const seedSlide = (): ZoneSlide => ({
+    zones: {
+      1: { kind: 'text', text: (item.payload?.title as string) || item.title || '' },
+      2: { kind: 'black' },
+      3: { kind: 'logo' },
+      4: { kind: 'black' },
+    },
   })
 
   const pickScene = (sceneId: string): void => {
@@ -113,7 +124,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
             <ZoneRolePalette />
             {canDeck && (
               <button
-                onClick={() => saveDeck([blankSlide()])}
+                onClick={() => saveDeck([seedSlide()])}
                 className="shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-700"
               >
                 Build slides
