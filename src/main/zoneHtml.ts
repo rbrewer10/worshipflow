@@ -351,9 +351,34 @@ const LYRICS_SCRIPT = `
       prevBg=null;prevGradKey='';prevLine=null;return;
     }
     if(m==='logo'){
-      document.body.style.background='linear-gradient(135deg,#0c1a3a 0%,#0a1628 100%)';
-      bgvid.style.opacity='0';bgimg.style.opacity='0';gradient.style.opacity='0';
-      blob1.style.opacity='0';blob2.style.opacity='0';
+      // Mirrors the back screens' logo branch: honour the configured logo
+      // backdrop when there is one, else the SAME charcoal they use. This zone
+      // used to ignore state.background and paint its own dark navy, so the
+      // Lyrics TVs looked black next to the back screens and a configured logo
+      // background never appeared on them at all.
+      gradient.style.opacity='0';
+      if(state.background){
+        if(state.background!==prevBg){
+          prevBg=state.background;
+          document.body.style.background='#000';
+          blob1.style.opacity='0';blob2.style.opacity='0';
+          bgimg.style.backgroundSize='cover';bgimg.style.animation='none';
+          if(isVid(state.background)){
+            bgvid.src=fileUrl(state.background);bgvid.loop=true;bgvid.load();bgvid.play().catch(function(){});
+            bgvid.style.opacity='1';bgimg.style.opacity='0';
+          } else {
+            bgimg.style.backgroundImage='url('+fileUrl(state.background)+')';
+            bgimg.style.opacity='1';bgvid.style.opacity='0';
+          }
+        }
+      } else {
+        if(prevBg!=='__logo_grad__'){
+          prevBg='__logo_grad__';
+          bgvid.style.opacity='0';bgimg.style.opacity='0';
+          blob1.style.opacity='0';blob2.style.opacity='0';
+        }
+        document.body.style.background='linear-gradient(135deg,#54585f 0%,#3a3d43 100%)';
+      }
       lineEl.innerHTML=state.imagePath
         ?'<img src="'+fileUrl(state.imagePath)+'" style="max-width:60vw;max-height:55vh;object-fit:contain;filter:drop-shadow(0 0 80px rgba(0,0,0,0.7))"/>'
         :'<div style="font-size:18vw;font-weight:900;color:rgba(255,255,255,0.75)">\\u271d</div>';
