@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play, Mic } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play, Mic, FileQuestion } from 'lucide-react'
 import type { LiveState, ServiceItem, TrackId } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
@@ -68,7 +68,8 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
       {items.map((it) => {
         const its = slides[it.id] ?? ['']
         const isLiveItem = liveItemId === it.id
-        const Icon = ICON[it.type]
+        // See ServiceDeck: an unknown item type must not blank the tab.
+        const Icon = ICON[it.type] ?? FileQuestion
         const bgFile = itemThumbBackground(it, songBg)
         return (
           <div key={it.id} ref={isLiveItem ? liveRowRef : null} className="card-lg">

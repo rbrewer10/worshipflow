@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId, ZoneId } from '../../shared/types'
 import { ZONE_NAMES } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
@@ -164,7 +164,10 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
         )}
         {items.map((it, i) => {
           const preview = itemPreview(it)
-          const Icon = TYPE_ICON[it.type]
+          // An item whose type this build doesn't know (a row left by a newer
+          // branch, say) must not take the whole tab down with an undefined
+          // component — fall back to a neutral icon.
+          const Icon = TYPE_ICON[it.type] ?? FileQuestion
           return (
             <div
               key={it.id}
