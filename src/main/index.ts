@@ -86,6 +86,7 @@ import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
 import { TABLET_PORT, tabletHtml } from './tabletHtml'
 import { attachLivecallSignaling } from './livecallSignaling'
+import { phoneClientHtml } from './phoneClientHtml'
 import { OBS_HTML } from './obsHtml'
 import { ZONE_HTML } from './zoneHtml'
 import { MULTIVIEW_HTML } from './multiviewHtml'
@@ -1444,6 +1445,14 @@ function startTabletServer(): void {
     } else if (isObs) {
       res.writeHead(200, htmlHeaders)
       res.end(OBS_HTML)
+    } else if (path === '/phone') {
+      const host = req.headers.host ?? `localhost:${boundTabletPort}`
+      // Match the scheme the page was loaded over: Tailscale Serve terminates
+      // HTTPS in front of this plain-HTTP server, and a page served over https
+      // cannot open a ws:// socket.
+      const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
+      res.writeHead(200, htmlHeaders)
+      res.end(phoneClientHtml(`${proto}://${host}/livecall`, livecallToken(), 'sanctuary'))
     } else if (path === '/file') {
       // Serve local media files (images, videos) to Pi browsers and multiview iframes.
       const qs = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
