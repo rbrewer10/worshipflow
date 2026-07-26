@@ -1,5 +1,4 @@
 import type { ServiceItem, ThemeColors, SongFull, ZoneId, ZoneMode } from '../../../shared/types'
-import type { ZoneRole } from '../../../shared/zoneScenes'
 import type { ZoneSlide, ZoneSlot } from '../../../shared/zoneSlides'
 import { resolveSlot } from '../../../shared/zoneSlides'
 import type { ZoneTrackAssignment } from '../../../shared/zoneTrack'
@@ -37,7 +36,7 @@ function modeForSlot(slot: ZoneSlot): ZoneMode {
 // deck strip above the 2x2 grid; each card gets a slot editor beneath it and
 // accepts a dropped source slide.
 export default function ZoneDeckComposer({
-  item, serviceTheme, serviceColors, songFull, slides, trackAssignment, logoPath, onRoleChange,
+  item, serviceTheme, serviceColors, songFull, slides, trackAssignment, logoPath,
   deck, selectedDeckSlide, onSelectDeckSlide, onSaveDeck,
 }: {
   item: ServiceItem
@@ -47,7 +46,6 @@ export default function ZoneDeckComposer({
   slides: string[]
   trackAssignment: ZoneTrackAssignment
   logoPath: string | null
-  onRoleChange: (zoneId: ZoneId, role: ZoneRole) => void
   deck: ZoneSlide[]
   selectedDeckSlide: number
   onSelectDeckSlide: (index: number) => void
@@ -103,7 +101,6 @@ export default function ZoneDeckComposer({
                 offTrack={offTrack}
                 offTrackLabel={trackAssignment[zoneId] === 'main' ? 'Follows Main' : 'Follows Second'}
                 slideText={slotPreviewText(resolved, slides)}
-                onRoleChange={(role) => onRoleChange(zoneId, role)}
                 onSlideDrop={(sourceIndex) => setSlot(zoneId, { kind: 'slide', index: sourceIndex })}
               />
               <ZoneSlotEditor slot={rawSlot} onChange={(next) => setSlot(zoneId, next)} />

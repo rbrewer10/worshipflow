@@ -93,7 +93,6 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
           slides={slides}
           trackAssignment={trackAssignment}
           logoPath={logoPath}
-          onRoleChange={setRole}
           deck={deck}
           selectedDeckSlide={selectedDeckSlide}
           onSelectDeckSlide={setSelectedDeckSlide}

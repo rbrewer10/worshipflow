@@ -28,12 +28,20 @@ export default function ZoneScreenCard({
   offTrack?: boolean
   offTrackLabel?: string
   slideText?: string
-  onRoleChange: (role: ZoneRole) => void
+  // Optional: in deck mode the resolved slot decides what the screen shows, so
+  // the item's role routing is inert. Omitting this handler (rather than
+  // wiring it to a no-op) keeps a stray click from silently rewriting that
+  // stored-but-unused routing.
+  onRoleChange?: (role: ZoneRole) => void
   onSlideDrop?: (sourceIndex: number) => void
 }): JSX.Element {
   const [dragOver, setDragOver] = useState(false)
   const role = roleForMode(mode)
-  const editable = role !== null && !offTrack
+  const canEditRole = onRoleChange !== undefined && role !== null
+  // A card is a valid drop target if it can do EITHER role editing or slide
+  // drops — a deck-mode card has no onRoleChange but must still light up for
+  // a dragged slide. offTrack always wins over both.
+  const editable = (canEditRole || onSlideDrop !== undefined) && !offTrack
 
   // dragend fires on the drag SOURCE, so a cancelled drag (Esc, or a drop
   // outside any target) never reaches this card's own dragleave/drop handlers
@@ -45,16 +53,18 @@ export default function ZoneScreenCard({
   }, [])
 
   const cycle = (): void => {
-    if (role === null || !editable) return
-    onRoleChange(ROLES[(ROLES.indexOf(role) + 1) % ROLES.length])
+    if (!canEditRole || offTrack) return
+    onRoleChange!(ROLES[(ROLES.indexOf(role!) + 1) % ROLES.length])
   }
 
   const handleDrop = (e: React.DragEvent): void => {
     e.preventDefault()
     setDragOver(false)
     if (!editable) return
-    const dropped = e.dataTransfer.getData(ROLE_DND_TYPE)
-    if (dropped === 'content' || dropped === 'logo' || dropped === 'black') { onRoleChange(dropped); return }
+    if (onRoleChange) {
+      const dropped = e.dataTransfer.getData(ROLE_DND_TYPE)
+      if (dropped === 'content' || dropped === 'logo' || dropped === 'black') { onRoleChange(dropped); return }
+    }
     const slideIndex = e.dataTransfer.getData(SLIDE_DND_TYPE)
     if (slideIndex !== '' && onSlideDrop) onSlideDrop(Number(slideIndex))
   }
