@@ -5,6 +5,7 @@ import {
 } from './zoneScenes'
 import { ZONE_ROUTING_DEFAULTS } from './types'
 import type { SceneDef } from './zoneScenes'
+import type { ZoneRouting } from './types'
 
 const lyricsTvsOnly = STARTER_SCENES.find((s) => s.id === 'lyrics-tvs-only')!
 const everywhere = STARTER_SCENES.find((s) => s.id === 'everywhere')!
@@ -130,5 +131,34 @@ describe('parse/validate', () => {
   it('validateSceneConfig rejects non-string typeDefaults values', () => {
     const bad = { scenes: [lyricsTvsOnly], typeDefaults: { song: 123 } }
     expect(validateSceneConfig(bad)).toBe(false)
+  })
+})
+
+describe('unknown item type (row from a newer build, or a downgrade)', () => {
+  // Regression: ZONE_ROUTING_DEFAULTS had no entry, defaultRoutingFor returned
+  // undefined, and matchScene threw reading routing[1] — blanking the Build tab
+  // on a single such row.
+  const unknown = 'somethingelse' as unknown as Parameters<typeof defaultRoutingFor>[0]
+
+  it('returns a usable routing instead of undefined', () => {
+    const routing = defaultRoutingFor(unknown, config)
+    expect(routing).toBeDefined()
+    expect(routing[1]).toBeDefined()
+    expect(routing[4]).toBeDefined()
+  })
+
+  it('puts nothing unexpected on the audience screens', () => {
+    expect(defaultRoutingFor(unknown, config)).toEqual({
+      1: 'logo', 2: 'logo', 3: 'logo', 4: 'stage'
+    })
+  })
+
+  it('matchScene does not throw on a missing routing', () => {
+    expect(() => matchScene(undefined as unknown as ZoneRouting, unknown, config)).not.toThrow()
+    expect(matchScene(undefined as unknown as ZoneRouting, unknown, config)).toBe('custom')
+  })
+
+  it('effectiveRouting is safe for an unknown type with no explicit routing', () => {
+    expect(() => effectiveRouting({ type: unknown, zoneRouting: null }, config)).not.toThrow()
   })
 })

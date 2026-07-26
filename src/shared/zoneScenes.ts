@@ -76,10 +76,18 @@ export function expandScene(scene: SceneDef, type: ServiceItemType): ZoneRouting
 
 // Default routing for a type: the palette's typeDefault scene (if it exists),
 // else the built-in hardcoded defaults. Deleted/unknown sceneIds fall through.
+// A service_item row whose type this build doesn't know — written by a newer
+// version, or left behind by a downgrade — has no ZONE_ROUTING_DEFAULTS entry.
+// Returning undefined here took down every caller that reads routing[1], so a
+// single such row blanked the entire Build tab. Nothing unexpected goes on
+// screen for it: logo everywhere, stage monitors as usual.
+const UNKNOWN_TYPE_ROUTING: ZoneRouting = { 1: 'logo', 2: 'logo', 3: 'logo', 4: 'stage' }
+
 export function defaultRoutingFor(type: ServiceItemType, config: SceneConfig): ZoneRouting {
   const sceneId = config.typeDefaults[type]
   const scene = sceneId ? config.scenes.find((s) => s.id === sceneId) : undefined
-  return scene ? expandScene(scene, type) : ZONE_ROUTING_DEFAULTS[type]
+  if (scene) return expandScene(scene, type)
+  return ZONE_ROUTING_DEFAULTS[type] ?? UNKNOWN_TYPE_ROUTING
 }
 
 export function effectiveRouting(
@@ -92,6 +100,9 @@ export function effectiveRouting(
 // Reverse-match a routing against every scene's expansion for this type.
 // Compares all four zones (so an Advanced-edited Z4 correctly reads as custom).
 export function matchScene(routing: ZoneRouting, type: ServiceItemType, config: SceneConfig): string | 'custom' {
+  // Defensive: a missing routing is 'custom', never a crash. This function is
+  // called during render, so throwing here blanks the page.
+  if (!routing) return 'custom'
   // If two scenes expand identically for this type, the first in config order wins (tie-break is intentional).
   for (const scene of config.scenes) {
     const exp = expandScene(scene, type)
