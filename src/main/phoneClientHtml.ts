@@ -170,6 +170,20 @@ function setTelemetry(text) {
 // --------------------------------------------------------------- camera --
 
 async function initCamera() {
+  // Browsers delete navigator.mediaDevices entirely on an insecure origin, so
+  // calling getUserMedia there throws "undefined is not an object" — a message
+  // that tells the preacher nothing. Check first and say what is actually wrong.
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    els.noCamera.classList.remove('hidden');
+    els.noCamera.innerHTML =
+      '<div style="max-width:280px"><b>The camera cannot be used on this address.</b><br><br>' +
+      'This page is open over <code>' + location.protocol + '//</code>, and phones only allow ' +
+      'camera access over <b>https</b>.<br><br>' +
+      'Open the Tailscale address instead (it starts with <code>https://</code>). ' +
+      'On the church computer run:<br><code>tailscale serve --bg ' + (location.port || '3691') + '</code></div>';
+    els.btnMain.disabled = true;
+    return;
+  }
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },

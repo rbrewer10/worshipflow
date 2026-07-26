@@ -102,10 +102,12 @@ export default function LiveCallEditor(): JSX.Element {
           <div className="space-y-1.5 text-[11px] leading-snug text-slate-500">
             <p>Scan this on the phone, then Share &rarr; Add to Home Screen.</p>
             <p className="break-all font-mono text-[10px] text-slate-400">{phoneUrl}</p>
-            <p>
-              This address only works on the church network. Away from the building he needs
-              Tailscale, and this page served over its HTTPS name — the camera will not turn on
-              otherwise.
+            <p className="rounded bg-amber-50 p-2 text-amber-800 ring-1 ring-amber-200">
+              <b>This http:// address cannot use the camera.</b> Phones only allow camera access
+              over https, so it is good for checking the page loads and nothing else. For a real
+              call, run <code className="font-mono">tailscale serve --bg 3691</code> on this
+              computer and give him the <code className="font-mono">https://</code> Tailscale
+              address instead.
             </p>
           </div>
         </div>
