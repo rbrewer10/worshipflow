@@ -6,14 +6,18 @@ export const MODE_LABELS: Record<ZoneState['mode'], string> = {
   countdown: 'Countdown', text: 'Text', image: 'Image', sermon: 'Sermon', off: 'Off',
 }
 
-const ZONE_MODE_OPTIONS: ZoneState['mode'][] = ['lyrics', 'stage', 'black', 'logo', 'countdown', 'text', 'image', 'off']
+const ZONE_MODE_OPTIONS: ZoneState['mode'][] = ['lyrics', 'stage', 'black', 'logo', 'countdown', 'text', 'image', 'sermon', 'off']
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
 // Only Zone 4's physical template (STAGE_SCRIPT in zoneHtml.ts) actually
 // renders 'stage' mode — zones 1-3 fall through to a blank or wrong-looking
-// screen if routed there, so it's not offered as a choice for them.
+// screen if routed there, so it's not offered as a choice for them. 'sermon' is
+// the mirror case: it's the designed backdrop for the room-facing screens (and
+// the sermon type's own default for zones 1/2). Zone 4 is the band's monitor,
+// which wants the stage view — so it keeps 'stage' and skips 'sermon'.
 function modeOptionsFor(zoneId: ZoneId): ZoneState['mode'][] {
-  return zoneId === 4 ? ZONE_MODE_OPTIONS : ZONE_MODE_OPTIONS.filter((m) => m !== 'stage')
+  const excluded: ZoneState['mode'] = zoneId === 4 ? 'sermon' : 'stage'
+  return ZONE_MODE_OPTIONS.filter((m) => m !== excluded)
 }
 
 // The raw per-zone mode grid (the "Advanced" escape hatch). Fully controlled.
