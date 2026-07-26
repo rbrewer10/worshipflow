@@ -52,7 +52,9 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
   // A deck is only meaningful for items that resolve to more than one thing to
   // say per screen — a sermon title held on one screen while another cycles
   // verses. Songs, scripture-alone, etc. keep the plain routing UI untouched.
-  const canDeck = item.type === 'sermon' || item.type === 'text'
+  // Announcements join sermon and text: a block has many things to say per
+  // screen, which is exactly what a deck expresses.
+  const canDeck = item.type === 'sermon' || item.type === 'text' || item.type === 'announcement'
 
   const save = (next: ZoneRouting): void => {
     void window.wf.zoneSetRouting(item.id, next).then(onChanged)

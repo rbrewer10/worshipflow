@@ -174,7 +174,11 @@ export const ItemEditor = memo(function ItemEditor({
       )}
 
       {item.type === 'announcement' && (
-        <AnnouncementItemEditor refId={item.ref_id} />
+        <AnnouncementItemEditor
+          refId={item.ref_id}
+          refIds={(payload.refIds as number[] | undefined) ?? []}
+          onChange={(refIds) => savePayload({ ...payload, refIds })}
+        />
       )}
 
       {/* ── Background & Color ── */}

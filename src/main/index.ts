@@ -84,6 +84,7 @@ import { listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolde
 import { generateBackgroundImage } from './replicateApi'
 import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
+import { autoDeckFor } from './autoDeck'
 import { TABLET_PORT, tabletHtml } from './tabletHtml'
 import { OBS_HTML } from './obsHtml'
 import { ZONE_HTML } from './zoneHtml'
@@ -801,6 +802,13 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
   } else if (slot.kind === 'text') {
     base.mode = 'text'
     base.line = slot.text ?? ''
+  } else if (slot.kind === 'sermon') {
+    // The designed title card. Speaker is deliberately null — during a reading
+    // the room needs the title and where we are, not who is preaching.
+    base.mode = 'sermon'
+    base.title = slot.text ?? ''
+    base.speaker = null
+    base.passage = slot.reference ?? null
   } else if (slot.kind === 'scripture') {
     // Keyed by the CURRENT slide's own index, not wherever the slot was
     // originally authored — loadDeckOnto pre-populates the cache for every
@@ -818,7 +826,25 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
   } else {
     base.mode = 'black'
   }
+
+  // The stage monitor renders a next-line preview under the current text, and
+  // it is the screen the pastor reads from — without this it sits empty and the
+  // monitor is half useless. Costs nothing on the other zones.
+  base.next = deckNextText(t, zoneId)
   return base
+}
+
+// What this zone will show on the following slide, as plain text. Returns ''
+// at the end of the deck, and for slots that have no text to preview.
+function deckNextText(t: LiveTrackState, zoneId: ZoneId): string {
+  if (!t.deckSlides) return ''
+  const nextIndex = t.index + 1
+  if (nextIndex >= t.deckSlides.length) return ''
+  const slot = resolveSlot(t.deckSlides, nextIndex, zoneId)
+  if (slot.kind === 'text' || slot.kind === 'sermon') return slot.text ?? ''
+  if (slot.kind === 'slide') return t.deckSource[slot.index ?? -1] ?? ''
+  if (slot.kind === 'scripture') return t.deckScripture.get(`${nextIndex}:${zoneId}`) ?? ''
+  return ''
 }
 
 function zoneBroadcast(): void {
@@ -1038,7 +1064,18 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
 // cursor. Pre-resolves every scripture slot because computeZoneStates is
 // synchronous and fires as often as every 100ms. Returns false if no deck.
 async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: number): Promise<boolean> {
-  const slides = parseZoneSlides(getItemZoneSlides(item.id))
+  // A hand-authored deck always wins; generation only fills the gap where there
+  // isn't one, so nothing anyone built in the composer changes behaviour.
+  const slides = parseZoneSlides(getItemZoneSlides(item.id)) ?? await autoDeckFor(item, {
+    budget: zoneChunkBudget(),
+    lookupScripture: (reference) => bibleTranslation === 'kjv'
+      ? Promise.resolve(lookupScripture(reference))
+      : fetchScripture(reference, bibleTranslation),
+    getAnnouncement: async (id) => {
+      const a = getAnnouncement(id)
+      return a ? { id: a.id, title: a.title, body: a.body } : null
+    },
+  })
   if (!slides) return false
   const source = await computeItemSourceSlides(item)
   if (tracks[track].loadGeneration !== generation) return true
@@ -1241,8 +1278,17 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
   }
 }
 
-async function doLoadAnnouncement(track: TrackId, id: number): Promise<void> {
-  const a = getAnnouncement(id)
+// `item` is optional so the plain "load this one announcement" callers still
+// work; when it IS given, the block's generated deck loads on top and the
+// screens split into heading + content. The main projector keeps showing the
+// first announcement either way, which is what it did before blocks existed.
+async function doLoadAnnouncement(track: TrackId, id: number | null, item?: ServiceItem | null): Promise<void> {
+  const refIds = Array.isArray(item?.payload.refIds)
+    ? (item!.payload.refIds as unknown[]).filter((n): n is number => typeof n === 'number')
+    : []
+  const firstId = refIds[0] ?? id
+  if (firstId == null) return
+  const a = getAnnouncement(firstId)
   if (!a) return
   if (a.display === 'ticker') {
     // Title literally 'Announcement' triggers the ticker renderer (existing mechanism).
@@ -1250,6 +1296,8 @@ async function doLoadAnnouncement(track: TrackId, id: number): Promise<void> {
   } else {
     doLoadText(track, a.title, a.body, a.background ?? null, undefined, a.blurBehindText)
   }
+  // doLoadText bumped loadGeneration, so read it back rather than capturing it earlier.
+  if (item) void loadDeckOnto(track, item, tracks[track].loadGeneration)
 }
 
 // Pure: the slides an item would show, without going live (for the slide
@@ -1376,8 +1424,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
     const txt = item.payload.text as string
     if (!txt) return
     doLoadText(track, 'Announcement', txt)
-  } else if (item.type === 'announcement' && item.ref_id != null) {
-    await doLoadAnnouncement(track, item.ref_id)
+  } else if (item.type === 'announcement') {
+    await doLoadAnnouncement(track, item.ref_id, item)
   } else if (item.type === 'sermon') {
     doLoadSermon(
       track,
@@ -1404,6 +1452,14 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   if (track === 'main') {
     void recordingSession.onItemLive(item, activeServiceId, activeServiceName, activeServiceDate)
   }
+}
+
+// Characters per generated slide. The right number depends on the physical
+// screens and how far back the room sits, so it is a setting rather than a
+// constant someone guessed at a desk.
+function zoneChunkBudget(): number {
+  const raw = parseInt(getSetting('zone_chunk_budget') ?? '', 10)
+  return Number.isFinite(raw) && raw > 0 ? raw : 300
 }
 
 // --- Tablet HTTP + WebSocket server ---
@@ -1803,8 +1859,11 @@ ipcMain.handle('wf:live:loadMedia', (_e, track: TrackId, filePath: string, title
   doLoadMedia(track, filePath, title); broadcast()
 })
 
-ipcMain.handle('wf:live:loadAnnouncement', async (_e, track: TrackId, id: number) => {
-  await doLoadAnnouncement(track, id); broadcast()
+ipcMain.handle('wf:live:loadAnnouncement', async (_e, track: TrackId, id: number | null, itemId?: number) => {
+  const item = itemId != null
+    ? activeServiceItems.find((it) => it.id === itemId && it.track === track) ?? null
+    : null
+  await doLoadAnnouncement(track, id, item); broadcast()
 })
 
 ipcMain.handle('wf:getState', (_e, track?: TrackId): LiveState => renderState(track ?? 'main'))

@@ -1,25 +1,100 @@
 import { useEffect, useState } from 'react'
-import { Megaphone } from 'lucide-react'
-import type { Announcement } from '../../shared/types'
+import { ChevronDown, ChevronUp, Megaphone } from 'lucide-react'
+import type { AnnouncementSummary } from '../../shared/types'
 
-// Shown in the service editor for an `announcement` item. Content is owned by the
-// Announcements library, so this is read-only — it points the operator there to edit.
-export default function AnnouncementItemEditor({ refId }: { refId: number | null }): JSX.Element {
-  const [a, setA] = useState<Announcement | null>(null)
+/**
+ * Picks the announcements in one block, in the order the pastor reads them.
+ *
+ * Selection order IS reading order, so this keeps its own ordered array rather
+ * than deriving it from the library list. Content itself is owned by the
+ * Announcements library — this only chooses and sequences.
+ */
+export default function AnnouncementItemEditor({
+  refId, refIds, onChange,
+}: {
+  refId: number | null
+  refIds: number[]
+  onChange: (refIds: number[]) => void
+}): JSX.Element {
+  const [library, setLibrary] = useState<AnnouncementSummary[]>([])
+
   useEffect(() => {
-    if (refId != null) window.wf.announcementGet(refId).then(setA)
-  }, [refId])
+    void window.wf.announcementsList('').then(setLibrary).catch(() => setLibrary([]))
+  }, [])
 
-  if (!a) return <div className="text-sm text-slate-500">Announcement not found. It may have been deleted from the library.</div>
+  // Seeding rule: an existing single-announcement item has no refIds, so fall
+  // back to its ref_id. This is what keeps every already-built service
+  // rendering exactly as it does today.
+  const selected = refIds.length ? refIds : refId != null ? [refId] : []
+
+  const toggle = (id: number): void => {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
+  }
+
+  const move = (index: number, delta: number): void => {
+    const next = [...selected]
+    const target = index + delta
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    onChange(next)
+  }
+
+  const titleOf = (id: number): string => library.find((a) => a.id === id)?.title ?? `#${id}`
 
   return (
-    <div className="space-y-2 text-sm text-slate-700">
-      <div className="flex items-center gap-2 font-semibold text-slate-900">
-        <Megaphone size={15} /> {a.title}
+    <div className="space-y-3">
+      <div>
+        <div className="section-header mb-2 flex items-center gap-1.5">
+          <Megaphone size={12} /> Reading order
+        </div>
+        {selected.length === 0 ? (
+          <p className="text-[11px] text-slate-400">Nothing picked yet.</p>
+        ) : (
+          <ol className="space-y-1">
+            {selected.map((id, i) => (
+              <li key={id} className="flex items-center gap-2 rounded border border-slate-200 px-2 py-1.5 text-[12px]">
+                <span className="w-4 text-right text-slate-400">{i + 1}</span>
+                <span className="flex-1 truncate">{titleOf(id)}</span>
+                <button
+                  aria-label="Move up"
+                  disabled={i === 0}
+                  onClick={() => move(i, -1)}
+                  className="text-slate-400 hover:text-slate-700 disabled:opacity-30"
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  aria-label="Move down"
+                  disabled={i === selected.length - 1}
+                  onClick={() => move(i, 1)}
+                  className="text-slate-400 hover:text-slate-700 disabled:opacity-30"
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
-      <p className="whitespace-pre-line rounded-lg bg-slate-100 px-3 py-2 text-slate-600">{a.body || '(no text)'}</p>
-      <p className="text-xs text-slate-500">
-        Shows as <b className="capitalize">{a.display}</b>. Edit the text, background, or schedule in the <b>Announcements</b> tab.
+
+      <div>
+        <div className="section-header mb-2">Announcements library</div>
+        <div className="max-h-56 space-y-1 overflow-y-auto">
+          {library.map((a) => (
+            <label key={a.id} className="flex items-center gap-2 text-[12px]">
+              <input type="checkbox" checked={selected.includes(a.id)} onChange={() => toggle(a.id)} />
+              <span className="truncate">{a.title}</span>
+              {a.expired && <span className="text-[10px] text-amber-600">expired</span>}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <p className="text-[11px] leading-snug text-slate-400">
+        {selected.length === 1
+          ? 'One announcement.'
+          : `${selected.length} announcements — Next walks through them one at a time.`}
+        {' '}Edit the text itself in the <b>Announcements</b> tab.
       </p>
     </div>
   )

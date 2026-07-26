@@ -59,7 +59,8 @@ const wf = {
   announcementUpdate: (id: number, input: AnnouncementInput): Promise<void> => ipcRenderer.invoke('wf:announcements:update', id, input),
   announcementDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:announcements:delete', id),
   announcementsScheduled: (serviceDate: string): Promise<AnnouncementSummary[]> => ipcRenderer.invoke('wf:announcements:scheduled', serviceDate),
-  liveLoadAnnouncement: (track: TrackId, id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadAnnouncement', track, id),
+  liveLoadAnnouncement: (track: TrackId, id: number | null, itemId?: number): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadAnnouncement', track, id, itemId),
 
   // Service builder
   servicesList: (): Promise<ServiceSummary[]> => ipcRenderer.invoke('wf:services:list'),

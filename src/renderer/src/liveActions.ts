@@ -22,7 +22,10 @@ export function canGoLive(item: ServiceItem): boolean {
     (item.type === 'image' && !!(item.payload.path as string)) ||
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
     (item.type === 'ticker' && !!(item.payload.text as string)) ||
-    (item.type === 'announcement' && item.ref_id != null) ||
+    // A block carries its announcements in payload.refIds and may have no
+    // ref_id at all, so requiring one would make it un-airable.
+    (item.type === 'announcement' &&
+      (item.ref_id != null || ((item.payload.refIds as number[] | undefined)?.length ?? 0) > 0)) ||
     (item.type === 'sermon')
   )
 }
@@ -62,8 +65,8 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
     const txt = item.payload.text as string
     if (!txt) return false
     await window.wf.liveLoadText(track, 'Announcement', txt)
-  } else if (item.type === 'announcement' && item.ref_id != null) {
-    await window.wf.liveLoadAnnouncement(track, item.ref_id)
+  } else if (item.type === 'announcement') {
+    await window.wf.liveLoadAnnouncement(track, item.ref_id, item.id)
   } else if (item.type === 'sermon') {
     await window.wf.liveLoadSermon(
       track,
