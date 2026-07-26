@@ -4,6 +4,8 @@
 
 **Goal:** Let a sermon or text item carry an authored deck of slides, where each slide holds separate content per zone screen — so Back Left can hold a sermon title while Back Right shows a different verse on each slide, advancing together on one Next.
 
+**Interaction (decided with Ryan, 2026-07-25):** the filmstrip of the item's own resolved slides sits below the four zone cards, and a source slide is **dragged onto a zone card** to fill that zone's slot for the selected deck slide. That is the fast path for items that already have real slides (a 12-verse scripture: drag verse 3 onto Back Right, verse 1 onto Back Left). Because a sermon item resolves to only one source slide, a slot can also be **typed** — free text, or a scripture reference that gets looked up. Drag when the content exists; type when it does not. Both produce a slot; only the `kind` differs.
+
 **Architecture:** A new nullable `service_item.zone_slides` JSON column, following the exact convention of the existing `zone_routing` / `style` / `payload_json` columns. Pure parse/resolve logic lives in a new `src/shared/zoneSlides.ts` and is unit-tested. The live engine needs no new cursor: `t.song.lines` is populated with one summary string per deck slide, so Next/Prev, auto-advance and totals work unchanged, and `computeZoneStates()` reads the deck at `t.index` for per-zone content. Scripture slots are pre-resolved once on load so the synchronous 100ms render path never blocks.
 
 **Tech Stack:** Electron + electron-vite, React 18, TypeScript, Tailwind v3, sql.js, vitest.
@@ -168,10 +170,11 @@ Create `src/shared/zoneSlides.ts`:
 
 import type { ZoneId } from './types'
 
-export type ZoneSlotKind = 'text' | 'scripture' | 'logo' | 'black' | 'image' | 'same'
+export type ZoneSlotKind = 'slide' | 'text' | 'scripture' | 'logo' | 'black' | 'image' | 'same'
 
 export interface ZoneSlot {
   kind: ZoneSlotKind
+  index?: number      // kind 'slide' — into the item's own resolved source slides
   text?: string       // kind 'text'
   reference?: string  // kind 'scripture'
   path?: string       // kind 'image'
@@ -182,7 +185,7 @@ export interface ZoneSlide {
 }
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
-const KINDS: ZoneSlotKind[] = ['text', 'scripture', 'logo', 'black', 'image', 'same']
+const KINDS: ZoneSlotKind[] = ['slide', 'text', 'scripture', 'logo', 'black', 'image', 'same']
 
 const BLACK: ZoneSlot = { kind: 'black' }
 
@@ -200,8 +203,11 @@ export function resolveSlot(slides: ZoneSlide[], index: number, zoneId: ZoneId):
   return BLACK
 }
 
-function slotText(slot: ZoneSlot | undefined): string {
+// `source` is the item's own resolved slides — a 'slide' slot is just an index
+// into them, so the deck stays in sync when the underlying item is edited.
+function slotText(slot: ZoneSlot | undefined, source: string[] = []): string {
   if (!slot) return ''
+  if (slot.kind === 'slide') return source[slot.index ?? -1] ?? ''
   if (slot.kind === 'text') return slot.text ?? ''
   if (slot.kind === 'scripture') return slot.reference ?? ''
   return ''
@@ -209,11 +215,11 @@ function slotText(slot: ZoneSlot | undefined): string {
 
 // The one-line label for this slide in the slide grid and the Live tab rail.
 // Zone 3 (Lyrics TVs) wins because it is the screen the congregation reads.
-export function slideSummary(slide: ZoneSlide): string {
-  const preferred = slotText(slide.zones?.[3])
+export function slideSummary(slide: ZoneSlide, source: string[] = []): string {
+  const preferred = slotText(slide.zones?.[3], source)
   if (preferred) return preferred
   for (const zoneId of ZONE_IDS) {
-    const text = slotText(slide.zones?.[zoneId])
+    const text = slotText(slide.zones?.[zoneId], source)
     if (text) return text
   }
   return ''
