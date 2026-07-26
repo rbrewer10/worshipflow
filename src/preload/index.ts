@@ -29,6 +29,7 @@ import type {
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
+import type { ZoneSlide } from '../shared/zoneSlides'
 
 const wf = {
   // The real build version comes from the main process via getInfo() — don't
@@ -278,6 +279,10 @@ const wf = {
     ipcRenderer.invoke('wf:zone:getRouting', itemId),
   zoneSetRouting: (itemId: number, routing: ZoneRouting | null): Promise<void> =>
     ipcRenderer.invoke('wf:zone:setRouting', itemId, routing),
+  zoneGetSlides: (itemId: number): Promise<ZoneSlide[] | null> =>
+    ipcRenderer.invoke('wf:zone:getSlides', itemId),
+  zoneSetSlides: (itemId: number, slides: ZoneSlide[] | null): Promise<void> =>
+    ipcRenderer.invoke('wf:zone:setSlides', itemId, slides),
   zoneSetOverride: (zoneId: ZoneId, mode: ZoneState['mode'] | null): Promise<void> =>
     ipcRenderer.invoke('wf:zone:setOverride', zoneId, mode),
   zoneClearOverrides: (): Promise<void> =>

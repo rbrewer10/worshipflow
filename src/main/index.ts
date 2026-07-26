@@ -14,6 +14,8 @@ import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../sha
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
+import { parseZoneSlides } from '../shared/zoneSlides'
+import type { ZoneSlide } from '../shared/zoneSlides'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -52,6 +54,8 @@ import {
   reorderServiceItems,
   getItemZoneRouting,
   setItemZoneRouting,
+  getItemZoneSlides,
+  setItemZoneSlides,
   getZoneTrackAssignment,
   setZoneTrackAssignment,
   setSongBgMotion,
@@ -1930,6 +1934,19 @@ ipcMain.handle('wf:zone:setRouting', (_e, itemId: number, routing: ZoneRouting |
   // Update item in activeServiceItems cache so zone states re-compute correctly.
   const idx = activeServiceItems.findIndex((it) => it.id === itemId)
   if (idx >= 0) activeServiceItems[idx] = { ...activeServiceItems[idx], zoneRouting: routing }
+  broadcast()
+})
+
+ipcMain.handle('wf:zone:getSlides', (_e, itemId: number): ZoneSlide[] | null =>
+  parseZoneSlides(getItemZoneSlides(itemId))
+)
+
+ipcMain.handle('wf:zone:setSlides', (_e, itemId: number, slides: ZoneSlide[] | null): void => {
+  setItemZoneSlides(itemId, slides ? JSON.stringify(slides) : null)
+  // Zone states are computed from the deck, so an edit while this item is live
+  // must push fresh state to the screens. Unlike zone_routing, the deck isn't
+  // (yet) part of the ServiceItem type/activeServiceItems cache, so there's no
+  // cache entry to refresh here — just rebroadcast.
   broadcast()
 })
 

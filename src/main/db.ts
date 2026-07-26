@@ -167,6 +167,7 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN style TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN zone_routing TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE service_item ADD COLUMN zone_slides TEXT') } catch { /* already exists */ }
   try { db.run("ALTER TABLE service_item ADD COLUMN track TEXT NOT NULL DEFAULT 'main'") } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN zone_track_assignment TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN output_path TEXT') } catch { /* already exists */ }
@@ -757,6 +758,17 @@ export function getItemZoneRouting(itemId: number): string | null {
 
 export function setItemZoneRouting(itemId: number, routing: string | null): void {
   db.run('UPDATE service_item SET zone_routing = ? WHERE id = ?', [routing, itemId])
+  persist()
+}
+
+export function getItemZoneSlides(itemId: number): string | null {
+  const rows = db.exec('SELECT zone_slides FROM service_item WHERE id = ?', [itemId])
+  if (!rows.length || !rows[0].values.length) return null
+  return (rows[0].values[0][0] as string | null) ?? null
+}
+
+export function setItemZoneSlides(itemId: number, slides: string | null): void {
+  db.run('UPDATE service_item SET zone_slides = ? WHERE id = ?', [slides, itemId])
   persist()
 }
 

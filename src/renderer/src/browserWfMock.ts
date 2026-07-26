@@ -28,6 +28,7 @@ import type {
 } from '../../shared/types'
 import { starterConfig } from '../../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
+import type { ZoneSlide } from '../../shared/zoneSlides'
 
 const demoLines = [
   'Amazing grace, how sweet the sound',
@@ -410,6 +411,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
 
     zoneGetRouting: async (): Promise<ZoneRouting | null> => null,
     zoneSetRouting: noop,
+    zoneGetSlides: async (): Promise<ZoneSlide[] | null> => null,
+    zoneSetSlides: noop,
     zoneSetOverride: noop,
     zoneClearOverrides: noop,
     zoneGetStates: async (): Promise<Record<ZoneId, ZoneState>> => ({
