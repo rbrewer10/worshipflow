@@ -128,7 +128,77 @@ const SERMON_CSS = `
 @keyframes wfSermonSettle{from{transform:translateY(-54%)}to{transform:translateY(-51.4%)}}
 `
 
-function zoneBase(zoneId: number, css: string, body: string, script: string): string {
+/**
+ * Live Call viewer, shared by every zone page.
+ *
+ * The relay (the control renderer) offers us a video-only stream over the LAN
+ * and we answer. Muted on purpose and with no audio track to begin with: the
+ * control machine is the single audio source, because several screens playing
+ * the same voice milliseconds apart is comb-filtered mush.
+ */
+const LIVECALL_VIEWER_JS = String.raw`
+var lcPc=null,lcWs=null,lcRetry=0,lcTimer=null;
+var lcVideo=document.createElement('video');
+lcVideo.autoplay=true;lcVideo.playsInline=true;lcVideo.muted=true;
+lcVideo.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:none;z-index:50';
+document.body.appendChild(lcVideo);
+
+function lcApplyMode(){
+  lcVideo.style.display = (state.mode==='livecall') ? 'block' : 'none';
+}
+
+function lcConnect(){
+  if(lcTimer){clearTimeout(lcTimer);lcTimer=null;}
+  var proto = location.protocol==='https:' ? 'wss' : 'ws';
+  lcWs = new WebSocket(proto+'://'+location.host+'/livecall');
+  lcWs.onopen=function(){
+    lcRetry=0;
+    lcWs.send(JSON.stringify({type:'hello',token:LIVECALL_TOKEN,role:'viewer',room:LIVECALL_ROOM}));
+  };
+  lcWs.onmessage=function(e){
+    var m;
+    try{ m=JSON.parse(e.data); }catch(ex){ return; }
+    if(m.type==='offer'){
+      // A fresh offer means the relay rebuilt our connection; drop the old one.
+      if(lcPc) lcPc.close();
+      lcPc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+      // ev.streams is EMPTY when the relay pre-negotiated this connection with
+      // addTransceiver and filled it later via replaceTrack — no stream id was
+      // ever associated. Trusting ev.streams[0] alone leaves the screen black
+      // for exactly the case the pre-negotiation was meant to speed up.
+      lcPc.ontrack=function(ev){
+        var s = ev.streams[0] || new MediaStream([ev.track]);
+        if(lcVideo.srcObject !== s) lcVideo.srcObject = s;
+      };
+      lcPc.onicecandidate=function(ev){
+        if(ev.candidate&&lcWs&&lcWs.readyState===1) lcWs.send(JSON.stringify({type:'ice-candidate',candidate:ev.candidate}));
+      };
+      lcPc.setRemoteDescription({type:'offer',sdp:m.sdp})
+        .then(function(){ return lcPc.createAnswer(); })
+        .then(function(ans){ return lcPc.setLocalDescription(ans).then(function(){ return ans; }); })
+        .then(function(ans){ if(lcWs&&lcWs.readyState===1) lcWs.send(JSON.stringify({type:'answer',sdp:ans.sdp})); })
+        .catch(function(){});
+    } else if(m.type==='ice-candidate'&&lcPc&&m.candidate){
+      lcPc.addIceCandidate(m.candidate).catch(function(){});
+    }
+  };
+  lcWs.onclose=function(){
+    lcRetry++;
+    lcTimer=setTimeout(lcConnect, Math.min(1000*Math.pow(2,lcRetry),15000));
+  };
+  lcWs.onerror=function(){ try{ lcWs.close(); }catch(ex){} };
+}
+lcConnect();
+`
+
+function zoneBase(
+  zoneId: number,
+  css: string,
+  body: string,
+  script: string,
+  livecallToken: string,
+  livecallRoom: string
+): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -157,14 +227,18 @@ ${body}
         if(msg.type==='zones'&&msg.states&&msg.states[ZONE]){
           state=msg.states[ZONE];
           render();
+          lcApplyMode();
         }
       }catch(ex){}
     };
     ws.onclose=function(){ reconnectTimer=setTimeout(connect,2000); };
     ws.onerror=function(){ ws.close(); };
   }
+  var LIVECALL_TOKEN=${JSON.stringify(livecallToken)};
+  var LIVECALL_ROOM=${JSON.stringify(livecallRoom)};
   ${SHARED_JS}
   ${script}
+  ${LIVECALL_VIEWER_JS}
   connect();
 })();
 <\/script>
@@ -624,9 +698,22 @@ const STAGE_SCRIPT = `
 const FLEX_BODY = `<div id="root"><video id="bgvid" autoplay muted loop playsinline></video><div id="bgimg"></div><div id="blob1"></div><div id="blob2"></div><div id="overlay"></div><div id="sermon" style="display:none"></div><div id="content"></div></div>`
 const STAGE_BODY = `<div id="wrap"><div id="topbar"><div id="songtitle"></div><div id="clock"></div></div><div id="stagemsg"><span></span></div><div id="current"></div><div id="divider"></div><div id="nextsection"><div id="nextlabel">Next</div><div id="nextline"></div></div><div id="slidecounter"></div></div>`
 
-export const ZONE_HTML: Record<number, string> = {
-  1: zoneBase(1, FLEX_CSS,   FLEX_BODY,       FLEX_SCRIPT),
-  2: zoneBase(2, FLEX_CSS,   FLEX_BODY,       FLEX_SCRIPT),
-  3: zoneBase(3, LYRICS_CSS, LYRICS_BODY_INNER, LYRICS_SCRIPT),
-  4: zoneBase(4, STAGE_CSS,  STAGE_BODY,      STAGE_SCRIPT),
+const ZONE_PARTS: Record<number, [string, string, string]> = {
+  1: [FLEX_CSS,   FLEX_BODY,         FLEX_SCRIPT],
+  2: [FLEX_CSS,   FLEX_BODY,         FLEX_SCRIPT],
+  3: [LYRICS_CSS, LYRICS_BODY_INNER, LYRICS_SCRIPT],
+  4: [STAGE_CSS,  STAGE_BODY,        STAGE_SCRIPT],
 }
+
+/**
+ * Build a zone page. Rendered per request rather than once at import, because
+ * the Live Call token is generated lazily and does not exist yet at module load.
+ * Returns null for an unknown zone id.
+ */
+export function zoneHtmlFor(zoneId: number, livecallToken: string, livecallRoom: string): string | null {
+  const parts = ZONE_PARTS[zoneId]
+  if (!parts) return null
+  return zoneBase(zoneId, parts[0], parts[1], parts[2], livecallToken, livecallRoom)
+}
+
+export const ZONE_IDS = [1, 2, 3, 4]

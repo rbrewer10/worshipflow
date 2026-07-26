@@ -88,7 +88,7 @@ import { TABLET_PORT, tabletHtml } from './tabletHtml'
 import { attachLivecallSignaling } from './livecallSignaling'
 import { phoneClientHtml } from './phoneClientHtml'
 import { OBS_HTML } from './obsHtml'
-import { ZONE_HTML } from './zoneHtml'
+import { zoneHtmlFor } from './zoneHtml'
 import { MULTIVIEW_HTML } from './multiviewHtml'
 import { parsePptx, parsePptxService } from './pptx'
 import {
@@ -1436,9 +1436,10 @@ function startTabletServer(): void {
       'Pragma': 'no-cache',
       'Expires': '0',
     }
-    if (zoneId && ZONE_HTML[zoneId]) {
+    const zonePage = zoneId ? zoneHtmlFor(zoneId, livecallToken(), 'sanctuary') : null
+    if (zonePage) {
       res.writeHead(200, htmlHeaders)
-      res.end(ZONE_HTML[zoneId])
+      res.end(zonePage)
     } else if (path === '/multiview') {
       res.writeHead(200, htmlHeaders)
       res.end(MULTIVIEW_HTML)
