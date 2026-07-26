@@ -24,7 +24,8 @@ import type {
   AnnouncementSummary,
   Announcement,
   AnnouncementInput,
-  TrackId
+  TrackId,
+  LivecallConfig
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
@@ -302,6 +303,8 @@ const wf = {
   scenesSet: (config: SceneConfig): Promise<void> => ipcRenderer.invoke('wf:scenes:set', config),
   getTabletPort: (): Promise<number> =>
     ipcRenderer.invoke('wf:app:getTabletPort'),
+  livecallConfig: (): Promise<LivecallConfig> =>
+    ipcRenderer.invoke('wf:livecall:config'),
   restoreRecovery: (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> =>
     ipcRenderer.invoke('wf:app:restoreRecovery'),
   multiviewOpen: (): Promise<void> =>

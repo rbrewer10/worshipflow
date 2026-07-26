@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, re
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
@@ -1038,6 +1038,26 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
   if (item) void loadDeckOnto(track, item, t.loadGeneration)
 }
 
+// Live Call: hand the screens over to the incoming video. There is no slide
+// content to load — the pixels arrive over WebRTC, and every screen negotiates
+// for them itself. All this does is put the track in the mode that tells them to.
+function doLoadLiveCall(track: TrackId, title: string): void {
+  const t = tracks[track]
+  t.loadGeneration++
+  t.hasLiveContent = true
+  clearCountdown(track)
+  clearAutoAdvance(track)
+  t.songId = null
+  t.scriptureRef = null
+  clearSongMeta(track)
+  t.deckSlides = null
+  t.song = { title, lines: [''], background: null }
+  t.songTextColor = null; t.songFont = null
+  t.blurBehindText = false
+  t.mode = 'livecall'
+  t.index = 0
+}
+
 // Fills t.song.lines with one summary per deck slide, so the EXISTING cursor,
 // next/prev and auto-advance all work unchanged — the deck needs no second
 // cursor. Pre-resolves every scripture slot because computeZoneStates is
@@ -1393,6 +1413,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
       item.payload.blurBehindText as boolean | undefined,
       item
     )
+  } else if (item.type === 'livecall') {
+    doLoadLiveCall(track, item.title)
   } else {
     return
   }
@@ -2298,6 +2320,18 @@ ipcMain.handle('wf:scenes:set', (_e, config: SceneConfig) => {
 
 ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {
   return boundTabletPort
+})
+
+// Everything a renderer needs to reach Live Call signaling. The renderer runs on
+// the Vite dev server (or file://) in packaged builds, so it cannot derive the
+// tablet server's origin from location.host — it has to be told.
+ipcMain.handle('wf:livecall:config', async (): Promise<LivecallConfig> => {
+  return {
+    url: `ws://127.0.0.1:${boundTabletPort}/livecall`,
+    phoneUrl: `http://${getLocalIp()}:${boundTabletPort}/phone`,
+    token: livecallToken(),
+    room: 'sanctuary',
+  }
 })
 
 ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => {

@@ -3,7 +3,7 @@
 import type { ThemeColors, FontKey } from './themes'
 export type { ThemeColors } from './themes'
 
-export type Mode = 'lyrics' | 'black' | 'logo' | 'countdown'
+export type Mode = 'lyrics' | 'black' | 'logo' | 'countdown' | 'livecall'
 export type Intent = 'next' | 'prev' | 'black' | 'logo' | 'lyrics'
 export type TrackId = 'main' | 'second'
 export type Theme = 'modern-church' | 'minimalist' | 'vibrant' | 'dark-premium'
@@ -191,6 +191,16 @@ export interface NewServiceItem {
   ref_id?: number | null
   payload?: Record<string, unknown>
   track?: TrackId
+}
+
+// Everything a renderer needs to reach Live Call signaling. `url` is loopback
+// because the relay and the output windows run on this machine; `phoneUrl` is
+// the LAN address for the QR code (swap for a Tailscale name off-site).
+export interface LivecallConfig {
+  url: string
+  phoneUrl: string
+  token: string
+  room: string
 }
 
 // --- Multi-zone display system ---

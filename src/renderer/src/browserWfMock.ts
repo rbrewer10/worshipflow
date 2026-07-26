@@ -24,7 +24,8 @@ import type {
   ZoneId,
   ZoneRouting,
   ZoneState,
-  TrackId
+  TrackId,
+  LivecallConfig
 } from '../../shared/types'
 import { starterConfig } from '../../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
@@ -442,6 +443,12 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     scenesGet: async () => starterConfig(),
     scenesSet: noop,
     getTabletPort: async (): Promise<number> => 3691,
+    livecallConfig: async (): Promise<LivecallConfig> => ({
+      url: 'ws://127.0.0.1:3691/livecall',
+      phoneUrl: 'http://127.0.0.1:3691/phone',
+      token: '',
+      room: 'sanctuary',
+    }),
     restoreRecovery: async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => ({ ok: true, restored: false }),
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),
