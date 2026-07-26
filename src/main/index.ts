@@ -6,6 +6,9 @@ import { randomUUID, randomBytes } from 'crypto'
 import { createServer } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
 import os from 'os'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+const execFileAsync = promisify(execFile)
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
 import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
@@ -1433,6 +1436,42 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   }
 }
 
+// The machine's Tailscale HTTPS base, e.g. https://desktop.tailxxxx.ts.net.
+//
+// This matters because phones refuse camera access on a plain-http origin, so
+// the LAN address in the QR code can never carry a real call — it just fails at
+// the camera prompt. Asking Ryan to type a MagicDNS name would be one more thing
+// to get wrong, so read it from Tailscale directly.
+//
+// Cached: shelling out per HTTP request would be silly, and the name is stable.
+// null means Tailscale isn't installed or isn't up, and we fall back to the LAN
+// address with a warning in the UI.
+// Async and cached: this shells out, and doing it synchronously would block the
+// main process — a hung Tailscale CLI would freeze the whole app mid-service.
+let tailscaleBaseCache: string | null | undefined
+async function tailscaleHttpsBase(): Promise<string | null> {
+  if (tailscaleBaseCache !== undefined) return tailscaleBaseCache
+  const candidates = [
+    'tailscale',
+    'C:\\Program Files\\Tailscale\\tailscale.exe',
+    'C:\\Program Files (x86)\\Tailscale\\tailscale.exe',
+  ]
+  let found: string | null = null
+  for (const exe of candidates) {
+    try {
+      const { stdout } = await execFileAsync(exe, ['status', '--json'], { timeout: 4000 })
+      const dns = (JSON.parse(stdout) as { Self?: { DNSName?: string } }).Self?.DNSName
+      if (dns) {
+        found = `https://${dns.replace(/\.$/, '')}`
+        break
+      }
+    } catch { /* not installed at this path, or not running — try the next */ }
+  }
+  tailscaleBaseCache = found
+  logInfo(`[livecall] tailscale base: ${found ?? 'not detected'}`)
+  return found
+}
+
 // Shared secret for Live Call signaling. Generated once on first use and
 // persisted; both the phone client and the relay present it. Anyone on the
 // tailnet with this value can join the call room, so it is a password.
@@ -2330,9 +2369,14 @@ ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {
 // the Vite dev server (or file://) in packaged builds, so it cannot derive the
 // tablet server's origin from location.host — it has to be told.
 ipcMain.handle('wf:livecall:config', async (): Promise<LivecallConfig> => {
+  // Prefer the Tailscale HTTPS name: it is the only address a phone will grant
+  // camera access on, and the only one reachable when he is out of town.
+  const ts = await tailscaleHttpsBase()
   return {
     url: `ws://127.0.0.1:${boundTabletPort}/livecall`,
-    phoneUrl: `http://${getLocalIp()}:${boundTabletPort}/phone`,
+    phoneUrl: ts ? `${ts}/phone` : `http://${getLocalIp()}:${boundTabletPort}/phone`,
+    phoneUrlIsSecure: ts !== null,
+    tabletPort: boundTabletPort,
     token: livecallToken(),
     room: 'sanctuary',
   }

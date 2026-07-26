@@ -20,7 +20,7 @@ const STATE_STYLE: Record<CallState, { label: string; className: string }> = {
  * setting up the phone by typing it is miserable.
  */
 export default function LiveCallEditor(): JSX.Element {
-  const { state, telemetry, viewerCount, autoAccept, setAutoAccept, accept, decline, stream, phoneUrl } = useLiveCall()
+  const { state, telemetry, viewerCount, autoAccept, setAutoAccept, accept, decline, stream, phoneUrl, phoneUrlIsSecure, tabletPort } = useLiveCall()
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [qr, setQr] = useState<string | null>(null)
 
@@ -102,13 +102,21 @@ export default function LiveCallEditor(): JSX.Element {
           <div className="space-y-1.5 text-[11px] leading-snug text-slate-500">
             <p>Scan this on the phone, then Share &rarr; Add to Home Screen.</p>
             <p className="break-all font-mono text-[10px] text-slate-400">{phoneUrl}</p>
-            <p className="rounded bg-amber-50 p-2 text-amber-800 ring-1 ring-amber-200">
-              <b>This http:// address cannot use the camera.</b> Phones only allow camera access
-              over https, so it is good for checking the page loads and nothing else. For a real
-              call, run <code className="font-mono">tailscale serve --bg 3691</code> on this
-              computer and give him the <code className="font-mono">https://</code> Tailscale
-              address instead.
-            </p>
+            {phoneUrlIsSecure ? (
+              <p className="rounded bg-emerald-50 p-2 text-emerald-800 ring-1 ring-emerald-200">
+                Tailscale address detected. It only serves this page while{' '}
+                <code className="font-mono">tailscale serve --bg {tabletPort}</code> is running on
+                this computer — that survives reboots once set.
+              </p>
+            ) : (
+              <p className="rounded bg-amber-50 p-2 text-amber-800 ring-1 ring-amber-200">
+                <b>Tailscale not detected, so this http:// address cannot use the camera.</b>{' '}
+                Phones only allow camera access over https. Install Tailscale on this computer and
+                on his phone, run{' '}
+                <code className="font-mono">tailscale serve --bg {tabletPort}</code>, and reopen
+                this panel — the code will switch to the https address on its own.
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -199,6 +199,9 @@ export interface NewServiceItem {
 export interface LivecallConfig {
   url: string
   phoneUrl: string
+  /** False when we fell back to the LAN address, which can never use a camera. */
+  phoneUrlIsSecure: boolean
+  tabletPort: number
   token: string
   room: string
 }

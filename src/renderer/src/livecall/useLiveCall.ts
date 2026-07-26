@@ -39,6 +39,8 @@ export interface LiveCallUi {
   decline: () => void
   stream: MediaStream | null
   phoneUrl: string
+  phoneUrlIsSecure: boolean
+  tabletPort: number
 }
 
 export function useLiveCall(): LiveCallUi {
@@ -48,10 +50,17 @@ export function useLiveCall(): LiveCallUi {
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [autoAccept, setAutoAcceptState] = useState(true)
   const [phoneUrl, setPhoneUrl] = useState('')
+  const [phoneUrlIsSecure, setPhoneUrlIsSecure] = useState(false)
+  const [tabletPort, setTabletPort] = useState(3691)
 
   useEffect(() => {
     let cancelled = false
-    void window.wf.livecallConfig().then((cfg) => { if (!cancelled) setPhoneUrl(cfg.phoneUrl) })
+    void window.wf.livecallConfig().then((cfg) => {
+      if (cancelled) return
+      setPhoneUrl(cfg.phoneUrl)
+      setPhoneUrlIsSecure(cfg.phoneUrlIsSecure)
+      setTabletPort(cfg.tabletPort)
+    })
     void getRelay().then((r) => {
       if (cancelled) return
       r.setCallbacks({
@@ -82,5 +91,7 @@ export function useLiveCall(): LiveCallUi {
     decline: () => { void getRelay().then((r) => r.declineCall()) },
     stream,
     phoneUrl,
+    phoneUrlIsSecure,
+    tabletPort,
   }
 }

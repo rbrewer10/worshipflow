@@ -447,6 +447,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     livecallConfig: async (): Promise<LivecallConfig> => ({
       url: 'ws://127.0.0.1:3691/livecall',
       phoneUrl: 'http://127.0.0.1:3691/phone',
+      phoneUrlIsSecure: false,
+      tabletPort: 3691,
       token: '',
       room: 'sanctuary',
     }),
