@@ -143,7 +143,7 @@ export interface SongUsage {
 }
 
 // --- Service builder ---
-export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement' | 'sermon'
+export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement' | 'sermon' | 'livecall'
 
 // Item types whose live rendering supports a custom file background stored
 // directly on the item's own payload (payload.background) — Song has its own
@@ -197,7 +197,7 @@ export interface NewServiceItem {
 export type ZoneId = 1 | 2 | 3 | 4
 // 'sermon' is the designed sermon backdrop (title card behind the pastor) —
 // distinct from 'text', which renders the same content as a plain live line.
-export type ZoneMode = 'lyrics' | 'stage' | 'black' | 'logo' | 'countdown' | 'text' | 'image' | 'sermon' | 'off'
+export type ZoneMode = 'lyrics' | 'stage' | 'black' | 'logo' | 'countdown' | 'text' | 'image' | 'sermon' | 'livecall' | 'off'
 
 export interface ZoneState {
   mode: ZoneMode
@@ -242,6 +242,9 @@ export const ZONE_ROUTING_DEFAULTS: Record<ServiceItemType, ZoneRouting> = {
   // Back screens get the designed sermon backdrop (title/speaker/passage) —
   // the Lyrics TVs stay on the logo so the room isn't reading the same card twice.
   sermon:    { 1: 'sermon',    2: 'sermon',    3: 'logo',      4: 'stage' },
+  // The call is the content — every audience screen shows him. Stage monitors
+  // keep their normal view so the platform team still sees what they need.
+  livecall:  { 1: 'livecall',  2: 'livecall',  3: 'livecall',  4: 'stage' },
 }
 
 export const ZONE_NAMES: Record<ZoneId, string> = {

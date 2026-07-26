@@ -32,6 +32,7 @@ function readout(zs: ZoneState | undefined): { primary: string; secondary: strin
       primary: zs.title || 'Sermon',
       secondary: [zs.speaker, zs.passage].filter(Boolean).join(' · ') || null
     }
+    case 'livecall': return { primary: 'Live Call', secondary: zs.title || null }
     case 'lyrics':
     case 'text': return { primary: zs.line || zs.title || '—', secondary: zs.line ? zs.title || null : null }
   }

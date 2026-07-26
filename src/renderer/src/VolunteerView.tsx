@@ -13,6 +13,7 @@ import {
   Newspaper,
   Square,
   Timer,
+  Video,
   X
 } from 'lucide-react'
 import type { Intent, LiveState, ServiceFull, ServiceItem, ServiceSummary } from '../../shared/types'
@@ -26,7 +27,8 @@ const ICON: Record<ServiceItem['type'], JSX.Element> = {
   welcome: <Hand size={14} />,
   ticker: <Newspaper size={14} />,
   announcement: <Newspaper size={14} />,
-  sermon: <Mic size={14} />
+  sermon: <Mic size={14} />,
+  livecall: <Video size={14} />
 }
 
 function canGoLive(item: ServiceItem): boolean {

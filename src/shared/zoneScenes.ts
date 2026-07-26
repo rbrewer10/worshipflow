@@ -45,6 +45,7 @@ export function contentModeFor(type: ServiceItemType): ZoneMode {
   if (type === 'song') return 'lyrics'
   if (type === 'countdown' || type === 'welcome') return 'countdown'
   if (type === 'image') return 'image'
+  if (type === 'livecall') return 'livecall'
   return 'text' // scripture, text, ticker, announcement
 }
 
@@ -61,7 +62,7 @@ export function modeForRole(role: ZoneRole | undefined, type: ServiceItemType): 
 export function roleForMode(mode: ZoneMode): ZoneRole | null {
   if (mode === 'logo') return 'logo'
   if (mode === 'black') return 'black'
-  if (mode === 'lyrics' || mode === 'text' || mode === 'countdown' || mode === 'image') return 'content'
+  if (mode === 'lyrics' || mode === 'text' || mode === 'countdown' || mode === 'image' || mode === 'livecall') return 'content'
   return null
 }
 
