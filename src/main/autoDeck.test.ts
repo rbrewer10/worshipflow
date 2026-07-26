@@ -121,9 +121,19 @@ describe('autoDeckFor — announcement block', () => {
     expect(deck!.map((s) => s.zones[2].text)).toEqual(['One.', 'Two.'])
   })
 
-  it('reads a single ref_id when there is no refIds array', async () => {
+  it('leaves a legacy single-announcement item alone', async () => {
+    // ref_id with no refIds is every announcement item built before blocks
+    // existed. Generating for it would silently re-lay-out existing services.
     const deck = await autoDeckFor(
       item({ type: 'announcement', ref_id: 1, payload: {} }),
+      withAnnouncements({ 1: 'One.' })
+    )
+    expect(deck).toBeNull()
+  })
+
+  it('generates for a block of one, because that was picked on purpose', async () => {
+    const deck = await autoDeckFor(
+      item({ type: 'announcement', payload: { refIds: [1] } }),
       withAnnouncements({ 1: 'One.' })
     )
     expect(deck!.map((s) => s.zones[2].text)).toEqual(['One.'])

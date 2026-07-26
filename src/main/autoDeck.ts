@@ -64,10 +64,14 @@ async function sermonDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSl
 }
 
 async function announcementDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSlide[] | null> {
+  // Deliberately NOT falling back to item.ref_id. Every announcement item ever
+  // built has a ref_id and no refIds, so honouring it here would silently
+  // re-lay-out every existing service the first time this shipped. A block is
+  // opt-in: it exists once the operator has picked announcements in the editor.
   const fromPayload = item.payload.refIds
   const ids = Array.isArray(fromPayload)
     ? fromPayload.filter((n): n is number => typeof n === 'number')
-    : item.ref_id != null ? [item.ref_id] : []
+    : []
   if (!ids.length) return null
 
   const slides: ZoneSlide[] = []
