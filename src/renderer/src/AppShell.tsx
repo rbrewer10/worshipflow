@@ -12,6 +12,7 @@ import ScriptureLookup from './ScriptureLookup'
 import VolunteerView from './VolunteerView'
 import LogoSettings from './LogoSettings'
 import SoundCheckTab from './sound-check/SoundCheckTab'
+import { getRelay } from './livecall/useLiveCall'
 import NotifyToasts from './NotifyToasts'
 
 export type View = 'home' | 'live' | 'service' | 'songs' | 'announcements' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck'
@@ -89,6 +90,16 @@ function AppShell(): JSX.Element {
   useEffect(() => {
     window.wf.restoreRecovery().catch(err => {
       console.error('Failed to restore recovery state:', err)
+    })
+  }, [])
+
+  // Start the Live Call relay app-wide rather than when its editor opens. The
+  // screens negotiate with the relay, so if it only existed while the operator
+  // had the item open, taking a call live without opening it would leave every
+  // screen black. One idle WebSocket is a cheap price for that not happening.
+  useEffect(() => {
+    void getRelay().catch(err => {
+      console.error('Failed to start Live Call relay:', err)
     })
   }, [])
 

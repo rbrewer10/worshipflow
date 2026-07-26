@@ -23,7 +23,10 @@ export function canGoLive(item: ServiceItem): boolean {
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
     (item.type === 'ticker' && !!(item.payload.text as string)) ||
     (item.type === 'announcement' && item.ref_id != null) ||
-    (item.type === 'sermon')
+    (item.type === 'sermon') ||
+    // Nothing to configure — the call either connects or it doesn't, and the
+    // operator needs to be able to hand the screens over before it does.
+    (item.type === 'livecall')
   )
 }
 
@@ -73,6 +76,8 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
       item.payload.background as string | null | undefined,
       item.payload.blurBehindText as boolean | undefined
     )
+  } else if (item.type === 'livecall') {
+    await window.wf.liveLoadLiveCall(track, item.title)
   } else {
     return false
   }

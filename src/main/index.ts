@@ -1844,6 +1844,10 @@ ipcMain.handle('wf:live:loadSermon', (_e, track: TrackId, title: string, speaker
   doLoadSermon(track, title, speaker, passage, background ?? null, blurBehindText); broadcast()
 })
 
+ipcMain.handle('wf:live:loadLiveCall', (_e, track: TrackId, title: string) => {
+  doLoadLiveCall(track, title); broadcast()
+})
+
 ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean) => {
   doLoadCountdown(track, seconds, background, blurBehindText); broadcast()
 })

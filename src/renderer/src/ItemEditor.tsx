@@ -10,6 +10,7 @@ import { ImageEditor } from './editors/ImageEditor'
 import { CountdownEditor } from './editors/CountdownEditor'
 import { TickerEditor } from './editors/TickerEditor'
 import { SermonEditor } from './editors/SermonEditor'
+import LiveCallEditor from './editors/LiveCallEditor'
 import AnnouncementItemEditor from './AnnouncementItemEditor'
 
 interface ItemEditorProps {
@@ -176,6 +177,8 @@ export const ItemEditor = memo(function ItemEditor({
       {item.type === 'announcement' && (
         <AnnouncementItemEditor refId={item.ref_id} />
       )}
+
+      {item.type === 'livecall' && <LiveCallEditor />}
 
       {/* ── Background & Color ── */}
       <div className="border-t border-slate-200 pt-3">
