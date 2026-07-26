@@ -17,6 +17,7 @@ const MODE_COLORS: Record<ZoneState['mode'], string> = {
   countdown: 'bg-amber-600 text-white',
   text:      'bg-slate-100 text-slate-900',
   image:     'bg-slate-100 text-slate-900',
+  sermon:    'bg-blue-600 text-white',
   off:       'bg-slate-200 text-slate-500',
 }
 

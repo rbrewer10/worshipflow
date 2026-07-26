@@ -1,4 +1,5 @@
 import Store from 'electron-store'
+import type { ZonePins } from '../shared/zonePins'
 
 // Crash recovery: persist the actual service item being played, per track, restore on launch.
 // Stores the live service item ID so we can restore the exact item after a crash,
@@ -12,6 +13,9 @@ export interface TrackSnapshot {
 export interface RecoverySnapshot {
   main: TrackSnapshot
   second: TrackSnapshot | null
+  // Live zone pins ("hold this screen on X"). Optional: snapshots written by
+  // earlier builds simply have none, and electron-store tolerates the new key.
+  pins?: ZonePins
 }
 
 const recoveryStore = new Store<{ lastState: RecoverySnapshot | null }>({ name: 'recovery' })

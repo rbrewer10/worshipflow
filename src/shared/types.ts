@@ -195,7 +195,9 @@ export interface NewServiceItem {
 
 // --- Multi-zone display system ---
 export type ZoneId = 1 | 2 | 3 | 4
-export type ZoneMode = 'lyrics' | 'stage' | 'black' | 'logo' | 'countdown' | 'text' | 'image' | 'off'
+// 'sermon' is the designed sermon backdrop (title card behind the pastor) —
+// distinct from 'text', which renders the same content as a plain live line.
+export type ZoneMode = 'lyrics' | 'stage' | 'black' | 'logo' | 'countdown' | 'text' | 'image' | 'sermon' | 'off'
 
 export interface ZoneState {
   mode: ZoneMode
@@ -214,6 +216,9 @@ export interface ZoneState {
   stageMessage: string | null
   // image
   imagePath: string | null
+  // sermon backdrop extras (mode 'sermon'): the designed title card's subtext
+  speaker: string | null
+  passage: string | null
   // text slide custom style
   bgColor: string | null        // solid hex bg color (when no background file)
   bgOverlay: number | null      // 0-1 opacity of readability overlay
@@ -234,7 +239,9 @@ export const ZONE_ROUTING_DEFAULTS: Record<ServiceItemType, ZoneRouting> = {
   welcome:   { 1: 'countdown', 2: 'countdown', 3: 'countdown', 4: 'stage' },
   ticker:    { 1: 'text',      2: 'text',      3: 'text',      4: 'stage' },
   announcement: { 1: 'text',   2: 'text',      3: 'text',      4: 'stage' },
-  sermon:    { 1: 'logo',      2: 'logo',      3: 'logo',      4: 'stage' },
+  // Back screens get the designed sermon backdrop (title/speaker/passage) —
+  // the Lyrics TVs stay on the logo so the room isn't reading the same card twice.
+  sermon:    { 1: 'sermon',    2: 'sermon',    3: 'logo',      4: 'stage' },
 }
 
 export const ZONE_NAMES: Record<ZoneId, string> = {

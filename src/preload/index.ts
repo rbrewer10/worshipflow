@@ -30,6 +30,7 @@ import type { SceneConfig } from '../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import type { ZoneSlide } from '../shared/zoneSlides'
+import type { ZonePin, ZonePins } from '../shared/zonePins'
 
 const wf = {
   // The real build version comes from the main process via getInfo() — don't
@@ -283,10 +284,23 @@ const wf = {
     ipcRenderer.invoke('wf:zone:getSlides', itemId),
   zoneSetSlides: (itemId: number, slides: ZoneSlide[] | null): Promise<void> =>
     ipcRenderer.invoke('wf:zone:setSlides', itemId, slides),
+  zoneSetPin: (zoneId: ZoneId, pin: ZonePin | null): Promise<void> =>
+    ipcRenderer.invoke('wf:zone:setPin', zoneId, pin),
+  zoneClearPins: (): Promise<void> =>
+    ipcRenderer.invoke('wf:zone:clearPins'),
+  zoneGetPins: (): Promise<ZonePins> =>
+    ipcRenderer.invoke('wf:zone:getPins'),
+  // DEPRECATED shims for the pre-pin ZonePanel, which PN-4 replaces wholesale.
+  // Only 'logo' | 'black' | 'lyrics' are pinnable, so any other mode clears the
+  // pin instead of throwing at the old caller. Delete both with ZonePanel.
   zoneSetOverride: (zoneId: ZoneId, mode: ZoneState['mode'] | null): Promise<void> =>
-    ipcRenderer.invoke('wf:zone:setOverride', zoneId, mode),
+    ipcRenderer.invoke(
+      'wf:zone:setPin',
+      zoneId,
+      mode === 'logo' || mode === 'black' || mode === 'lyrics' ? { kind: 'mode', mode } : null
+    ),
   zoneClearOverrides: (): Promise<void> =>
-    ipcRenderer.invoke('wf:zone:clearOverrides'),
+    ipcRenderer.invoke('wf:zone:clearPins'),
   zoneGetStates: (): Promise<Record<ZoneId, ZoneState>> =>
     ipcRenderer.invoke('wf:zone:getStates'),
   zoneGetIp: (): Promise<string> =>

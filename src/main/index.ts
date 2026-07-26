@@ -16,6 +16,8 @@ import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides'
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
+import { validateZonePins } from '../shared/zonePins'
+import type { ZonePin, ZonePins } from '../shared/zonePins'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -302,8 +304,16 @@ const tracks: Record<TrackId, LiveTrackState> = {
   second: createTrackState({ title: '', lines: [], background: null })
 }
 
-// Zone state: manual overrides set by the operator; null = auto-route from service item routing.
-const zoneOverrides: Map<ZoneId, ZoneState['mode']> = new Map()
+// Zone pins: "this screen holds X until I unpin it." The operator's most recent,
+// most explicit intent, so it sits at the TOP of the precedence chain:
+//   pin > deck (t.deckSlides) > per-item zone_routing > scene typeDefault > idleDefault
+// In-memory + mirrored into recovery.json by broadcast(); cleared on service switch.
+const zonePins: Map<ZoneId, ZonePin> = new Map()
+// Keys (`zoneId:itemId`) already warned about for a pin whose item has gone
+// missing. computeZoneStates runs as often as 10×/second during auto-advance,
+// so the warning has to be one-per-bad-pin, not one-per-broadcast. Cleared
+// wherever zonePins is mutated, so a newly-set bad pin is still reported once.
+const warnedMissingPins = new Set<string>()
 let ccliLicense: string | null = null  // church CCLI license number (loaded from settings)
 let logoPath: string | null = null     // church logo image path for logo zones
 let logoBg: string | null = null       // motion background (video/image) for logo zones
@@ -582,6 +592,8 @@ function emptyZoneState(live: LiveState): ZoneState {
     secondsLeft: 0,
     stageMessage: live.stageMessage,
     imagePath: null,
+    speaker: null,
+    passage: null,
     bgColor: null,
     bgOverlay: null,
     textAlign: null,
@@ -590,6 +602,41 @@ function emptyZoneState(live: LiveState): ZoneState {
   }
 }
 
+// Zones can't load a `theme:<id>` background as a file (only the projector
+// renders motion themes), so resolve the effective theme to colors and let the
+// zone draw an animated gradient. Real image/video file backgrounds pass
+// through as-is. One helper so the mode branches can't drift apart on it.
+function applyZoneBackground(base: ZoneState, background: string | null | undefined, live: LiveState): void {
+  const isThemeBg = background?.startsWith('theme:') ?? false
+  const themeId = isThemeBg ? background!.slice(6) : (live.slideTheme ?? null)
+  base.background = isThemeBg ? null : (background ?? null)
+  base.themeColors = resolveColors(getTheme(themeId), live.slideThemeColors)
+}
+
+// A `titleCard` pin freezes one service item onto a zone — the designed sermon
+// backdrop built from THAT item's own payload, not from whatever happens to be
+// live now. That independence is the entire point of holding a screen.
+function titleCardZoneState(item: ServiceItem, live: LiveState): ZoneState {
+  const base = emptyZoneState(live)
+  base.mode = 'sermon'
+  base.title = (item.payload.title as string | undefined) ?? item.title
+  if (item.type === 'sermon') {
+    base.speaker = (item.payload.speaker as string | undefined) || null
+    base.passage = (item.payload.passage as string | undefined) || null
+  }
+  applyZoneBackground(base, (item.payload.background as string | null | undefined) ?? null, live)
+  return base
+}
+
+// The live zone pins as a plain record (for IPC and the recovery snapshot).
+function zonePinsRecord(): ZonePins {
+  const out: ZonePins = {}
+  for (const [zoneId, pin] of zonePins) out[zoneId] = pin
+  return out
+}
+
+// Precedence, highest first:
+//   pin  >  deck (t.deckSlides)  >  per-item zone_routing  >  scene typeDefault  >  idleDefault
 function computeZoneStates(): Record<ZoneId, ZoneState> {
   const result = {} as Record<ZoneId, ZoneState>
   const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
@@ -601,10 +648,40 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     const live = renderState(zoneTrack)
     const t = tracks[zoneTrack]
 
+    // A pin is the operator's most recent and most explicit instruction for
+    // this one screen — it outranks everything below, including an authored
+    // deck. A mode pin falls through to the shared mode-population code below
+    // (as the old manual override did); a titleCard pin is fully resolved here.
+    const pin = zonePins.get(zoneId)
+    let pinnedMode: ZoneMode | null = null
+    if (pin) {
+      if (pin.kind === 'titleCard') {
+        // Deliberately NOT filtered by track: the operator pinned this specific
+        // item, and which track it belongs to has nothing to do with holding it.
+        const pinnedItem = activeServiceItems.find((it) => it.id === pin.itemId)
+        if (pinnedItem) {
+          result[zoneId] = titleCardZoneState(pinnedItem, live)
+          continue
+        }
+        // Item was deleted out from under the pin. Fall back to the logo, never
+        // to black — a dark screen mid-service reads as broken equipment.
+        const warnKey = `${zoneId}:${pin.itemId}`
+        if (!warnedMissingPins.has(warnKey)) {
+          warnedMissingPins.add(warnKey)
+          logWarn(`[zones] pinned item id=${pin.itemId} is no longer in the service — zone ${zoneId} falls back to the logo`)
+        }
+        pinnedMode = 'logo'
+      } else {
+        pinnedMode = pin.mode
+      }
+    }
+
     // An authored deck says explicitly what every zone shows on the current
-    // slide — that's its whole purpose, so it wins outright over manual zone
-    // overrides and per-item auto-routing alike, not just the idle default.
-    if (t.deckSlides && t.index < t.deckSlides.length) {
+    // slide — that's its whole purpose, so it wins outright over per-item
+    // auto-routing and the idle default alike. The one thing it does NOT beat
+    // is a pin, handled above: the operator asked for this screen by hand,
+    // after the deck was authored.
+    if (pinnedMode == null && t.deckSlides && t.index < t.deckSlides.length) {
       result[zoneId] = zoneStateFromSlot(resolveSlot(t.deckSlides, t.index, zoneId), t, zoneId, live)
       continue
     }
@@ -629,21 +706,22 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       }
     }
 
-    // Manual override takes precedence over auto-routing (global, track-agnostic).
-    const override = zoneOverrides.get(zoneId)
     // No service item is live on this track (routing is null) — e.g. nothing's
     // loaded yet, OR ad-hoc content (Quick Scripture / Quick Countdown) is live,
     // which deliberately has no service item for per-item routing to key off.
-    // Show that ad-hoc content on zones 1/2 (which otherwise default to the
-    // Logo backdrop) instead of silently hiding it — but only once something
-    // real has actually loaded on this track (hasLiveContent), and only while
-    // the track itself is actively displaying it (not black/logo'd out), so a
-    // pristine, never-touched track still shows the safe Logo/Off default.
+    // Show that ad-hoc content on EVERY content screen (1/2 back screens and 3
+    // the Lyrics TVs, with 4 on its stage view) instead of silently hiding it —
+    // a Quick Scripture called mid-sermon used to blank the Lyrics TVs, which
+    // is precisely the screen the congregation reads verses from. Only once
+    // something real has actually loaded on this track (hasLiveContent), and
+    // only while the track itself is actively displaying it (not black/logo'd
+    // out), so a pristine, never-touched track still shows the safe Logo/Off.
     const trackShowingContent = t.hasLiveContent && (t.mode === 'lyrics' || t.mode === 'countdown')
-    const idleDefault: ZoneMode = (zoneId === 1 || zoneId === 2)
-      ? (trackShowingContent ? (t.mode === 'countdown' ? 'countdown' : 'text') : 'logo')
-      : 'off'
-    const routedMode = override ?? (routing ? routing[zoneId] : idleDefault)
+    const idleContentMode: ZoneMode = t.mode === 'countdown' ? 'countdown' : 'text'
+    const idleDefault: ZoneMode = trackShowingContent
+      ? (zoneId === 4 ? 'stage' : idleContentMode)
+      : ((zoneId === 1 || zoneId === 2) ? 'logo' : 'off')
+    const routedMode = pinnedMode ?? (routing ? routing[zoneId] : idleDefault)
     const mode = routedMode ?? 'off'
 
     const base: ZoneState = { ...emptyZoneState(live), mode }
@@ -653,13 +731,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       base.line = live.line
       base.next = live.next
       base.title = live.songTitle
-      // Zones can't load `theme:<id>` as a file (only the projector renders motion
-      // themes), so resolve the effective theme to colors and let the zone draw an
-      // animated gradient. Real image/video file backgrounds pass through as-is.
-      const isThemeBg = live.background?.startsWith('theme:') ?? false
-      const themeId = isThemeBg ? live.background!.slice(6) : (live.slideTheme ?? null)
-      base.background = isThemeBg ? null : live.background
-      base.themeColors = resolveColors(getTheme(themeId), live.slideThemeColors)
+      applyZoneBackground(base, live.background, live)
       // For text-type items, pull per-item style overrides from payload
       if (t.serviceItemId != null) {
         const liveItem = activeServiceItems.find((it) => it.id === t.serviceItemId && it.type === 'text')
@@ -672,6 +744,21 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
           if (pl.fontScale != null) base.fontScale = pl.fontScale as number
         }
       }
+    } else if (mode === 'sermon') {
+      // The designed sermon backdrop reached by routing (not by a pin): same
+      // live content the lyrics/text branch shows, plus the speaker/passage the
+      // card is built around, read off the live item when it really is a sermon.
+      base.line = live.line
+      base.next = live.next
+      base.title = live.songTitle
+      const sermonItem = t.serviceItemId != null
+        ? activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === zoneTrack)
+        : undefined
+      if (sermonItem?.type === 'sermon') {
+        base.speaker = (sermonItem.payload.speaker as string | undefined) || null
+        base.passage = (sermonItem.payload.passage as string | undefined) || null
+      }
+      applyZoneBackground(base, live.background, live)
     } else if (mode === 'stage') {
       // Stage always shows lyrics content with next preview.
       base.line = live.line
@@ -685,14 +772,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       const secs = parseInt(parts[1] ?? '0', 10)
       base.secondsLeft = (isNaN(mins) ? 0 : mins) * 60 + (isNaN(secs) ? 0 : secs)
       base.title = live.songTitle
-      // Same background resolution the lyrics/text branch already does — a real
-      // file background passes through as-is; a `theme:<id>` background can't be
-      // loaded as a file by the zone page, so resolve it to colors for the
-      // animated gradient instead.
-      const isThemeBg = live.background?.startsWith('theme:') ?? false
-      const themeId = isThemeBg ? live.background!.slice(6) : (live.slideTheme ?? null)
-      base.background = isThemeBg ? null : live.background
-      base.themeColors = resolveColors(getTheme(themeId), live.slideThemeColors)
+      applyZoneBackground(base, live.background, live)
     } else if (mode === 'image') {
       const item = activeServiceItems.find((it) => it.id === t.serviceItemId)
       base.imagePath = item ? ((item.payload.path as string) ?? null) : null
@@ -812,7 +892,10 @@ function broadcast(): void {
     main: { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode },
     second: payload.second
       ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
-      : null
+      : null,
+    // Pins are live-operation state, so a crash mid-sermon must not silently
+    // release a held screen — restoreRecovery puts them back.
+    pins: zonePinsRecord()
   })
   tabletBroadcast(payload.main)
   zoneBroadcast()
@@ -1822,6 +1905,10 @@ function refreshActiveServiceItems(serviceId: number): void {
 
 ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   loggedSongIds.clear()  // new/switched service → start CCLI counting fresh
+  // Pins belong to the service that was on screen; carrying them into the next
+  // one would hold a card from a service nobody is running any more.
+  zonePins.clear()
+  warnedMissingPins.clear()
   if (serviceId == null) {
     activeServiceId = null
     activeServiceItems = []
@@ -2120,19 +2207,27 @@ ipcMain.handle('wf:zone:setSlides', (_e, itemId: number, slides: ZoneSlide[] | n
   broadcast()
 })
 
-ipcMain.handle('wf:zone:setOverride', (_e, zoneId: ZoneId, mode: ZoneState['mode'] | null): void => {
-  if (mode == null) {
-    zoneOverrides.delete(zoneId)
+// Pin/unpin one screen. Full broadcast() rather than zoneBroadcast(): the
+// operator UI reads pins back from state, and the recovery snapshot has to
+// record the pin the moment it's set, not on the next unrelated live action.
+ipcMain.handle('wf:zone:setPin', (_e, zoneId: ZoneId, pin: ZonePin | null): void => {
+  if (pin == null) {
+    zonePins.delete(zoneId)
   } else {
-    zoneOverrides.set(zoneId, mode)
+    if (!validateZonePins({ [zoneId]: pin })) throw new Error('Invalid zone pin')
+    zonePins.set(zoneId, pin)
   }
-  zoneBroadcast()
+  warnedMissingPins.clear()
+  broadcast()
 })
 
-ipcMain.handle('wf:zone:clearOverrides', (): void => {
-  zoneOverrides.clear()
-  zoneBroadcast()
+ipcMain.handle('wf:zone:clearPins', (): void => {
+  zonePins.clear()
+  warnedMissingPins.clear()
+  broadcast()
 })
+
+ipcMain.handle('wf:zone:getPins', (): ZonePins => zonePinsRecord())
 
 ipcMain.handle('wf:zone:getStates', (): Record<ZoneId, ZoneState> => {
   return computeZoneStates()
@@ -2199,6 +2294,23 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restor
 
   await restoreTrack('main', recovered.main)
   await restoreTrack('second', recovered.second)
+
+  // Put held screens back exactly as the operator left them — except a
+  // titleCard pin whose item is gone from the service (deleted, or a different
+  // service is now active): that would hold a screen on nothing.
+  zonePins.clear()
+  warnedMissingPins.clear()
+  if (validateZonePins(recovered.pins ?? {})) {
+    for (const [key, pin] of Object.entries(recovered.pins ?? {})) {
+      if (!pin) continue
+      if (pin.kind === 'titleCard' && !activeServiceItems.some((i) => i.id === pin.itemId)) {
+        logWarn(`[zones] dropping recovered pin for zone ${key} — item id=${pin.itemId} is not in the active service`)
+        continue
+      }
+      zonePins.set(Number(key) as ZoneId, pin)
+    }
+  }
+
   broadcast()
   return { ok: true, restored: restoredAny, fallback: fallbackAny }
 })

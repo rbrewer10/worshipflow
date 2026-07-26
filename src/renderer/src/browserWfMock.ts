@@ -185,6 +185,8 @@ const emptyZone: ZoneState = {
   secondsLeft: 0,
   stageMessage: null,
   imagePath: null,
+  speaker: null,
+  passage: null,
   bgColor: null,
   bgOverlay: null,
   textAlign: null,
@@ -415,6 +417,9 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     zoneSetSlides: noop,
     zoneSetOverride: noop,
     zoneClearOverrides: noop,
+    zoneSetPin: noop,
+    zoneClearPins: noop,
+    zoneGetPins: async (): Promise<import('../../shared/zonePins').ZonePins> => ({}),
     zoneGetStates: async (): Promise<Record<ZoneId, ZoneState>> => ({
       1: clone(emptyZone),
       2: clone(emptyZone),

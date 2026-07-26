@@ -3,7 +3,7 @@ import { ZONE_NAMES } from '../../shared/types'
 
 export const MODE_LABELS: Record<ZoneState['mode'], string> = {
   lyrics: 'Lyrics', stage: 'Stage', black: 'Black', logo: 'Logo',
-  countdown: 'Countdown', text: 'Text', image: 'Image', off: 'Off',
+  countdown: 'Countdown', text: 'Text', image: 'Image', sermon: 'Sermon', off: 'Off',
 }
 
 const ZONE_MODE_OPTIONS: ZoneState['mode'][] = ['lyrics', 'stage', 'black', 'logo', 'countdown', 'text', 'image', 'off']
