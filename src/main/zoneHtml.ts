@@ -343,7 +343,7 @@ const LYRICS_SCRIPT = `
         document.body.style.background='radial-gradient(58% 46% at 74% 22%,rgba(255,205,140,.30) 0%,rgba(0,0,0,0) 72%),'
           +'linear-gradient(160deg,'+sc1+' 0%,#152238 42%,#2a2b34 72%,#4a3a2c 100%)';
       }
-      var sf='saturate(.68) brightness(.62) contrast(1.06)';
+      var sf='saturate(.92) brightness(.88) contrast(1.02)';
       bgimg.style.filter=sf;bgvid.style.filter=sf;
       bgimg.style.animation='wfSermonDrift 240s ease-in-out infinite alternate';
       sermon.style.display='block';sermonOn=true;
@@ -510,7 +510,7 @@ const FLEX_SCRIPT = `
         root.style.background='radial-gradient(58% 46% at 74% 22%,rgba(255,205,140,.30) 0%,rgba(0,0,0,0) 72%),'
           +'linear-gradient(160deg,'+sc1+' 0%,#152238 42%,#2a2b34 72%,#4a3a2c 100%)';
       }
-      var sf='saturate(.68) brightness(.62) contrast(1.06)';
+      var sf='saturate(.92) brightness(.88) contrast(1.02)';
       bgimg.style.filter=sf;bgvid.style.filter=sf;
       bgimg.style.animation='wfSermonDrift 240s ease-in-out infinite alternate';
       sermon.style.display='block';sermonOn=true;
@@ -528,7 +528,7 @@ const FLEX_SCRIPT = `
       // Back Left read as one pair instead of one dim and one bright. It also
       // fixes the harder problem: white verse text over a bright sky is what a
       // back row can't read.
-      var tf=state.background?'saturate(.68) brightness(.62) contrast(1.06)':'';
+      var tf=state.background?'saturate(.92) brightness(.88) contrast(1.02)':'';
       bgimg.style.filter=tf;bgvid.style.filter=tf;
       if(state.blurBehindText){content.style.backdropFilter='blur(10px)';content.style.webkitBackdropFilter='blur(10px)';content.style.background='rgba(20,20,30,.3)';content.style.width='100%';content.style.maxWidth='100%';content.style.padding='24px 48px';}
       var tc=state.themeColors;
@@ -547,7 +547,13 @@ const FLEX_SCRIPT = `
       // Reserve the actual title block height (title + its 2vw top margin) so a long
       // titled slide shrinks to fit both, not just the line.
       var titleH=content.children.length>1?content.children[1].getBoundingClientRect().height+window.innerWidth*0.02:0;
-      fitText(content.firstChild,fs,2,window.innerWidth*0.82,window.innerHeight*0.90-titleH);
+      // Measure the REAL content box, exactly as the stage monitor does. Fitting
+      // against an abstract 0.82w x 0.90h of the viewport while the text actually
+      // wraps inside a narrower #content made it shrink far more than it needed
+      // to — which is why the same words were big on the stage and small here.
+      fitText(content.firstChild,fs,3,
+        content.clientWidth-window.innerWidth*0.10,
+        content.clientHeight-window.innerWidth*0.06-titleH);
       return;
     }
     if(m==='countdown'){
