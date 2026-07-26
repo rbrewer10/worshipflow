@@ -50,6 +50,7 @@ export function attachLivecallSignaling(wss: WebSocketServer, token: string): ()
 
       if (msg.type === 'hello') {
         const result = rooms.join(peerId, msg)
+        console.log(`[livecall] hello role=${String(msg.role)} room=${String(msg.room)} id=${peerId.slice(0, 8)} accepted=${result.accepted} evicted=${result.evicted ? result.evicted.slice(0, 8) : 'none'}`)
         if (!result.accepted) {
           send(peerId, { type: 'error', reason: result.reason })
           ws.close(result.reason === 'bad-token' ? 4001 : 4002, result.reason)
