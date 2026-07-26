@@ -799,9 +799,11 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
   if (slot.kind === 'slide') {
     base.mode = 'text'
     base.line = t.deckSource[slot.index ?? -1] ?? ''
+    applyZoneBackground(base, live.background, live)
   } else if (slot.kind === 'text') {
     base.mode = 'text'
     base.line = slot.text ?? ''
+    applyZoneBackground(base, live.background, live)
   } else if (slot.kind === 'sermon') {
     // The designed title card. Speaker is deliberately null — during a reading
     // the room needs the title and where we are, not who is preaching.
@@ -809,6 +811,7 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
     base.title = slot.text ?? ''
     base.speaker = null
     base.passage = slot.reference ?? null
+    applyZoneBackground(base, live.background, live)
   } else if (slot.kind === 'scripture') {
     // Keyed by the CURRENT slide's own index, not wherever the slot was
     // originally authored — loadDeckOnto pre-populates the cache for every
@@ -816,13 +819,23 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
     // this always has a matching entry when a lookup for this reference
     // succeeded at load time.
     const verse = t.deckScripture.get(`${t.index}:${zoneId}`)
-    if (verse) { base.mode = 'text'; base.line = verse; base.title = slot.reference ?? '' }
-    else base.mode = 'black'   // lookup failed — better blank than a stale verse
+    if (verse) {
+      base.mode = 'text'
+      base.line = verse
+      base.title = slot.reference ?? ''
+      applyZoneBackground(base, live.background, live)
+    } else base.mode = 'black'   // lookup failed — better blank than a stale verse
   } else if (slot.kind === 'image') {
     base.mode = 'image'
     base.imagePath = slot.path ?? null
   } else if (slot.kind === 'logo') {
+    // Must carry the church logo and its backdrop, exactly as the non-deck logo
+    // branch does. Without these the zone page has no image to draw and falls
+    // back to a generic cross glyph — the Lyrics TVs showed a plain ✝ instead of
+    // the Snow Hill logo.
     base.mode = 'logo'
+    base.imagePath = logoPath
+    base.background = logoBg
   } else {
     base.mode = 'black'
   }
@@ -1459,7 +1472,10 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
 // constant someone guessed at a desk.
 function zoneChunkBudget(): number {
   const raw = parseInt(getSetting('zone_chunk_budget') ?? '', 10)
-  return Number.isFinite(raw) && raw > 0 ? raw : 300
+  // 150 ≈ one verse. The first try at 300 fit John 3:16-17 onto a single slide,
+  // which shrank the type until the back of the room couldn't read it and
+  // overflowed the stage monitor. Fewer characters per slide means bigger words.
+  return Number.isFinite(raw) && raw > 0 ? raw : 150
 }
 
 // --- Tablet HTTP + WebSocket server ---
