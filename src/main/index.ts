@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } fro
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
-import { randomUUID } from 'crypto'
+import { randomUUID, randomBytes } from 'crypto'
 import { createServer } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
 import os from 'os'
@@ -85,6 +85,7 @@ import { generateBackgroundImage } from './replicateApi'
 import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
 import { TABLET_PORT, tabletHtml } from './tabletHtml'
+import { attachLivecallSignaling } from './livecallSignaling'
 import { OBS_HTML } from './obsHtml'
 import { ZONE_HTML } from './zoneHtml'
 import { MULTIVIEW_HTML } from './multiviewHtml'
@@ -1409,6 +1410,18 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   }
 }
 
+// Shared secret for Live Call signaling. Generated once on first use and
+// persisted; both the phone client and the relay present it. Anyone on the
+// tailnet with this value can join the call room, so it is a password.
+function livecallToken(): string {
+  let t = getSetting('livecall_token')
+  if (!t) {
+    t = randomBytes(32).toString('hex')
+    setSetting('livecall_token', t)
+  }
+  return t
+}
+
 // --- Tablet HTTP + WebSocket server ---
 function startTabletServer(): void {
   const server = createServer((req, res) => {
@@ -1511,6 +1524,7 @@ function startTabletServer(): void {
     const target = path === '/livecall' ? livecallWss! : wss
     target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req))
   })
+  attachLivecallSignaling(livecallWss, livecallToken())
   tabletHttpServer = server
   tabletWss = wss
 
