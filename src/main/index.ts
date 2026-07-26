@@ -778,9 +778,10 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       const item = activeServiceItems.find((it) => it.id === t.serviceItemId)
       base.imagePath = item ? ((item.payload.path as string) ?? null) : null
     } else if (mode === 'logo') {
-      // Logo zones (Back Left/Right) stay on their own static backdrop — they do
-      // NOT follow the live song/theme background. `logoBg` is the configured logo
-      // backdrop; when unset the zone page draws its charcoal gradient.
+      // Logo zones stay on their own static backdrop — they do NOT follow the
+      // live song/theme background. `logoBg` is the configured logo backdrop;
+      // when unset the zone page draws its charcoal gradient. This applies to
+      // every logo zone, Lyrics TVs included.
       base.imagePath = logoPath
       base.background = logoBg
     }
