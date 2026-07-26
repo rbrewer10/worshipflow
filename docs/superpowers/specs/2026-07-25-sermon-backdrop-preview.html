@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>WorshipFlow — Sermon Title Backdrop (Zone 1 / Zone 2)</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   PREVIEW CHROME ONLY — none of this gets ported into zoneHtml.ts
+   ══════════════════════════════════════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#0b0d11;color:#cbd5e1;font-family:system-ui,sans-serif;overflow-x:hidden}
+#chrome{padding:14px 18px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-bottom:1px solid #1e293b}
+#chrome h1{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin-right:10px}
+#chrome button{background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer}
+#chrome button:hover{background:#334155}
+#chrome button.on{background:#0e7490;border-color:#22d3ee;color:#fff}
+#note{padding:10px 18px 0;font-size:12px;color:#475569;max-width:1100px;line-height:1.5}
+#scaler{margin:18px auto 40px;transform-origin:top center}
+#canvas{width:1920px;height:1080px;position:relative;overflow:hidden;background:#000;
+        box-shadow:0 0 0 1px #1e293b,0 30px 80px rgba(0,0,0,.6)}
+/* Approximate pastor occlusion check (these are FLANKING screens, so this is only a sanity check) */
+#pastor{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:430px;height:760px;display:none;z-index:9;
+        pointer-events:none;opacity:.92}
+#pastor .head{position:absolute;left:50%;top:0;transform:translateX(-50%);width:170px;height:210px;border-radius:50% 50% 46% 46%;background:#05070b}
+#pastor .body{position:absolute;left:0;right:0;top:186px;bottom:0;border-radius:180px 180px 0 0;background:#05070b}
+#pastor.show{display:block}
+.grid-safe{position:absolute;inset:6.25% 6.25%;border:1px dashed rgba(34,211,238,.45);z-index:8;display:none;pointer-events:none}
+.grid-safe.show{display:block}
+.grid-safe::after{content:'TV safe area — 6.25%';position:absolute;top:-24px;left:0;font:600 15px system-ui;color:rgba(34,211,238,.75);letter-spacing:.1em}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ▼▼▼ PORTABLE BLOCK START — everything below goes into zoneHtml.ts ▼▼▼
+   In production: `#sermon{--u:1vw}` instead of the px value used here, and the
+   .s-bg layer is deleted (the existing #bgimg / #bgvid layers do that job).
+   Every other declaration ports verbatim.
+   ══════════════════════════════════════════════════════════════════════════ */
+#sermon{
+  /* ── ONE unit knob. Production: --u:1vw  (this preview: 1vw of 1920 = 19.2px) */
+  --u:19.2px;
+
+  /* ── Plumbed from ZoneState.themeColors (see notes) ───────────────────── */
+  --wf-accent:#c8102e;              /* themeColors.secondary || church red      */
+  --wf-ink:#ffffff;                 /* themeColors.text || #fff                 */
+  --wf-wash:4,7,13;                 /* wash RGB — near-black, very slightly blue */
+
+  /* ── ⬇⬇ THE REAL BACKGROUND IMAGE GOES HERE ⬇⬇ ────────────────────────
+     Production: applyBg(state.background) paints it onto #bgimg via
+     fileUrl(state.background). In this preview it is a CSS stand-in.
+     Swap to:  --wf-bg:url('file:///C:/path/to/one-of-your-200-pngs.png');   */
+  --wf-bg:
+      radial-gradient(58% 46% at 74% 22%, rgba(255,205,140,.85) 0%, rgba(216,132,60,.42) 38%, rgba(0,0,0,0) 72%),
+      radial-gradient(90% 70% at 18% 88%, rgba(28,52,92,.95) 0%, rgba(10,18,36,.9) 55%, rgba(0,0,0,0) 100%),
+      linear-gradient(160deg,#1b2c4d 0%,#152238 42%,#2a2b34 72%,#4a3a2c 100%);
+
+  position:absolute;inset:0;overflow:hidden;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  z-index:3;
+}
+
+/* PREVIEW-ONLY layer. Production deletes this rule — #bgimg already exists and
+   only needs the `filter` + `animation` lines copied onto it. */
+#sermon .s-bg{position:absolute;inset:0;background:var(--wf-bg);background-size:cover;background-position:center;
+  filter:saturate(.68) brightness(.62) contrast(1.06);
+  animation:wfSermonDrift 240s ease-in-out infinite alternate;will-change:transform}
+
+/* The dark glass. Two stacked gradients: an asymmetric left-heavy wash that
+   buries the type side, and a bottom-up grounding gradient. */
+#sermon .s-wash{position:absolute;inset:0;background:
+  linear-gradient(100deg,
+     rgba(var(--wf-wash),.94) 0%,
+     rgba(var(--wf-wash),.88) 30%,
+     rgba(var(--wf-wash),.66) 58%,
+     rgba(var(--wf-wash),.50) 78%,
+     rgba(var(--wf-wash),.72) 100%),
+  linear-gradient(to top,
+     rgba(var(--wf-wash),.86) 0%,
+     rgba(var(--wf-wash),.16) 42%,
+     rgba(var(--wf-wash),0) 64%)}
+#sermon .s-vig{position:absolute;inset:0;background:
+  radial-gradient(122% 92% at 62% 40%, rgba(0,0,0,0) 36%, rgba(0,0,0,.58) 100%)}
+
+/* ── Type block: left-anchored, optically above centre ────────────────────── */
+#sermon .s-type{position:absolute;left:calc(var(--u) * 7.8);top:50%;
+  width:calc(var(--u) * 60);max-width:calc(100% - var(--u) * 15.6);
+  transform:translateY(-54%);
+  animation:wfSermonSettle 300s ease-in-out infinite alternate;
+  color:var(--wf-ink);text-shadow:0 calc(var(--u) * .1) calc(var(--u) * 1.3) rgba(0,0,0,.6)}
+
+#sermon .s-rule{display:block;width:calc(var(--u) * 3.5);height:calc(var(--u) * .2);
+  background:var(--wf-accent);border-radius:calc(var(--u) * .1)}
+#sermon .s-kicker{display:block;margin-top:calc(var(--u) * 1.15);
+  font-size:calc(var(--u) * 1.32);font-weight:700;text-transform:uppercase;
+  letter-spacing:.42em;color:rgba(255,255,255,.66)}
+
+#sermon .s-title{margin-top:calc(var(--u) * 2.1);
+  font-family:Georgia,'Times New Roman','Liberation Serif','DejaVu Serif','Nimbus Roman',serif;
+  font-size:calc(var(--u) * 9);        /* fitText() shrinks this for long titles */
+  font-weight:700;line-height:1.03;letter-spacing:-.006em;color:var(--wf-ink)}
+
+#sermon .s-hair{margin-top:calc(var(--u) * 2.9);width:calc(var(--u) * 22);height:1px;
+  background:linear-gradient(90deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 100%)}
+
+#sermon .s-speaker{margin-top:calc(var(--u) * 2.3);
+  font-size:calc(var(--u) * 2.5);font-weight:600;letter-spacing:.005em;color:rgba(255,255,255,.93)}
+#sermon .s-passage{margin-top:calc(var(--u) * .85);
+  font-size:calc(var(--u) * 1.5);font-weight:600;text-transform:uppercase;
+  letter-spacing:.26em;color:rgba(255,255,255,.56)}
+
+/* Optional identity mark. Text, not the logo PNG — the wordmark is black+red
+   and vanishes on a dark wash (see notes). Hidden by adding class .no-mark. */
+#sermon .s-mark{position:absolute;right:calc(var(--u) * 6.25);bottom:calc(var(--u) * 6.25);
+  font-size:calc(var(--u) * 1.12);font-weight:700;text-transform:uppercase;letter-spacing:.3em;
+  color:rgba(255,255,255,.3)}
+#sermon.no-mark .s-mark{display:none}
+
+/* Entrance only — one 0.6s move when the sermon goes live, then dead still. */
+@keyframes wfSermonIn{from{opacity:0;transform:translateY(calc(var(--u) * .9))}to{opacity:1;transform:none}}
+#sermon .s-in{animation:wfSermonIn .6s cubic-bezier(.22,1,.36,1) both}
+#sermon .s-d1{animation-delay:.06s}#sermon .s-d2{animation-delay:.14s}
+#sermon .s-d3{animation-delay:.2s}#sermon .s-d4{animation-delay:.26s}
+
+/* Imperceptible over 40 min; transform-only so a Pi composites it for free.
+   Also nudges pixels so nothing sits burned into the same phosphor all hour. */
+@keyframes wfSermonDrift{from{transform:scale(1.02) translate3d(0,0,0)}
+                         to{transform:scale(1.08) translate3d(-1.2%,-.8%,0)}}
+@keyframes wfSermonSettle{from{transform:translateY(-54%)}to{transform:translateY(-51.4%)}}
+
+/* Preview toggles (these three rules are preview-only conveniences) */
+#sermon.no-wash .s-wash,#sermon.no-wash .s-vig{display:none}
+#sermon.no-drift .s-bg,#sermon.no-drift .s-type{animation:none}
+#sermon.no-drift .s-type{transform:translateY(-54%)}
+/* ▲▲▲ PORTABLE BLOCK END ▲▲▲ */
+</style>
+</head>
+<body>
+
+<div id="chrome">
+  <h1>Sermon Title Backdrop — 1920 × 1080</h1>
+  <button id="b-pastor">Pastor silhouette</button>
+  <button id="b-safe">Safe area</button>
+  <button id="b-wash" class="on">Dark wash</button>
+  <button id="b-drift" class="on">Slow drift</button>
+  <button id="b-mark" class="on">Church mark</button>
+  <button id="b-long">Long-title stress test</button>
+  <button id="b-squint">Squint test (blur)</button>
+</div>
+<div id="note">
+  Fonts are deliberately system-only — <code>zoneHtml.ts</code> embeds no webfonts and the Pi zone pages
+  can't reach Google Fonts, so hierarchy is carried by scale, tracking and case rather than by a typeface.
+  The serif title falls back Georgia → Liberation/DejaVu Serif → generic <code>serif</code>, all of which exist on Raspberry Pi OS.
+</div>
+
+<div id="scaler"><div id="canvas">
+
+  <!-- ▼▼▼ PORTABLE MARKUP — this is what the new 'sermon' branch injects ▼▼▼ -->
+  <div id="sermon">
+    <div class="s-bg"></div>            <!-- PREVIEW ONLY: prod uses #bgimg/#bgvid -->
+    <div class="s-wash"></div>
+    <div class="s-vig"></div>
+    <div class="s-type">
+      <span class="s-rule s-in"></span>
+      <span class="s-kicker s-in s-d1">Today&rsquo;s Message</span>
+      <div class="s-title s-in s-d2">He&rsquo;s Risen</div>
+      <div class="s-hair s-in s-d3"></div>
+      <div class="s-speaker s-in s-d3">Archie Sealy</div>
+      <div class="s-passage s-in s-d4">Psalm 90:4&ndash;12</div>
+    </div>
+    <div class="s-mark">Snow Hill Church</div>
+  </div>
+  <!-- ▲▲▲ PORTABLE MARKUP END ▲▲▲ -->
+
+  <div class="grid-safe" id="safe"></div>
+  <div id="pastor"><div class="head"></div><div class="body"></div></div>
+</div></div>
+
+<script>
+// ── Preview harness only ─────────────────────────────────────────────────────
+var canvas=document.getElementById('canvas'),scaler=document.getElementById('scaler');
+function rescale(){var s=Math.min(1,(window.innerWidth-48)/1920);scaler.style.transform='scale('+s+')';
+  scaler.style.height=(1080*s+20)+'px';}
+window.addEventListener('resize',rescale);rescale();
+
+var sermon=document.getElementById('sermon'),title=sermon.querySelector('.s-title');
+function toggle(btnId,fn){var b=document.getElementById(btnId);
+  b.addEventListener('click',function(){b.classList.toggle('on');fn(b.classList.contains('on'));});}
+toggle('b-pastor',function(on){document.getElementById('pastor').classList.toggle('show',on)});
+toggle('b-safe',function(on){document.getElementById('safe').classList.toggle('show',on)});
+document.getElementById('b-wash').addEventListener('click',function(){this.classList.toggle('on');sermon.classList.toggle('no-wash')});
+document.getElementById('b-drift').addEventListener('click',function(){this.classList.toggle('on');sermon.classList.toggle('no-drift')});
+document.getElementById('b-mark').addEventListener('click',function(){this.classList.toggle('on');sermon.classList.toggle('no-mark')});
+toggle('b-squint',function(on){canvas.style.filter=on?'blur(5px)':'none'});
+toggle('b-long',function(on){
+  title.textContent=on?'The Unshakeable Kingdom of Our Risen King':'He\u2019s Risen';fitTitle();});
+
+// Same binary-search shrink-to-fit already used by zoneHtml.ts (fitText).
+function fitTitle(){
+  var u=19.2,maxU=9,minU=4.2,availW=60*u,availH=19*u;
+  title.style.fontSize=(maxU*u)+'px';
+  if(title.scrollHeight<=availH+1&&title.scrollWidth<=availW+1)return;
+  var lo=minU,hi=maxU;
+  for(var i=0;i<16;i++){var mid=(lo+hi)/2;title.style.fontSize=(mid*u)+'px';
+    if(title.scrollHeight<=availH+1&&title.scrollWidth<=availW+1){lo=mid}else{hi=mid}}
+  title.style.fontSize=(lo*u)+'px';
+}
+fitTitle();
+</script>
+</body>
+</html>
