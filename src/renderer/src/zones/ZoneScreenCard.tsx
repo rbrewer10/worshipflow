@@ -5,6 +5,7 @@ import type { ZoneRole } from '../../../shared/zoneScenes'
 import { roleForMode } from '../../../shared/zoneScenes'
 import ServiceSlidePreview from '../ServiceSlidePreview'
 import { ROLE_DND_TYPE, ROLES, ROLE_LABEL } from './ZoneRolePalette'
+import { SLIDE_DND_TYPE } from './ZoneSlideFilmstrip'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -15,7 +16,7 @@ function toAssetUrl(p: string): string {
 // equivalent ('off', 'stage') renders read-only — the Advanced grid remains the
 // way to change those.
 export default function ZoneScreenCard({
-  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, slideText, onRoleChange
+  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, slideText, onRoleChange, onSlideDrop
 }: {
   zoneId: ZoneId
   mode: ZoneMode
@@ -28,6 +29,7 @@ export default function ZoneScreenCard({
   offTrackLabel?: string
   slideText?: string
   onRoleChange: (role: ZoneRole) => void
+  onSlideDrop?: (sourceIndex: number) => void
 }): JSX.Element {
   const [dragOver, setDragOver] = useState(false)
   const role = roleForMode(mode)
@@ -52,7 +54,9 @@ export default function ZoneScreenCard({
     setDragOver(false)
     if (!editable) return
     const dropped = e.dataTransfer.getData(ROLE_DND_TYPE)
-    if (dropped === 'content' || dropped === 'logo' || dropped === 'black') onRoleChange(dropped)
+    if (dropped === 'content' || dropped === 'logo' || dropped === 'black') { onRoleChange(dropped); return }
+    const slideIndex = e.dataTransfer.getData(SLIDE_DND_TYPE)
+    if (slideIndex !== '' && onSlideDrop) onSlideDrop(Number(slideIndex))
   }
 
   const body = (): JSX.Element => {
