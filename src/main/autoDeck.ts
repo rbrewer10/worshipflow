@@ -54,13 +54,21 @@ async function sermonDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSl
   const ranges = chunkVerses(result.verses, deps.budget)
   if (!ranges.length) return null
 
-  return ranges.map((range) => {
+  // Intro slide: the message title on BOTH back screens and no verses yet. The
+  // sermon starts by announcing itself, and jumping straight into verse 1 gave
+  // the room no moment to see what the message even is. Next begins the reading.
+  const introCard: ZoneSlot = { kind: 'sermon', text: title, reference: passage }
+  const intro = slide(introCard, introCard, LOGO, introCard)
+
+  const reading = ranges.map((range) => {
     const reference = subReference(result.reference ?? passage, range.from, range.to)
     const verse: ZoneSlot = { kind: 'scripture', reference }
     // Back Left keeps the designed card up and moves its reference along with
     // the reading; the stage monitor carries the same words the pastor reads.
     return slide({ kind: 'sermon', text: title, reference }, verse, LOGO, verse)
   })
+
+  return [intro, ...reading]
 }
 
 async function announcementDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSlide[] | null> {

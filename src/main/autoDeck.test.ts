@@ -25,15 +25,27 @@ const deps = (over: Partial<AutoDeckDeps> = {}): AutoDeckDeps => ({
 })
 
 describe('autoDeckFor — sermon', () => {
-  it('emits one slide per chunk, with sub-references', async () => {
+  it('opens with a title-only intro on BOTH back screens, no verses yet', async () => {
+    const deck = await autoDeckFor(
+      item({ type: 'sermon', payload: { title: 'The Gift', passage: 'John 3:16-18' } }),
+      deps()
+    )
+    const card = { kind: 'sermon', text: 'The Gift', reference: 'John 3:16-18' }
+    expect(deck![0].zones[1]).toEqual(card)
+    expect(deck![0].zones[2]).toEqual(card)
+    expect(deck![0].zones[4]).toEqual(card)
+  })
+
+  it('emits one slide per chunk after the intro, with sub-references', async () => {
     const deck = await autoDeckFor(
       item({ type: 'sermon', payload: { title: 'The Gift', passage: 'John 3:16-18' } }),
       deps()
     )
     expect(deck).not.toBeNull()
-    expect(deck!.length).toBe(2) // 8+8=16 fits 20; the third verse starts a new chunk
-    expect(deck![0].zones[2]).toEqual({ kind: 'scripture', reference: 'John 3:16-17' })
-    expect(deck![1].zones[2]).toEqual({ kind: 'scripture', reference: 'John 3:18' })
+    // 1 intro + 2 chunks: 8+8=16 fits 20; the third verse starts a new chunk.
+    expect(deck!.length).toBe(3)
+    expect(deck![1].zones[2]).toEqual({ kind: 'scripture', reference: 'John 3:16-17' })
+    expect(deck![2].zones[2]).toEqual({ kind: 'scripture', reference: 'John 3:18' })
   })
 
   it('holds the title on Back Left with the current reference', async () => {
@@ -41,8 +53,8 @@ describe('autoDeckFor — sermon', () => {
       item({ type: 'sermon', payload: { title: 'The Gift', passage: 'John 3:16-18' } }),
       deps()
     )
-    expect(deck![0].zones[1]).toEqual({ kind: 'sermon', text: 'The Gift', reference: 'John 3:16-17' })
-    expect(deck![1].zones[1]).toEqual({ kind: 'sermon', text: 'The Gift', reference: 'John 3:18' })
+    expect(deck![1].zones[1]).toEqual({ kind: 'sermon', text: 'The Gift', reference: 'John 3:16-17' })
+    expect(deck![2].zones[1]).toEqual({ kind: 'sermon', text: 'The Gift', reference: 'John 3:18' })
   })
 
   it('puts the words on the stage monitor and the logo on the Lyrics TVs', async () => {
@@ -50,8 +62,8 @@ describe('autoDeckFor — sermon', () => {
       item({ type: 'sermon', payload: { title: 'The Gift', passage: 'John 3:16-18' } }),
       deps()
     )
-    expect(deck![0].zones[4]).toEqual({ kind: 'scripture', reference: 'John 3:16-17' })
-    expect(deck![0].zones[3]).toEqual({ kind: 'logo' })
+    expect(deck![1].zones[4]).toEqual({ kind: 'scripture', reference: 'John 3:16-17' })
+    expect(deck![1].zones[3]).toEqual({ kind: 'logo' })
   })
 
   it('returns null when the sermon has no passage', async () => {
@@ -68,7 +80,7 @@ describe('autoDeckFor — sermon', () => {
       item({ type: 'sermon', title: 'Fallback', payload: { passage: 'John 3:16-18' } }),
       deps()
     )
-    expect(deck![0].zones[1].text).toBe('Fallback')
+    expect(deck![1].zones[1].text).toBe('Fallback')
   })
 })
 

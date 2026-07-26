@@ -795,11 +795,16 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
 // resolved ZoneSlot (already walked back through any 'same' chain by the
 // caller) becomes the ZoneState for one zone. Synchronous and cache-only — no
 // lookups happen here, see loadDeckOnto.
-// Deck content starts bigger than the normal 6vw. The back-screen template
-// shrink-to-fits aggressively, so a verse there came out noticeably smaller than
-// the same words on the stage monitor — unreadable from the back of the room.
-// Starting high and letting fitText come down is what closes that gap.
+// Deck content on the ROOM-FACING screens starts bigger than the normal 6vw:
+// their template shrink-to-fits aggressively, so a verse came out much smaller
+// there than the same words on the stage monitor. Zone 4 is excluded on purpose
+// — the stage monitor's own sizing was already right, and raising it there made
+// it worse, not better.
 const DECK_TEXT_FONT_SCALE = 9
+
+function deckFontScale(zoneId: ZoneId, live: LiveState): number {
+  return zoneId === 4 ? live.fontScale : DECK_TEXT_FONT_SCALE
+}
 
 function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, live: LiveState): ZoneState {
   const base = emptyZoneState(live)
@@ -810,7 +815,7 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
   } else if (slot.kind === 'text') {
     base.mode = 'text'
     base.line = slot.text ?? ''
-    base.fontScale = DECK_TEXT_FONT_SCALE
+    base.fontScale = deckFontScale(zoneId, live)
     applyZoneBackground(base, live.background, live)
   } else if (slot.kind === 'sermon') {
     // The designed title card. Speaker is deliberately null — during a reading
@@ -831,7 +836,7 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
       base.mode = 'text'
       base.line = verse
       base.title = slot.reference ?? ''
-      base.fontScale = DECK_TEXT_FONT_SCALE
+      base.fontScale = deckFontScale(zoneId, live)
       applyZoneBackground(base, live.background, live)
     } else base.mode = 'black'   // lookup failed — better blank than a stale verse
   } else if (slot.kind === 'image') {
