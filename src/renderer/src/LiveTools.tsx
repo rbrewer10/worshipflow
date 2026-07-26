@@ -14,7 +14,7 @@ import { notifyLocal } from './NotifyToasts'
 // scripture, font, auto-advance, OBS, and a collapsible "More" with the
 // rarely-used controls. (Second track gets the leaner SecondTrackTools.)
 function LiveTools({ track }: { track: TrackId }): JSX.Element {
-  const { activeService, reloadActiveService } = useService()
+  const { activeService } = useService()
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [live, setLive] = useState<LiveState | null>(null)
   const [scriptureRef, setScriptureRef] = useState('')
@@ -202,7 +202,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
 
       {/* Zone display system */}
       <section className="rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
-        <ZonePanel liveItem={liveItem} reloadActiveService={reloadActiveService} />
+        <ZonePanel />
       </section>
     </aside>
   )

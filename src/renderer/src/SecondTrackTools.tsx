@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
 import { MonitorOff, Image as ImageIcon, Play } from 'lucide-react'
 import type { LiveState } from '../../shared/types'
-import { useService } from './ServiceContext'
 import { ScripturePanel } from './ScripturePanel'
-import ZonePanel from './ZonePanel'
 
 // The Second track's control rail — deliberately smaller than Main's LiveTools.
 // No OBS/CCLI/hymn-timer/stage-message/tablet-remote: those stay Main-only
 // (see docs/superpowers/specs/2026-07-24-dual-live-track-design.md, Non-goals).
 function SecondTrackTools(): JSX.Element {
-  const { activeService, reloadActiveService } = useService()
   const [live, setLive] = useState<LiveState | null>(null)
   const [scriptureRef, setScriptureRef] = useState('')
   const [bibleTranslation, setBibleTranslation] = useState<'kjv' | 'web' | 'bbe'>('kjv')
@@ -19,8 +16,6 @@ function SecondTrackTools(): JSX.Element {
     window.wf.getState('second').then(setLive)
     return off
   }, [])
-
-  const liveItem = activeService?.items.find((it) => it.id === live?.liveServiceItemId && it.track === 'second') ?? null
 
   const quickScripture = async (): Promise<void> => {
     const ref = scriptureRef.trim()
@@ -56,12 +51,9 @@ function SecondTrackTools(): JSX.Element {
         onGoLive={quickScripture}
         onTranslationChange={(t) => { setBibleTranslation(t); window.wf.featuresSetBibleTranslation(t) }}
       />
-
-      <div className="border-t border-slate-200" />
-
-      <section className="rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
-        <ZonePanel liveItem={liveItem} reloadActiveService={reloadActiveService} />
-      </section>
+      {/* No zone panel here on purpose: the screens are one shared resource, so
+          one panel (Main's LiveTools) owns them. Two mounts meant two copies of
+          the same controls that had to poll each other to stay in step. */}
     </aside>
   )
 }

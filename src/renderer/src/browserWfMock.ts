@@ -29,6 +29,9 @@ import type {
 import { starterConfig } from '../../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
 import type { ZoneSlide } from '../../shared/zoneSlides'
+import type { ZonePin, ZonePins } from '../../shared/zonePins'
+
+const mockPins: ZonePins = {}
 
 const demoLines = [
   'Amazing grace, how sweet the sound',
@@ -415,11 +418,17 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     zoneSetRouting: noop,
     zoneGetSlides: async (): Promise<ZoneSlide[] | null> => null,
     zoneSetSlides: noop,
-    zoneSetOverride: noop,
-    zoneClearOverrides: noop,
-    zoneSetPin: noop,
-    zoneClearPins: noop,
-    zoneGetPins: async (): Promise<import('../../shared/zonePins').ZonePins> => ({}),
+    // Pins live in the main process for real; in the browser mock they live in
+    // this object, so the Live tab's cards actually latch when clicked instead
+    // of silently snapping back on the next zoneGetPins().
+    zoneSetPin: async (zoneId: ZoneId, pin: ZonePin | null): Promise<void> => {
+      if (pin == null) delete mockPins[zoneId]
+      else mockPins[zoneId] = pin
+    },
+    zoneClearPins: async (): Promise<void> => {
+      for (const key of Object.keys(mockPins)) delete mockPins[Number(key) as ZoneId]
+    },
+    zoneGetPins: async (): Promise<ZonePins> => ({ ...mockPins }),
     zoneGetStates: async (): Promise<Record<ZoneId, ZoneState>> => ({
       1: clone(emptyZone),
       2: clone(emptyZone),

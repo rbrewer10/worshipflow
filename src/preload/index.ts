@@ -290,17 +290,6 @@ const wf = {
     ipcRenderer.invoke('wf:zone:clearPins'),
   zoneGetPins: (): Promise<ZonePins> =>
     ipcRenderer.invoke('wf:zone:getPins'),
-  // DEPRECATED shims for the pre-pin ZonePanel, which PN-4 replaces wholesale.
-  // Only 'logo' | 'black' | 'lyrics' are pinnable, so any other mode clears the
-  // pin instead of throwing at the old caller. Delete both with ZonePanel.
-  zoneSetOverride: (zoneId: ZoneId, mode: ZoneState['mode'] | null): Promise<void> =>
-    ipcRenderer.invoke(
-      'wf:zone:setPin',
-      zoneId,
-      mode === 'logo' || mode === 'black' || mode === 'lyrics' ? { kind: 'mode', mode } : null
-    ),
-  zoneClearOverrides: (): Promise<void> =>
-    ipcRenderer.invoke('wf:zone:clearPins'),
   zoneGetStates: (): Promise<Record<ZoneId, ZoneState>> =>
     ipcRenderer.invoke('wf:zone:getStates'),
   zoneGetIp: (): Promise<string> =>
