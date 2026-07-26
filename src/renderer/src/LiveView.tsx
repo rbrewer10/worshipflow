@@ -10,9 +10,16 @@ import { useService } from './ServiceContext'
 // is mounted app-wide in AppShell too, not here — see LiveDrawer.tsx.)
 // Keyboard shortcuts (B/L/N/P/S) are handled globally in AppShell and always
 // target the Main track.
+// Second track is hidden on the Live tab for now — Ryan isn't using it, and the
+// extra column ate room from the Main grid he actually drives during a service.
+// The feature is untouched: second-track items still exist, still go live, and
+// still render. Flip this to re-enable the column.
+const SHOW_SECOND_TRACK = false
+
 function LiveView(): JSX.Element {
   const { activeService } = useService()
-  const hasSecond = activeService?.items.some((it) => it.track === 'second') ?? false
+  const hasSecond =
+    SHOW_SECOND_TRACK && (activeService?.items.some((it) => it.track === 'second') ?? false)
 
   return (
     <div className="flex h-full min-h-0">
