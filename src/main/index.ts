@@ -1149,9 +1149,33 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
       }
     }
   }
+  if (tracks[track].loadGeneration !== generation) return true
+
+  // Re-summarise each slide now that the verse text exists.
+  //
+  // slideSummary prefers zone 3, which these decks hold on the logo, so it fell
+  // through to zone 1 — the title card — and EVERY slide summarised as the
+  // sermon title. That is what the tablet remote and the slide grid display, so
+  // the preacher's tablet read "He's Risen" on every slide instead of the words
+  // he is about to read. Prefer the screens that carry content, and use the
+  // resolved verse rather than the bare reference.
+  const CONTENT_ZONES: ZoneId[] = [2, 4, 3, 1]
+  tracks[track].song = {
+    ...tracks[track].song,
+    lines: slides.map((slide, i) => {
+      for (const zoneId of CONTENT_ZONES) {
+        const verse = tracks[track].deckScripture.get(`${i}:${zoneId}`)
+        if (verse) return verse
+        const slot = resolveSlot(slides, i, zoneId)
+        if (slot.kind === 'text' && slot.text) return slot.text
+      }
+      return slideSummary(slide, source)
+    }),
+  }
+
   // Verse text arrived after the initial deck broadcast above — push it out,
   // or scripture slots stay black until the next unrelated state change.
-  if (tracks[track].loadGeneration === generation) broadcast()
+  broadcast()
   return true
 }
 
@@ -1490,10 +1514,11 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
 // constant someone guessed at a desk.
 function zoneChunkBudget(): number {
   const raw = parseInt(getSetting('zone_chunk_budget') ?? '', 10)
-  // 150 ≈ one verse. The first try at 300 fit John 3:16-17 onto a single slide,
-  // which shrank the type until the back of the room couldn't read it and
-  // overflowed the stage monitor. Fewer characters per slide means bigger words.
-  return Number.isFinite(raw) && raw > 0 ? raw : 150
+  // Fewer characters per slide is the ONLY thing that makes the words bigger:
+  // the verse is shrink-to-fit, so however large it starts, a long chunk still
+  // ends up small. 300 was unreadable, 150 was still shrinking well below the
+  // reference label above it. 90 is roughly one sentence of a verse.
+  return Number.isFinite(raw) && raw > 0 ? raw : 90
 }
 
 // --- Tablet HTTP + WebSocket server ---

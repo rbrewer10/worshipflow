@@ -540,7 +540,10 @@ const FLEX_SCRIPT = `
       var fs=Math.max(3,Math.min(state.fontScale||6,18));
       var lineChanged=state.line!==prevLine;prevLine=state.line;
       content.innerHTML='<div class="'+(lineChanged?'fade-up':'')+'" style="font-size:'+fs+'vw;font-weight:800;line-height:1.25;color:'+textColor+';white-space:pre-line;'+shadow+'">'+esc(state.line)+'</div>'
-        +(state.title?'<div style="margin-top:2vw;font-size:'+(fs*0.3)+'vw;color:'+textColor+';opacity:0.5;font-weight:600;letter-spacing:0.15em;text-transform:uppercase">'+esc(state.title)+'</div>':'');
+        // Capped: the reference is a FIXED size while the verse below is
+        // shrink-to-fit, so on a long chunk the label ended up bigger than the
+        // words it labels. It should never compete with the verse.
+        +(state.title?'<div style="margin-top:2vw;font-size:'+Math.min(fs*0.3,3)+'vw;color:'+textColor+';opacity:0.5;font-weight:600;letter-spacing:0.15em;text-transform:uppercase">'+esc(state.title)+'</div>':'');
       // Reserve the actual title block height (title + its 2vw top margin) so a long
       // titled slide shrinks to fit both, not just the line.
       var titleH=content.children.length>1?content.children[1].getBoundingClientRect().height+window.innerWidth*0.02:0;
