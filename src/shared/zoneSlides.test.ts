@@ -79,3 +79,51 @@ describe('parseZoneSlides / validateZoneSlides', () => {
     expect(parseZoneSlides(JSON.stringify(deck))).toEqual(deck)
   })
 })
+
+describe('sermon slot kind', () => {
+  const sermonDeck: ZoneSlide[] = [
+    { zones: {
+        1: { kind: 'sermon', text: 'The Prodigal Son', reference: 'Luke 15:11-13' },
+        2: { kind: 'scripture', reference: 'Luke 15:11-13' },
+        3: { kind: 'logo' },
+        4: { kind: 'scripture', reference: 'Luke 15:11-13' },
+    } },
+    { zones: {
+        1: { kind: 'sermon', text: 'The Prodigal Son', reference: 'Luke 15:14-16' },
+        2: { kind: 'scripture', reference: 'Luke 15:14-16' },
+        3: { kind: 'same' },
+        4: { kind: 'scripture', reference: 'Luke 15:14-16' },
+    } },
+  ]
+
+  it('validates a deck containing sermon slots', () => {
+    expect(validateZoneSlides(sermonDeck)).toBe(true)
+  })
+
+  it('resolves a sermon slot as itself', () => {
+    expect(resolveSlot(sermonDeck, 1, 1)).toEqual({
+      kind: 'sermon', text: 'The Prodigal Son', reference: 'Luke 15:14-16'
+    })
+  })
+
+  it('holds a sermon slot through a same chain', () => {
+    const held: ZoneSlide[] = [
+      { zones: { 1: { kind: 'sermon', text: 'T', reference: 'R' }, 2: { kind: 'black' }, 3: { kind: 'black' }, 4: { kind: 'black' } } },
+      { zones: { 1: { kind: 'same' }, 2: { kind: 'black' }, 3: { kind: 'black' }, 4: { kind: 'black' } } },
+    ]
+    expect(resolveSlot(held, 1, 1)).toEqual({ kind: 'sermon', text: 'T', reference: 'R' })
+  })
+
+  it('summarises a sermon slot by its title', () => {
+    const slide: ZoneSlide = { zones: {
+      1: { kind: 'sermon', text: 'The Prodigal Son', reference: 'Luke 15' },
+      2: { kind: 'black' }, 3: { kind: 'black' }, 4: { kind: 'black' },
+    } }
+    expect(slideSummary(slide)).toBe('The Prodigal Son')
+  })
+
+  it('still rejects an unknown kind', () => {
+    const bad = [{ zones: { 1: { kind: 'nope' }, 2: { kind: 'black' }, 3: { kind: 'black' }, 4: { kind: 'black' } } }]
+    expect(validateZoneSlides(bad)).toBe(false)
+  })
+})

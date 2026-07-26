@@ -4,13 +4,13 @@
 
 import type { ZoneId } from './types'
 
-export type ZoneSlotKind = 'slide' | 'text' | 'scripture' | 'logo' | 'black' | 'image' | 'same'
+export type ZoneSlotKind = 'slide' | 'text' | 'scripture' | 'logo' | 'black' | 'image' | 'same' | 'sermon'
 
 export interface ZoneSlot {
   kind: ZoneSlotKind
   index?: number      // kind 'slide' — into the item's own resolved source slides
-  text?: string       // kind 'text'
-  reference?: string  // kind 'scripture'
+  text?: string       // kind 'text', and the title for kind 'sermon'
+  reference?: string  // kind 'scripture', and the passage for kind 'sermon'
   path?: string       // kind 'image'
 }
 
@@ -19,7 +19,7 @@ export interface ZoneSlide {
 }
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
-const KINDS: ZoneSlotKind[] = ['slide', 'text', 'scripture', 'logo', 'black', 'image', 'same']
+const KINDS: ZoneSlotKind[] = ['slide', 'text', 'scripture', 'logo', 'black', 'image', 'same', 'sermon']
 
 const BLACK: ZoneSlot = { kind: 'black' }
 
@@ -43,6 +43,7 @@ function slotText(slot: ZoneSlot | undefined, source: string[] = []): string {
   if (!slot) return ''
   if (slot.kind === 'slide') return source[slot.index ?? -1] ?? ''
   if (slot.kind === 'text') return slot.text ?? ''
+  if (slot.kind === 'sermon') return slot.text ?? ''
   if (slot.kind === 'scripture') return slot.reference ?? ''
   return ''
 }
