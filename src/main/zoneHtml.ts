@@ -524,12 +524,20 @@ const FLEX_SCRIPT = `
     }
     if(m==='lyrics'||m==='text'){
       applyBg(state.background,true);
+      // Grade the photo the same way the sermon card does, so Back Right and
+      // Back Left read as one pair instead of one dim and one bright. It also
+      // fixes the harder problem: white verse text over a bright sky is what a
+      // back row can't read.
+      var tf=state.background?'saturate(.68) brightness(.62) contrast(1.06)':'';
+      bgimg.style.filter=tf;bgvid.style.filter=tf;
       if(state.blurBehindText){content.style.backdropFilter='blur(10px)';content.style.webkitBackdropFilter='blur(10px)';content.style.background='rgba(20,20,30,.3)';content.style.width='100%';content.style.maxWidth='100%';content.style.padding='24px 48px';}
       var tc=state.themeColors;
       if(!state.background) root.style.background=(tc&&tc.primary)||'#0a1628';
       var textColor=state.background?'#fff':(tc&&tc.text)||'#fff';
       var shadow=state.background?'text-shadow:0 2px 24px rgba(0,0,0,0.8);':'';
-      var fs=Math.max(3,Math.min(state.fontScale||6,12));
+      // Cap raised from 12 to 18 so deck verses can fill the screen. Safe for
+      // everything else: ordinary slides ask for 6 and min() keeps them there.
+      var fs=Math.max(3,Math.min(state.fontScale||6,18));
       var lineChanged=state.line!==prevLine;prevLine=state.line;
       content.innerHTML='<div class="'+(lineChanged?'fade-up':'')+'" style="font-size:'+fs+'vw;font-weight:800;line-height:1.25;color:'+textColor+';white-space:pre-line;'+shadow+'">'+esc(state.line)+'</div>'
         +(state.title?'<div style="margin-top:2vw;font-size:'+(fs*0.3)+'vw;color:'+textColor+';opacity:0.5;font-weight:600;letter-spacing:0.15em;text-transform:uppercase">'+esc(state.title)+'</div>':'');

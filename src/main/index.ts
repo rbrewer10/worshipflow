@@ -800,10 +800,14 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
 // there than the same words on the stage monitor. Zone 4 is excluded on purpose
 // — the stage monitor's own sizing was already right, and raising it there made
 // it worse, not better.
-const DECK_TEXT_FONT_SCALE = 9
+const DECK_TEXT_FONT_SCALE = 14
 
-function deckFontScale(zoneId: ZoneId, live: LiveState): number {
-  return zoneId === 4 ? live.fontScale : DECK_TEXT_FONT_SCALE
+// The stage monitor is a lectern screen a few feet away, not a room-facing one,
+// so it wants LESS than the audience screens — 5 rather than the 6 it inherited.
+const DECK_STAGE_FONT_SCALE = 5
+
+function deckFontScale(zoneId: ZoneId, _live: LiveState): number {
+  return zoneId === 4 ? DECK_STAGE_FONT_SCALE : DECK_TEXT_FONT_SCALE
 }
 
 function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, live: LiveState): ZoneState {
