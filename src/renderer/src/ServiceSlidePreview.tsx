@@ -23,6 +23,13 @@ export interface ServiceSlidePreviewProps {
   // verses come from a Bible lookup that can't run during render, so without
   // this the scripture case can only show a placeholder).
   overrideLine?: string
+  // Set by the zone deck composer: what THIS SCREEN is showing on THIS SLIDE,
+  // which can differ from the item's own type/title/passage — e.g. a sermon
+  // item's Back Right screen holds a 'scripture' slot, not a 'sermon' one.
+  // Without this, renderContent() switched on item.type alone, so every deck
+  // slide for a sermon item previewed as the item's own title card regardless
+  // of what that particular slot actually held.
+  deckSlot?: { kind: 'text' | 'scripture' | 'sermon'; text?: string; reference?: string }
 }
 
 export default function ServiceSlidePreview({
@@ -31,7 +38,8 @@ export default function ServiceSlidePreview({
   serviceColors,
   songFull,
   className,
-  overrideLine
+  overrideLine,
+  deckSlot
 }: ServiceSlidePreviewProps): JSX.Element {
   const payload = (item.payload ?? {}) as Record<string, unknown>
 
@@ -75,6 +83,50 @@ export default function ServiceSlidePreview({
   }
 
   const renderContent = (): JSX.Element => {
+    // Deck mode: render what THIS SLOT holds, not the item's own type. Checked
+    // first because item.type stays 'sermon' (etc.) for every slide in the
+    // deck regardless of which slot is being previewed.
+    if (deckSlot) {
+      if (deckSlot.kind === 'sermon') {
+        return (
+          <div className="flex flex-col items-center gap-2 px-6 text-center">
+            <div className="text-2xl font-bold leading-tight" style={baseTextStyle}>
+              {deckSlot.text || 'Sermon'}
+            </div>
+            {deckSlot.reference && (
+              <div className="text-xs" style={{ ...baseTextStyle, opacity: 0.7 }}>
+                {deckSlot.reference}
+              </div>
+            )}
+          </div>
+        )
+      }
+      if (deckSlot.kind === 'scripture') {
+        return (
+          <div className="flex flex-col items-center gap-2 px-6 text-center">
+            <div
+              className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+              style={{ ...baseTextStyle, opacity: 0.8 }}
+            >
+              {deckSlot.reference || 'Reference'}
+            </div>
+            <div className="text-xs" style={{ ...baseTextStyle, opacity: 0.6 }}>
+              Verse text appears on the projector when live
+            </div>
+          </div>
+        )
+      }
+      // kind 'text'
+      return deckSlot.text ? (
+        <div className="whitespace-pre-line px-6 text-center text-xl font-bold leading-tight" style={baseTextStyle}>
+          {deckSlot.text}
+        </div>
+      ) : (
+        <div className="text-sm" style={{ ...baseTextStyle, opacity: 0.4 }}>
+          Empty
+        </div>
+      )
+    }
     switch (item.type) {
       case 'scripture': {
         const reference = (payload.reference as string | undefined) || 'Reference'

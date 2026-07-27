@@ -20,6 +20,21 @@ function slotPreviewText(slot: ZoneSlot, source: string[]): string {
   return ''
 }
 
+// What ServiceSlidePreview actually draws for this slot, independent of the
+// item's own type — see ServiceSlidePreview's deckSlot prop for why that
+// distinction matters. 'slide' folds into 'text': it's a plain resolved line
+// from the item's own source slides, same as an authored text slot.
+function slotToDeckSlot(
+  slot: ZoneSlot,
+  source: string[]
+): { kind: 'text' | 'scripture' | 'sermon'; text?: string; reference?: string } | undefined {
+  if (slot.kind === 'text') return { kind: 'text', text: slot.text }
+  if (slot.kind === 'scripture') return { kind: 'scripture', reference: slot.reference }
+  if (slot.kind === 'sermon') return { kind: 'sermon', text: slot.text, reference: slot.reference }
+  if (slot.kind === 'slide') return { kind: 'text', text: source[slot.index ?? -1] ?? '' }
+  return undefined
+}
+
 // A deck slot's kind is what actually governs the screen once a deck exists —
 // exactly how the live engine's computeZoneStates treats the deck as winning
 // over the item's stored zone_routing (see zoneStateFromSlot in main/index.ts).
@@ -101,6 +116,7 @@ export default function ZoneDeckComposer({
                 offTrack={offTrack}
                 offTrackLabel={trackAssignment[zoneId] === 'main' ? 'Follows Main' : 'Follows Second'}
                 slideText={slotPreviewText(resolved, slides)}
+                deckSlot={slotToDeckSlot(resolved, slides)}
                 onSlideDrop={(sourceIndex) => setSlot(zoneId, { kind: 'slide', index: sourceIndex })}
               />
               <ZoneSlotEditor slot={rawSlot} zoneId={zoneId} onChange={(next) => setSlot(zoneId, next)} />

@@ -16,7 +16,7 @@ function toAssetUrl(p: string): string {
 // equivalent ('off', 'stage') renders read-only — the Advanced grid remains the
 // way to change those.
 export default function ZoneScreenCard({
-  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, slideText, onRoleChange, onSlideDrop
+  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, slideText, deckSlot, onRoleChange, onSlideDrop
 }: {
   zoneId: ZoneId
   mode: ZoneMode
@@ -28,6 +28,9 @@ export default function ZoneScreenCard({
   offTrack?: boolean
   offTrackLabel?: string
   slideText?: string
+  // See ServiceSlidePreview: what THIS SCREEN holds on THIS deck slide, which
+  // can differ from the item's own type.
+  deckSlot?: { kind: 'text' | 'scripture' | 'sermon'; text?: string; reference?: string }
   // Optional: in deck mode the resolved slot decides what the screen shows, so
   // the item's role routing is inert. Omitting this handler (rather than
   // wiring it to a no-op) keeps a stray click from silently rewriting that
@@ -71,7 +74,7 @@ export default function ZoneScreenCard({
 
   const body = (): JSX.Element => {
     if (role === 'content') {
-      return <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} overrideLine={slideText} />
+      return <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} overrideLine={slideText} deckSlot={deckSlot} />
     }
     // Same 16:9 box shape ServiceSlidePreview uses, so all four cards line up.
     return (
