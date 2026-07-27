@@ -565,7 +565,19 @@ const FLEX_SCRIPT = `
       // where it started — that's why the size slider looked like it did
       // nothing on long verses. Skipping the search is what makes it real.
       if(!state.fixedFontScale){
-        fitText(content.firstChild,fs,2,window.innerWidth*0.82,window.innerHeight*0.90-titleH);
+        // availW used to be a guessed fraction of the viewport (0.82, later
+        // tried 0.90) — but #content's real width isn't a fixed fraction: it's
+        // max-width:90vw normally, OR max-width:100% whenever blurBehindText
+        // is on (inline override a few lines up). A hardcoded number could
+        // never match both, so the width half of fitText's check
+        // (el.scrollWidth<=availW) was narrower than the REAL box, which could
+        // never pass for multi-line text — the search bottomed out at the
+        // floor (minVw=2) regardless of fs, which is why raising fontScale
+        // never visibly changed anything. Measuring the box directly is
+        // correct in both cases and needs no more guessing.
+        var contentCs=getComputedStyle(content);
+        var contentAvailW=content.clientWidth-parseFloat(contentCs.paddingLeft)-parseFloat(contentCs.paddingRight);
+        fitText(content.firstChild,fs,2,contentAvailW,window.innerHeight*0.90-titleH);
       }
       return;
     }
