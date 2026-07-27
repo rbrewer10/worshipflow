@@ -540,7 +540,13 @@ const FLEX_SCRIPT = `
       // Safe for everything else: ordinary slides ask for 6 and min() holds them.
       var fs=Math.max(3,Math.min(state.fontScale||6,20));
       var lineChanged=state.line!==prevLine;prevLine=state.line;
-      content.innerHTML='<div class="'+(lineChanged?'fade-up':'')+'" style="font-size:'+fs+'vw;font-weight:800;line-height:1.25;color:'+textColor+';white-space:pre-line;'+shadow+'">'+esc(state.line)+'</div>'
+      // overflow-wrap/word-break: without this, a single long word at a large
+      // fixed size (e.g. "condemnation") is wider than the screen and the
+      // browser lets it run off the edge rather than break it — invisible,
+      // clipped text, which is what turned "one notch bigger" into unreadable.
+      // Wrapping mid-word looks awkward at the extreme end but stays on screen,
+      // which is the whole point of a manual size the operator can trust.
+      content.innerHTML='<div class="'+(lineChanged?'fade-up':'')+'" style="font-size:'+fs+'vw;font-weight:800;line-height:1.25;color:'+textColor+';white-space:pre-line;overflow-wrap:break-word;word-break:break-word;'+shadow+'">'+esc(state.line)+'</div>'
         // Capped: the reference is a FIXED size while the verse below is
         // shrink-to-fit, so on a long chunk the label ended up bigger than the
         // words it labels. It should never compete with the verse.
