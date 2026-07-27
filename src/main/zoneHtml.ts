@@ -99,10 +99,10 @@ const SERMON_CSS = `
   color:var(--wf-ink);text-shadow:0 calc(var(--u) * .1) calc(var(--u) * 1.3) rgba(0,0,0,.6)}
 #sermon .s-rule{display:block;width:calc(var(--u) * 3.5);height:calc(var(--u) * .2);
   background:var(--wf-accent);border-radius:calc(var(--u) * .1)}
-#sermon .s-kicker{display:block;margin-top:calc(var(--u) * 1.15);
-  font-size:calc(var(--u) * 1.32);font-weight:700;text-transform:uppercase;
-  letter-spacing:.42em;color:rgba(255,255,255,.66)}
-#sermon .s-title{margin-top:calc(var(--u) * 2.1);
+#sermon .s-kicker{display:block;margin-top:calc(var(--u) * 1.3);
+  font-size:calc(var(--u) * 1.8);font-weight:700;text-transform:uppercase;
+  letter-spacing:.36em;color:rgba(255,255,255,.7)}
+#sermon .s-title{margin-top:calc(var(--u) * 2.4);
   font-family:Georgia,'Times New Roman','Liberation Serif','DejaVu Serif','Nimbus Roman',serif;
   font-size:calc(var(--u) * 9);
   font-weight:700;line-height:1.03;letter-spacing:-.006em;color:var(--wf-ink)}
@@ -110,9 +110,14 @@ const SERMON_CSS = `
   background:linear-gradient(90deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 100%)}
 #sermon .s-speaker{margin-top:calc(var(--u) * 2.3);
   font-size:calc(var(--u) * 2.5);font-weight:600;letter-spacing:.005em;color:rgba(255,255,255,.93)}
-#sermon .s-passage{margin-top:calc(var(--u) * .85);
-  font-size:calc(var(--u) * 1.5);font-weight:600;text-transform:uppercase;
-  letter-spacing:.26em;color:rgba(255,255,255,.56)}
+/* s-passage's margin-top was 0.85u — fine when it follows a speaker line, but
+   s-hair renders unconditionally even with no speaker, so on a passage-only
+   card (no speaker set — the common case) it sat almost flush against the
+   hairline. Raised so the reference always gets real breathing room below
+   the divider, speaker present or not. */
+#sermon .s-passage{margin-top:calc(var(--u) * 1.6);
+  font-size:calc(var(--u) * 2);font-weight:600;text-transform:uppercase;
+  letter-spacing:.22em;color:rgba(255,255,255,.6)}
 #sermon .s-mark{position:absolute;right:calc(var(--u) * 6.25);bottom:calc(var(--u) * 6.25);
   font-size:calc(var(--u) * 1.12);font-weight:700;text-transform:uppercase;letter-spacing:.3em;
   color:rgba(255,255,255,.3)}
