@@ -185,6 +185,7 @@ const emptyZone: ZoneState = {
   background: null,
   themeColors: null,
   fontScale: 6,
+  fixedFontScale: false,
   secondsLeft: 0,
   stageMessage: null,
   imagePath: null,

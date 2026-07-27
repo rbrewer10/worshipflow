@@ -210,6 +210,14 @@ export interface ZoneState {
   background: string | null
   themeColors: { primary: string; secondary: string; text: string } | null
   fontScale: number
+  // True when fontScale is an operator-set override on the deck slot itself,
+  // rather than the automatic default. The zone page's shrink-to-fit is a
+  // binary search DOWN from fontScale to whatever fits the box — raising
+  // fontScale on text that already needs shrinking converges to the same
+  // final size regardless, so it silently did nothing. This tells the zone
+  // page to skip that search and render at exactly the chosen size instead,
+  // which is the only way "set a size" actually behaves like a manual control.
+  fixedFontScale: boolean
   // countdown
   secondsLeft: number
   // stage extras

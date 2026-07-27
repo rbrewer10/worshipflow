@@ -535,9 +535,10 @@ const FLEX_SCRIPT = `
       if(!state.background) root.style.background=(tc&&tc.primary)||'#0a1628';
       var textColor=state.background?'#fff':(tc&&tc.text)||'#fff';
       var shadow=state.background?'text-shadow:0 2px 24px rgba(0,0,0,0.8);':'';
-      // Cap raised from 12 to 18 so deck verses can fill the screen. Safe for
-      // everything else: ordinary slides ask for 6 and min() keeps them there.
-      var fs=Math.max(3,Math.min(state.fontScale||6,18));
+      // Cap matches the manual size slider's own max (20), so a fixedFontScale
+      // value is never silently clamped to something other than what was set.
+      // Safe for everything else: ordinary slides ask for 6 and min() holds them.
+      var fs=Math.max(3,Math.min(state.fontScale||6,20));
       var lineChanged=state.line!==prevLine;prevLine=state.line;
       content.innerHTML='<div class="'+(lineChanged?'fade-up':'')+'" style="font-size:'+fs+'vw;font-weight:800;line-height:1.25;color:'+textColor+';white-space:pre-line;'+shadow+'">'+esc(state.line)+'</div>'
         // Capped: the reference is a FIXED size while the verse below is
@@ -552,7 +553,14 @@ const FLEX_SCRIPT = `
       // text — the check becomes circular, always passes, and the verse renders
       // enormous and overflows off-screen. The stage's #current is flex:1, a
       // fixed box, which is why the same approach is safe there and not here.
-      fitText(content.firstChild,fs,2,window.innerWidth*0.82,window.innerHeight*0.90-titleH);
+      // fixedFontScale means the operator set this size on purpose. fitText's
+      // binary search only ever shrinks, so raising fontScale on text that
+      // already needs shrinking converges to the SAME final size regardless of
+      // where it started — that's why the size slider looked like it did
+      // nothing on long verses. Skipping the search is what makes it real.
+      if(!state.fixedFontScale){
+        fitText(content.firstChild,fs,2,window.innerWidth*0.82,window.innerHeight*0.90-titleH);
+      }
       return;
     }
     if(m==='countdown'){

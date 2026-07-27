@@ -95,6 +95,7 @@ export default function ZoneSlotEditor({ slot, zoneId, onChange }: {
             step={1}
             value={slot.fontScale ?? defaultScale}
             onChange={(e) => onChange({ ...slot, fontScale: Number(e.target.value) })}
+            title="Sets the exact size, bypassing auto-fit — long text can run off the screen if set too high"
             className="h-1 flex-1 accent-blue-600"
           />
           <span className="w-5 shrink-0 text-right text-[10px] tabular-nums text-slate-500">

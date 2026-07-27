@@ -591,6 +591,7 @@ function emptyZoneState(live: LiveState): ZoneState {
     background: null,
     themeColors: null,
     fontScale: live.fontScale,
+    fixedFontScale: false,
     secondsLeft: 0,
     stageMessage: live.stageMessage,
     imagePath: null,
@@ -823,6 +824,7 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
     // An operator-set size on the slot always wins over the automatic one —
     // this is the manual escape hatch from auto-fit guessing wrong.
     base.fontScale = slot.fontScale ?? deckFontScale(zoneId, live)
+    base.fixedFontScale = slot.fontScale != null
     applyZoneBackground(base, live.background, live)
   } else if (slot.kind === 'sermon') {
     // The designed title card. Speaker is deliberately null — during a reading
@@ -844,6 +846,7 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
       base.line = verse
       base.title = slot.reference ?? ''
       base.fontScale = slot.fontScale ?? deckFontScale(zoneId, live)
+      base.fixedFontScale = slot.fontScale != null
       applyZoneBackground(base, live.background, live)
     } else base.mode = 'black'   // lookup failed — better blank than a stale verse
   } else if (slot.kind === 'image') {
