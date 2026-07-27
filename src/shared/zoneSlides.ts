@@ -12,6 +12,9 @@ export interface ZoneSlot {
   text?: string       // kind 'text', and the title for kind 'sermon'
   reference?: string  // kind 'scripture', and the passage for kind 'sermon'
   path?: string       // kind 'image'
+  // kind 'text' / 'scripture' only. Overrides the automatic size when set — the
+  // manual escape hatch from auto-fit guessing wrong on a particular slide.
+  fontScale?: number
 }
 
 export interface ZoneSlide {

@@ -33,6 +33,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
   const [selectedSlide, setSelectedSlide] = useState(0)
   const [deck, setDeck] = useState<ZoneSlide[] | null>(null)
   const [selectedDeckSlide, setSelectedDeckSlide] = useState(0)
+  const [buildingSlides, setBuildingSlides] = useState(false)
 
   useEffect(() => { void window.wf.scenesGet().then(setConfig) }, [])
   useEffect(() => { void window.wf.logoGet().then(({ logoPath: p }) => setLogoPath(p)) }, [])
@@ -80,6 +81,21 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
     },
   })
 
+  // "Build slides" for a sermon or announcement block pulls in the ACTUAL
+  // reading/announcements — real verse text, real references, one slide per
+  // chunk — rather than a single blank card the operator has to type from
+  // scratch. Once saved it's a normal stored deck: click any slide, edit its
+  // wording, or set its size, exactly like a hand-built one.
+  const buildSlides = async (): Promise<void> => {
+    setBuildingSlides(true)
+    try {
+      const generated = await window.wf.zoneGenerateSlides(item)
+      saveDeck(generated ?? [seedSlide()])
+    } finally {
+      setBuildingSlides(false)
+    }
+  }
+
   const pickScene = (sceneId: string): void => {
     const scene = config.scenes.find((s) => s.id === sceneId)
     if (!scene) return
@@ -126,10 +142,11 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
             <ZoneRolePalette />
             {canDeck && (
               <button
-                onClick={() => saveDeck([seedSlide()])}
-                className="shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-700"
+                onClick={() => { void buildSlides() }}
+                disabled={buildingSlides}
+                className="shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-700 disabled:text-slate-400"
               >
-                Build slides
+                {buildingSlides ? 'Building…' : 'Build slides'}
               </button>
             )}
           </div>

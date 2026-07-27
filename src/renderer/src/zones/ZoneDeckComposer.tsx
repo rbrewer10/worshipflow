@@ -103,7 +103,7 @@ export default function ZoneDeckComposer({
                 slideText={slotPreviewText(resolved, slides)}
                 onSlideDrop={(sourceIndex) => setSlot(zoneId, { kind: 'slide', index: sourceIndex })}
               />
-              <ZoneSlotEditor slot={rawSlot} onChange={(next) => setSlot(zoneId, next)} />
+              <ZoneSlotEditor slot={rawSlot} zoneId={zoneId} onChange={(next) => setSlot(zoneId, next)} />
             </div>
           )
         })}

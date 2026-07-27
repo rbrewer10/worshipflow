@@ -547,13 +547,12 @@ const FLEX_SCRIPT = `
       // Reserve the actual title block height (title + its 2vw top margin) so a long
       // titled slide shrinks to fit both, not just the line.
       var titleH=content.children.length>1?content.children[1].getBoundingClientRect().height+window.innerWidth*0.02:0;
-      // Measure the REAL content box, exactly as the stage monitor does. Fitting
-      // against an abstract 0.82w x 0.90h of the viewport while the text actually
-      // wraps inside a narrower #content made it shrink far more than it needed
-      // to — which is why the same words were big on the stage and small here.
-      fitText(content.firstChild,fs,3,
-        content.clientWidth-window.innerWidth*0.10,
-        content.clientHeight-window.innerWidth*0.06-titleH);
+      // NOTE: do not "fix" this by measuring content.clientHeight the way the
+      // stage monitor does. #content is auto-height, so it grows with its own
+      // text — the check becomes circular, always passes, and the verse renders
+      // enormous and overflows off-screen. The stage's #current is flex:1, a
+      // fixed box, which is why the same approach is safe there and not here.
+      fitText(content.firstChild,fs,2,window.innerWidth*0.82,window.innerHeight*0.90-titleH);
       return;
     }
     if(m==='countdown'){

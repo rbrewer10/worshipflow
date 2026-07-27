@@ -8,6 +8,7 @@ import type {
   SongInput,
   ServiceSummary,
   ServiceFull,
+  ServiceItem,
   NewServiceItem,
   ScriptureResult,
   Theme,
@@ -283,6 +284,8 @@ const wf = {
     ipcRenderer.invoke('wf:zone:setRouting', itemId, routing),
   zoneGetSlides: (itemId: number): Promise<ZoneSlide[] | null> =>
     ipcRenderer.invoke('wf:zone:getSlides', itemId),
+  zoneGenerateSlides: (item: ServiceItem): Promise<ZoneSlide[] | null> =>
+    ipcRenderer.invoke('wf:zone:generateSlides', item),
   zoneSetSlides: (itemId: number, slides: ZoneSlide[] | null): Promise<void> =>
     ipcRenderer.invoke('wf:zone:setSlides', itemId, slides),
   zoneSetPin: (zoneId: ZoneId, pin: ZonePin | null): Promise<void> =>

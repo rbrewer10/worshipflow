@@ -85,6 +85,7 @@ import { generateBackgroundImage } from './replicateApi'
 import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
 import { autoDeckFor } from './autoDeck'
+import type { AutoDeckDeps } from './autoDeck'
 import { TABLET_PORT, tabletHtml } from './tabletHtml'
 import { OBS_HTML } from './obsHtml'
 import { ZONE_HTML } from './zoneHtml'
@@ -819,7 +820,9 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
   } else if (slot.kind === 'text') {
     base.mode = 'text'
     base.line = slot.text ?? ''
-    base.fontScale = deckFontScale(zoneId, live)
+    // An operator-set size on the slot always wins over the automatic one —
+    // this is the manual escape hatch from auto-fit guessing wrong.
+    base.fontScale = slot.fontScale ?? deckFontScale(zoneId, live)
     applyZoneBackground(base, live.background, live)
   } else if (slot.kind === 'sermon') {
     // The designed title card. Speaker is deliberately null — during a reading
@@ -840,7 +843,7 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
       base.mode = 'text'
       base.line = verse
       base.title = slot.reference ?? ''
-      base.fontScale = deckFontScale(zoneId, live)
+      base.fontScale = slot.fontScale ?? deckFontScale(zoneId, live)
       applyZoneBackground(base, live.background, live)
     } else base.mode = 'black'   // lookup failed — better blank than a stale verse
   } else if (slot.kind === 'image') {
@@ -1094,10 +1097,11 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
 // next/prev and auto-advance all work unchanged — the deck needs no second
 // cursor. Pre-resolves every scripture slot because computeZoneStates is
 // synchronous and fires as often as every 100ms. Returns false if no deck.
-async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: number): Promise<boolean> {
-  // A hand-authored deck always wins; generation only fills the gap where there
-  // isn't one, so nothing anyone built in the composer changes behaviour.
-  const slides = parseZoneSlides(getItemZoneSlides(item.id)) ?? await autoDeckFor(item, {
+// Shared by loadDeckOnto and the "load reading as slides" IPC below — both
+// need the exact same lookup wiring, and drifting between two copies is how
+// the composer's preview would end up different from what actually goes live.
+function autoDeckDeps(): AutoDeckDeps {
+  return {
     budget: zoneChunkBudget(),
     lookupScripture: (reference) => bibleTranslation === 'kjv'
       ? Promise.resolve(lookupScripture(reference))
@@ -1106,7 +1110,13 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
       const a = getAnnouncement(id)
       return a ? { id: a.id, title: a.title, body: a.body } : null
     },
-  })
+  }
+}
+
+async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: number): Promise<boolean> {
+  // A hand-authored deck always wins; generation only fills the gap where there
+  // isn't one, so nothing anyone built in the composer changes behaviour.
+  const slides = parseZoneSlides(getItemZoneSlides(item.id)) ?? await autoDeckFor(item, autoDeckDeps())
   if (!slides) return false
   const source = await computeItemSourceSlides(item)
   if (tracks[track].loadGeneration !== generation) return true
@@ -2314,6 +2324,16 @@ ipcMain.handle('wf:zone:setRouting', (_e, itemId: number, routing: ZoneRouting |
 
 ipcMain.handle('wf:zone:getSlides', (_e, itemId: number): ZoneSlide[] | null =>
   parseZoneSlides(getItemZoneSlides(itemId))
+)
+
+// Computes what the deck WOULD be — the same reading/announcement generation
+// loadDeckOnto falls back to when nothing is stored — without saving it. The
+// composer calls this once, on "Build slides", to seed real verses/announcement
+// text instead of one blank card the operator would have to fill in by hand.
+// Takes the whole item because the Build Service editor holds a service that
+// may not be the live one, so there is no activeServiceItems entry to look up.
+ipcMain.handle('wf:zone:generateSlides', async (_e, item: ServiceItem): Promise<ZoneSlide[] | null> =>
+  autoDeckFor(item, autoDeckDeps())
 )
 
 ipcMain.handle('wf:zone:setSlides', (_e, itemId: number, slides: ZoneSlide[] | null): void => {

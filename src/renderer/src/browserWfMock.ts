@@ -417,6 +417,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     zoneGetRouting: async (): Promise<ZoneRouting | null> => null,
     zoneSetRouting: noop,
     zoneGetSlides: async (): Promise<ZoneSlide[] | null> => null,
+    zoneGenerateSlides: async (): Promise<ZoneSlide[] | null> => null,
     zoneSetSlides: noop,
     // Pins live in the main process for real; in the browser mock they live in
     // this object, so the Live tab's cards actually latch when clicked instead
