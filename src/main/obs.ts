@@ -4,7 +4,7 @@
 // auto-connect on startup and silently retry when the connection drops.
 import OBSWebSocket from 'obs-websocket-js'
 import type { ObsStatus } from '../shared/types'
-import { getSetting, setSetting } from './db'
+import { getSetting, setSetting, getSecretSetting, setSecretSetting } from './db'
 
 const obs = new OBSWebSocket()
 
@@ -98,7 +98,7 @@ export async function connectObs(host: string, port: number, password: string): 
   creds = { host: host || 'localhost', port: port || 4455, password: password || '' }
   setSetting('obs_host', creds.host)
   setSetting('obs_port', String(creds.port))
-  setSetting('obs_password', creds.password)
+  setSecretSetting('obs_password', creds.password)
   try {
     await obs.disconnect().catch(() => undefined)
     const url = `ws://${creds.host}:${creds.port}`
@@ -131,7 +131,7 @@ export async function initObsAutoConnect(): Promise<void> {
   const host = getSetting('obs_host')
   if (!host) return
   const port = Number(getSetting('obs_port')) || 4455
-  const password = getSetting('obs_password') ?? ''
+  const password = getSecretSetting('obs_password') ?? ''
   await connectObs(host, port, password)
 }
 

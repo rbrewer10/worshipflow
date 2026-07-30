@@ -1,7 +1,46 @@
+import { useCallback, useRef, useState } from 'react'
 import type { ServiceItem, TrackId } from '../../shared/types'
 import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 
 // Shared live-load helpers used by both LiveView and the service deck builder.
+
+// Tap-to-arm, tap-again-to-cancel, auto-fires after delayMs — the "are you
+// sure" gesture for any click that can switch what's live, so one stray tap
+// can't send the wrong thing to the congregation. Keyed by a caller-chosen
+// string so unrelated targets (item id, or `${itemId}:${slideIndex}`) each
+// arm/cancel independently, and arming a new target always clears a still-
+// pending one first — otherwise both timers would fire independently and send
+// two different things live back-to-back.
+export function usePendingConfirm(delayMs = 1500): {
+  pendingKey: string | null
+  trigger: (key: string, run: () => void) => void
+  cancel: () => void
+} {
+  const [pendingKey, setPendingKey] = useState<string | null>(null)
+  const pendingKeyRef = useRef<string | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const cancel = useCallback(() => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    pendingKeyRef.current = null
+    setPendingKey(null)
+  }, [])
+
+  const trigger = useCallback((key: string, run: () => void) => {
+    if (pendingKeyRef.current === key) { cancel(); return } // second tap on the same target cancels it
+    cancel() // arming a different target always clears any still-pending one first
+    pendingKeyRef.current = key
+    setPendingKey(key)
+    timer.current = setTimeout(() => {
+      pendingKeyRef.current = null
+      timer.current = null
+      setPendingKey(null)
+      run()
+    }, delayMs)
+  }, [cancel, delayMs])
+
+  return { pendingKey, trigger, cancel }
+}
 
 // Resolves the background file an item's slide thumbnail should show.
 // Text/Scripture/Countdown/Welcome/Sermon backgrounds live on the item itself;

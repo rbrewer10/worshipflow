@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, safeStorage } from 'electron'
 import { join, dirname } from 'path'
 import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync } from 'fs'
 import initSqlJs, { type Database } from 'sql.js'
@@ -560,6 +560,8 @@ function itemTitle(type: string, refId: number | null, payload: Record<string, u
     const p = (payload.path as string) || ''
     return p.split(/[/\\]/).pop() || 'Image'
   }
+  if (type === 'header') return (payload.label as string) || 'Section'
+  if (type === 'placeholder') return (payload.label as string) || 'Placeholder — TBD'
   return type
 }
 
@@ -693,6 +695,53 @@ export function addServiceItem(serviceId: number, item: NewServiceItem): number 
   return id
 }
 
+// Clones an item — payload, style, zone routing, and any authored zone deck —
+// into a new row directly after the original, shifting everything after it
+// down by one ordinal. Songs/announcements keep the same ref_id (they point
+// at the shared library record, not a copy of it).
+export function duplicateServiceItem(itemId: number): number | null {
+  const cur = db.prepare(
+    'SELECT service_id, ordinal, type, ref_id, payload_json, notes, style, zone_routing, zone_slides, track FROM service_item WHERE id = ?'
+  )
+  cur.bind([itemId])
+  if (!cur.step()) {
+    cur.free()
+    return null
+  }
+  const r = cur.getAsObject() as {
+    service_id: number
+    ordinal: number
+    type: string
+    ref_id: number | null
+    payload_json: string | null
+    notes: string | null
+    style: string | null
+    zone_routing: string | null
+    zone_slides: string | null
+    track: string
+  }
+  cur.free()
+
+  db.run('BEGIN')
+  try {
+    db.run(
+      'UPDATE service_item SET ordinal = ordinal + 1 WHERE service_id = ? AND track = ? AND ordinal > ?',
+      [r.service_id, r.track, r.ordinal]
+    )
+    db.run(
+      'INSERT INTO service_item (service_id, ordinal, type, ref_id, payload_json, notes, style, zone_routing, zone_slides, track) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [r.service_id, r.ordinal + 1, r.type, r.ref_id, r.payload_json, r.notes, r.style, r.zone_routing, r.zone_slides, r.track]
+    )
+    db.run('COMMIT')
+  } catch (e) {
+    db.run('ROLLBACK')
+    throw e
+  }
+  const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number
+  persist()
+  return id
+}
+
 export function removeServiceItem(itemId: number): void {
   db.run('DELETE FROM service_item WHERE id = ?', [itemId])
   persist()
@@ -813,6 +862,34 @@ export function setSetting(key: string, value: string | null): void {
   if (value == null) db.run('DELETE FROM setting WHERE key = ?', [key])
   else db.run('INSERT INTO setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?', [key, value, value])
   persist()
+}
+
+// --- Secrets (OBS password, AI API keys) — same `setting` table, encrypted at
+// rest via Electron's OS-backed safeStorage (DPAPI on Windows) instead of
+// sitting in the DB file as plaintext. The 'wfenc1:' prefix marks an encrypted
+// value so a legacy plaintext row (written before this existed) is still read
+// correctly — and self-heals: the next setSecretSetting call re-encrypts it.
+
+const SECRET_PREFIX = 'wfenc1:'
+
+export function setSecretSetting(key: string, value: string | null): void {
+  if (value == null || value === '') { setSetting(key, null); return }
+  if (safeStorage.isEncryptionAvailable()) {
+    setSetting(key, SECRET_PREFIX + safeStorage.encryptString(value).toString('base64'))
+  } else {
+    setSetting(key, value) // no OS keychain available — best effort, unchanged from before
+  }
+}
+
+export function getSecretSetting(key: string): string | null {
+  const raw = getSetting(key)
+  if (raw == null) return null
+  if (!raw.startsWith(SECRET_PREFIX)) return raw // legacy plaintext row
+  try {
+    return safeStorage.decryptString(Buffer.from(raw.slice(SECRET_PREFIX.length), 'base64'))
+  } catch {
+    return null // e.g. DB copied to a different machine/user — can't decrypt, treat as unset
+  }
 }
 
 // --- CCLI song usage log ---

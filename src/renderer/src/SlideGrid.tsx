@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play, Mic, FileQuestion } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play, Mic, FileQuestion, Minus, HelpCircle, Hourglass } from 'lucide-react'
 import type { LiveState, ServiceItem, TrackId } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
-import { canGoLive, itemThumbBackground } from './liveActions'
+import { canGoLive, itemThumbBackground, usePendingConfirm } from './liveActions'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
 const ICON: Record<ServiceItem['type'], IconType> = {
-  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic
+  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic,
+  header: Minus, placeholder: HelpCircle
 }
 
 // The Live tab's main area: each item a panel of clickable slide thumbnails.
@@ -21,12 +22,15 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
   const [slides, setSlides] = useState<Record<number, string[]>>({})
   const [songBg, setSongBg] = useState<Record<number, string | null>>({})
   const liveRowRef = useRef<HTMLDivElement | null>(null)
+  const { pendingKey, trigger, cancel } = usePendingConfirm()
 
   useEffect(() => {
     const off = window.wf.onState((s) => setLive(track === 'main' ? s.main : s.second))
     window.wf.getState(track).then(setLive)
-    return off
-  }, [track])
+    // Also cancel a pending tap-to-confirm on unmount so it can't fire the
+    // wrong item live after the operator navigates away from this tab.
+    return () => { off(); cancel() }
+  }, [track, cancel])
 
   useEffect(() => {
     window.wf.songsList().then((list) => {
@@ -80,18 +84,35 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               {its.map((slideText, idx) => {
                 const isLiveSlide = isLiveItem && liveIndex === idx
+                const slideKey = `${it.id}:${idx}`
+                const isPending = pendingKey === slideKey
+                const goLive = (): void => { window.wf.liveGoLiveAt(track, it.id, idx) }
+                // Navigating within the item that's ALREADY live is just moving
+                // the cursor (same as Next/Prev) — instant. Jumping to a DIFFERENT
+                // item switches what the congregation sees, so it gets the same
+                // tap-to-confirm gesture as the item rail, instead of firing on
+                // the first stray click the way this used to.
+                const handleClick = (): void => { isLiveItem ? goLive() : trigger(slideKey, goLive) }
                 return (
                   <button
                     key={idx}
-                    onClick={() => window.wf.liveGoLiveAt(track, it.id, idx)}
+                    onClick={handleClick}
                     aria-label={`Play slide ${idx + 1} of ${its.length}`}
-                    className={`overflow-hidden rounded-md transition-shadow min-h-10 cursor-pointer group relative ${isLiveSlide ? 'ring-2 ring-blue-500' : 'ring-1 ring-slate-200 hover:ring-blue-400/50'}`}
-                    title={`Click to play slide ${idx + 1}`}
+                    className={`overflow-hidden rounded-md transition-shadow min-h-10 cursor-pointer group relative ${
+                      isLiveSlide ? 'ring-2 ring-blue-500' : isPending ? 'ring-2 ring-amber-500/70' : 'ring-1 ring-slate-200 hover:ring-blue-400/50'
+                    }`}
+                    title={isPending ? 'Tap again to confirm' : `Click to play slide ${idx + 1}`}
                   >
                     <SlideThumb label={slideText} itemStyle={it.style} serviceTheme={activeService.theme} serviceColors={activeService.themeColors} bgFile={bgFile} />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Play size={20} className="text-white" fill="currentColor" />
-                    </div>
+                    {isPending ? (
+                      <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/55 text-[10px] font-bold text-amber-300 animate-pulse">
+                        <Hourglass size={13} /> tap to confirm
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Play size={20} className="text-white" fill="currentColor" />
+                      </div>
+                    )}
                     <div className="bg-[#e9ecf1] px-1.5 py-0.5 text-left text-[9px] text-slate-500">{idx + 1}</div>
                   </button>
                 )

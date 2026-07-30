@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Mic, Image as ImageIcon, User } from 'lucide-react'
+import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User } from 'lucide-react'
 import type { AppInfo, ObsStatus } from '../../shared/types'
 import type { View } from './AppShell'
 import BrandMark from './BrandMark'
@@ -25,7 +25,10 @@ const NAV_ITEMS: { id: View; Icon: IconType; label: string }[] = [
   { id: 'songs', Icon: Music, label: 'Songs' },
   { id: 'announcements', Icon: Megaphone, label: 'Announcements' },
   { id: 'scripture', Icon: BookOpen, label: 'Scripture' },
-  { id: 'soundcheck', Icon: Mic, label: 'Sound Check' },
+  { id: 'obs', Icon: Video, label: 'OBS Connect' },
+  // Sound Check (Yamaha TF-Rack) is a prototype — fake channel data, unverified
+  // OSC addresses/fader curve (see yamaha-controller.ts). Hidden from nav until
+  // it's real; the tab/route/controller code is untouched, just unreachable.
   { id: 'settings', Icon: ImageIcon, label: 'Logo & BG' }
 ]
 

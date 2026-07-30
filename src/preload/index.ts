@@ -75,6 +75,8 @@ const wf = {
     ipcRenderer.invoke('wf:services:addItem', serviceId, item),
   serviceRemoveItem: (itemId: number): Promise<void> =>
     ipcRenderer.invoke('wf:services:removeItem', itemId),
+  serviceDuplicateItem: (itemId: number): Promise<number | null> =>
+    ipcRenderer.invoke('wf:services:duplicateItem', itemId),
   serviceMoveItem: (itemId: number, dir: 'up' | 'down'): Promise<void> =>
     ipcRenderer.invoke('wf:services:moveItem', itemId, dir),
   serviceUpdateItemNotes: (itemId: number, notes: string | null): Promise<void> =>
@@ -189,6 +191,10 @@ const wf = {
   // Tablet remote
   getTabletUrl: (): Promise<string> =>
     ipcRenderer.invoke('wf:getTabletUrl'),
+  getTabletPin: (): Promise<string> =>
+    ipcRenderer.invoke('wf:getTabletPin'),
+  regenerateTabletPin: (): Promise<string> =>
+    ipcRenderer.invoke('wf:regenerateTabletPin'),
   setActiveService: (serviceId: number | null): Promise<void> =>
     ipcRenderer.invoke('wf:setActiveService', serviceId),
   getActiveServiceId: (): Promise<number | null> =>
@@ -269,6 +275,11 @@ const wf = {
     ipcRenderer.invoke('wf:logo:get'),
   logoSet: (path: string | null, bg: string | null): Promise<void> =>
     ipcRenderer.invoke('wf:logo:set', path, bg),
+
+  // Per-screen output scale
+  zonesGetScales: (): Promise<Record<ZoneId, number>> => ipcRenderer.invoke('wf:zones:getScales'),
+  zonesSetScale: (zoneId: ZoneId, percent: number): Promise<void> =>
+    ipcRenderer.invoke('wf:zones:setScale', zoneId, percent),
 
   // CCLI
   ccliGetLicense: (): Promise<string | null> => ipcRenderer.invoke('wf:ccli:getLicense'),

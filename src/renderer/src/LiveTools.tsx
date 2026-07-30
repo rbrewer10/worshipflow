@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MonitorOff, Image as ImageIcon, Play, Timer, ChevronUp, ChevronDown, Keyboard, FileText, Tablet, FolderOpen } from 'lucide-react'
 import type { AppInfo, LiveState, TrackId } from '../../shared/types'
-import ObsPanel from './ObsPanel'
 import ZonePanel from './ZonePanel'
 import { useService } from './ServiceContext'
 import { PresenterPanel } from './PresenterPanel'
@@ -11,8 +10,10 @@ import { TimingPanel } from './TimingPanel'
 import { notifyLocal } from './NotifyToasts'
 
 // The Live tab's right-hand control panel for the Main track: stage message,
-// scripture, font, auto-advance, OBS, and a collapsible "More" with the
-// rarely-used controls. (Second track gets the leaner SecondTrackTools.)
+// scripture, font, auto-advance, and a collapsible "More" with the rarely-used
+// controls. OBS setup/streaming lives on its own "OBS Connect" tab now — it
+// needed more room than this sidebar could give it. (Second track gets the
+// leaner SecondTrackTools.)
 function LiveTools({ track }: { track: TrackId }): JSX.Element {
   const { activeService } = useService()
   const [info, setInfo] = useState<AppInfo | null>(null)
@@ -21,6 +22,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
   const [stageMsg, setStageMsg] = useState('')
   const [msgSent, setMsgSent] = useState(false)
   const [tabletUrl, setTabletUrl] = useState('')
+  const [tabletPin, setTabletPin] = useState('')
   const [autoAdvanceSecs, setAutoAdvanceSecs] = useState('10')
   const [autoAdvanceLoop, setAutoAdvanceLoop] = useState(false)
   const [bibleTranslation, setBibleTranslation] = useState<'kjv' | 'web' | 'bbe'>('kjv')
@@ -33,6 +35,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
     const t = setTimeout(() => window.wf.getInfo().then(setInfo), 900)
     const off = window.wf.onState((s) => setLive(track === 'main' ? s.main : s.second))
     window.wf.getTabletUrl().then(setTabletUrl)
+    window.wf.getTabletPin().then(setTabletPin)
     return () => { clearTimeout(t); off() }
   }, [track])
   useEffect(() => { if (live?.songTitle) window.wf.getInfo().then(setInfo) }, [live?.songTitle])
@@ -161,8 +164,6 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       {/* Divider */}
       <div className="border-t border-slate-200" />
 
-      <ObsPanel />
-
       <button onClick={() => setShowMore((v) => !v)} className="w-full btn">
         {showMore ? <><ChevronUp size={14} /> Less</> : <><ChevronDown size={14} /> More</>}
       </button>
@@ -195,7 +196,16 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
           <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-2">
             <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700"><Tablet size={13} /> Tablet Remote</div>
             <div className="break-all rounded bg-slate-100 px-2 py-1 text-center font-mono text-[11px] text-blue-700">{tabletUrl || 'Starting server…'}</div>
-            <div className="mt-1 text-[10px] text-slate-500">Open on an iPad/phone as a wireless stage monitor + remote.</div>
+            <div className="mt-1 flex items-center justify-center gap-2">
+              <span className="rounded bg-slate-900 px-2 py-0.5 font-mono text-xs tracking-widest text-emerald-400">{tabletPin || '······'}</span>
+              <button
+                onClick={() => { if (window.confirm('Generate a new PIN? Any tablet already unlocked will need the new one.')) window.wf.regenerateTabletPin().then(setTabletPin) }}
+                className="text-[10px] font-semibold text-blue-700 hover:underline"
+              >
+                New PIN
+              </button>
+            </div>
+            <div className="mt-1 text-[10px] text-slate-500">Open on an iPad/phone as a wireless stage monitor. Give volunteers the PIN to unlock controls.</div>
           </div>
         </div>
       )}

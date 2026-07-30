@@ -57,7 +57,8 @@ body{display:flex;flex-direction:column}
 .si.live{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.25);color:#60a5fa}
 .si:active{opacity:.65}
 
-#ctrl{flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;padding-bottom:max(16px,env(safe-area-inset-bottom));background:#0d1420;border-top:1px solid rgba(255,255,255,.08)}
+#ctrl{flex-shrink:0;display:none;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;padding-bottom:max(16px,env(safe-area-inset-bottom));background:#0d1420;border-top:1px solid rgba(255,255,255,.08)}
+#ctrl.show{display:grid}
 .cb{padding:24px 10px;border-radius:16px;border:2px solid rgba(255,255,255,.1);background:rgba(255,255,255,.07);color:#fff;font-size:20px;font-weight:800;cursor:pointer;text-align:center;user-select:none;transition:transform .1s,background .1s,border-color .1s;-webkit-tap-highlight-color:transparent;min-height:60px;display:flex;align-items:center;justify-content:center}
 .cb:active{transform:scale(.96);background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.2)}
 .cb-next{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#3b82f6;font-weight:900}
@@ -66,6 +67,17 @@ body{display:flex;flex-direction:column}
 .cb-black:active{background:rgba(0,0,0,.7)}
 .cb-logo{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.3);color:#3b82f6;font-size:18px}
 .cb-logo:active{background:rgba(59,130,246,.25);border-color:rgba(59,130,246,.4)}
+
+#lockbtn{display:none;flex-shrink:0;align-items:center;justify-content:center;gap:8px;padding:18px 14px;padding-bottom:max(18px,env(safe-area-inset-bottom));background:#0d1420;border-top:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:15px;font-weight:700;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+#lockbtn.show{display:flex}
+
+#pingate{position:fixed;inset:0;background:rgba(6,9,18,.96);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:50;padding:20px}
+#pingate.on{display:flex}
+#pingate h2{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8}
+#pin-input{font-size:30px;letter-spacing:.3em;text-align:center;width:220px;padding:14px 10px;border-radius:12px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#fff}
+#pin-err{color:#f87171;font-size:13px;min-height:16px}
+#pin-go{padding:14px 40px;border-radius:12px;border:none;background:rgba(52,211,153,.85);color:#052e1d;font-weight:800;font-size:16px;cursor:pointer}
+#pin-cancel{background:none;border:none;color:#475569;font-size:13px;cursor:pointer;padding:6px}
 </style>
 </head>
 <body>
@@ -109,6 +121,15 @@ body{display:flex;flex-direction:column}
   <button class="cb cb-black" onclick="send('black')">&#9632; Black</button>
   <button class="cb cb-logo" onclick="send('logo')">&#10013; Logo</button>
 </div>
+<div id="lockbtn" onclick="showPinGate()">&#128274; Tap to unlock controls</div>
+
+<div id="pingate">
+  <h2>Enter Remote PIN</h2>
+  <input id="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" onkeydown="if(event.key==='Enter') submitPin()">
+  <div id="pin-err"></div>
+  <button id="pin-go" onclick="submitPin()">Unlock</button>
+  <button id="pin-cancel" onclick="hidePinGate()">Cancel</button>
+</div>
 
 <script>
 var elCur = document.getElementById('cur')
@@ -125,11 +146,35 @@ var elMsgTxt = document.getElementById('msg-txt')
 var liveId = null
 var ws = null
 var msgDismissed = null
+var authed = false
+var cachedPin = localStorage.getItem('wf_tablet_pin') || ''
+
+function updateLockUI() {
+  document.getElementById('ctrl').className = authed ? 'show' : ''
+  document.getElementById('lockbtn').className = authed ? '' : 'show'
+}
+function showPinGate(err) {
+  document.getElementById('pingate').className = 'on'
+  document.getElementById('pin-err').textContent = err || ''
+  document.getElementById('pin-input').value = ''
+  document.getElementById('pin-input').focus()
+}
+function hidePinGate() {
+  document.getElementById('pingate').className = ''
+}
+function submitPin() {
+  var v = document.getElementById('pin-input').value.trim()
+  if (!v) return
+  cachedPin = v
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'auth', pin: v }))
+}
+updateLockUI()
 
 function dismissMsg() {
   msgDismissed = elMsgTxt.textContent
   elMsg.className = ''
   // Clear the message everywhere (operator screen, stage window, all tablets).
+  if (!authed) { showPinGate(); return }
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'clearStageMessage' }))
 }
 
@@ -150,6 +195,7 @@ function connect() {
   ws.onopen = function() {
     console.log('[tablet] connected!')
     elDot.className = 'ok'
+    if (cachedPin) ws.send(JSON.stringify({ type: 'auth', pin: cachedPin }))
   }
   ws.onclose = function() {
     console.log('[tablet] disconnected, reconnecting in 2s...')
@@ -166,6 +212,19 @@ function connect() {
 }
 
 function apply(msg) {
+  if (msg.type === 'authResult') {
+    if (msg.ok) {
+      authed = true
+      localStorage.setItem('wf_tablet_pin', cachedPin)
+      hidePinGate()
+    } else {
+      authed = false
+      localStorage.removeItem('wf_tablet_pin')
+      showPinGate(msg.lockedOutMs ? 'Too many attempts — try again shortly' : 'Incorrect PIN')
+    }
+    updateLockUI()
+    return
+  }
   if (msg.type !== 'state') return
   var s = msg.state
   console.log('[tablet] state update:', { mode: s.mode, index: s.index, line: s.line, total: s.total })
@@ -227,6 +286,7 @@ function renderStrip(items) {
 }
 
 function send(intent) {
+  if (!authed) { showPinGate(); return }
   if (ws && ws.readyState === 1) {
     console.log('[tablet] sending intent:', intent)
     ws.send(JSON.stringify({ type: 'intent', intent: intent }))
@@ -236,6 +296,7 @@ function send(intent) {
 }
 
 function loadItem(id) {
+  if (!authed) { showPinGate(); return }
   if (ws && ws.readyState === 1) {
     console.log('[tablet] loading item:', id)
     ws.send(JSON.stringify({ type: 'loadItem', itemId: id }))

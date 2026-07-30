@@ -2,8 +2,8 @@ import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } fro
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
-import { randomUUID } from 'crypto'
-import { createServer } from 'http'
+import { randomUUID, randomInt } from 'crypto'
+import { createServer, type IncomingMessage } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
@@ -42,11 +42,14 @@ import {
   deleteService,
   getService,
   addServiceItem,
+  duplicateServiceItem,
   removeServiceItem,
   moveServiceItem,
   updateServiceItemNotes,
   getSetting,
   setSetting,
+  getSecretSetting,
+  setSecretSetting,
   recordSongUsage,
   listSongUsage,
   clearSongUsage,
@@ -319,6 +322,10 @@ const warnedMissingPins = new Set<string>()
 let ccliLicense: string | null = null  // church CCLI license number (loaded from settings)
 let logoPath: string | null = null     // church logo image path for logo zones
 let logoBg: string | null = null       // motion background (video/image) for logo zones
+// Per-screen output scale (percent), keyed by ZoneId. Cached in memory —
+// computeZoneStates can fire every 100ms during auto-advance, so this must not
+// hit the DB on every broadcast the way a fresh getSetting() call would.
+let zoneScales: Record<ZoneId, number> = { 1: 100, 2: 100, 3: 100, 4: 100 }
 const loggedSongIds = new Set<number>()  // songs already counted this service (CCLI: once per service)
 let serviceSlideTheme: string = DEFAULT_THEME_ID  // service-level baseline
 let serviceSlideThemeColors: ThemeColors | null = null
@@ -334,6 +341,29 @@ let tabletHttpServer: ReturnType<typeof createServer> | null = null
 let tabletWss: WebSocketServer | null = null
 let tabletHeartbeat: ReturnType<typeof setInterval> | null = null
 let boundTabletPort = TABLET_PORT
+
+// PIN-gates tablet-remote CONTROL (intents/loadItem/stage-message clear) only.
+// State/zone broadcasts stay open to every connection: the Pi zone screens share
+// this same WS server and have no way to enter a PIN, and read-only mirrored
+// state isn't the exposure — an unauthenticated stranger driving the live show is.
+const authedTabletClients = new WeakSet<WsSocket>()
+const tabletAuthFailures = new Map<string, { count: number; lockedUntil: number }>()
+const TABLET_AUTH_MAX_FAILURES = 5
+const TABLET_AUTH_LOCKOUT_MS = 60_000
+
+function getTabletPin(): string {
+  const existing = getSetting('tablet_pin')
+  if (existing) return existing
+  const pin = String(randomInt(0, 1_000_000)).padStart(6, '0')
+  setSetting('tablet_pin', pin)
+  return pin
+}
+
+function regenerateTabletPin(): string {
+  const pin = String(randomInt(0, 1_000_000)).padStart(6, '0')
+  setSetting('tablet_pin', pin)
+  return pin
+}
 let activeServiceItems: ServiceItem[] = []
 let activeServiceId: number | null = null  // which service is currently active (for Volunteer mode to honor)
 let activeServiceName = ''
@@ -436,7 +466,7 @@ const contentRunner = createContentRunner({
   ffmpegPath: resolveFfmpegPath(),
   getRecording,
   listMarkers: listRecordingMarkers,
-  getSetting,
+  getSetting: getSecretSetting, // both keys this reads (replicate/anthropic) are secrets
   saveAi: (id, fields) => setRecordingAi(id, fields),
   renderThumbnail,
   onProgress: (id, label) => {
@@ -546,16 +576,22 @@ function getLocalIp(): string {
 
 function renderState(track: TrackId = 'main'): LiveState {
   const t = tracks[track]
-  const lines = t.song.lines
+  // Mirrors computeZoneStates' hasLiveContent gate: on a pristine track, t.song
+  // is still the Phase-0 demo song (see demoSong.ts) — real content only lands
+  // once a load* function runs. Without this gate, every consumer of this
+  // function (operator Live/Volunteer views, the tablet remote, AND the real
+  // audience-facing Output.tsx fullscreen window on a directly-attached
+  // projector) would show "Amazing Grace" before anything is actually live.
+  const lines = t.hasLiveContent ? t.song.lines : []
   return {
     mode: t.mode,
     index: t.index,
     line: lines[t.index] ?? '',
     next: lines[t.index + 1] ?? '',
     total: lines.length,
-    songTitle: t.song.title,
-    background: t.song.background ?? null,
-    bgMotion: (t.song.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null,
+    songTitle: t.hasLiveContent ? t.song.title : '',
+    background: t.hasLiveContent ? (t.song.background ?? null) : null,
+    bgMotion: t.hasLiveContent ? ((t.song.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null) : null,
     bgFit: t.bgFit,
     liveServiceItemId: t.serviceItemId,
     fontScale: t.fontScale,
@@ -735,9 +771,11 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       base.next = live.next
       base.title = live.songTitle
       applyZoneBackground(base, live.background, live)
-      // For text-type items, pull per-item style overrides from payload
+      // Pull per-item style overrides from payload. Scripture/Announcement only
+      // author fontScale today (no UI for the others yet), but reading the same
+      // payload keys for all three means those get support for free once added.
       if (t.serviceItemId != null) {
-        const liveItem = activeServiceItems.find((it) => it.id === t.serviceItemId && it.type === 'text')
+        const liveItem = activeServiceItems.find((it) => it.id === t.serviceItemId && (it.type === 'text' || it.type === 'scripture' || it.type === 'announcement'))
         if (liveItem) {
           const pl = liveItem.payload
           if (pl.bgOverlay != null) base.bgOverlay = pl.bgOverlay as number
@@ -790,6 +828,10 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
 
     result[zoneId] = base
   }
+  // Stamped after the loop, not per-branch: some zoneIds resolve through
+  // titleCardZoneState/zoneStateFromSlot instead of `base` above, and scale is
+  // a screen property, not a content one — every path should get it the same way.
+  for (const zoneId of ZONE_IDS) result[zoneId].scale = zoneScales[zoneId] ?? 100
   return result
 }
 
@@ -1044,7 +1086,7 @@ function processIntent(track: TrackId, type: Intent): void {
 // `item`, when given, is the live ServiceItem this text came from — used to
 // look up and load its authored zone-slide deck (if any). Ad-hoc loads (Quick
 // Text, tickers, announcements) pass no item, so they never carry a deck.
-function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number, blurBehindText?: boolean, item?: ServiceItem | null): void {
+function doLoadText(track: TrackId, title: string, body: string, background: string | null = null, fontScale?: number, blurBehindText?: boolean, item?: ServiceItem | null, bgFit?: 'cover' | 'contain'): void {
   const t = tracks[track]
   t.loadGeneration++
   t.hasLiveContent = true
@@ -1053,7 +1095,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   t.songId = null
   t.scriptureRef = null
   clearSongMeta(track)
-  t.bgFit = 'cover'
+  t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
   const lines: string[] = []
   if (title) lines.push(title)
@@ -1071,7 +1113,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
 }
 
 // See doLoadText's `item` comment — same deal here.
-function doLoadSermon(track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean, item?: ServiceItem | null): void {
+function doLoadSermon(track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean, item?: ServiceItem | null, bgFit?: 'cover' | 'contain'): void {
   const t = tracks[track]
   t.loadGeneration++
   t.hasLiveContent = true
@@ -1080,7 +1122,7 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
   t.songId = null
   t.scriptureRef = null
   clearSongMeta(track)
-  t.bgFit = 'cover'
+  t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
   const line = [speaker, passage].filter(Boolean).join('\n')
   t.song = { title, lines: [line], background: background ?? null }
@@ -1192,7 +1234,7 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
   return true
 }
 
-function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): void {
+function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean, bgFit?: 'cover' | 'contain'): void {
   const t = tracks[track]
   t.loadGeneration++
   t.hasLiveContent = true
@@ -1201,7 +1243,7 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
   t.songId = null
   t.scriptureRef = null
   clearSongMeta(track)
-  t.bgFit = 'cover'
+  t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // countdowns never carry a deck
   const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   let remaining = seconds
@@ -1253,7 +1295,7 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
 // Returns false (leaving the current slide untouched) when the reference can't be
 // resolved, so callers don't mark a failed scripture "live" and strand the wrong
 // content on the projector.
-async function doLoadScripture(track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> {
+async function doLoadScripture(track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean, fontScale?: number, bgFit?: 'cover' | 'contain'): Promise<boolean> {
   // Bump the generation synchronously, before the (possibly slow, non-KJV)
   // network await, and remember our value. If anything else loads onto this
   // track while we're waiting — including another scripture lookup — that call
@@ -1282,7 +1324,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   t.songId = null
   t.scriptureRef = reference
   clearSongMeta(track)
-  t.bgFit = 'cover'
+  t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // ad-hoc scripture loads never carry a deck
   const lines =
     result.verses.length === 1
@@ -1291,6 +1333,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   t.song = { title: result.reference!, lines, background: background ?? null }
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = blurBehindText ?? false
+  if (fontScale != null) t.fontScale = fontScale
   t.mode = 'lyrics'
   t.index = 0
   return true
@@ -1362,7 +1405,14 @@ async function doLoadAnnouncement(track: TrackId, id: number | null, item?: Serv
     // Title literally 'Announcement' triggers the ticker renderer (existing mechanism).
     doLoadText(track, 'Announcement', a.body)
   } else {
-    doLoadText(track, a.title, a.body, a.background ?? null, undefined, a.blurBehindText)
+    // The service item's own background/fontScale (set via its "My Backgrounds"
+    // picker) wins when present; falls back to the announcement record's own
+    // defaults so a plain "load this one announcement" caller (no item) still works.
+    const bg = (item?.payload.background as string | null | undefined) ?? a.background ?? null
+    const blur = (item?.payload.blurBehindText as boolean | undefined) ?? a.blurBehindText
+    const fontScale = item?.payload.fontScale as number | undefined
+    const bgFit = item?.payload.bgFit as 'cover' | 'contain' | undefined
+    doLoadText(track, a.title, a.body, bg, fontScale, blur, undefined, bgFit)
   }
   // doLoadText bumped loadGeneration, so read it back rather than capturing it earlier.
   if (item) void loadDeckOnto(track, item, tracks[track].loadGeneration)
@@ -1465,7 +1515,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined))) return  // lookup failed → don't mark it live
+    if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.payload.fontScale as number | undefined, item.payload.bgFit as 'cover' | 'contain' | undefined))) return  // lookup failed → don't mark it live
   } else if (item.type === 'text') {
     doLoadText(
       track,
@@ -1474,12 +1524,13 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
       (item.payload.background as string) ?? null,
       item.payload.fontScale as number | undefined,
       item.payload.blurBehindText as boolean | undefined,
-      item
+      item,
+      item.payload.bgFit as 'cover' | 'contain' | undefined
     )
   } else if (item.type === 'countdown') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    doLoadCountdown(track, secs, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
+    doLoadCountdown(track, secs, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.payload.bgFit as 'cover' | 'contain' | undefined)
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return
@@ -1487,7 +1538,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
     if (secs <= 0) return
-    doLoadCountdown(track, secs, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
+    doLoadCountdown(track, secs, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.payload.bgFit as 'cover' | 'contain' | undefined)
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return
@@ -1502,7 +1553,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
       (item.payload.passage as string) ?? '',
       item.payload.background as string | null | undefined,
       item.payload.blurBehindText as boolean | undefined,
-      item
+      item,
+      item.payload.bgFit as 'cover' | 'contain' | undefined
     )
   } else {
     return
@@ -1634,7 +1686,8 @@ function startTabletServer(): void {
   // don't pong back before the next tick.
   const aliveClients = new WeakSet<WsSocket>()
 
-  wss.on('connection', (ws: WsSocket) => {
+  wss.on('connection', (ws: WsSocket, req: IncomingMessage) => {
+    const remoteIp = req.socket.remoteAddress ?? 'unknown'
     tabletClients.add(ws)
     aliveClients.add(ws)
     ws.on('pong', () => aliveClients.add(ws))
@@ -1652,7 +1705,34 @@ function startTabletServer(): void {
     // on the 'main' track, same reasoning as tabletBroadcast/maybeAutoSwitchScene.
     ws.on('message', (data) => {
       try {
-        const msg = JSON.parse(data.toString()) as { type: string; intent?: string; itemId?: number }
+        const msg = JSON.parse(data.toString()) as { type: string; intent?: string; itemId?: number; pin?: string }
+
+        if (msg.type === 'auth') {
+          const failure = tabletAuthFailures.get(remoteIp)
+          if (failure && failure.lockedUntil > Date.now()) {
+            ws.send(JSON.stringify({ type: 'authResult', ok: false, lockedOutMs: failure.lockedUntil - Date.now() }))
+            return
+          }
+          if (typeof msg.pin === 'string' && msg.pin === getTabletPin()) {
+            authedTabletClients.add(ws)
+            tabletAuthFailures.delete(remoteIp)
+            ws.send(JSON.stringify({ type: 'authResult', ok: true }))
+          } else {
+            const fails = (failure?.count ?? 0) + 1
+            tabletAuthFailures.set(remoteIp, {
+              count: fails,
+              lockedUntil: fails >= TABLET_AUTH_MAX_FAILURES ? Date.now() + TABLET_AUTH_LOCKOUT_MS : 0
+            })
+            ws.send(JSON.stringify({ type: 'authResult', ok: false }))
+          }
+          return
+        }
+
+        // Everything below is a control action — require a prior successful auth.
+        if (!authedTabletClients.has(ws)) {
+          ws.send(JSON.stringify({ type: 'authResult', ok: false }))
+          return
+        }
         if (msg.type === 'intent' && msg.intent) {
           processIntent('main', msg.intent as Intent)
         } else if (msg.type === 'loadItem' && msg.itemId != null) {
@@ -2010,6 +2090,14 @@ ipcMain.handle('wf:logo:set', (_e, path: string | null, bg: string | null) => {
   zoneBroadcast()
 })
 
+// --- Zone screen scale IPCs ---
+ipcMain.handle('wf:zones:getScales', () => zoneScales)
+ipcMain.handle('wf:zones:setScale', (_e, zoneId: ZoneId, percent: number) => {
+  zoneScales = { ...zoneScales, [zoneId]: Math.min(150, Math.max(50, percent)) }
+  setSetting('zone_scales', JSON.stringify(zoneScales))
+  zoneBroadcast()
+})
+
 // --- CCLI IPCs ---
 ipcMain.handle('wf:ccli:getLicense', () => ccliLicense)
 ipcMain.handle('wf:ccli:setLicense', (_e, license: string | null) => {
@@ -2022,6 +2110,8 @@ ipcMain.handle('wf:ccli:clearUsage', () => clearSongUsage())
 
 // --- Tablet IPCs ---
 ipcMain.handle('wf:getTabletUrl', () => `http://${getLocalIp()}:${boundTabletPort}`)
+ipcMain.handle('wf:getTabletPin', () => getTabletPin())
+ipcMain.handle('wf:regenerateTabletPin', () => regenerateTabletPin())
 
 // Rebuilds activeServiceItems (and dependent theme/notes state) from the DB.
 // This is the cache handleTabletLoadItem/computeZoneStates read to resolve an
@@ -2144,8 +2234,8 @@ ipcMain.handle('wf:recordings:saveAi', (_e, recordingId: number, fields: { aiTit
   setRecordingAi(recordingId, fields)
 })
 ipcMain.handle('wf:recordings:revealPath', async (_e, p: string) => { if (p) shell.showItemInFolder(p) })
-ipcMain.handle('wf:recordings:getAnthropicKey', () => getSetting('anthropic_api_key') ?? '')
-ipcMain.handle('wf:recordings:setAnthropicKey', (_e, key: string) => { setSetting('anthropic_api_key', key || null) })
+ipcMain.handle('wf:recordings:getAnthropicKey', () => getSecretSetting('anthropic_api_key') ?? '')
+ipcMain.handle('wf:recordings:setAnthropicKey', (_e, key: string) => { setSecretSetting('anthropic_api_key', key || null) })
 ipcMain.handle('wf:obs:setScene', (_e, sceneName: string) => {
   lastAutoScene = sceneName  // manual switch updates the baseline so auto-switch won't fight it
   return obsSetScene(sceneName)
@@ -2260,6 +2350,7 @@ ipcMain.handle('wf:services:addItem', (_e, serviceId: number, item: NewServiceIt
   addServiceItem(serviceId, item)
 )
 ipcMain.handle('wf:services:removeItem', (_e, itemId: number) => removeServiceItem(itemId))
+ipcMain.handle('wf:services:duplicateItem', (_e, itemId: number) => duplicateServiceItem(itemId))
 ipcMain.handle('wf:services:moveItem', (_e, itemId: number, dir: 'up' | 'down') =>
   moveServiceItem(itemId, dir)
 )
@@ -2603,7 +2694,7 @@ ipcMain.handle('wf:bg:generate', async (_e: unknown, prompt: string) => {
   const provider = getSetting('ai_provider') ?? 'pollinations'
 
   if (provider === 'replicate') {
-    const apiKey = getSetting('replicate_api_key')
+    const apiKey = getSecretSetting('replicate_api_key')
     if (!apiKey) {
       throw new Error('Replicate API key not set. Switch to Free, or paste your key in the AI Generate tab, then Save.')
     }
@@ -2677,9 +2768,15 @@ ipcMain.handle('wf:songs:setBgMotion', (_e: unknown, id: number, motion: string 
   setSongBgMotion(id, motion)
 })
 
-// Settings getter/setter (used by Settings tab for API keys etc.)
-ipcMain.handle('wf:setting:get', (_e: unknown, key: string) => getSetting(key))
-ipcMain.handle('wf:setting:set', (_e: unknown, key: string, value: string | null) => setSetting(key, value))
+// Settings getter/setter (used by Settings tab for API keys etc.). A handful
+// of keys are secrets (API keys, credentials) and route through the
+// safeStorage-encrypted helpers instead of the plaintext ones — everything
+// else (church name, chunk budgets, provider choice, ...) is unaffected.
+const SECRET_SETTING_KEYS = new Set(['replicate_api_key', 'anthropic_api_key', 'obs_password'])
+ipcMain.handle('wf:setting:get', (_e: unknown, key: string) =>
+  SECRET_SETTING_KEYS.has(key) ? getSecretSetting(key) : getSetting(key))
+ipcMain.handle('wf:setting:set', (_e: unknown, key: string, value: string | null) =>
+  SECRET_SETTING_KEYS.has(key) ? setSecretSetting(key, value) : setSetting(key, value))
 
 // Pop-out song editor window
 let editorWin: BrowserWindow | null = null
@@ -2900,6 +2997,10 @@ app.whenReady().then(async () => {
   ccliLicense = getSetting('ccli_license')
   logoPath = getSetting('logo_path')
   logoBg = getSetting('logo_bg')
+  const storedZoneScales = getSetting('zone_scales')
+  if (storedZoneScales) {
+    try { zoneScales = { ...zoneScales, ...JSON.parse(storedZoneScales) } } catch { /* keep defaults */ }
+  }
 
   const soundCheckState = new SoundCheckState()
   await soundCheckState.initialize()

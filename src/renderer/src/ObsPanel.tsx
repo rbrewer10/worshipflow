@@ -57,8 +57,11 @@ function ObsPanel(): JSX.Element {
   // Load saved settings + current status on mount.
   useEffect(() => {
     try {
+      // Host/port only — the password is never cached in the renderer. Main
+      // process is the sole source of truth (encrypted at rest, see db.ts's
+      // setSecretSetting) and already auto-reconnects with it on startup.
       const c = localStorage.getItem('wf-obs-conn')
-      if (c) { const p = JSON.parse(c); setHost(p.host ?? 'localhost'); setPort(p.port ?? '4455'); setPassword(p.password ?? '') }
+      if (c) { const p = JSON.parse(c); setHost(p.host ?? 'localhost'); setPort(p.port ?? '4455') }
       const s = localStorage.getItem('wf-obs-scenes')
       if (s) setSceneMap(JSON.parse(s))
       const a = localStorage.getItem('wf-obs-autoswitch')
@@ -113,7 +116,7 @@ function ObsPanel(): JSX.Element {
 
   const connect = async (): Promise<void> => {
     setConnecting(true)
-    localStorage.setItem('wf-obs-conn', JSON.stringify({ host, port, password }))
+    localStorage.setItem('wf-obs-conn', JSON.stringify({ host, port }))
     const result = await window.wf.obsConnect(host, Number(port) || 4455, password)
     setStatus(result)
     setConnecting(false)

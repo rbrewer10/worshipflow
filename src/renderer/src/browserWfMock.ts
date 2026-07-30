@@ -289,6 +289,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       return id
     },
     serviceRemoveItem: noop,
+    serviceDuplicateItem: async (): Promise<number | null> => null,
     serviceMoveItem: noop,
     serviceUpdateItemNotes: noop,
     serviceSetTheme: async (serviceId: number, themeId: string | null, colors: ThemeColors | null): Promise<void> => {
@@ -362,6 +363,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     serviceOpen: noop,
 
     getTabletUrl: async (): Promise<string> => 'Browser preview only',
+    getTabletPin: async (): Promise<string> => '000000',
+    regenerateTabletPin: async (): Promise<string> => '000000',
     setActiveService: async (serviceId: number | null): Promise<void> => { activeServiceId = serviceId },
     getActiveServiceId: async (): Promise<number | null> => activeServiceId,
     featuresStartAutoAdvance: noop,
@@ -410,6 +413,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
 
     logoGet: async (): Promise<{ logoPath: string | null; logoBg: string | null }> => ({ logoPath: null, logoBg: null }),
     logoSet: noop,
+    zonesGetScales: async (): Promise<Record<ZoneId, number>> => ({ 1: 100, 2: 100, 3: 100, 4: 100 }),
+    zonesSetScale: noop,
     ccliGetLicense: async (): Promise<string | null> => null,
     ccliSetLicense: noop,
     ccliListUsage: async (): Promise<SongUsage[]> => [],

@@ -1,25 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Hourglass } from 'lucide-react'
 import type { LiveState, ServiceItem } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
 import OutputPreview from './OutputPreview'
-import { sendItemLive, itemThumbBackground } from './liveActions'
+import { sendItemLive, itemThumbBackground, usePendingConfirm } from './liveActions'
 
 // Persistent left rail: the loaded service's items + the pinned output preview.
 function ServiceRail(): JSX.Element {
   const { activeService } = useService()
   const [live, setLive] = useState<LiveState | null>(null)
-  const [pendingId, setPendingId] = useState<number | null>(null)
+  const { pendingKey, trigger, cancel } = usePendingConfirm()
   const [songBg, setSongBg] = useState<Record<number, string | null>>({})
-  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     const off = window.wf.onState((s) => setLive(s.main))
     window.wf.getState('main').then(setLive)
     // Also cancel a pending tap-to-confirm on unmount so it can't fire the
     // wrong item live after the operator navigates away from the Live tab.
-    return () => { off(); if (pendingTimer.current) clearTimeout(pendingTimer.current) }
-  }, [])
+    return () => { off(); cancel() }
+  }, [cancel])
 
   useEffect(() => {
     window.wf.songsList().then((list) => {
@@ -32,16 +31,7 @@ function ServiceRail(): JSX.Element {
   const liveId = live?.liveServiceItemId ?? null
 
   const handleItemClick = (it: ServiceItem): void => {
-    if (pendingId === it.id) {
-      if (pendingTimer.current) clearTimeout(pendingTimer.current)
-      setPendingId(null)
-      return
-    }
-    setPendingId(it.id)
-    pendingTimer.current = setTimeout(() => {
-      sendItemLive(it, 'main')
-      setPendingId(null)
-    }, 1500)
+    trigger(String(it.id), () => { sendItemLive(it, 'main') })
   }
 
   return (
@@ -73,19 +63,19 @@ function ServiceRail(): JSX.Element {
                 className={`relative flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-left transition-colors min-h-10 ${
                   liveId === it.id
                     ? 'bg-blue-600/15 ring-1 ring-blue-500/50'
-                    : pendingId === it.id
+                    : pendingKey === String(it.id)
                     ? 'bg-amber-500/20 ring-2 ring-amber-500/60'
                     : 'hover:bg-slate-100'
                 }`}
               >
-                {pendingId === it.id && (
+                {pendingKey === String(it.id) && (
                   <div className="absolute inset-0 rounded-md border-2 border-amber-400 animate-pulse" />
                 )}
                 <div className="w-10 shrink-0">
                   <SlideThumb label="" itemStyle={it.style} serviceTheme={activeService?.theme ?? null} serviceColors={activeService?.themeColors ?? null} bgFile={itemThumbBackground(it, songBg)} />
                 </div>
                 <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{it.title}</span>
-                {pendingId === it.id
+                {pendingKey === String(it.id)
                   ? <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-amber-700"><Hourglass size={11} /> tap to cancel</span>
                   : liveId === it.id
                   ? <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
