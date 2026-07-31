@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileDown, Film, Image as ImageIcon, Music, Plus, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, FileDown, Film, Image as ImageIcon, Music, Plus, X } from 'lucide-react'
 import type { SongSummary } from '../../shared/types'
 import CcliPanel from './CcliPanel'
 import SongEditor from './editor/SongEditor'
@@ -7,6 +7,53 @@ import PptxImport from './PptxImport'
 import Modal from './Modal'
 import { useAutosave } from './useAutosave'
 import { notifyLocalAction } from './NotifyToasts'
+import { findDuplicateSongTitles } from './songDuplicates'
+
+// Surfaces titles that are already duplicated in the library (left over from
+// before the New Song draft-gate warned about this going forward) — the
+// audit specifically noted finding several. Reuses the parent's own
+// edit/delete handlers rather than its own, so cleanup here goes through the
+// exact same confirm-and-Undo path as the main list.
+function DuplicateSongsPanel({ onEdit, onDelete }: { onEdit: (id: number) => void; onDelete: (id: number) => void }): JSX.Element | null {
+  const [groups, setGroups] = useState<ReturnType<typeof findDuplicateSongTitles>>([])
+  const [expanded, setExpanded] = useState(false)
+
+  const load = (): void => {
+    window.wf.songsList('').then((list) => setGroups(findDuplicateSongTitles(list)))
+  }
+  useEffect(load, [])
+
+  const total = groups.reduce((n, g) => n + g.songs.length, 0)
+  if (total === 0) return null
+
+  return (
+    <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06]">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-amber-800"
+      >
+        <AlertTriangle size={13} className="shrink-0" />
+        <span className="flex-1">{groups.length} duplicate title{groups.length === 1 ? '' : 's'} in your library ({total} songs)</span>
+        {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+      </button>
+      {expanded && (
+        <div className="space-y-2 border-t border-amber-500/20 px-3 py-2">
+          {groups.map((g) => (
+            <div key={g.normalizedTitle}>
+              {g.songs.map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2 py-0.5 text-xs">
+                  <span className="min-w-0 flex-1 truncate text-slate-700">{s.title}</span>
+                  <button onClick={() => onEdit(s.id)} className="shrink-0 text-slate-500 hover:text-slate-900">Edit</button>
+                  <button onClick={() => onDelete(s.id)} className="shrink-0 text-red-600 hover:text-red-700">Delete</button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function SongLibrary(): JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([])
@@ -137,6 +184,7 @@ function SongLibrary(): JSX.Element {
       {/* Library list */}
       <div className="flex w-96 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
         <CcliPanel />
+        <DuplicateSongsPanel onEdit={setEditorId} onDelete={remove} />
         <PptxImport onImported={() => refresh()} />
         <button
           onClick={async () => {
