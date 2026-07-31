@@ -10,6 +10,9 @@ import type { ServiceItem, ItemStyle, ThemeColors, SongFull } from '../../shared
 import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 import BackgroundLibraryGrid from './BackgroundLibraryGrid'
 import { resolveBackgroundApply } from './drawer/resolveBackgroundApply'
+import { useAutosave } from './useAutosave'
+import { combineSaveStatus } from './saveQueue'
+import SaveStatusBadge from './SaveStatusBadge'
 
 export interface ItemBackgroundPanelProps {
   item: ServiceItem
@@ -22,11 +25,25 @@ export interface ItemBackgroundPanelProps {
 export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemBackgroundPanelProps): JSX.Element {
   const [tab, setTab] = useState<'library' | 'presets'>('library')
 
-  const apply = (style: ItemStyle): Promise<void> =>
-    window.wf.serviceSetItemStyle(item.id, style).then(onChanged)
-  const clearStyle = (): Promise<void> => window.wf.serviceSetItemStyle(item.id, null).then(onChanged)
-  const savePayload = (next: Record<string, unknown>): Promise<void> =>
-    window.wf.serviceSetItemPayload(item.id, next).then(onChanged)
+  // Serialized + retryable saves (see saveQueue.ts) — this panel's clicks
+  // (theme swatches, color drags, background picks) previously fired
+  // `window.wf...().then(onChanged)` with no catch: a rejected save vanished
+  // silently while the swatch still looked selected.
+  const styleQueue = useAutosave<ItemStyle | null>((style) => window.wf.serviceSetItemStyle(item.id, style).then(() => onChanged()))
+  const payloadQueue = useAutosave<Record<string, unknown>>((next) => window.wf.serviceSetItemPayload(item.id, next).then(() => onChanged()))
+  const songBgQueue = useAutosave<{ refId: number; path: string | null }>(({ refId, path }) =>
+    window.wf.songSetBackground(refId, path).then(() => onChanged())
+  )
+  const songBlurQueue = useAutosave<{ refId: number; value: boolean }>(({ refId, value }) =>
+    window.wf.songSetBlurBehindText(refId, value).then(() => onChanged())
+  )
+  const saveStatus = combineSaveStatus([styleQueue.status, payloadQueue.status, songBgQueue.status, songBlurQueue.status])
+  const saveError = styleQueue.error ?? payloadQueue.error ?? songBgQueue.error ?? songBlurQueue.error ?? null
+  const retrySave = (): void => { styleQueue.retry(); payloadQueue.retry(); songBgQueue.retry(); songBlurQueue.retry() }
+
+  const apply = (style: ItemStyle): void => styleQueue.trigger(style)
+  const clearStyle = (): void => styleQueue.trigger(null)
+  const savePayload = (next: Record<string, unknown>): void => payloadQueue.trigger(next)
 
   const motionThemes = THEMES.filter((t) => t.kind === 'motion')
   const overrideThemeId = item.style?.theme
@@ -51,22 +68,23 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
 
   // Routes a pick to wherever this item type actually stores its background —
   // the same split the Live drawer's Backgrounds tab already goes through.
-  const applyBackground = (path: string | null): Promise<void> => {
+  const applyBackground = (path: string | null): void => {
     if (isSong && item.ref_id != null) {
-      return window.wf.songSetBackground(item.ref_id, path).then(onChanged)
+      songBgQueue.trigger({ refId: item.ref_id, path })
+      return
     }
     const action = resolveBackgroundApply(item, path ?? '')
     if (action.kind === 'payload') {
-      return savePayload({ ...payload, background: path })
+      savePayload({ ...payload, background: path })
     }
-    return Promise.resolve()
   }
 
-  const toggleBlur = (): Promise<void> => {
+  const toggleBlur = (): void => {
     if (isSong && item.ref_id != null) {
-      return window.wf.songSetBlurBehindText(item.ref_id, !blurBehindText).then(onChanged)
+      songBlurQueue.trigger({ refId: item.ref_id, value: !blurBehindText })
+      return
     }
-    return savePayload({ ...payload, blurBehindText: !blurBehindText })
+    savePayload({ ...payload, blurBehindText: !blurBehindText })
   }
 
   // Current resolved colors for the override theme (if any), used as <input> values.
@@ -198,9 +216,12 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
 
   return (
     <div className="flex flex-col gap-3 bg-[#f4f6f9] text-slate-900">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-        Background &amp; Color
-      </span>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+          Background &amp; Color
+        </span>
+        <SaveStatusBadge status={saveStatus} error={saveError} onRetry={retrySave} />
+      </div>
 
       {/* ── Blur behind text ── */}
       <button

@@ -5,6 +5,7 @@ import CcliPanel from './CcliPanel'
 import SongEditor from './editor/SongEditor'
 import PptxImport from './PptxImport'
 import Modal from './Modal'
+import { useAutosave } from './useAutosave'
 
 function SongLibrary(): JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([])
@@ -40,16 +41,21 @@ function SongLibrary(): JSX.Element {
     setConfirmDelete(null)
   }
 
+  // Serialized so picking backgrounds on two different rows in quick
+  // succession can't land out of order, and a rejected write surfaces as a
+  // toast (see saveQueue.ts) instead of vanishing — previously this had no
+  // catch at all.
+  const bgQueue = useAutosave<{ id: number; path: string | null }>(({ id, path }) =>
+    window.wf.songSetBackground(id, path).then(() => refresh())
+  )
   const pickBg = async (id: number): Promise<void> => {
     const result = await window.wf.dialogOpenFile()
     if (result.canceled || !result.filePaths[0]) return
-    await window.wf.songSetBackground(id, result.filePaths[0])
-    refresh()
+    bgQueue.trigger({ id, path: result.filePaths[0] })
   }
 
-  const clearBg = async (id: number): Promise<void> => {
-    await window.wf.songSetBackground(id, null)
-    refresh()
+  const clearBg = (id: number): void => {
+    bgQueue.trigger({ id, path: null })
   }
 
   const createSong = async (): Promise<void> => {

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { Announcement, AnnouncementInput } from '../../shared/types'
 import { announcementExpired } from '../../shared/announcementSchedule'
 import BackgroundLibraryGrid from './BackgroundLibraryGrid'
+import { useAutosave } from './useAutosave'
+import SaveStatusBadge from './SaveStatusBadge'
 
 // Edits one announcement. Loads the full record by id, saves via announcementUpdate
 // (dates/toggles save immediately; text fields save on blur to avoid a DB write per
@@ -13,12 +15,16 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
     window.wf.announcementGet(id).then(setA)
   }, [id])
 
+  const { status, error, trigger, retry } = useAutosave<AnnouncementInput>((input) =>
+    window.wf.announcementUpdate(id, input).then(() => onSaved())
+  )
+
   if (!a) return <div className="text-sm text-slate-500">Loading…</div>
 
   const save = (patch: Partial<Announcement>): void => {
     const next = { ...a, ...patch }
     setA(next)
-    const input: AnnouncementInput = {
+    trigger({
       title: next.title,
       body: next.body,
       display: next.display,
@@ -28,8 +34,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
       startDate: next.startDate,
       endDate: next.endDate,
       active: next.active
-    }
-    window.wf.announcementUpdate(id, input).then(onSaved)
+    })
   }
 
   const expired = announcementExpired(a, new Date().toISOString().slice(0, 10))
@@ -43,13 +48,16 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
-      <input
-        value={a.title}
-        onChange={(e) => setA({ ...a, title: e.target.value })}
-        onBlur={() => save({ title: a.title })}
-        placeholder="Announcement title"
-        className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-lg font-semibold outline-none focus:border-blue-500"
-      />
+      <div className="flex items-center justify-between gap-2">
+        <input
+          value={a.title}
+          onChange={(e) => setA({ ...a, title: e.target.value })}
+          onBlur={() => save({ title: a.title })}
+          placeholder="Announcement title"
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-lg font-semibold outline-none focus:border-blue-500"
+        />
+        <SaveStatusBadge status={status} error={error} onRetry={retry} />
+      </div>
       <textarea
         value={a.body}
         onChange={(e) => setA({ ...a, body: e.target.value })}

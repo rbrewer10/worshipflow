@@ -1,6 +1,7 @@
 import { memo, useEffect } from 'react'
 import { Trash2, X } from 'lucide-react'
 import type { ServiceItem, SongFull, ThemeColors } from '../../shared/types'
+import { NON_LIVE_TYPES } from '../../shared/types'
 import ServiceSlidePreview from './ServiceSlidePreview'
 import ItemBackgroundPanel from './ItemBackgroundPanel'
 import { SongEditor } from './editors/SongEditor'
@@ -11,6 +12,10 @@ import { CountdownEditor } from './editors/CountdownEditor'
 import { TickerEditor } from './editors/TickerEditor'
 import { SermonEditor } from './editors/SermonEditor'
 import AnnouncementItemEditor from './AnnouncementItemEditor'
+import { HeaderEditor } from './editors/HeaderEditor'
+import { PlaceholderEditor } from './editors/PlaceholderEditor'
+import SaveStatusBadge from './SaveStatusBadge'
+import type { SaveStatus } from './useAutosave'
 
 interface ItemEditorProps {
   item: ServiceItem
@@ -20,6 +25,9 @@ interface ItemEditorProps {
   onClose: () => void
   onChanged: () => void
   onDelete: (item: ServiceItem) => void
+  saveStatus: SaveStatus
+  saveError: string | null
+  onRetrySave: () => void
   songFull: SongFull | null
   lyrics: string
   showChords: boolean
@@ -51,6 +59,9 @@ export const ItemEditor = memo(function ItemEditor({
   onClose,
   onChanged,
   onDelete,
+  saveStatus,
+  saveError,
+  onRetrySave,
   songFull,
   lyrics,
   showChords,
@@ -90,11 +101,14 @@ export const ItemEditor = memo(function ItemEditor({
     <div className="card-lg flex w-80 shrink-0 flex-col gap-3 overflow-auto text-slate-900 animate-[fade-in_0.15s_ease-out]">
       <div className="flex items-center justify-between">
         <h3 className="section-title capitalize">{item.type}</h3>
-        <button onClick={onClose} aria-label="Close item editor" className="btn-pill text-xs"><X size={12} /> Close</button>
+        <div className="flex items-center gap-2">
+          <SaveStatusBadge status={saveStatus} error={saveError} onRetry={onRetrySave} />
+          <button onClick={onClose} aria-label="Close item editor" className="btn-pill text-xs"><X size={12} /> Close</button>
+        </div>
       </div>
 
-      {/* Live slide preview */}
-      {showPreview !== false && (
+      {/* Live slide preview — headers/placeholders never go live, nothing to preview */}
+      {showPreview !== false && !NON_LIVE_TYPES.includes(item.type) && (
         <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} />
       )}
 
@@ -124,7 +138,9 @@ export const ItemEditor = memo(function ItemEditor({
       {item.type === 'scripture' && (
         <ScriptureEditor
           reference={(payload.reference as string) ?? ''}
+          fontScale={(payload.fontScale as number) ?? 6}
           onReferenceChange={(ref) => savePayload({ ...payload, reference: ref })}
+          onFontScaleChange={(scale) => savePayload({ ...payload, fontScale: scale })}
         />
       )}
 
@@ -178,13 +194,33 @@ export const ItemEditor = memo(function ItemEditor({
           refId={item.ref_id}
           refIds={(payload.refIds as number[] | undefined) ?? []}
           onChange={(refIds) => savePayload({ ...payload, refIds })}
+          fontScale={(payload.fontScale as number) ?? 6}
+          onFontScaleChange={(scale) => savePayload({ ...payload, fontScale: scale })}
         />
       )}
 
-      {/* ── Background & Color ── */}
-      <div className="border-t border-slate-200 pt-3">
-        <ItemBackgroundPanel item={item} songFull={songFull} onChanged={onChanged} />
-      </div>
+      {item.type === 'header' && (
+        <HeaderEditor
+          label={(payload.label as string) ?? ''}
+          color={(payload.color as string) ?? '#64748b'}
+          onLabelChange={(label) => savePayload({ ...payload, label })}
+          onColorChange={(color) => savePayload({ ...payload, color })}
+        />
+      )}
+
+      {item.type === 'placeholder' && (
+        <PlaceholderEditor
+          label={(payload.label as string) ?? ''}
+          onLabelChange={(label) => savePayload({ ...payload, label })}
+        />
+      )}
+
+      {/* ── Background & Color — headers/placeholders never render on screen ── */}
+      {!NON_LIVE_TYPES.includes(item.type) && (
+        <div className="border-t border-slate-200 pt-3">
+          <ItemBackgroundPanel item={item} songFull={songFull} onChanged={onChanged} />
+        </div>
+      )}
 
       {/* Notes */}
       <div>

@@ -3,6 +3,8 @@ import type { ServiceItem, SongFull, SongInput, ThemeColors } from '../../shared
 import { ItemEditor } from './ItemEditor'
 import { parseSections, sectionsToText } from './songText'
 import { analyzeAndLabelSections, previewAutoLabels } from './autoLabel'
+import { useAutosave } from './useAutosave'
+import { combineSaveStatus } from './saveQueue'
 
 function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, onClose, onChanged, onDelete }: {
   item: ServiceItem
@@ -17,14 +19,13 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   const [notes, setNotes] = useState(item.notes ?? '')
   const [songFull, setSongFull] = useState<SongFull | null>(null)
   const [lyrics, setLyrics] = useState('')
-  const [songSaved, setSongSaved] = useState(false)
   const [showAutoLabelPreview, setShowAutoLabelPreview] = useState(false)
   const [autoLabelPreview, setAutoLabelPreview] = useState('')
   const [autoLabelAnalyses, setAutoLabelAnalyses] = useState<any[]>([])
   const [showChords, setShowChords] = useState(true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    setP(item.payload ?? {}); setNotes(item.notes ?? ''); setSongSaved(false)
+    setP(item.payload ?? {}); setNotes(item.notes ?? '')
     if (item.type === 'song' && item.ref_id != null) {
       window.wf.songGet(item.ref_id).then((s) => { setSongFull(s); setLyrics(s ? sectionsToText(s) : '') })
     } else {
@@ -32,28 +33,30 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
     }
   }, [item.id])
 
-  const pickSongBg = async (): Promise<void> => {
-    if (!songFull) return
-    const result = await window.wf.dialogOpenFile()
-    if (!result.canceled && result.filePaths[0]) {
-      await window.wf.songSetBackground(songFull.id, result.filePaths[0])
-      window.wf.songGet(songFull.id).then(setSongFull)
+  // One save queue per independent thing this panel persists — see
+  // saveQueue.ts. Routing the song record's background changes through the
+  // same queue as saveSong (rather than awaiting them directly) means a
+  // background pick can never land out of order against an in-flight lyric
+  // save to the same song row.
+  const songQueue = useAutosave<SongInput & { __id: number }>(({ __id, ...input }) =>
+    window.wf.songUpdate(__id, input).then(() => {
+      window.wf.songGet(__id).then(setSongFull)
       onChanged()
-    }
-  }
+    })
+  )
+  const payloadQueue = useAutosave<Record<string, unknown>>((next) =>
+    window.wf.serviceSetItemPayload(item.id, next).then(() => onChanged())
+  )
+  const notesQueue = useAutosave<string>((value) =>
+    window.wf.serviceUpdateItemNotes(item.id, value.trim() || null).then(() => onChanged())
+  )
 
-  const removeSongBg = async (): Promise<void> => {
-    if (!songFull) return
-    await window.wf.songSetBackground(songFull.id, null)
-    window.wf.songGet(songFull.id).then(setSongFull)
-    onChanged()
-  }
-
-  const saveSong = (): void => {
-    if (!songFull) return
+  const buildSongInput = (overrides: Partial<SongInput> = {}): (SongInput & { __id: number }) | null => {
+    if (!songFull) return null
     const sections = parseSections(lyrics)
     const validArr = (songFull.arrangement ?? []).filter((i) => i < sections.length)
-    const input: SongInput = {
+    return {
+      __id: songFull.id,
       title: songFull.title,
       author: songFull.author ?? undefined,
       ccli: songFull.ccli ?? undefined,
@@ -67,20 +70,40 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
       bgMotion: songFull.bgMotion,
       textColor: songFull.textColor,
       font: songFull.font,
-      blurBehindText: songFull.blurBehindText
+      blurBehindText: songFull.blurBehindText,
+      ...overrides
     }
-    window.wf.songUpdate(songFull.id, input).then(() => {
-      setSongSaved(true)
-      setTimeout(() => setSongSaved(false), 2500)
-      onChanged()
-    })
+  }
+
+  const pickSongBg = async (): Promise<void> => {
+    if (!songFull) return
+    const result = await window.wf.dialogOpenFile()
+    if (!result.canceled && result.filePaths[0]) {
+      const input = buildSongInput({ background: result.filePaths[0] })
+      if (input) songQueue.trigger(input)
+    }
+  }
+
+  const removeSongBg = async (): Promise<void> => {
+    if (!songFull) return
+    const input = buildSongInput({ background: null })
+    if (input) songQueue.trigger(input)
+  }
+
+  const saveSong = (): void => {
+    const input = buildSongInput()
+    if (input) songQueue.trigger(input)
   }
 
   const savePayload = (next: Record<string, unknown>): void => {
     setP(next)
-    window.wf.serviceSetItemPayload(item.id, next).then(onChanged)
+    payloadQueue.trigger(next)
   }
-  const saveNotes = (): void => { window.wf.serviceUpdateItemNotes(item.id, notes.trim() || null).then(onChanged) }
+  const saveNotes = (): void => { notesQueue.trigger(notes) }
+
+  const saveStatus = combineSaveStatus([songQueue.status, payloadQueue.status, notesQueue.status])
+  const saveError = songQueue.error ?? payloadQueue.error ?? notesQueue.error ?? null
+  const retrySave = (): void => { songQueue.retry(); payloadQueue.retry(); notesQueue.retry() }
 
   const handleAutoLabel = (): void => {
     const analyses = analyzeAndLabelSections(lyrics)
@@ -104,6 +127,9 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
       onClose={onClose}
       onChanged={onChanged}
       onDelete={onDelete}
+      saveStatus={saveStatus}
+      saveError={saveError}
+      onRetrySave={retrySave}
       songFull={songFull}
       lyrics={lyrics}
       showChords={showChords}

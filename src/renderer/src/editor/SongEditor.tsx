@@ -9,6 +9,9 @@ import { computeEditorSlides, applySlideEdit } from './slideCompute'
 import SlideStrip from './SlideStrip'
 import SlideCanvas from './SlideCanvas'
 import BackgroundPanel from './BackgroundPanel'
+import { useAutosave } from '../useAutosave'
+import { combineSaveStatus } from '../saveQueue'
+import SaveStatusBadge from '../SaveStatusBadge'
 
 export default function SongEditor({ songId, onSaved }: {
   songId: number
@@ -16,7 +19,6 @@ export default function SongEditor({ songId, onSaved }: {
 }): JSX.Element {
   const [song, setSong] = useState<SongFull | null>(null)
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
-  const [saving, setSaving] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const titleRef = useRef<HTMLInputElement>(null)
@@ -29,6 +31,34 @@ export default function SongEditor({ songId, onSaved }: {
 
   useEffect(() => { load() }, [load])
 
+  // One queue for the main record (title/lyrics/sections/arrangement — the
+  // fields edited continuously while typing/reordering slides) plus one per
+  // one-off setter, each hitting its own targeted IPC call so a background
+  // pick can't accidentally clobber a concurrent lyric edit or vice versa.
+  // Previously each of these was `if (saving) return; ...; await ...` with no
+  // catch: a save that arrived while another was in flight was silently
+  // DROPPED (not queued), and a rejected save left `saving` stuck true
+  // forever with the editor showing "Saving…" indefinitely — exactly the
+  // audit's complaint.
+  const songQueue = useAutosave<SongInput>((input) => window.wf.songUpdate(songId, input).then(() => onSaved?.()))
+  const bgQueue = useAutosave<string | null>((path) => window.wf.songSetBackground(songId, path))
+  const bgMotionQueue = useAutosave<SongFull['bgMotion']>((motion) => window.wf.songSetBgMotion(songId, motion))
+  const blurQueue = useAutosave<boolean>((value) => window.wf.songSetBlurBehindText(songId, value))
+  const fontScaleQueue = useAutosave<number>((scale) => window.wf.songSetFontScale(songId, scale))
+  const textColorQueue = useAutosave<string>((color) => window.wf.songSetTextColor(songId, color))
+  const fontQueue = useAutosave<SongFull['font']>((font) => window.wf.songSetFont(songId, font))
+
+  const saveStatus = combineSaveStatus([
+    songQueue.status, bgQueue.status, bgMotionQueue.status,
+    blurQueue.status, fontScaleQueue.status, textColorQueue.status, fontQueue.status
+  ])
+  const saveError = songQueue.error ?? bgQueue.error ?? bgMotionQueue.error ?? blurQueue.error
+    ?? fontScaleQueue.error ?? textColorQueue.error ?? fontQueue.error ?? null
+  const retrySave = (): void => {
+    songQueue.retry(); bgQueue.retry(); bgMotionQueue.retry()
+    blurQueue.retry(); fontScaleQueue.retry(); textColorQueue.retry(); fontQueue.retry()
+  }
+
   if (!song) {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>
   }
@@ -37,8 +67,6 @@ export default function SongEditor({ songId, onSaved }: {
   const activeSlide = slides[activeSlideIndex] ?? null
 
   const saveSong = async (updated: SongFull): Promise<void> => {
-    if (saving) return
-    setSaving(true)
     const input: SongInput = {
       title: updated.title,
       author: updated.author ?? undefined,
@@ -55,9 +83,7 @@ export default function SongEditor({ songId, onSaved }: {
       font: updated.font,
       blurBehindText: updated.blurBehindText
     }
-    await window.wf.songUpdate(songId, input)
-    setSaving(false)
-    onSaved?.()
+    songQueue.trigger(input)
   }
 
   const handleTextChange = async (sectionOrdinal: number, lineStart: number, lineCount: number, newText: string): Promise<void> => {
@@ -110,46 +136,42 @@ export default function SongEditor({ songId, onSaved }: {
     setActiveSlideIndex((i) => Math.min(i, Math.max(0, newSlides.length - 1)))
   }
 
-  const handleApplyBackground = async (bgPath: string): Promise<void> => {
+  const handleApplyBackground = (bgPath: string): void => {
     if (!song) return
     // bgPath can be empty string meaning "clear background"
     const path = bgPath || null
-    const updated = { ...song, background: path }
-    setSong(updated)
-    await window.wf.songSetBackground(songId, path)
+    setSong({ ...song, background: path })
+    bgQueue.trigger(path)
   }
 
-  const handleBgMotionChange = async (motion: SongFull['bgMotion']): Promise<void> => {
+  const handleBgMotionChange = (motion: SongFull['bgMotion']): void => {
     if (!song) return
-    const updated = { ...song, bgMotion: motion }
-    setSong(updated)
-    await window.wf.songSetBgMotion(songId, motion)
+    setSong({ ...song, bgMotion: motion })
+    bgMotionQueue.trigger(motion)
   }
 
-  const handleBlurBehindTextChange = async (value: boolean): Promise<void> => {
+  const handleBlurBehindTextChange = (value: boolean): void => {
     if (!song) return
-    const updated = { ...song, blurBehindText: value }
-    setSong(updated)
-    await window.wf.songSetBlurBehindText(songId, value)
+    setSong({ ...song, blurBehindText: value })
+    blurQueue.trigger(value)
   }
 
-  const handleFontScaleChange = async (scale: number): Promise<void> => {
+  const handleFontScaleChange = (scale: number): void => {
     if (!song) return
-    const updated = { ...song, fontScale: scale }
-    setSong(updated)
-    await window.wf.songSetFontScale(songId, scale)
+    setSong({ ...song, fontScale: scale })
+    fontScaleQueue.trigger(scale)
   }
 
-  const handleTextColorChange = async (color: string): Promise<void> => {
+  const handleTextColorChange = (color: string): void => {
     if (!song) return
     setSong({ ...song, textColor: color })
-    await window.wf.songSetTextColor(songId, color)
+    textColorQueue.trigger(color)
   }
 
-  const handleFontChange = async (font: SongFull['font']): Promise<void> => {
+  const handleFontChange = (font: SongFull['font']): void => {
     if (!song) return
     setSong({ ...song, font })
-    await window.wf.songSetFont(songId, font)
+    fontQueue.trigger(font)
   }
 
   const colorSwatches: { hex: string; label: string }[] = [
@@ -192,7 +214,7 @@ export default function SongEditor({ songId, onSaved }: {
           {song.author && <p className="truncate px-1 text-xs text-slate-500">{song.author}</p>}
         </div>
 
-        {saving && <span className="animate-pulse text-xs text-slate-500">Saving…</span>}
+        <SaveStatusBadge status={saveStatus} error={saveError} onRetry={retrySave} />
 
         <button
           onClick={handleDeleteSlide}
