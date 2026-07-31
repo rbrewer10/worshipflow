@@ -190,6 +190,7 @@ export default function SlideCanvas({ song, slide, onTextChange, onFontScaleChan
           <div className="absolute inset-0 flex items-center justify-center px-[8%] py-[6%]">
             <textarea
               ref={textRef}
+              aria-label="Slide lyrics"
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
               onBlur={handleBlur}

@@ -16,3 +16,6 @@ desktop.ini
 # Claude Code brainstorming-companion session scratch (mockups, server state)
 .superpowers/
 .worktrees/
+# Playwright E2E output
+/test-results
+/playwright-report
