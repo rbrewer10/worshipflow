@@ -14,11 +14,25 @@ import LogoSettings from './LogoSettings'
 import SoundCheckTab from './sound-check/SoundCheckTab'
 import ObsConnectTab from './ObsConnectTab'
 import NotifyToasts from './NotifyToasts'
+import { hasFailedSaves } from './saveRegistry'
 
 export type View = 'home' | 'live' | 'service' | 'songs' | 'announcements' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck' | 'obs'
 
 function AppShell(): JSX.Element {
-  const [view, setView] = useState<View>('home')
+  const [view, setViewRaw] = useState<View>('home')
+  // Autosave means most navigation is already safe — but a save that's
+  // actively FAILED (not just in flight) means the edit sitting in that
+  // editor's local state never actually reached the DB, and switching tabs
+  // would unmount it and silently lose that edit. saveRegistry is how any
+  // useAutosave instance, anywhere, reports that back up here without this
+  // component needing to know about every editor individually.
+  const setView = (next: View): void => {
+    if (next === view) return
+    if (hasFailedSaves() && !confirm(
+      "A recent change failed to save. If you leave this screen now, that change may be lost.\n\nLeave anyway?"
+    )) return
+    setViewRaw(next)
+  }
 
   // Global keyboard shortcuts for live control — Live tab only. These used to
   // fire from any tab (including while editing songs/services), so e.g. typing

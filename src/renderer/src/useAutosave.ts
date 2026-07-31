@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createSaveQueue, type SaveStatus } from './saveQueue'
 import { notifyLocal } from './NotifyToasts'
+import { registerSave, unregisterSave } from './saveRegistry'
 
 export type { SaveStatus }
 
@@ -22,16 +23,23 @@ export function useAutosave<T>(save: (value: T) => Promise<void>): {
   const saveRef = useRef(save)
   saveRef.current = save
 
+  // Registered with saveRegistry so AppShell can warn before switching tabs
+  // while this specific queue is 'failed' — save status otherwise lives only
+  // in this component's state and vanishes silently the moment it unmounts.
+  const registryId = useMemo(() => Symbol('useAutosave'), [])
+
   const queue = useMemo(
     () =>
       createSaveQueue<T>({
         save: (value) => saveRef.current(value),
-        onStatusChange: (s, e) => { setStatus(s); setError(e) },
+        onStatusChange: (s, e) => { setStatus(s); setError(e); registerSave(registryId, s) },
         notifyFailure: (message) => notifyLocal(`Save failed: ${message}`, 'error')
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   )
+
+  useEffect(() => () => unregisterSave(registryId), [registryId])
 
   return { status, error, trigger: queue.trigger, retry: queue.retry }
 }
