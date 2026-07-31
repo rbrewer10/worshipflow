@@ -32,7 +32,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
   const [searchTags, setSearchTags] = useState<string[]>([])
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const [editingTags, setEditingTags] = useState<string>('')
-  const dropRef = useRef<HTMLDivElement>(null)
+  const dropRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => { loadUploads() }, [])
 
@@ -153,12 +153,14 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
 
       {/* Drag-drop zone + Open folder */}
       <div className="flex gap-2">
-        <div
+        <button
+          type="button"
           ref={dropRef}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           onClick={handleBrowse}
+          aria-label="Upload a background — drag and drop a file here, or click to browse"
           className={[
             'flex flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-7 text-center transition-all',
             dragging
@@ -169,7 +171,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
           <Upload size={20} />
           <span className="text-xs font-medium">Drop image or video here</span>
           <span className="text-[10px] text-slate-500">or click to browse</span>
-        </div>
+        </button>
         <button
           onClick={() => window.wf.bgOpenFolder()}
           title="Open the backgrounds folder — drop in as many images as you want, then come back here"
@@ -192,7 +194,12 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
             return (
               <div
                 key={u.path}
+                role="button"
+                tabIndex={0}
                 onClick={() => onApply(u.path)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onApply(u.path) } }}
+                aria-label={`Use background: ${u.path.split(/[/\\]/).pop()}`}
+                aria-pressed={active}
                 className={[
                   'group relative cursor-pointer overflow-hidden rounded-lg transition-all duration-150',
                   active

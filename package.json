@@ -1,7 +1,7 @@
 {
   "name": "worshipflow",
   "productName": "WorshipFlow Pro",
-  "version": "0.11.0",
+  "version": "0.12.4",
   "description": "WorshipFlow Pro — church worship presentation & sound check software for Snow Hill Church",
   "main": "./out/main/index.js",
   "author": "Ryan Brewer",
@@ -16,7 +16,8 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint src/renderer/src"
   },
   "dependencies": {
     "electron-store": "^8.1.0",
@@ -37,11 +38,15 @@
     "@types/react-dom": "^18.3.1",
     "@types/sql.js": "^1.4.11",
     "@types/ws": "^8.18.1",
+    "@typescript-eslint/parser": "^8.65.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "electron": "^33.0.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
     "react": "^18.3.1",

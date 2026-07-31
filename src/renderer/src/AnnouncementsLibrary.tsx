@@ -71,12 +71,12 @@ function AnnouncementsLibrary(): JSX.Element {
                 <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
                   {it.display === 'ticker' ? <ScrollText size={14} /> : <Type size={14} />}
                 </div>
-                <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setEditorId(it.id)}>
+                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditorId(it.id)}>
                   <div className="truncate text-sm font-medium">{it.title}</div>
                   <div className="truncate text-xs text-slate-500">
                     {it.frequency === 'once' ? 'One time' : 'Recurring'}{it.expired ? ' · expired' : it.active ? '' : ' · paused'}
                   </div>
-                </div>
+                </button>
                 <button onClick={() => setConfirmDelete({ id: it.id, title: it.title })} className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-red-500/20 hover:text-red-600 group-hover:opacity-100">Del</button>
               </div>
             ))}

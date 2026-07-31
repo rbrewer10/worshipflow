@@ -74,7 +74,10 @@ export default function ZonePinPicker({
       {/* Backdrop, not a document-level mousedown listener: the card itself is
           this popover's trigger, so a listener would close on mousedown and the
           card's own click would immediately reopen it. Swallowing the whole
-          click here closes it exactly once. */}
+          click here closes it exactly once. The keyboard equivalent (Escape)
+          is handled by the document-level keydown listener above, not this
+          element, since this div is a click-catcher only and isn't focusable. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div className="fixed inset-0 z-20" onClick={onClose} />
       <div
         className={`absolute z-30 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg ${

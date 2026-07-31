@@ -61,7 +61,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
 
       {/* Display type */}
       <div>
-        <label className="mb-1.5 block text-xs font-semibold text-slate-600">Show as</label>
+        <span className="mb-1.5 block text-xs font-semibold text-slate-600">Show as</span>
         <div className="flex gap-2">
           {(['slide', 'ticker'] as const).map((d) => (
             <button
@@ -80,7 +80,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
       {/* Background + blur (slide only) */}
       {a.display === 'slide' && (
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-slate-600">Background (optional)</label>
+          <span className="text-xs font-semibold text-slate-600">Background (optional)</span>
           <button
             onClick={() => save({ blurBehindText: !a.blurBehindText })}
             className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
@@ -101,7 +101,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
 
       {/* Schedule */}
       <div>
-        <label className="mb-1.5 block text-xs font-semibold text-slate-600">Schedule</label>
+        <span className="mb-1.5 block text-xs font-semibold text-slate-600">Schedule</span>
         <div className="mb-2 flex gap-2">
           {(['once', 'recurring'] as const).map((f) => (
             <button

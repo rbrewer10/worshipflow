@@ -28,6 +28,10 @@ export default function AnnouncementsDrawerTab({ onDone }: { onDone: () => void 
   return (
     <div className="flex flex-col gap-2">
       <input
+        // This drawer tab only opens because the operator just chose to add
+        // an announcement — autofocusing the search box is the deliberate
+        // continuation of that action, not an unexpected focus steal.
+        // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus
         value={search}
         onChange={(e) => setSearch(e.target.value)}

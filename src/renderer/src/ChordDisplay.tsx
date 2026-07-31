@@ -117,6 +117,10 @@ export function ChordDisplay({ lyrics, showChords = true, onChordsChange }: Chor
               onChange={(e) => handleChordInput(e.target.value)}
               placeholder="e.g. G, D, Em"
               className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 mb-2"
+              // This dialog only exists because the operator just clicked "Edit
+              // Chords" — autofocusing its one input is the expected, deliberate
+              // continuation of that action, not an unexpected focus steal.
+              // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
             />
 

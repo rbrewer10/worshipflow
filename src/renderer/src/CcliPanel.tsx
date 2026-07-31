@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BarChart3, Download } from 'lucide-react'
 import type { SongUsage } from '../../shared/types'
+import Modal from './Modal'
 
 function fmtDate(ts: number): string {
   const d = new Date(ts)
@@ -79,13 +80,9 @@ function CcliPanel(): JSX.Element {
 
       {/* Usage report modal */}
       {showReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => setShowReport(false)}>
-          <div
-            className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Modal onClose={() => setShowReport(false)} labelledBy="ccli-report-title" className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">CCLI Song Usage ({usage.length})</h3>
+              <h3 id="ccli-report-title" className="text-sm font-bold text-slate-900">CCLI Song Usage ({usage.length})</h3>
               <div className="flex gap-2">
                 <button
                   onClick={exportCsv}
@@ -141,8 +138,7 @@ function CcliPanel(): JSX.Element {
                 </div>
               </div>
             )}
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

@@ -271,6 +271,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
           {logoImg ? (
             <img
               src={toAssetUrl(logoImg)}
+              alt={churchName}
               className="max-h-[55cqh] max-w-[60cqw] object-contain"
               style={{ filter: 'drop-shadow(0 0 6cqw rgba(0,0,0,0.6))' }}
             />

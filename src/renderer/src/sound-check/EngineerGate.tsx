@@ -50,6 +50,11 @@ export function EngineerPinPrompt({
           <input
             type="password"
             inputMode="numeric"
+            // This gate only renders because the operator just navigated to
+            // the mixer dashboard — autofocusing the passcode field is the
+            // deliberate continuation of that action, not an unexpected focus
+            // steal.
+            // eslint-disable-next-line jsx-a11y/no-autofocus
             autoFocus
             placeholder="Passcode"
             value={entry}

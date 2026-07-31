@@ -238,7 +238,7 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange, onBlu
               /* Replicate API key */
               <div className={`rounded-xl border p-3 ${apiKey ? 'border-slate-200 bg-white' : 'border-amber-500/30 bg-amber-500/[0.07]'}`}>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <label htmlFor="replicate-api-key" className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Replicate API key
                   </label>
                   {apiKey
@@ -247,6 +247,7 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange, onBlu
                 </div>
                 <div className="flex gap-1.5">
                   <input
+                    id="replicate-api-key"
                     type="password"
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
@@ -269,10 +270,11 @@ export default function BackgroundPanel({ song, onApply, onBgMotionChange, onBlu
 
             {/* Prompt label + textarea */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <label htmlFor="ai-bg-prompt" className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 Describe the background
               </label>
               <textarea
+                id="ai-bg-prompt"
                 className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 transition-colors focus:border-blue-500/70 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 rows={3}
                 placeholder='e.g. "golden rays of light through stained glass"'

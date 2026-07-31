@@ -113,7 +113,7 @@ export const SongEditor = memo(function SongEditor({
 
       {/* Song background */}
       <div className="space-y-2 border-t border-slate-200 pt-3">
-        <label className="section-header">Motion Background</label>
+        <span className="section-header">Motion Background</span>
         {songFull?.background ? (
           <div className="surface flex items-center gap-2">
             {/\.(mp4|webm|mov|m4v)$/i.test(songFull.background)

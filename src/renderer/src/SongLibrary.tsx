@@ -109,10 +109,10 @@ function SongLibrary(): JSX.Element {
                 editorId === s.id ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'hover:bg-slate-100'
               }`}
             >
-              <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setEditorId(s.id)}>
+              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditorId(s.id)}>
                 <div className="text-sm font-medium">{s.title}</div>
                 {s.author && <div className="text-xs text-slate-600">{s.author}</div>}
-              </div>
+              </button>
               {s.background ? (
                 <div className="flex shrink-0 items-center gap-1">
                   <button

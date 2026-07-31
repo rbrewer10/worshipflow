@@ -39,7 +39,7 @@ export const TextEditor = memo(function TextEditor({
       {/* ── Text Style ── */}
       <div className="space-y-3 border-t border-slate-200 pt-3 mt-2">
         <div className="flex items-center justify-between">
-          <label className="section-header">Text Style</label>
+          <span className="section-header">Text Style</span>
           <span className="text-xs text-slate-500">Appearance</span>
         </div>
 
@@ -58,7 +58,7 @@ export const TextEditor = memo(function TextEditor({
 
         {/* Text alignment */}
         <div>
-          <label className="mb-2 block text-[11px] text-slate-600">Text alignment</label>
+          <span className="mb-2 block text-[11px] text-slate-600">Text alignment</span>
           <div className="flex gap-1.5">
             {(['left', 'center', 'right'] as const).map((align) => (
               <button key={align} onClick={() => onTextAlignChange(align)}

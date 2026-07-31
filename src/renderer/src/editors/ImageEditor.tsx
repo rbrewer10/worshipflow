@@ -20,7 +20,7 @@ export const ImageEditor = memo(function ImageEditor({ imagePath, onPathChange }
 
   return (
     <div className="space-y-2">
-      <label className="section-header block">Image or Video</label>
+      <span className="section-header block">Image or Video</span>
       {hasFile ? (
         <div className="surface flex items-center gap-2">
           {isVideoFile(imagePath)

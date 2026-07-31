@@ -149,8 +149,12 @@ export default function SlideCanvas({ song, slide, onTextChange, onFontScaleChan
         {/* Slide text — click to edit */}
         {!isEmpty && !editing && (
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Edit slide text"
             className="absolute inset-0 flex cursor-text items-center justify-center px-[8%] py-[6%] text-center"
             onClick={handleTextClick}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTextClick() } }}
           >
             {textIsEmpty ? (
               <span

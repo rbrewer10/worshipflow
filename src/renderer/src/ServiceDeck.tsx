@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion, Minus, HelpCircle, Copy } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId, ZoneId } from '../../shared/types'
-import { ZONE_NAMES } from '../../shared/types'
+import { ZONE_NAMES, NON_LIVE_TYPES } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
 import { effectiveRouting, matchScene } from '../../shared/zoneScenes'
 import ZoneStripBadge from './ZoneStripBadge'
@@ -13,7 +13,8 @@ import ZoneTrackToggle from './ZoneTrackToggle'
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
 const TYPE_ICON: Record<ServiceItem['type'], IconType> = {
-  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic
+  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic,
+  header: Minus, placeholder: HelpCircle
 }
 
 const ADD_TYPES: { type: ServiceItem['type']; label: string; Icon: IconType }[] = [
@@ -24,6 +25,8 @@ const ADD_TYPES: { type: ServiceItem['type']; label: string; Icon: IconType }[] 
   { type: 'welcome',   label: 'Welcome',   Icon: Hand },
   { type: 'ticker',    label: 'Ticker',    Icon: ScrollText },
   { type: 'sermon',    label: 'Sermon',    Icon: Mic },
+  { type: 'header',      label: 'Section header', Icon: Minus },
+  { type: 'placeholder', label: 'Placeholder (TBD)', Icon: HelpCircle },
 ]
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
@@ -45,7 +48,7 @@ function itemPreview(it: ServiceItem): string {
   return ''
 }
 
-function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAssignmentChange, songs, announcements, liveItemId, selectedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onGoLive, onDelete, onReordered }: {
+function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAssignmentChange, songs, announcements, liveItemId, selectedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onGoLive, onDelete, onDuplicate, onBatchDelete, onReordered }: {
   service: ServiceFull
   track: TrackId
   onTrackChange: (track: TrackId) => void
@@ -61,10 +64,16 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
   onAddAnnouncement: (announcementId: number) => void
   onGoLive: (item: ServiceItem) => void
   onDelete: (item: ServiceItem) => void
+  onDuplicate: (item: ServiceItem) => void
+  onBatchDelete: (items: ServiceItem[]) => void
   onReordered: () => void
 }): JSX.Element {
   const [dragId, setDragId] = useState<number | null>(null)
   const [showAdd, setShowAdd] = useState(false)
+  // Ctrl/Cmd/Shift-click selection for batch move (drag) and batch delete —
+  // independent of `selectedId`, which drives the right-side editor panel.
+  const [multiSelected, setMultiSelected] = useState<Set<number>>(new Set())
+  const [rangeAnchor, setRangeAnchor] = useState<number | null>(null)
   const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
   useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [service])
   const items = service.items.filter((it) => it.track === track)
@@ -98,13 +107,62 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
   }, [showZonePopover])
 
   const onDrop = (targetId: number): void => {
-    if (dragId == null || dragId === targetId) return
+    if (dragId == null) return
     const ids = items.map((i) => i.id)
-    const from = ids.indexOf(dragId)
-    const to = ids.indexOf(targetId)
-    ids.splice(to, 0, ids.splice(from, 1)[0])
+    // Dragging a multi-selected row carries the whole selection as a block,
+    // in its current relative order — not just the one row under the cursor.
+    const movingSet = multiSelected.has(dragId) && multiSelected.size > 1 ? multiSelected : new Set([dragId])
+    if (movingSet.has(targetId)) { setDragId(null); return } // dropped inside the block being moved
+    const moving = ids.filter((id) => movingSet.has(id))
+    const remaining = ids.filter((id) => !movingSet.has(id))
+    const targetIndex = remaining.indexOf(targetId)
+    remaining.splice(targetIndex, 0, ...moving)
     setDragId(null)
-    window.wf.serviceReorder(service.id, track, ids).then(onReordered)
+    window.wf.serviceReorder(service.id, track, remaining).then(onReordered)
+  }
+
+  // Plain click: normal single-select (opens the editor), clears any multi-
+  // selection. Ctrl/Cmd-click: toggle this row in the batch selection.
+  // Shift-click: extend the batch selection from the last anchor to this row.
+  const handleRowClick = (it: ServiceItem, index: number, e: React.MouseEvent): void => {
+    if (e.shiftKey && rangeAnchor != null) {
+      const anchorIndex = items.findIndex((x) => x.id === rangeAnchor)
+      if (anchorIndex !== -1) {
+        const [lo, hi] = anchorIndex < index ? [anchorIndex, index] : [index, anchorIndex]
+        const rangeIds = items.slice(lo, hi + 1).map((x) => x.id)
+        setMultiSelected((prev) => new Set([...prev, ...rangeIds]))
+        return
+      }
+    }
+    if (e.ctrlKey || e.metaKey) {
+      setMultiSelected((prev) => {
+        const next = new Set(prev)
+        if (next.has(it.id)) next.delete(it.id); else next.add(it.id)
+        return next
+      })
+      setRangeAnchor(it.id)
+      return
+    }
+    setMultiSelected(new Set())
+    setRangeAnchor(it.id)
+    onSelect(it.id)
+  }
+
+  // Keyboard equivalent for a row click: just the plain single-select path —
+  // shift/ctrl range- and multi-select are mouse-only gestures with no
+  // established keyboard convention here, so Enter/Space do the simple thing.
+  const handleRowKeyDown = (it: ServiceItem, e: React.KeyboardEvent): void => {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    setMultiSelected(new Set())
+    setRangeAnchor(it.id)
+    onSelect(it.id)
+  }
+
+  const batchDelete = (): void => {
+    const toDelete = items.filter((it) => multiSelected.has(it.id))
+    if (toDelete.length) onBatchDelete(toDelete)
+    setMultiSelected(new Set())
   }
 
   return (
@@ -154,6 +212,16 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
         </div>
       )}
 
+      {multiSelected.size > 0 && (
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5">
+          <span className="text-xs font-semibold text-indigo-800">{multiSelected.size} selected</span>
+          <div className="flex items-center gap-2">
+            <button onClick={batchDelete} className="text-xs font-semibold text-red-600 hover:underline">Delete</button>
+            <button onClick={() => setMultiSelected(new Set())} className="text-xs font-medium text-indigo-600 hover:underline">Clear</button>
+          </div>
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-auto pr-1">
         {items.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -168,18 +236,62 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
           // branch, say) must not take the whole tab down with an undefined
           // component — fall back to a neutral icon.
           const Icon = TYPE_ICON[it.type] ?? FileQuestion
+          const isMultiSelected = multiSelected.has(it.id)
+          const nonLive = NON_LIVE_TYPES.includes(it.type)
+          const ring = selectedId === it.id
+            ? 'border-blue-500/30 bg-blue-500/[0.07] ring-1 ring-blue-500/30'
+            : isMultiSelected
+            ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-400'
+            : 'border-slate-200 bg-white hover:bg-slate-100'
+
+          // Section headers are a compact colored divider, not a content row —
+          // no type-line, no preview, no Play button, just the label and delete.
+          if (it.type === 'header') {
+            const color = (it.payload?.color as string | undefined) ?? '#64748b'
+            return (
+              <div
+                key={it.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Section: ${it.title || 'Section'}`}
+                draggable
+                onDragStart={() => setDragId(it.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => onDrop(it.id)}
+                onClick={(e) => handleRowClick(it, i, e)}
+                onKeyDown={(e) => handleRowKeyDown(it, e)}
+                className={`group mb-1.5 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${ring} ${dragId === it.id ? 'opacity-40' : ''}`}
+                style={selectedId !== it.id && !isMultiSelected ? { borderColor: color + '55', background: color + '14' } : undefined}
+              >
+                <GripVertical size={13} className="shrink-0 text-slate-400 group-hover:text-slate-600" />
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
+                <span className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-wide" style={{ color }}>
+                  {it.title || 'Section'}
+                </span>
+                {/* onClick here only keeps the row's own onClick from firing when duplicating/deleting — not a user-facing interaction itself. */}
+                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+                <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => onDuplicate(it)} className="text-slate-400 opacity-0 hover:text-blue-700 group-hover:opacity-100" title="Duplicate"><Copy size={13} /></button>
+                  <button onClick={() => onDelete(it)} className="text-slate-400 opacity-0 hover:text-red-600 group-hover:opacity-100" title="Delete"><X size={14} /></button>
+                </div>
+              </div>
+            )
+          }
+
           return (
             <div
               key={it.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`${it.type}: ${it.title || it.type}`}
               draggable
               onDragStart={() => setDragId(it.id)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => onDrop(it.id)}
-              onClick={() => onSelect(it.id)}
+              onClick={(e) => handleRowClick(it, i, e)}
+              onKeyDown={(e) => handleRowKeyDown(it, e)}
               className={`group mb-1.5 flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
-                selectedId === it.id
-                  ? 'border-blue-500/30 bg-blue-500/[0.07] ring-1 ring-blue-500/30'
-                  : 'border-slate-200 bg-white hover:bg-slate-100'
+                it.type === 'placeholder' && selectedId !== it.id && !isMultiSelected ? 'border-dashed border-amber-300 bg-amber-50/40' : ring
               } ${dragId === it.id ? 'opacity-40' : ''}`}
             >
               <div className="flex w-5 flex-shrink-0 flex-col items-center">
@@ -191,8 +303,11 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-slate-900">{it.title || it.type}</div>
                 <div className="flex items-center gap-1.5 truncate text-xs text-slate-600">
+                  {it.type === 'placeholder' && (
+                    <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">TBD</span>
+                  )}
                   <span className="truncate">{it.type} · #{i + 1}{preview ? ` · ${preview}` : ''}</span>
-                  {sceneConfig && (() => {
+                  {sceneConfig && !nonLive && (() => {
                     const routing = effectiveRouting(it, sceneConfig)
                     const matched = matchScene(routing, it.type, sceneConfig)
                     const name = matched === 'custom' ? 'Custom' : sceneConfig.scenes.find((s) => s.id === matched)?.name
@@ -204,6 +319,8 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                   })()}
                 </div>
               </div>
+              {/* onClick here only keeps the row's own onClick from firing when using these controls — not a user-facing interaction itself. */}
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
               <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 {liveItemId === it.id ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700">
@@ -212,11 +329,18 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                   </span>
                 ) : (
                   <>
+                    {!nonLive && (
+                      <button
+                        onClick={() => onGoLive(it)}
+                        className="text-slate-400 opacity-0 hover:text-blue-700 group-hover:opacity-100"
+                        title="Go live"
+                      ><Play size={14} /></button>
+                    )}
                     <button
-                      onClick={() => onGoLive(it)}
+                      onClick={() => onDuplicate(it)}
                       className="text-slate-400 opacity-0 hover:text-blue-700 group-hover:opacity-100"
-                      title="Go live"
-                    ><Play size={14} /></button>
+                      title="Duplicate"
+                    ><Copy size={13} /></button>
                     <button
                       onClick={() => onDelete(it)}
                       className="text-slate-400 opacity-0 hover:text-red-600 group-hover:opacity-100"
@@ -239,8 +363,9 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
             </button>
           </div>
           <div className="mb-3">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-600">Song from library</label>
+            <label htmlFor="deck-add-song" className="mb-1.5 block text-xs font-semibold text-slate-600">Song from library</label>
             <select
+              id="deck-add-song"
               value=""
               onChange={(e) => { if (e.target.value) { onAddSong(Number(e.target.value)); setShowAdd(false) } }}
               className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none hover:bg-slate-200"
@@ -251,8 +376,9 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
           </div>
           {announcements.length > 0 && (
             <div className="mb-3">
-              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Announcement from library</label>
+              <label htmlFor="deck-add-announcement" className="mb-1.5 block text-xs font-semibold text-slate-600">Announcement from library</label>
               <select
+                id="deck-add-announcement"
                 value=""
                 onChange={(e) => { if (e.target.value) { onAddAnnouncement(Number(e.target.value)); setShowAdd(false) } }}
                 className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none hover:bg-slate-200"

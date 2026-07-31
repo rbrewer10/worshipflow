@@ -4,6 +4,7 @@ import type { ServiceItemType } from '../../shared/types'
 import type { SceneConfig, SceneDef, ZoneRole } from '../../shared/zoneScenes'
 import { starterConfig, expandScene } from '../../shared/zoneScenes'
 import ZoneStripBadge from './ZoneStripBadge'
+import Modal from './Modal'
 
 const ROLE_CYCLE: ZoneRole[] = ['content', 'logo', 'black']
 const ROLE_LABEL: Record<ZoneRole, string> = { content: 'Content', logo: 'Logo', black: 'Black' }
@@ -79,11 +80,10 @@ export default function SceneEditorModal({ onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="max-h-[85vh] w-[560px] overflow-auto rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} labelledBy="scene-editor-title" className="max-h-[85vh] w-[560px] overflow-auto rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg">
         <div className="mb-1 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-900">Edit scenes</h3>
-          <button onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-slate-200"><X size={15} /></button>
+          <h3 id="scene-editor-title" className="text-lg font-semibold text-slate-900">Edit scenes</h3>
+          <button onClick={onClose} aria-label="Close" className="rounded p-1 text-slate-500 hover:bg-slate-200"><X size={15} /></button>
         </div>
         <p className="mb-4 text-xs text-slate-500">
           Tap a screen pill to cycle Content → Logo → Black. The Stage monitor always stays on Stage.
@@ -154,7 +154,6 @@ export default function SceneEditorModal({ onClose, onSaved }: {
           <button onClick={onClose} className="rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold hover:bg-slate-200">Cancel</button>
           <button onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">Done</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FileUp } from 'lucide-react'
 import type { ParsedPptxSong, SongInput } from '../../shared/types'
+import Modal from './Modal'
 
 // Import songs from PowerPoint (.pptx) files: pick files, review, then save.
 function PptxImport({ onImported }: { onImported: () => void }): JSX.Element {
@@ -52,13 +53,9 @@ function PptxImport({ onImported }: { onImported: () => void }): JSX.Element {
       </button>
 
       {parsed && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={close}>
-          <div
-            className="flex max-h-[82vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Modal onClose={close} labelledBy="pptx-import-title" className="flex max-h-[82vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl">
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">Import {parsed.length} PowerPoint file{parsed.length === 1 ? '' : 's'}</h3>
+              <h3 id="pptx-import-title" className="text-sm font-bold text-slate-900">Import {parsed.length} PowerPoint file{parsed.length === 1 ? '' : 's'}</h3>
               <button onClick={close} className="rounded bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">Cancel</button>
             </div>
             <p className="mb-3 text-xs text-slate-500">
@@ -104,8 +101,7 @@ function PptxImport({ onImported }: { onImported: () => void }): JSX.Element {
                 {importing ? 'Importing…' : `Import ${includedCount} song${includedCount === 1 ? '' : 's'}`}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </>
   )

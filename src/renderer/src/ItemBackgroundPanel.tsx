@@ -85,9 +85,9 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
       {/* ── Theme gallery ── */}
       <div className="flex flex-col gap-2">
         {!supportsFileBackground && (
-          <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
             Background &amp; Color
-          </label>
+          </span>
         )}
         <div className="grid grid-cols-2 gap-2">
           {/* Use service theme (clear/none) */}
@@ -198,9 +198,9 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
 
   return (
     <div className="flex flex-col gap-3 bg-[#f4f6f9] text-slate-900">
-      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
         Background &amp; Color
-      </label>
+      </span>
 
       {/* ── Blur behind text ── */}
       <button
