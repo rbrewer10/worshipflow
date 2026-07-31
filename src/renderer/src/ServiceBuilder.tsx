@@ -133,9 +133,8 @@ function ServiceBuilder(): JSX.Element {
       </div>
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="card-lg max-w-sm">
-            <h3 className="section-title">Delete Service?</h3>
+        <Modal onClose={() => setConfirmDelete(null)} labelledBy="delete-service-title" className="card-lg max-w-sm">
+            <h3 id="delete-service-title" className="section-title">Delete Service?</h3>
             <p className="mb-4 text-sm text-slate-600">
               Are you sure you want to delete <span className="font-semibold text-slate-900">{confirmDelete.name}</span>? This cannot be undone.
             </p>
@@ -151,8 +150,7 @@ function ServiceBuilder(): JSX.Element {
                 Delete
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <div className="flex h-full min-h-0 gap-4 bg-[#e9ecf1] p-4">

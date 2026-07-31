@@ -4,6 +4,7 @@ import { analyzeAndLabelSections, previewAutoLabels } from '../autoLabel'
 import type { SongFull } from '../../../shared/types'
 import { memo } from 'react'
 import { Guitar, Tag, Film, Image as ImageIcon, X, Check, Minus, Plus } from 'lucide-react'
+import Modal from '../Modal'
 
 interface SongEditorProps {
   songFull: SongFull | null
@@ -136,10 +137,9 @@ export const SongEditor = memo(function SongEditor({
 
       {/* Auto-label preview modal */}
       {showAutoLabelPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="card-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <Modal onClose={onAutoLabelPreviewClose} labelledBy="auto-label-title" className="card-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="mb-4">
-              <h3 className="section-title mb-1">Auto-Label Preview</h3>
+              <h3 id="auto-label-title" className="section-title mb-1">Auto-Label Preview</h3>
               <p className="text-xs text-slate-500">
                 Detected <span className="font-semibold text-slate-700">{autoLabelAnalyses.length}</span> sections — review confidence scores below
               </p>
@@ -178,8 +178,7 @@ export const SongEditor = memo(function SongEditor({
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

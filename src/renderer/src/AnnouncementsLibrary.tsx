@@ -2,12 +2,19 @@ import { useEffect, useState } from 'react'
 import { Megaphone, Plus, ScrollText, Type } from 'lucide-react'
 import type { AnnouncementSummary } from '../../shared/types'
 import AnnouncementEditor from './AnnouncementEditor'
+import Modal from './Modal'
 
 function AnnouncementsLibrary(): JSX.Element {
   const [items, setItems] = useState<AnnouncementSummary[]>([])
   const [search, setSearch] = useState('')
   const [editorId, setEditorId] = useState<number | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; title: string } | null>(null)
+  // "New Announcement" used to create a permanent "New Announcement" DB record
+  // on the first click, before the operator had typed anything — abandoning
+  // it left a placeholder in the real library. Naming it first means nothing
+  // is created until there's a real title to save.
+  const [namingNew, setNamingNew] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
 
   const refresh = (q = search): void => {
     window.wf.announcementsList(q).then(setItems)
@@ -25,12 +32,21 @@ function AnnouncementsLibrary(): JSX.Element {
     setConfirmDelete(null)
   }
 
+  const createAnnouncement = async (): Promise<void> => {
+    const title = newTitle.trim()
+    if (!title) return
+    const id = await window.wf.announcementCreate({ title, body: '', display: 'slide', frequency: 'recurring' })
+    setNamingNew(false)
+    setNewTitle('')
+    refresh()
+    setEditorId(id)
+  }
+
   return (
     <>
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg">
-            <h3 className="mb-2 text-lg font-semibold text-slate-900">Delete announcement?</h3>
+        <Modal onClose={() => setConfirmDelete(null)} labelledBy="delete-announcement-title" className="max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg">
+            <h3 id="delete-announcement-title" className="mb-2 text-lg font-semibold text-slate-900">Delete announcement?</h3>
             <p className="mb-4 text-sm text-slate-600">
               Delete <span className="font-semibold text-slate-900">{confirmDelete.title}</span>? This cannot be undone.
             </p>
@@ -38,21 +54,53 @@ function AnnouncementsLibrary(): JSX.Element {
               <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold hover:bg-slate-200">Cancel</button>
               <button onClick={confirmRemove} className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500">Delete</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
       <div className="flex h-full min-h-0 gap-4 p-4 text-slate-900">
         <div className="flex w-96 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
-          <button
-            onClick={async () => {
-              const id = await window.wf.announcementCreate({ title: 'New Announcement', body: '', display: 'slide', frequency: 'recurring' })
-              refresh()
-              setEditorId(id)
-            }}
-            className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-          >
-            <Plus size={15} /> New Announcement
-          </button>
+          {namingNew ? (
+            <form
+              onSubmit={(e) => { e.preventDefault(); void createAnnouncement() }}
+              className="mb-2 flex flex-col gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-2"
+            >
+              <input
+                // This form only renders because the operator just clicked
+                // "New Announcement" — autofocusing the title field is the
+                // deliberate continuation of that action, not an unexpected
+                // focus steal.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') { setNamingNew(false); setNewTitle('') } }}
+                placeholder="Announcement title…"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setNamingNew(false); setNewTitle('') }}
+                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newTitle.trim()}
+                  className="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-40"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => setNamingNew(true)}
+              className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+            >
+              <Plus size={15} /> New Announcement
+            </button>
+          )}
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}

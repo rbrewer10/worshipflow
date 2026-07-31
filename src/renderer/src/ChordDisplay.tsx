@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { extractChords, renderChordsWithLyrics, COMMON_CHORDS, formatChord } from './chordUtils'
+import Modal from './Modal'
 
 interface ChordDisplayProps {
   lyrics: string
@@ -106,9 +107,12 @@ export function ChordDisplay({ lyrics, showChords = true, onChordsChange }: Chor
 
       {/* Chord editor modal */}
       {showChordPicker && editingLineIdx != null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl">
-            <h3 className="mb-3 text-sm font-bold text-slate-900">Edit Chords</h3>
+        <Modal
+          onClose={() => { setShowChordPicker(false); setEditingLineIdx(null) }}
+          labelledBy="edit-chords-title"
+          className="w-full max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl"
+        >
+            <h3 id="edit-chords-title" className="mb-3 text-sm font-bold text-slate-900">Edit Chords</h3>
             <p className="mb-2 text-xs text-slate-600">{lines[editingLineIdx]}</p>
 
             <input
@@ -176,8 +180,7 @@ export function ChordDisplay({ lyrics, showChords = true, onChordsChange }: Chor
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

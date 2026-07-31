@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Check, X, Pencil, Tag, Upload, FolderOpen } from 'lucide-react'
+import Modal from './Modal'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -272,9 +273,8 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
 
       {/* Tag editing modal */}
       {editingPath && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl">
-            <h3 className="mb-3 text-sm font-bold text-slate-900">Edit Tags</h3>
+        <Modal onClose={() => { setEditingPath(null); setEditingTags('') }} labelledBy="edit-tags-title" className="w-full max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl">
+            <h3 id="edit-tags-title" className="mb-3 text-sm font-bold text-slate-900">Edit Tags</h3>
             <div className="mb-3 flex flex-wrap gap-2">
               {['worship', 'prayer', 'energetic', 'peaceful', 'joyful', 'dark', 'bright', 'nature', 'modern', 'seasonal', 'other'].map((tag) => (
                 <button
@@ -325,8 +325,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

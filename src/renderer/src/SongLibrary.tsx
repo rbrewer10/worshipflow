@@ -4,6 +4,7 @@ import type { SongSummary } from '../../shared/types'
 import CcliPanel from './CcliPanel'
 import SongEditor from './editor/SongEditor'
 import PptxImport from './PptxImport'
+import Modal from './Modal'
 
 function SongLibrary(): JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([])
@@ -68,9 +69,8 @@ function SongLibrary(): JSX.Element {
     <>
       {/* Confirmation Dialog */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg max-w-sm">
-            <h3 className="mb-2 text-lg font-semibold text-slate-900">Delete Song?</h3>
+        <Modal onClose={() => setConfirmDelete(null)} labelledBy="delete-song-title" className="rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg max-w-sm">
+            <h3 id="delete-song-title" className="mb-2 text-lg font-semibold text-slate-900">Delete Song?</h3>
             <p className="mb-4 text-sm text-slate-600">
               Are you sure you want to delete <span className="font-semibold text-slate-900">{confirmDelete.title}</span>? This cannot be undone.
             </p>
@@ -88,8 +88,7 @@ function SongLibrary(): JSX.Element {
                 Delete
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
       <div className="flex h-full min-h-0 gap-4 p-4 text-slate-900">
       {/* Library list */}

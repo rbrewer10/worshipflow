@@ -8,6 +8,8 @@ import CardEditPanel from './CardEditPanel'
 import ZoneScreenGrid from './zones/ZoneScreenGrid'
 import { sendItemLive } from './liveActions'
 import ScheduledAnnouncements from './ScheduledAnnouncements'
+import Modal from './Modal'
+import QuickSearchOverlay from './QuickSearchOverlay'
 import { useOptionalService } from './ServiceContext'
 
 function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
@@ -24,10 +26,24 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const [live, setLive] = useState<{ main: LiveState; second: LiveState | null } | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [selectedSongFull, setSelectedSongFull] = useState<SongFull | null>(null)
-  const [confirmDeleteItem, setConfirmDeleteItem] = useState<ServiceItem | null>(null)
+  const [confirmDeleteItems, setConfirmDeleteItems] = useState<ServiceItem[] | null>(null)
   const [track, setTrack] = useState<TrackId>('main')
   const [itemSlides, setItemSlides] = useState<Record<number, string[]>>({})
   const [trackAssignment, setTrackAssignment] = useState<ZoneTrackAssignment>(DEFAULT_ZONE_TRACK)
+  const [showQuickSearch, setShowQuickSearch] = useState(false)
+
+  // Ctrl/Cmd+F opens the cross-type quick search from anywhere in Build
+  // Service — matches ProPresenter's global search shortcut.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setShowQuickSearch(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const optionalSvc = useOptionalService()
 
@@ -151,13 +167,29 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     setSelectedId(id)
   }
 
-  const delItem = (item: ServiceItem): void => setConfirmDeleteItem(item)
-  const confirmDelete = async (): Promise<void> => {
-    if (!confirmDeleteItem) return
-    await window.wf.serviceRemoveItem(confirmDeleteItem.id)
-    if (selectedId === confirmDeleteItem.id) setSelectedId(null)
+  // From quick search: create the scripture item with its reference already
+  // filled in, rather than the blank item addCard('scripture') gives you.
+  const addScripture = async (reference: string): Promise<void> => {
+    const id = await window.wf.serviceAddItem(serviceId, { type: 'scripture', payload: { reference }, track })
     await reload()
-    setConfirmDeleteItem(null)
+    setSelectedId(id)
+  }
+
+  const delItem = (item: ServiceItem): void => setConfirmDeleteItems([item])
+  const batchDeleteItems = (deleteItems: ServiceItem[]): void => setConfirmDeleteItems(deleteItems)
+  const confirmDelete = async (): Promise<void> => {
+    if (!confirmDeleteItems) return
+    const ids = new Set(confirmDeleteItems.map((it) => it.id))
+    for (const it of confirmDeleteItems) await window.wf.serviceRemoveItem(it.id)
+    if (selectedId != null && ids.has(selectedId)) setSelectedId(null)
+    await reload()
+    setConfirmDeleteItems(null)
+  }
+
+  const duplicateItem = async (item: ServiceItem): Promise<void> => {
+    const id = await window.wf.serviceDuplicateItem(item.id)
+    await reload()
+    if (id != null) setSelectedId(id)
   }
 
   if (service == null) {
@@ -200,6 +232,8 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
             onAddAnnouncement={addAnnouncement}
             onGoLive={(it) => sendItemLive(it, it.track)}
             onDelete={delItem}
+            onDuplicate={duplicateItem}
+            onBatchDelete={batchDeleteItems}
             onReordered={reload}
           />
         </div>
@@ -236,17 +270,20 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
         )}
       </div>
 
-      {/* Confirm delete item modal */}
-      {confirmDeleteItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="max-w-sm rounded-xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl">
-            <h3 className="mb-2 text-lg font-semibold text-slate-900">Delete Item?</h3>
+      {/* Confirm delete item(s) modal */}
+      {confirmDeleteItems && (
+        <Modal onClose={() => setConfirmDeleteItems(null)} labelledBy="delete-items-title" className="max-w-sm rounded-xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl">
+            <h3 id="delete-items-title" className="mb-2 text-lg font-semibold text-slate-900">{confirmDeleteItems.length === 1 ? 'Delete Item?' : `Delete ${confirmDeleteItems.length} Items?`}</h3>
             <p className="mb-4 text-sm text-slate-600">
-              Are you sure you want to delete{' '}
-              <span className="font-semibold text-slate-900">{confirmDeleteItem.title}</span>? This cannot be undone.
+              {confirmDeleteItems.length === 1 ? (
+                <>Are you sure you want to delete{' '}
+                <span className="font-semibold text-slate-900">{confirmDeleteItems[0].title}</span>? This cannot be undone.</>
+              ) : (
+                <>Are you sure you want to delete these {confirmDeleteItems.length} items? This cannot be undone.</>
+              )}
             </p>
             <div className="flex gap-2">
-              <button onClick={() => setConfirmDeleteItem(null)}
+              <button onClick={() => setConfirmDeleteItems(null)}
                 className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                 Cancel
               </button>
@@ -255,8 +292,18 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
                 Delete
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
+      )}
+
+      {showQuickSearch && (
+        <QuickSearchOverlay
+          songs={songs}
+          announcements={announcements}
+          onAddSong={addSong}
+          onAddAnnouncement={addAnnouncement}
+          onAddScripture={addScripture}
+          onClose={() => setShowQuickSearch(false)}
+        />
       )}
     </div>
   )

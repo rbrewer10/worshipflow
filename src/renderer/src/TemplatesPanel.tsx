@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Save, X } from 'lucide-react'
+import Modal from './Modal'
 
 interface ServiceTemplate {
   id: string
@@ -99,10 +100,9 @@ export function TemplatesPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-2xl rounded-xl border border-slate-200 bg-[#f4f6f9] p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
+    <Modal onClose={onClose} labelledBy="templates-panel-title" className="w-full max-w-2xl rounded-xl border border-slate-200 bg-[#f4f6f9] p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-900">Service Templates</h2>
+          <h2 id="templates-panel-title" className="text-xl font-bold text-slate-900">Service Templates</h2>
           <button
             onClick={onClose}
             className="inline-flex items-center justify-center text-slate-600 hover:text-slate-900"
@@ -210,7 +210,6 @@ export function TemplatesPanel({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
