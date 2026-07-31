@@ -251,6 +251,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     songUpdate: noop,
     songDelete: noop,
     songsImportPptx: async (): Promise<ParsedPptxSong[]> => [],
+    songsExportList: async (): Promise<{ canceled: boolean; count: number }> => ({ canceled: true, count: 0 }),
 
     announcementsList: async () => [],
     announcementGet: async () => null,
@@ -455,6 +456,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),
     serviceImportFile: async (): Promise<{ canceled: boolean; serviceId: number | null }> => ({ canceled: true, serviceId: null }),
+    serviceImportPlan: async (): Promise<{ canceled: boolean; serviceId: number | null; matched: number; missing: string[] }> => ({ canceled: true, serviceId: null, matched: 0, missing: [] }),
 
     templatesList: async (): Promise<any[]> => [],
     templatesSave: async (template: any): Promise<any> => template,

@@ -2655,6 +2655,76 @@ ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serv
   }
   return { canceled: false, serviceId }
 })
+
+// Import a service plan exported from the Snow Hill Church app (.wfplan / .json).
+// Songs are matched to the library by title; scripture/sermon map to their real
+// types; everything else becomes a labeled placeholder to fill in.
+ipcMain.handle(
+  'wf:services:importPlan',
+  async (): Promise<{ canceled: boolean; serviceId: number | null; matched: number; missing: string[] }> => {
+    const { filePaths, canceled } = await dialog.showOpenDialog({
+      title: 'Import Service Plan',
+      filters: [{ name: 'Service Plan', extensions: ['wfplan', 'json'] }],
+      properties: ['openFile']
+    })
+    if (canceled || filePaths.length === 0)
+      return { canceled: true, serviceId: null, matched: 0, missing: [] }
+
+    let plan: {
+      kind?: string
+      date?: string
+      service?: string
+      title?: string
+      items?: Array<{ type: string; title?: string; detail?: string; leader?: string }>
+    }
+    try {
+      plan = JSON.parse(readFileSync(filePaths[0], 'utf-8'))
+    } catch (err) {
+      await dialog.showErrorBox('Import Failed', `Invalid plan file: ${err instanceof Error ? err.message : String(err)}`)
+      return { canceled: false, serviceId: null, matched: 0, missing: [] }
+    }
+    if (plan.kind !== 'service-plan' || !Array.isArray(plan.items)) {
+      await dialog.showErrorBox('Import Failed', 'That file is not a WorshipFlow service plan.')
+      return { canceled: false, serviceId: null, matched: 0, missing: [] }
+    }
+
+    const name = plan.title?.trim()
+      ? `${plan.title.trim()} — ${plan.service ?? ''} ${plan.date ?? ''}`.trim()
+      : `${plan.service ?? 'Service'} — ${plan.date ?? ''}`.trim()
+    const serviceId = createService(name, plan.date || undefined)
+
+    const missing: string[] = []
+    let matched = 0
+    for (const it of plan.items) {
+      const title = (it.title ?? '').trim()
+      const leader = (it.leader ?? '').trim()
+      const detail = (it.detail ?? '').trim()
+      const notes = [leader ? `Led by ${leader}` : '', detail].filter(Boolean).join(' · ') || null
+
+      let itemId: number
+      if (it.type === 'song') {
+        const found = listSongs(title).find((s) => s.title.toLowerCase() === title.toLowerCase())
+        if (found) {
+          matched++
+          itemId = addServiceItem(serviceId, { type: 'song', ref_id: found.id })
+        } else {
+          missing.push(title)
+          itemId = addServiceItem(serviceId, { type: 'placeholder', payload: { label: `Song: ${title}` } })
+        }
+      } else if (it.type === 'scripture') {
+        itemId = addServiceItem(serviceId, { type: 'scripture', payload: { reference: title } })
+      } else if (it.type === 'sermon') {
+        itemId = addServiceItem(serviceId, { type: 'sermon', payload: { title, speaker: leader || undefined } })
+      } else {
+        itemId = addServiceItem(serviceId, { type: 'placeholder', payload: { label: title || it.type } })
+      }
+      if (notes) updateServiceItemNotes(itemId, notes)
+    }
+
+    return { canceled: false, serviceId, matched, missing }
+  }
+)
+
 ipcMain.handle('wf:service:slides', async (_e, serviceId: number): Promise<{ id: number; slides: string[] }[]> => {
   const svc = getService(serviceId)
   if (!svc) return []
@@ -2913,6 +2983,26 @@ ipcMain.handle('wf:songs:importPptx', async (): Promise<ParsedPptxSong[]> => {
     }
   }
   return songs
+})
+
+// Export the song list (titles + authors) as a file the Snow Hill Church
+// planning app can import for its song picker.
+ipcMain.handle('wf:songs:exportList', async (): Promise<{ canceled: boolean; count: number }> => {
+  const all = listSongs('')
+  const bundle = {
+    app: 'worshipflow',
+    kind: 'song-list',
+    version: 1,
+    songs: all.map((s) => ({ title: s.title, author: s.author ?? undefined }))
+  }
+  const { filePath, canceled } = await dialog.showSaveDialog({
+    title: 'Export Song List',
+    defaultPath: 'worshipflow-songs.wfsongs',
+    filters: [{ name: 'Song List', extensions: ['wfsongs', 'json'] }]
+  })
+  if (canceled || !filePath) return { canceled: true, count: 0 }
+  writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8')
+  return { canceled: false, count: all.length }
 })
 
 // Natural sort so Slide2 comes before Slide10.

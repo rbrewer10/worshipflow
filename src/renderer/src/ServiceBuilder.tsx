@@ -4,6 +4,7 @@ import type { ServiceItem } from '../../shared/types'
 import ServiceEditor from './ServiceEditor'
 import { useService } from './ServiceContext'
 import { TemplatesPanel } from './TemplatesPanel'
+import Modal from './Modal'
 
 function ServiceBuilder(): JSX.Element {
   const { services, activeServiceId: openId, activeService: service, selectService, refreshServices, reloadActiveService } = useService()
@@ -45,6 +46,20 @@ function ServiceBuilder(): JSX.Element {
     if (!res.canceled && res.serviceId != null) {
       refreshServices()
       open(res.serviceId)
+    }
+  }
+
+  const importPlan = async (): Promise<void> => {
+    const res = await window.wf.serviceImportPlan()
+    if (res.canceled || res.serviceId == null) return
+    refreshServices()
+    open(res.serviceId)
+    if (res.missing.length > 0) {
+      window.alert(
+        `Imported the plan. ${res.matched} song${res.matched === 1 ? '' : 's'} matched your library.\n\n` +
+          `These songs weren't found (added as placeholders — add them to your Song Library):\n• ` +
+          res.missing.join('\n• ')
+      )
     }
   }
 
@@ -171,6 +186,12 @@ function ServiceBuilder(): JSX.Element {
               className="w-full btn text-xs"
               title="Load a .wfservice file exported from another computer">
               <FolderOpen size={13} /> Load saved service (.wfservice)
+            </button>
+            <button onClick={importPlan}
+              aria-label="Import a service plan from the church app"
+              className="w-full btn text-xs"
+              title="Import a .wfplan exported from the Snow Hill Church planning app — songs match your library by title">
+              <FileUp size={13} /> Import plan from church app
             </button>
             <button onClick={() => setShowTemplates(true)}
               aria-label="Manage service templates"

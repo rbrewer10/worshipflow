@@ -52,6 +52,8 @@ const wf = {
   songUpdate: (id: number, input: SongInput): Promise<void> => ipcRenderer.invoke('wf:songs:update', id, input),
   songDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:songs:delete', id),
   songsImportPptx: (): Promise<ParsedPptxSong[]> => ipcRenderer.invoke('wf:songs:importPptx'),
+  songsExportList: (): Promise<{ canceled: boolean; count: number }> =>
+    ipcRenderer.invoke('wf:songs:exportList'),
 
   // Announcements library
   announcementsList: (search?: string): Promise<AnnouncementSummary[]> => ipcRenderer.invoke('wf:announcements:list', search),
@@ -333,6 +335,12 @@ const wf = {
     ipcRenderer.invoke('wf:services:export', serviceId),
   serviceImportFile: (): Promise<{ canceled: boolean; serviceId: number | null }> =>
     ipcRenderer.invoke('wf:services:import'),
+  serviceImportPlan: (): Promise<{
+    canceled: boolean
+    serviceId: number | null
+    matched: number
+    missing: string[]
+  }> => ipcRenderer.invoke('wf:services:importPlan'),
 
   // Sound check
   soundCheck: {
