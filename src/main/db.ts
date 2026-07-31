@@ -180,7 +180,35 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE recording ADD COLUMN thumbnail_path TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN ai_state TEXT') } catch { /* already exists */ }
   normalizeSectionLyrics()
+  normalizeTitles()
   persist()
+}
+
+// Pure so it's unit-testable without a DB — trims and collapses internal
+// whitespace, never touches actual wording/spelling (which needs a human
+// read-through the audit itself couldn't safely automate either).
+export function normalizeTitleText(title: string): string {
+  return title.trim().replace(/\s+/g, ' ')
+}
+
+// One-time (idempotent) pass fixing whitespace cruft (leading/trailing,
+// doubled internal spaces) in existing song/author/announcement titles — the
+// audit found several already in the library from before createSong/
+// createAnnouncement defensively trimmed on write. Only rows that actually
+// change are rewritten, same idiom as normalizeSectionLyrics below.
+function normalizeTitles(): void {
+  const targets: [string, string][] = [['song', 'title'], ['song', 'author'], ['announcement', 'title']]
+  for (const [table, column] of targets) {
+    const rows: { id: number; value: string | null }[] = []
+    const stmt = db.prepare(`SELECT id, ${column} AS value FROM ${table}`)
+    while (stmt.step()) rows.push(stmt.getAsObject() as unknown as { id: number; value: string | null })
+    stmt.free()
+    for (const row of rows) {
+      if (row.value == null) continue
+      const next = normalizeTitleText(row.value)
+      if (next !== row.value) db.run(`UPDATE ${table} SET ${column} = ? WHERE id = ?`, [next, row.id])
+    }
+  }
 }
 
 // One-time (idempotent) pass that re-splits over-long single-line verses into
@@ -309,8 +337,8 @@ export function createSong(input: SongInput): number {
     db.run(
       'INSERT INTO song (title, author, ccli, copyright, publisher, background, arrangement, font_scale, lines_per_slide, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
       [
-        input.title,
-        input.author ?? null,
+        normalizeTitleText(input.title),
+        input.author ? normalizeTitleText(input.author) : null,
         input.ccli ?? null,
         input.copyright ?? null,
         input.publisher ?? null,
@@ -351,8 +379,8 @@ export function updateSong(id: number, input: SongInput): void {
     db.run(
       'UPDATE song SET title = ?, author = ?, ccli = ?, copyright = ?, publisher = ?, arrangement = ?, font_scale = ?, lines_per_slide = ?, bg_motion = ?, text_color = ?, font = ?, blur_behind_text = ? WHERE id = ?',
       [
-        input.title,
-        input.author ?? null,
+        normalizeTitleText(input.title),
+        input.author ? normalizeTitleText(input.author) : null,
         input.ccli ?? null,
         input.copyright ?? null,
         input.publisher ?? null,
@@ -489,7 +517,7 @@ export function createAnnouncement(input: AnnouncementInput): number {
   db.run(
     'INSERT INTO announcement (title, body, display, background, blur_behind_text, frequency, start_date, end_date, active, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
     [
-      input.title,
+      normalizeTitleText(input.title),
       input.body,
       input.display,
       input.background ?? null,
@@ -510,7 +538,7 @@ export function updateAnnouncement(id: number, input: AnnouncementInput): void {
   db.run(
     'UPDATE announcement SET title = ?, body = ?, display = ?, background = ?, blur_behind_text = ?, frequency = ?, start_date = ?, end_date = ?, active = ? WHERE id = ?',
     [
-      input.title,
+      normalizeTitleText(input.title),
       input.body,
       input.display,
       input.background ?? null,
