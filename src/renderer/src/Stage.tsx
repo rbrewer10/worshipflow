@@ -30,6 +30,17 @@ function Stage(): JSX.Element {
     return () => { off(); clearInterval(t) }
   }, [])
 
+  // This is a real physical monitor facing the pastor/worship leader — must
+  // never show live content while rehearsing.
+  if (live?.rehearsal) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-[#0b0f17] text-center text-white/70" style={{ cursor: 'none' }}>
+        <div className="text-[3vw] font-bold uppercase tracking-[0.3em] text-amber-400">Rehearsal</div>
+        <div className="mt-2 text-[1.4vw]">Nothing is live on this screen</div>
+      </div>
+    )
+  }
+
   const mode = live?.mode ?? 'lyrics'
   const isBlack = mode === 'black'
   const isLogo = mode === 'logo'

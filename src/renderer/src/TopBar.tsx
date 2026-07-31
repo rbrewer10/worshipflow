@@ -37,6 +37,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
   const [build, setBuild] = useState<{ version: string; isPackaged: boolean } | null>(null)
   const [obs, setObs] = useState<ObsStatus | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [rehearsal, setRehearsal] = useState(false)
   useEffect(() => {
     const load = (): void => {
       window.wf.getInfo().then((i: AppInfo) => {
@@ -48,8 +49,15 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
     const t = setInterval(load, 2000)
     window.wf.obsGetStatus().then(setObs)
     const off = window.wf.obsOnStatus(setObs)
+    window.wf.getRehearsalMode().then(setRehearsal)
     return () => { clearInterval(t); off() }
   }, [])
+
+  const toggleRehearsal = (): void => {
+    const next = !rehearsal
+    setRehearsal(next)
+    void window.wf.setRehearsalMode(next)
+  }
 
   const onAir = Boolean(obs?.streaming || obs?.recording)
   useEffect(() => {
@@ -93,11 +101,28 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
       </nav>
 
       <div className="flex flex-shrink-0 items-center gap-2">
-        {outputs > 0 ? (
-          <div className="flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-1.5">
-            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
-            <span className="text-xs font-semibold text-blue-700">
-              {outputs} screen{outputs !== 1 ? 's' : ''} live
+        <button
+          onClick={toggleRehearsal}
+          title={rehearsal ? 'Rehearsing — real outputs show nothing. Click to disarm.' : 'Arm rehearsal mode — real outputs will show nothing while you practice'}
+          className={`rounded-lg px-2.5 py-1.5 text-xs font-bold uppercase tracking-wide transition-colors ${
+            rehearsal ? 'bg-amber-500 text-black' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
+          }`}
+        >
+          {rehearsal ? 'Rehearsing' : 'Rehearsal'}
+        </button>
+
+        {rehearsal ? (
+          <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 ring-1 ring-amber-500/30" title="Rehearsal mode is armed — real outputs are showing nothing, regardless of what's happening here">
+            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />
+            <span className="text-xs font-bold uppercase tracking-wide text-amber-700">
+              Outputs held back
+            </span>
+          </div>
+        ) : outputs > 0 ? (
+          <div className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 ring-1 ring-red-500/30" title="Real screens are connected — anything sent live reaches the congregation">
+            <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-red-500" />
+            <span className="text-xs font-bold uppercase tracking-wide text-red-700">
+              Live armed · {outputs} screen{outputs !== 1 ? 's' : ''}
             </span>
           </div>
         ) : (

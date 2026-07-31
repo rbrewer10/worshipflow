@@ -14,6 +14,15 @@ const SHARED_JS = `
   // Shrink-to-fit: keep the desired font size when it fits, otherwise binary-search
   // the largest size (down to minVw) whose rendered text fits within availW x availH.
   // Prevents oversized slides (whole verse+chorus on one slide) from clipping.
+  // Per-screen output scale: shrinks/grows the whole page around its center,
+  // compensating for a physical screen that crops edges or leaves them empty.
+  // Applied to <body> (not the per-template #root/#wrap) so it works for all
+  // 4 zone templates without touching their individual render() functions.
+  function applyScale(){
+    var s=(state.scale||100)/100;
+    document.body.style.transform=s===1?'none':'scale('+s+')';
+    document.body.style.transformOrigin='center center';
+  }
   function fitText(el,maxVw,minVw,availW,availH){
     if(!el) return;
     el.style.fontSize=maxVw+'vw';
@@ -25,6 +34,9 @@ const SHARED_JS = `
       if(el.scrollHeight<=availH+1 && el.scrollWidth<=availW+1){ lo=mid; } else { hi=mid; }
     }
     el.style.fontSize=lo+'vw';
+    // Still doesn't fit even at the floor — genuinely too much text for this
+    // screen. Read by the Zone Multiview window to badge the offending screen.
+    if(el.scrollHeight>availH+1 || el.scrollWidth>availW+1) window.__wfOverflow=true;
   }
   // ── Sermon backdrop (mode 'sermon') ─────────────────────────────────────────
   // The designed title card that sits behind the pastor. Markup is rebuilt only
@@ -151,7 +163,7 @@ ${body}
 <script>
 (function(){
   var ZONE=${zoneId};
-  var state={mode:'off',line:'',next:'',title:'',index:0,total:0,background:null,themeColors:null,fontScale:6,secondsLeft:0,stageMessage:null,imagePath:null,bgColor:null,bgOverlay:null,textAlign:null,textPosition:null,blurBehindText:false};
+  var state={mode:'off',line:'',next:'',title:'',index:0,total:0,background:null,themeColors:null,fontScale:6,secondsLeft:0,stageMessage:null,imagePath:null,bgColor:null,bgOverlay:null,textAlign:null,textPosition:null,blurBehindText:false,scale:100};
   var ws,reconnectTimer;
   function connect(){
     ws=new WebSocket('ws://'+location.host);
@@ -160,7 +172,11 @@ ${body}
       try{
         var msg=JSON.parse(e.data);
         if(msg.type==='zones'&&msg.states&&msg.states[ZONE]){
-          state=msg.states[ZONE];
+          // Rehearsal mode: real zone screens show the safe idle/off state
+          // (same as "nothing routed here") instead of whatever the operator
+          // is rehearsing through — never the actual live content.
+          state=msg.rehearsal ? {mode:'off',line:'',next:'',title:'',index:0,total:0,background:null,themeColors:null,fontScale:6,secondsLeft:0,stageMessage:null,imagePath:null,bgColor:null,bgOverlay:null,textAlign:null,textPosition:null,blurBehindText:false,scale:state.scale} : msg.states[ZONE];
+          applyScale();
           render();
         }
       }catch(ex){}
@@ -261,6 +277,7 @@ const LYRICS_SCRIPT = `
   }
 
   function render(){
+    window.__wfOverflow=false;
     var m=state.mode;
     lineEl.style.backdropFilter='none';lineEl.style.webkitBackdropFilter='none';lineEl.style.background='transparent';lineEl.style.padding='0 8vw';
     // Sermon teardown: hide the backdrop and undo the grade/drift it puts on the
@@ -449,6 +466,7 @@ const FLEX_SCRIPT = `
   }
 
   function render(){
+    window.__wfOverflow=false;
     var m=state.mode;
     content.style.backdropFilter='none';content.style.webkitBackdropFilter='none';content.style.background='transparent';content.style.width='';content.style.maxWidth='';content.style.padding='';
     // Sermon teardown: every other mode starts with the backdrop hidden and the
@@ -583,6 +601,13 @@ const FLEX_SCRIPT = `
         var contentCs=getComputedStyle(content);
         var contentAvailW=content.clientWidth-parseFloat(contentCs.paddingLeft)-parseFloat(contentCs.paddingRight);
         fitText(content.firstChild,fs,2,contentAvailW,window.innerHeight*0.90-titleH);
+      } else {
+        // fitText is skipped on purpose here (see above) so it can't flag
+        // overflow either — check read-only, without touching the chosen size.
+        var fixedCs=getComputedStyle(content);
+        var fixedAvailW=content.clientWidth-parseFloat(fixedCs.paddingLeft)-parseFloat(fixedCs.paddingRight);
+        var fixedEl=content.firstChild;
+        if(fixedEl&&(fixedEl.scrollWidth>fixedAvailW+1||fixedEl.scrollHeight>(window.innerHeight*0.90-titleH)+1)) window.__wfOverflow=true;
       }
       return;
     }
@@ -639,6 +664,7 @@ const STAGE_SCRIPT = `
   }
   tick();setInterval(tick,1000);
   function render(){
+    window.__wfOverflow=false;
     var m=state.mode;
     if(state.stageMessage){
       stageMsg.style.display='block';

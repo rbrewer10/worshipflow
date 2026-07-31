@@ -12,15 +12,22 @@ import ScriptureLookup from './ScriptureLookup'
 import VolunteerView from './VolunteerView'
 import LogoSettings from './LogoSettings'
 import SoundCheckTab from './sound-check/SoundCheckTab'
+import ObsConnectTab from './ObsConnectTab'
 import NotifyToasts from './NotifyToasts'
 
-export type View = 'home' | 'live' | 'service' | 'songs' | 'announcements' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck'
+export type View = 'home' | 'live' | 'service' | 'songs' | 'announcements' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck' | 'obs'
 
 function AppShell(): JSX.Element {
   const [view, setView] = useState<View>('home')
 
-  // Global keyboard shortcuts for live control (available from any tab)
+  // Global keyboard shortcuts for live control — Live tab only. These used to
+  // fire from any tab (including while editing songs/services), so e.g. typing
+  // "b" or using arrow keys anywhere in the app could black the live output or
+  // advance/reverse it. Volunteer mode has its own separate, smarter handler
+  // (VolunteerView.tsx) — this one staying mounted for 'volunteer' too would
+  // double-fire the same keystroke through two different intent paths.
   useEffect(() => {
+    if (view !== 'live') return
     const handleKeyDown = (e: KeyboardEvent): void => {
       // Don't intercept while typing in a field
       const tag = (e.target as HTMLElement).tagName
@@ -83,7 +90,7 @@ function AppShell(): JSX.Element {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [view])
 
   // Restore recovery state after renderer is ready and activeServiceItems is populated
   useEffect(() => {
@@ -119,6 +126,8 @@ function AppShell(): JSX.Element {
             <SongLibrary />
           ) : view === 'announcements' ? (
             <AnnouncementsLibrary />
+          ) : view === 'obs' ? (
+            <ObsConnectTab />
           ) : view === 'soundcheck' ? (
             <SoundCheckTab />
           ) : view === 'settings' ? (

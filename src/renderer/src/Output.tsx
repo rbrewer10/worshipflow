@@ -31,6 +31,7 @@ export interface AudienceModel {
   songFont: string | null
   blurBehindText: boolean
   ccli: { author: string | null; copyright: string | null; ccli: string | null; license: string | null }
+  rehearsal: boolean
 }
 
 // Subscribes to the main-process live broadcast and returns the current render
@@ -49,6 +50,7 @@ export function useLiveModel(): AudienceModel {
   const [songTextColor, setSongTextColor] = useState<string | null>(null)
   const [songFont, setSongFont] = useState<string | null>(null)
   const [blurBehindText, setBlurBehindText] = useState(false)
+  const [rehearsal, setRehearsal] = useState(false)
   const [ccli, setCcli] = useState<{
     author: string | null
     copyright: string | null
@@ -67,6 +69,7 @@ export function useLiveModel(): AudienceModel {
       setSongTextColor(s.songTextColor ?? null)
       setSongFont(s.songFont ?? null)
       setBlurBehindText(s.blurBehindText ?? false)
+      setRehearsal(s.rehearsal ?? false)
       setFontScale(s.fontScale ?? 6)
       setCcli({
         author: s.songAuthor ?? null,
@@ -96,7 +99,7 @@ export function useLiveModel(): AudienceModel {
 
   return {
     mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
-    slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli
+    slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli, rehearsal
   }
 }
 
@@ -309,6 +312,20 @@ function Output(): JSX.Element {
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
   }, [])
+
+  // Rehearsal mode: this is a REAL physical output, so it must never show
+  // live content while rehearsing — the operator's own previews (LiveMirror,
+  // SlideGrid, etc.) still show the real thing so they can practice.
+  if (model.rehearsal) {
+    return (
+      <div className="relative flex h-screen w-screen items-center justify-center overflow-hidden bg-[#0b0f17]" style={{ cursor: 'none' }}>
+        <div className="text-center text-white/70">
+          <div className="text-[3vw] font-bold uppercase tracking-[0.3em] text-amber-400">Rehearsal</div>
+          <div className="mt-2 text-[1.4vw]">Nothing is live on this screen</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black" style={{ cursor: 'none' }}>

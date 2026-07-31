@@ -362,6 +362,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     editorOpen: noop,
     serviceOpen: noop,
 
+    getRehearsalMode: async (): Promise<boolean> => false,
+    setRehearsalMode: async (): Promise<void> => {},
     getTabletUrl: async (): Promise<string> => 'Browser preview only',
     getTabletPin: async (): Promise<string> => '000000',
     regenerateTabletPin: async (): Promise<string> => '000000',

@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Play, LayoutGrid, MonitorSpeaker, ListMusic, Music, BookOpen, User } from 'lucide-react'
+import { Play, LayoutGrid, MonitorSpeaker, ListMusic, Music, BookOpen, User, Check, TriangleAlert } from 'lucide-react'
 import type { View } from './AppShell'
+import type { AppInfo, ObsStatus } from '../../shared/types'
 import { useService } from './ServiceContext'
 import BrandMark from './BrandMark'
 
@@ -22,8 +24,46 @@ function greeting(): string {
   return 'Good evening'
 }
 
+// A row's status. 'ok' and 'warn' are opinions ("this probably needs
+// attention before Sunday"); 'info' is neutral — not every church streams
+// every service, so no OBS connection isn't itself a problem.
+type PreflightLevel = 'ok' | 'warn' | 'info'
+
 function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
   const { activeService } = useService()
+  const [outputs, setOutputs] = useState(0)
+  const [rehearsal, setRehearsal] = useState(false)
+  const [obs, setObs] = useState<ObsStatus | null>(null)
+
+  // Startup preflight: the app used to say "Ready when you are" unconditionally,
+  // with no way to tell whether outputs are actually connected, rehearsal mode
+  // was left armed, or a service is even loaded. This surfaces that state
+  // up front instead of leaving the operator to discover it live.
+  useEffect(() => {
+    const load = (): void => {
+      window.wf.getInfo().then((i: AppInfo) => setOutputs(i.outputs))
+      window.wf.getRehearsalMode().then(setRehearsal)
+    }
+    load()
+    const t = setInterval(load, 2000)
+    window.wf.obsGetStatus().then(setObs)
+    const off = window.wf.obsOnStatus(setObs)
+    return () => { clearInterval(t); off() }
+  }, [])
+
+  const checks: { level: PreflightLevel; label: string }[] = [
+    rehearsal
+      ? { level: 'warn', label: 'Rehearsal mode is armed — real outputs are showing nothing' }
+      : { level: 'ok', label: 'Rehearsal mode off' },
+    outputs > 0
+      ? { level: 'ok', label: `${outputs} output${outputs !== 1 ? 's' : ''} connected` }
+      : { level: 'warn', label: 'No outputs connected yet' },
+    activeService
+      ? { level: 'ok', label: `"${activeService.name}" loaded` }
+      : { level: 'warn', label: 'No service loaded yet' },
+    { level: obs?.connected ? 'ok' : 'info', label: obs?.connected ? 'OBS connected' : 'OBS not connected' }
+  ]
+  const needsAttention = checks.some((c) => c.level === 'warn')
 
   const handle = (card: typeof CARDS[0]): void => {
     if (card.view) setView(card.view)
@@ -41,7 +81,27 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
         </div>
       </div>
       <div className="mb-1 text-xl font-semibold text-slate-900">{greeting()}</div>
-      <div className="mb-6 text-sm text-slate-500">Ready when you are</div>
+      <div className="mb-3 text-sm text-slate-500">
+        {needsAttention ? 'A few things to check before you go live' : 'Ready when you are'}
+      </div>
+
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {checks.map((c, i) => (
+          <div
+            key={i}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium ${
+              c.level === 'warn'
+                ? 'border-amber-500/30 bg-amber-500/[0.08] text-amber-800'
+                : c.level === 'ok'
+                ? 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-800'
+                : 'border-slate-200 bg-white text-slate-500'
+            }`}
+          >
+            {c.level === 'warn' ? <TriangleAlert size={13} className="shrink-0" /> : c.level === 'ok' ? <Check size={13} className="shrink-0" /> : null}
+            <span className="truncate">{c.label}</span>
+          </div>
+        ))}
+      </div>
 
       <button
         onClick={() => setView('live')}

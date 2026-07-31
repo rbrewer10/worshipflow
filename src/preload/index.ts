@@ -188,6 +188,12 @@ const wf = {
   editorOpen: (songId: number): Promise<void> => ipcRenderer.invoke('wf:editor:open', songId),
   serviceOpen: (serviceId: number): Promise<void> => ipcRenderer.invoke('wf:service:open', serviceId),
 
+  // Rehearsal mode — real physical outputs show nothing while armed
+  getRehearsalMode: (): Promise<boolean> =>
+    ipcRenderer.invoke('wf:live:getRehearsalMode'),
+  setRehearsalMode: (on: boolean): Promise<void> =>
+    ipcRenderer.invoke('wf:live:setRehearsalMode', on),
+
   // Tablet remote
   getTabletUrl: (): Promise<string> =>
     ipcRenderer.invoke('wf:getTabletUrl'),

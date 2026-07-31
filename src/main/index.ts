@@ -485,6 +485,11 @@ let obsAutoSwitch = false
 let obsSceneMap: Record<SceneContext, string> = { worship: '', word: '', countdown: '' }
 let lastAutoScene: string | null = null
 
+// Rehearsal mode: a global, session-only (never persisted — always starts OFF)
+// flag carried on LiveState. Real physical outputs check it and show nothing;
+// operator-facing previews ignore it. See the field's comment in shared/types.ts.
+let rehearsalMode = false
+
 function clearCountdown(track: TrackId): void {
   const t = tracks[track]
   if (t.countdownTimer) { clearInterval(t.countdownTimer); t.countdownTimer = null }
@@ -609,7 +614,8 @@ function renderState(track: TrackId = 'main'): LiveState {
     slideThemeColors: t.slideThemeColors,
     songTextColor: t.songTextColor,
     songFont: t.songFont,
-    blurBehindText: t.blurBehindText
+    blurBehindText: t.blurBehindText,
+    rehearsal: rehearsalMode
   }
 }
 
@@ -929,7 +935,7 @@ function deckNextText(t: LiveTrackState, zoneId: ZoneId): string {
 function zoneBroadcast(): void {
   if (tabletClients.size === 0) return
   const states = computeZoneStates()
-  const payload = JSON.stringify({ type: 'zones', states })
+  const payload = JSON.stringify({ type: 'zones', states, rehearsal: rehearsalMode })
   for (const client of tabletClients) {
     if ((client as WsSocket).readyState === 1) (client as WsSocket).send(payload)
   }
@@ -1699,7 +1705,7 @@ function startTabletServer(): void {
       items: activeServiceItems.map((it) => ({ id: it.id, type: it.type, title: it.title }))
     }))
     // Send zone states so zone pages render immediately on connect.
-    ws.send(JSON.stringify({ type: 'zones', states: computeZoneStates() }))
+    ws.send(JSON.stringify({ type: 'zones', states: computeZoneStates(), rehearsal: rehearsalMode }))
 
     // The tablet remote is Main-only (see design's non-goals) — always operates
     // on the 'main' track, same reasoning as tabletBroadcast/maybeAutoSwitchScene.
@@ -2109,6 +2115,12 @@ ipcMain.handle('wf:ccli:listUsage', () => listSongUsage())
 ipcMain.handle('wf:ccli:clearUsage', () => clearSongUsage())
 
 // --- Tablet IPCs ---
+ipcMain.handle('wf:live:getRehearsalMode', () => rehearsalMode)
+ipcMain.handle('wf:live:setRehearsalMode', (_e, on: boolean) => {
+  rehearsalMode = on
+  broadcast()
+})
+
 ipcMain.handle('wf:getTabletUrl', () => `http://${getLocalIp()}:${boundTabletPort}`)
 ipcMain.handle('wf:getTabletPin', () => getTabletPin())
 ipcMain.handle('wf:regenerateTabletPin', () => regenerateTabletPin())

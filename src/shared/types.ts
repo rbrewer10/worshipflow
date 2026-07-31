@@ -50,6 +50,13 @@ export interface LiveState {
   songTextColor?: string | null
   songFont?: string | null
   blurBehindText?: boolean       // draw a blurred/tinted band behind the live text
+  // True while Rehearsal mode is armed — a global flag (not per-track), carried
+  // on LiveState so it reaches every consumer for free. Real physical outputs
+  // (Output.tsx windows, Stage.tsx, zone screens) must treat this as "show
+  // nothing," while operator-facing previews (LiveMirror, SlideGrid, the
+  // ServiceRail preview) ignore it and keep showing the real content, since the
+  // whole point of rehearsing is to see what WOULD go out.
+  rehearsal?: boolean
 }
 
 export interface DisplayInfo {
@@ -143,17 +150,25 @@ export interface SongUsage {
 }
 
 // --- Service builder ---
-export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement' | 'sermon'
+// 'header' and 'placeholder' are organizational-only: they never go live and
+// carry no zone routing. 'header' is a colored section divider (Welcome /
+// Worship / Sermon / Response); 'placeholder' reserves a labeled TBD slot in
+// the running order before its real content exists.
+export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement' | 'sermon' | 'header' | 'placeholder'
+
+// Item types that never go live — no zone routing, no "Go Live" action, no
+// zone-screen preview. Purely organizational rows in the service list.
+export const NON_LIVE_TYPES: ServiceItemType[] = ['header', 'placeholder']
 
 // Item types whose live rendering supports a custom file background stored
 // directly on the item's own payload (payload.background) — Song has its own
 // separate background system (SongFull.background), Image's payload.path
-// already IS the background, and Ticker/Announcement don't support one.
+// already IS the background, and Ticker doesn't support one.
 // SINGLE SOURCE OF TRUTH: every place that needs to know "does this item type
 // support a background" must import this instead of hardcoding its own copy
 // of the list — three separate copies have already drifted out of sync once
 // each as new types gained support (Scripture/Countdown/Welcome, then Sermon).
-export const PAYLOAD_BACKGROUND_TYPES: ServiceItemType[] = ['text', 'scripture', 'countdown', 'welcome', 'sermon']
+export const PAYLOAD_BACKGROUND_TYPES: ServiceItemType[] = ['text', 'scripture', 'countdown', 'welcome', 'sermon', 'announcement']
 
 export interface ServiceSummary {
   id: number
@@ -233,6 +248,11 @@ export interface ZoneState {
   textAlign: string | null      // 'left' | 'center' | 'right'
   textPosition: string | null   // 'top' | 'center' | 'bottom'
   blurBehindText?: boolean      // blurred/tinted band behind the main line/content
+  // Per-screen output scale (percent, default 100). Compensates for a physical
+  // screen that crops edges or leaves them empty — set once per screen, not per
+  // item. computeZoneStates stamps this onto every ZoneState right before
+  // broadcast, so it's always populated regardless of which branch built the rest.
+  scale?: number
 }
 
 // Per-service-item zone routing: what each zone shows when this item is live.
@@ -250,6 +270,9 @@ export const ZONE_ROUTING_DEFAULTS: Record<ServiceItemType, ZoneRouting> = {
   // Back screens get the designed sermon backdrop (title/speaker/passage) —
   // the Lyrics TVs stay on the logo so the room isn't reading the same card twice.
   sermon:    { 1: 'sermon',    2: 'sermon',    3: 'logo',      4: 'stage' },
+  // Never go live — see NON_LIVE_TYPES.
+  header:      { 1: 'off', 2: 'off', 3: 'off', 4: 'off' },
+  placeholder: { 1: 'off', 2: 'off', 3: 'off', 4: 'off' },
 }
 
 export const ZONE_NAMES: Record<ZoneId, string> = {
