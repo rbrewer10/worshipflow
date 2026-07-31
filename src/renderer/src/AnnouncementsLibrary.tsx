@@ -3,6 +3,7 @@ import { Megaphone, Plus, ScrollText, Type } from 'lucide-react'
 import type { AnnouncementSummary } from '../../shared/types'
 import AnnouncementEditor from './AnnouncementEditor'
 import Modal from './Modal'
+import { notifyLocalAction } from './NotifyToasts'
 
 function AnnouncementsLibrary(): JSX.Element {
   const [items, setItems] = useState<AnnouncementSummary[]>([])
@@ -33,10 +34,29 @@ function AnnouncementsLibrary(): JSX.Element {
 
   const confirmRemove = async (): Promise<void> => {
     if (!confirmDelete) return
-    if (editorId === confirmDelete.id) setEditorId(null)
-    await window.wf.announcementDelete(confirmDelete.id)
+    const { id, title } = confirmDelete
+    if (editorId === id) setEditorId(null)
+    // Captured before deleting so Undo can recreate it — see the matching
+    // comment in SongLibrary.tsx (a real re-create, not a true un-delete).
+    const full = await window.wf.announcementGet(id)
+    await window.wf.announcementDelete(id)
     refresh()
     setConfirmDelete(null)
+    if (full) {
+      notifyLocalAction(`Deleted "${title}"`, 'Undo', () => {
+        void window.wf.announcementCreate({
+          title: full.title,
+          body: full.body,
+          display: full.display,
+          background: full.background,
+          blurBehindText: full.blurBehindText,
+          frequency: full.frequency,
+          startDate: full.startDate,
+          endDate: full.endDate,
+          active: full.active
+        }).then(() => refresh())
+      })
+    }
   }
 
   const createAnnouncement = async (): Promise<void> => {

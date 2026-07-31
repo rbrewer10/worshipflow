@@ -11,6 +11,7 @@ import ScheduledAnnouncements from './ScheduledAnnouncements'
 import Modal from './Modal'
 import QuickSearchOverlay from './QuickSearchOverlay'
 import { useOptionalService } from './ServiceContext'
+import { notifyLocalAction } from './NotifyToasts'
 
 function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   serviceId: number
@@ -179,11 +180,34 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const batchDeleteItems = (deleteItems: ServiceItem[]): void => setConfirmDeleteItems(deleteItems)
   const confirmDelete = async (): Promise<void> => {
     if (!confirmDeleteItems) return
-    const ids = new Set(confirmDeleteItems.map((it) => it.id))
-    for (const it of confirmDeleteItems) await window.wf.serviceRemoveItem(it.id)
+    const deletedItems = confirmDeleteItems // the full ServiceItem objects, captured before they're gone
+    const ids = new Set(deletedItems.map((it) => it.id))
+    for (const it of deletedItems) await window.wf.serviceRemoveItem(it.id)
     if (selectedId != null && ids.has(selectedId)) setSelectedId(null)
     await reload()
     setConfirmDeleteItems(null)
+
+    // A real re-create (new ids, same content: payload/notes/style/zone
+    // routing), not a true un-delete — there's no soft-delete/trash table —
+    // but it gets the operator back to where they were after an accidental
+    // confirm, same pattern as SongLibrary/AnnouncementsLibrary's Undo.
+    notifyLocalAction(
+      deletedItems.length === 1 ? `Deleted "${deletedItems[0].title}"` : `Deleted ${deletedItems.length} items`,
+      'Undo',
+      () => {
+        void (async () => {
+          for (const it of deletedItems) {
+            const newId = await window.wf.serviceAddItem(serviceId, { type: it.type, ref_id: it.ref_id, payload: it.payload, track: it.track })
+            if (newId != null) {
+              if (it.notes) await window.wf.serviceUpdateItemNotes(newId, it.notes)
+              if (it.style) await window.wf.serviceSetItemStyle(newId, it.style)
+              if (it.zoneRouting) await window.wf.zoneSetRouting(newId, it.zoneRouting)
+            }
+          }
+          await reload()
+        })()
+      }
+    )
   }
 
   const duplicateItem = async (item: ServiceItem): Promise<void> => {

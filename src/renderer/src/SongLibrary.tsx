@@ -6,6 +6,7 @@ import SongEditor from './editor/SongEditor'
 import PptxImport from './PptxImport'
 import Modal from './Modal'
 import { useAutosave } from './useAutosave'
+import { notifyLocalAction } from './NotifyToasts'
 
 function SongLibrary(): JSX.Element {
   const [songs, setSongs] = useState<SongSummary[]>([])
@@ -44,10 +45,36 @@ function SongLibrary(): JSX.Element {
 
   const confirmRemove = async (): Promise<void> => {
     if (!confirmDelete) return
-    if (editorId === confirmDelete.id) setEditorId(null)
-    await window.wf.songDelete(confirmDelete.id)
+    const { id, title } = confirmDelete
+    if (editorId === id) setEditorId(null)
+    // Captured before deleting so a click on the Undo toast can recreate it —
+    // there's no soft-delete/trash table, so this is a real re-create (a new
+    // id, same content) rather than a true un-delete, but it gets the operator
+    // back to where they were after an accidental confirm.
+    const full = await window.wf.songGet(id)
+    await window.wf.songDelete(id)
     refresh()
     setConfirmDelete(null)
+    if (full) {
+      notifyLocalAction(`Deleted "${title}"`, 'Undo', () => {
+        void window.wf.songCreate({
+          title: full.title,
+          author: full.author ?? undefined,
+          ccli: full.ccli ?? undefined,
+          copyright: full.copyright ?? undefined,
+          publisher: full.publisher ?? undefined,
+          background: full.background,
+          sections: full.sections,
+          arrangement: full.arrangement ?? undefined,
+          fontScale: full.fontScale ?? undefined,
+          linesPerSlide: full.linesPerSlide ?? undefined,
+          bgMotion: full.bgMotion,
+          textColor: full.textColor,
+          font: full.font,
+          blurBehindText: full.blurBehindText
+        }).then(() => refresh())
+      })
+    }
   }
 
   // Serialized so picking backgrounds on two different rows in quick
