@@ -2963,6 +2963,63 @@ function pruneBackups(bakDir: string, keep: number): void {
   }
 }
 
+// Turns "worshipflow-20260730T221530.db" back into a real Date, the inverse of
+// createTimestampedBackup's `now.toISOString().replace(/[:-]/g, '').split('.')[0]`.
+// Returns null (rather than an Invalid Date) for anything that doesn't match,
+// so a stray or hand-renamed file in the backups folder can't corrupt the list.
+function parseBackupTimestamp(filename: string): Date | null {
+  const m = filename.match(/^worshipflow-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})\.db$/)
+  if (!m) return null
+  const [, y, mo, d, h, mi, s] = m
+  const date = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+// The automatic per-launch backup (createTimestampedBackup) protects against a
+// bad migration, but the backups just sat in a folder with no way to actually
+// use one short of manual file surgery — closing that gap with a real
+// restore path, gated behind an explicit operator confirmation + relaunch
+// (restoring into the live sql.js instance mid-session would mean resetting
+// every module-level cache in this file by hand — relaunching the whole app
+// is the same recovery path the operator already gets after any crash).
+ipcMain.handle('wf:backups:list', (): { filename: string; timestamp: number }[] => {
+  const bakDir = join(app.getPath('userData'), 'backups')
+  if (!existsSync(bakDir)) return []
+  try {
+    return readdirSync(bakDir)
+      .map((filename) => ({ filename, date: parseBackupTimestamp(filename) }))
+      .filter((f): f is { filename: string; date: Date } => f.date != null)
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .map((f) => ({ filename: f.filename, timestamp: f.date.getTime() }))
+  } catch (err) {
+    logError('[backups] failed to list', err)
+    return []
+  }
+})
+
+ipcMain.handle('wf:backups:restore', (_e, filename: string): void => {
+  if (!/^worshipflow-\d{8}T\d{6}\.db$/.test(filename)) {
+    throw new Error(`Invalid backup filename: ${filename}`)
+  }
+  const bakDir = join(app.getPath('userData'), 'backups')
+  const backupPath = join(bakDir, filename)
+  if (!existsSync(backupPath)) throw new Error('Backup file not found')
+  const dbPath = join(app.getPath('userData'), 'worshipflow.db')
+  // One more safety copy of the CURRENT (pre-restore) database, in case the
+  // chosen backup was the wrong one — this is not pruned by pruneBackups'
+  // normal cadence rotation, it's a single just-in-case snapshot.
+  const preRestorePath = join(bakDir, `worshipflow-pre-restore-${Date.now()}.db`)
+  try {
+    if (existsSync(dbPath)) copyFileSync(dbPath, preRestorePath)
+    copyFileSync(backupPath, dbPath)
+  } catch (err) {
+    logError('[backups] restore failed', err)
+    throw err instanceof Error ? err : new Error(String(err))
+  }
+  app.relaunch()
+  app.exit(0)
+})
+
 // Pick one or more .pptx files and parse them into song previews (not yet saved).
 ipcMain.handle('wf:songs:importPptx', async (): Promise<ParsedPptxSong[]> => {
   const opts = {

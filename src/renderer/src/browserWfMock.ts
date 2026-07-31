@@ -380,6 +380,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
 
     logsGetRecent: async (): Promise<string[]> => [],
     logsOpenFolder: noop,
+    backupsList: async (): Promise<{ filename: string; timestamp: number }[]> => [],
+    backupsRestore: noop,
 
     getObsUrl: async (): Promise<string> => 'Browser preview only',
     obsOnStatus: (cb: (s: ObsStatus) => void): (() => void) => {

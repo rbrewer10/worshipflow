@@ -244,6 +244,8 @@ function LogoSettings(): JSX.Element {
           </div>
         </div>
 
+        <BackupsPanel />
+
         <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
           <p className="text-xs text-gray-400 leading-relaxed">
             <strong className="text-gray-600">How it works:</strong> Zones 1 &amp; 2 (back-left and back-right screens) show your logo and background whenever the system is between songs or in logo mode.
@@ -252,6 +254,66 @@ function LogoSettings(): JSX.Element {
           </p>
         </div>
       </div>
+    </div>
+  )
+}
+
+function fmtBackupTime(ts: number): string {
+  const d = new Date(ts)
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+// The app already takes a full database backup on every launch (see
+// createTimestampedBackup, main process) — this just closes the gap between
+// "backups silently exist" and "an operator can actually use one" without
+// touching the filesystem by hand.
+function BackupsPanel(): JSX.Element {
+  const [backups, setBackups] = useState<{ filename: string; timestamp: number }[]>([])
+  const [restoring, setRestoring] = useState<string | null>(null)
+
+  useEffect(() => { window.wf.backupsList().then(setBackups) }, [])
+
+  const restore = (filename: string, timestamp: number): void => {
+    const when = fmtBackupTime(timestamp)
+    if (!confirm(
+      `Restore the database to how it was on ${when}?\n\n` +
+      'Everything added or changed since then will be gone. The app will ' +
+      'restart automatically — your current database is also backed up first, ' +
+      'just in case.'
+    )) return
+    setRestoring(filename)
+    window.wf.backupsRestore(filename).catch((err) => {
+      setRestoring(null)
+      alert(`Restore failed: ${err instanceof Error ? err.message : String(err)}`)
+    })
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="mb-4">
+        <h2 className="font-semibold text-gray-900">Backups</h2>
+        <div className="text-xs text-gray-400 mt-0.5">
+          A snapshot of your whole database (songs, services, announcements) is taken automatically every time the app starts. Restoring rolls everything back to that point and restarts the app.
+        </div>
+      </div>
+      {backups.length === 0 ? (
+        <p className="text-xs text-gray-400">No backups yet — one is taken the next time you start the app.</p>
+      ) : (
+        <ul className="max-h-48 space-y-1 overflow-auto">
+          {backups.map((b) => (
+            <li key={b.filename} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-gray-50">
+              <span className="text-gray-700">{fmtBackupTime(b.timestamp)}</span>
+              <button
+                onClick={() => restore(b.filename, b.timestamp)}
+                disabled={restoring != null}
+                className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                {restoring === b.filename ? 'Restoring…' : 'Restore'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
