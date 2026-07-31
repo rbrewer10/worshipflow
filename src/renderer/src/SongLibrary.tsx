@@ -18,6 +18,15 @@ function SongLibrary(): JSX.Element {
   // first means nothing is created until there's a real title to save.
   const [namingNew, setNamingNew] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  // Full-library titles for duplicate detection — fetched fresh (not filtered
+  // by whatever's in the search box) each time the naming form opens, per the
+  // audit's "warn about likely duplicates" (the library already had several
+  // duplicate "New Song" placeholders from before the draft-gate existed).
+  const [existingTitles, setExistingTitles] = useState<string[]>([])
+  useEffect(() => {
+    if (namingNew) window.wf.songsList('').then((list) => setExistingTitles(list.map((s) => s.title)))
+  }, [namingNew])
+  const duplicateTitle = existingTitles.find((t) => t.trim().toLowerCase() === newTitle.trim().toLowerCase())
 
   const refresh = (q = search): void => {
     window.wf.songsList(q).then(setSongs)
@@ -97,6 +106,7 @@ function SongLibrary(): JSX.Element {
         </Modal>
       )}
       <div className="flex h-full min-h-0 gap-4 p-4 text-slate-900">
+      <h1 className="sr-only">Song Library</h1>
       {/* Library list */}
       <div className="flex w-96 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
         <CcliPanel />
@@ -132,6 +142,11 @@ function SongLibrary(): JSX.Element {
               placeholder="Song title…"
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
             />
+            {duplicateTitle && (
+              <p className="text-[11px] text-amber-700">
+                “{duplicateTitle}” is already in your library — this will create a separate copy.
+              </p>
+            )}
             <div className="flex gap-1.5">
               <button
                 type="button"

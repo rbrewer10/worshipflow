@@ -154,6 +154,7 @@ function ServiceBuilder(): JSX.Element {
       )}
 
       <div className="flex h-full min-h-0 gap-4 bg-[#e9ecf1] p-4">
+        <h1 className="sr-only">Build Service</h1>
         {/* Services list */}
         <div className="flex w-72 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
           <div className="mb-3 flex gap-2">

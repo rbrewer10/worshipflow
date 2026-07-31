@@ -15,6 +15,13 @@ function AnnouncementsLibrary(): JSX.Element {
   // is created until there's a real title to save.
   const [namingNew, setNamingNew] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  // Full-library titles for duplicate detection, independent of whatever the
+  // search box currently shows — see the matching comment in SongLibrary.tsx.
+  const [existingTitles, setExistingTitles] = useState<string[]>([])
+  useEffect(() => {
+    if (namingNew) window.wf.announcementsList('').then((list) => setExistingTitles(list.map((a) => a.title)))
+  }, [namingNew])
+  const duplicateTitle = existingTitles.find((t) => t.trim().toLowerCase() === newTitle.trim().toLowerCase())
 
   const refresh = (q = search): void => {
     window.wf.announcementsList(q).then(setItems)
@@ -57,6 +64,7 @@ function AnnouncementsLibrary(): JSX.Element {
         </Modal>
       )}
       <div className="flex h-full min-h-0 gap-4 p-4 text-slate-900">
+        <h1 className="sr-only">Announcements</h1>
         <div className="flex w-96 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
           {namingNew ? (
             <form
@@ -76,6 +84,11 @@ function AnnouncementsLibrary(): JSX.Element {
                 placeholder="Announcement title…"
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
               />
+              {duplicateTitle && (
+                <p className="text-[11px] text-amber-700">
+                  “{duplicateTitle}” is already in your library — this will create a separate copy.
+                </p>
+              )}
               <div className="flex gap-1.5">
                 <button
                   type="button"

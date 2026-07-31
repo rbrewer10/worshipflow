@@ -24,6 +24,7 @@ function ScriptureLookup(): JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col p-4 text-slate-900">
+      <h1 className="sr-only">Scripture Lookup</h1>
       <div className="mb-3 flex gap-2">
         <input
           value={ref}

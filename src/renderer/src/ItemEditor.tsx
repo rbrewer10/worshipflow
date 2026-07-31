@@ -1,6 +1,6 @@
 import { memo, useEffect } from 'react'
 import { Trash2, X } from 'lucide-react'
-import type { ServiceItem, SongFull, ThemeColors } from '../../shared/types'
+import type { ItemStyle, ServiceItem, SongFull, ThemeColors } from '../../shared/types'
 import { NON_LIVE_TYPES } from '../../shared/types'
 import ServiceSlidePreview from './ServiceSlidePreview'
 import ItemBackgroundPanel from './ItemBackgroundPanel'
@@ -49,6 +49,9 @@ interface ItemEditorProps {
   setAutoLabelAnalyses: (analyses: any[]) => void
   setShowAutoLabelPreview: (show: boolean) => void
   savePayload: (payload: Record<string, unknown>) => void
+  applySongBackground: (path: string | null) => void
+  onToggleSongBlur: () => void
+  applyItemStyle: (style: ItemStyle | null) => void
 }
 
 export const ItemEditor = memo(function ItemEditor({
@@ -82,7 +85,10 @@ export const ItemEditor = memo(function ItemEditor({
   setAutoLabelPreview,
   setAutoLabelAnalyses,
   setShowAutoLabelPreview,
-  savePayload
+  savePayload,
+  applySongBackground,
+  onToggleSongBlur,
+  applyItemStyle
 }: ItemEditorProps): JSX.Element {
   const payload = item.payload ?? {}
 
@@ -218,7 +224,18 @@ export const ItemEditor = memo(function ItemEditor({
       {/* ── Background & Color — headers/placeholders never render on screen ── */}
       {!NON_LIVE_TYPES.includes(item.type) && (
         <div className="border-t border-slate-200 pt-3">
-          <ItemBackgroundPanel item={item} songFull={songFull} onChanged={onChanged} />
+          <ItemBackgroundPanel
+            item={item}
+            songFull={songFull}
+            onChanged={onChanged}
+            savePayload={savePayload}
+            applySongBackground={applySongBackground}
+            onToggleSongBlur={onToggleSongBlur}
+            applyItemStyle={applyItemStyle}
+            saveStatus={saveStatus}
+            saveError={saveError}
+            onRetrySave={onRetrySave}
+          />
         </div>
       )}
 

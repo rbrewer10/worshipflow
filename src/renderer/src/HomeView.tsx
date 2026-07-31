@@ -75,10 +75,10 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
     <div className="h-full overflow-auto bg-[#e9ecf1] p-6">
       <div className="mb-5 flex items-center gap-3">
         <BrandMark size={40} className="flex-shrink-0 rounded-[9px] shadow-sm" />
-        <div className="flex items-baseline gap-1.5">
+        <h1 className="flex items-baseline gap-1.5">
           <span className="text-2xl font-extrabold tracking-tight text-slate-900">WorshipFlow</span>
           <span className="text-base font-bold tracking-wide text-blue-600">PRO</span>
-        </div>
+        </h1>
       </div>
       <div className="mb-1 text-xl font-semibold text-slate-900">{greeting()}</div>
       <div className="mb-3 text-sm text-slate-500">

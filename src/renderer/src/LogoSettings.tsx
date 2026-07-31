@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Check, Church, Film, Image as ImageIcon, Sparkles } from 'lucide-react'
+import type { ZoneId } from '../../shared/types'
+
+const ZONE_LABELS: Record<ZoneId, string> = {
+  1: 'Back Left',
+  2: 'Back Right',
+  3: 'Lyrics TVs',
+  4: 'Stage Monitors'
+}
 
 function LogoSettings(): JSX.Element {
   const [logoPath, setLogoPath] = useState<string | null>(null)
   const [logoBg, setLogoBg] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [churchName, setChurchName] = useState('')
+  const [zoneScales, setZoneScales] = useState<Record<ZoneId, number>>({ 1: 100, 2: 100, 3: 100, 4: 100 })
 
   useEffect(() => {
     window.wf.logoGet().then(({ logoPath: p, logoBg: b }) => {
@@ -13,7 +22,13 @@ function LogoSettings(): JSX.Element {
       setLogoBg(b)
     })
     window.wf.settingGet('church_name').then((v) => setChurchName(v ?? ''))
+    window.wf.zonesGetScales().then(setZoneScales)
   }, [])
+
+  const setZoneScale = (zoneId: ZoneId, percent: number): void => {
+    setZoneScales((prev) => ({ ...prev, [zoneId]: percent }))
+    window.wf.zonesSetScale(zoneId, percent)
+  }
 
   const saveChurchName = (name: string): void => {
     setChurchName(name)
@@ -60,7 +75,7 @@ function LogoSettings(): JSX.Element {
   return (
     <div className="h-full overflow-auto bg-gray-50 p-6">
       <div className="mb-6">
-        <div className="text-xl font-semibold text-gray-900">Logo &amp; Background</div>
+        <h1 className="text-xl font-semibold text-gray-900">Logo &amp; Background</h1>
         <div className="mt-1 text-sm text-gray-400">
           Configure what shows on your left/right background screens (Zones 1 &amp; 2) when between songs.
         </div>
@@ -69,7 +84,7 @@ function LogoSettings(): JSX.Element {
       <div className="mx-auto max-w-xl space-y-5">
         {/* Church Name */}
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="font-semibold text-gray-900">Church Name</div>
+          <h2 className="font-semibold text-gray-900">Church Name</h2>
           <div className="text-xs text-gray-400 mt-0.5 mb-3">Shown on logo / idle screens when no logo image is set.</div>
           <input
             type="text"
@@ -84,7 +99,7 @@ function LogoSettings(): JSX.Element {
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <div className="font-semibold text-gray-900">Church Logo</div>
+              <h2 className="font-semibold text-gray-900">Church Logo</h2>
               <div className="text-xs text-gray-400 mt-0.5">Displayed on logo screens between songs</div>
             </div>
             {saved && <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600"><Check size={13} /> Saved</span>}
@@ -135,7 +150,7 @@ function LogoSettings(): JSX.Element {
         {/* Motion Background */}
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="mb-4">
-            <div className="font-semibold text-gray-900">Motion Background</div>
+            <h2 className="font-semibold text-gray-900">Motion Background</h2>
             <div className="text-xs text-gray-400 mt-0.5">
               Plays behind your logo — supports video files (.mp4, .webm) or images (Ken Burns effect)
             </div>
@@ -188,6 +203,44 @@ function LogoSettings(): JSX.Element {
                 Remove
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Screen Scale */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <h2 className="font-semibold text-gray-900">Screen Scale</h2>
+            <div className="text-xs text-gray-400 mt-0.5">
+              Shrinks or grows what a screen shows, per screen — use this if one physical monitor crops the edges or leaves black bars, without changing anything else.
+            </div>
+          </div>
+          <div className="space-y-3">
+            {(Object.keys(ZONE_LABELS) as unknown as ZoneId[]).map((zoneId) => (
+              <div key={zoneId} className="flex items-center gap-3">
+                <span className="w-32 shrink-0 text-xs font-medium text-gray-600">{ZONE_LABELS[zoneId]}</span>
+                <input
+                  type="range"
+                  min={50}
+                  max={150}
+                  step={1}
+                  value={zoneScales[zoneId] ?? 100}
+                  onChange={(e) => setZoneScale(zoneId, Number(e.target.value))}
+                  className="h-1 flex-1 accent-blue-600"
+                />
+                <span className="w-12 shrink-0 text-right text-xs font-mono tabular-nums text-gray-500">
+                  {zoneScales[zoneId] ?? 100}%
+                </span>
+                {zoneScales[zoneId] != null && zoneScales[zoneId] !== 100 && (
+                  <button
+                    onClick={() => setZoneScale(zoneId, 100)}
+                    className="shrink-0 text-xs text-gray-400 hover:text-gray-600"
+                    title="Reset to 100%"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 

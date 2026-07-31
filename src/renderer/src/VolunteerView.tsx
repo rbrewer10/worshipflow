@@ -9,8 +9,10 @@ import {
   Hand,
   Image as ImageIcon,
   Mic,
+  Minus,
   Music,
   Newspaper,
+  HelpCircle,
   Square,
   Timer,
   X
@@ -26,7 +28,9 @@ const ICON: Record<ServiceItem['type'], JSX.Element> = {
   welcome: <Hand size={14} />,
   ticker: <Newspaper size={14} />,
   announcement: <Newspaper size={14} />,
-  sermon: <Mic size={14} />
+  sermon: <Mic size={14} />,
+  header: <Minus size={14} />,
+  placeholder: <HelpCircle size={14} />
 }
 
 function canGoLive(item: ServiceItem): boolean {
@@ -171,6 +175,10 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
 
   return (
     <div className="flex h-full select-none flex-col bg-[#e9ecf1]">
+      {/* No visible title by design (this screen is all big touch controls) —
+          an sr-only heading still gives screen-reader heading-navigation
+          something to land on. */}
+      <h1 className="sr-only">Volunteer Mode</h1>
       {/* ── Top bar ── */}
       <div className="flex items-center gap-2 border-b border-slate-200 bg-[#f4f6f9] px-4 py-2">
         <TopBtn active={isBlack} onClick={() => send('black')} className={isBlack ? 'bg-slate-700 text-white ring-1 ring-slate-900/10' : ''}>

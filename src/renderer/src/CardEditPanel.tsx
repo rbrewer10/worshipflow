@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ServiceItem, SongFull, SongInput, ThemeColors } from '../../shared/types'
+import type { ItemStyle, ServiceItem, SongFull, SongInput, ThemeColors } from '../../shared/types'
 import { ItemEditor } from './ItemEditor'
 import { parseSections, sectionsToText } from './songText'
 import { analyzeAndLabelSections, previewAutoLabels } from './autoLabel'
@@ -49,6 +49,14 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   )
   const notesQueue = useAutosave<string>((value) =>
     window.wf.serviceUpdateItemNotes(item.id, value.trim() || null).then(() => onChanged())
+  )
+  // ItemBackgroundPanel's theme/color picker writes item.style — previously it
+  // had its own separate useAutosave queue for this even though it's rendered
+  // as a child of this same item's editor, so a rapid theme click here and a
+  // text edit elsewhere in the panel could reach the DB out of order. Owning
+  // it here and passing the trigger down closes that gap.
+  const styleQueue = useAutosave<ItemStyle | null>((style) =>
+    window.wf.serviceSetItemStyle(item.id, style).then(() => onChanged())
   )
 
   const buildSongInput = (overrides: Partial<SongInput> = {}): (SongInput & { __id: number }) | null => {
@@ -101,9 +109,22 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   }
   const saveNotes = (): void => { notesQueue.trigger(notes) }
 
-  const saveStatus = combineSaveStatus([songQueue.status, payloadQueue.status, notesQueue.status])
-  const saveError = songQueue.error ?? payloadQueue.error ?? notesQueue.error ?? null
-  const retrySave = (): void => { songQueue.retry(); payloadQueue.retry(); notesQueue.retry() }
+  // Passed down to ItemBackgroundPanel so its background/blur picks for a
+  // song item go through this same songQueue instead of a separate one.
+  const applySongBackground = (path: string | null): void => {
+    const input = buildSongInput({ background: path })
+    if (input) songQueue.trigger(input)
+  }
+  const toggleSongBlurBehindText = (): void => {
+    if (!songFull) return
+    const input = buildSongInput({ blurBehindText: !songFull.blurBehindText })
+    if (input) songQueue.trigger(input)
+  }
+  const applyItemStyle = (style: ItemStyle | null): void => styleQueue.trigger(style)
+
+  const saveStatus = combineSaveStatus([songQueue.status, payloadQueue.status, notesQueue.status, styleQueue.status])
+  const saveError = songQueue.error ?? payloadQueue.error ?? notesQueue.error ?? styleQueue.error ?? null
+  const retrySave = (): void => { songQueue.retry(); payloadQueue.retry(); notesQueue.retry(); styleQueue.retry() }
 
   const handleAutoLabel = (): void => {
     const analyses = analyzeAndLabelSections(lyrics)
@@ -151,6 +172,9 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
       setAutoLabelAnalyses={setAutoLabelAnalyses}
       setShowAutoLabelPreview={setShowAutoLabelPreview}
       savePayload={savePayload}
+      applySongBackground={applySongBackground}
+      onToggleSongBlur={toggleSongBlurBehindText}
+      applyItemStyle={applyItemStyle}
     />
   )
 }

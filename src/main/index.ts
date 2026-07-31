@@ -21,6 +21,7 @@ import type { ZonePin, ZonePins } from '../shared/zonePins'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
+import { assertTrackId, assertZoneId, isIntent, isPositiveInt } from './ipcValidate'
 import {
   initDb,
   onPersistError,
@@ -1740,9 +1741,9 @@ function startTabletServer(): void {
           ws.send(JSON.stringify({ type: 'authResult', ok: false }))
           return
         }
-        if (msg.type === 'intent' && msg.intent) {
-          processIntent('main', msg.intent as Intent)
-        } else if (msg.type === 'loadItem' && msg.itemId != null) {
+        if (msg.type === 'intent' && isIntent(msg.intent)) {
+          processIntent('main', msg.intent)
+        } else if (msg.type === 'loadItem' && isPositiveInt(msg.itemId)) {
           void handleTabletLoadItem('main', msg.itemId)
         } else if (msg.type === 'clearStageMessage') {
           // Pastor tapped "Got it" — clear the message everywhere.
@@ -1995,7 +1996,7 @@ function layoutOutputs(windowedFallback = false): void {
 }
 
 // --- IPC: intents ---
-ipcMain.on('wf:intent', (_e, track: TrackId, type: Intent) => processIntent(track, type))
+ipcMain.on('wf:intent', (_e, track: TrackId, type: Intent) => { assertTrackId(track); processIntent(track, type) })
 
 ipcMain.handle('wf:getInfo', (): AppInfo => ({
   song: tracks.main.song,
@@ -2009,38 +2010,45 @@ ipcMain.handle('wf:getInfo', (): AppInfo => ({
 
 // --- Live engine ---
 ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: string, background?: string | null, fontScale?: number, blurBehindText?: boolean) => {
+  assertTrackId(track)
   doLoadText(track, title, body, background ?? null, fontScale, blurBehindText); broadcast()
 })
 ipcMain.handle('wf:live:loadSermon', (_e, track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean) => {
+  assertTrackId(track)
   doLoadSermon(track, title, speaker, passage, background ?? null, blurBehindText); broadcast()
 })
 
 ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean) => {
+  assertTrackId(track)
   doLoadCountdown(track, seconds, background, blurBehindText); broadcast()
 })
 
 ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> => {
+  assertTrackId(track)
   const ok = await doLoadScripture(track, reference, background, blurBehindText)
   if (ok) broadcast()
   return ok
 })
 
 ipcMain.handle('wf:live:loadSong', async (_e, track: TrackId, id: number) => {
+  assertTrackId(track)
   await doLoadSong(track, id); broadcast()
 })
 
 ipcMain.handle('wf:live:loadMedia', (_e, track: TrackId, filePath: string, title: string) => {
+  assertTrackId(track)
   doLoadMedia(track, filePath, title); broadcast()
 })
 
 ipcMain.handle('wf:live:loadAnnouncement', async (_e, track: TrackId, id: number | null, itemId?: number) => {
+  assertTrackId(track)
   const item = itemId != null
     ? activeServiceItems.find((it) => it.id === itemId && it.track === track) ?? null
     : null
   await doLoadAnnouncement(track, id, item); broadcast()
 })
 
-ipcMain.handle('wf:getState', (_e, track?: TrackId): LiveState => renderState(track ?? 'main'))
+ipcMain.handle('wf:getState', (_e, track?: TrackId): LiveState => renderState(track != null ? assertTrackId(track) : 'main'))
 
 ipcMain.handle('wf:stage:open', () => { createStageWindow() })
 ipcMain.handle('wf:multiview:open', () => { createMultiviewWindow() })
@@ -2049,6 +2057,7 @@ ipcMain.handle('wf:multiview:open', () => { createMultiviewWindow() })
 ipcMain.handle('wf:output:open', () => { layoutOutputs(true); broadcast() })
 
 ipcMain.handle('wf:live:setItemId', (_e, track: TrackId, id: number | null) => {
+  assertTrackId(track)
   const t = tracks[track]
   t.serviceItemId = id
   const item = id != null ? activeServiceItems.find((it) => it.id === id && it.track === track) : undefined
@@ -2071,17 +2080,20 @@ ipcMain.handle('wf:live:setItemId', (_e, track: TrackId, id: number | null) => {
 })
 
 ipcMain.handle('wf:live:setFontScale', (_e, track: TrackId, scale: number) => {
+  assertTrackId(track)
   tracks[track].fontScale = Math.min(14, Math.max(3, scale))
   broadcast()
 })
 
 ipcMain.handle('wf:live:saveFontScale', (_e, track: TrackId) => {
+  assertTrackId(track)
   const t = tracks[track]
   if (t.songId == null) return
   setSongFontScale(t.songId, t.fontScale)
 })
 
 ipcMain.handle('wf:live:setStageMessage', (_e, track: TrackId, msg: string | null) => {
+  assertTrackId(track)
   tracks[track].stageMessage = msg || null
   broadcast()
 })
@@ -2100,6 +2112,7 @@ ipcMain.handle('wf:logo:set', (_e, path: string | null, bg: string | null) => {
 // --- Zone screen scale IPCs ---
 ipcMain.handle('wf:zones:getScales', () => zoneScales)
 ipcMain.handle('wf:zones:setScale', (_e, zoneId: ZoneId, percent: number) => {
+  assertZoneId(zoneId)
   zoneScales = { ...zoneScales, [zoneId]: Math.min(150, Math.max(50, percent)) }
   setSetting('zone_scales', JSON.stringify(zoneScales))
   zoneBroadcast()
@@ -2377,6 +2390,7 @@ ipcMain.handle('wf:services:setItemPayload', (_e, itemId: number, payload: Recor
   setServiceItemPayload(itemId, payload)
 )
 ipcMain.handle('wf:services:reorder', (_e, serviceId: number, track: TrackId, orderedIds: number[]) => {
+  assertTrackId(track)
   reorderServiceItems(serviceId, track, orderedIds)
 })
 
@@ -2471,6 +2485,7 @@ ipcMain.handle('wf:zone:setSlides', (_e, itemId: number, slides: ZoneSlide[] | n
 // operator UI reads pins back from state, and the recovery snapshot has to
 // record the pin the moment it's set, not on the next unrelated live action.
 ipcMain.handle('wf:zone:setPin', (_e, zoneId: ZoneId, pin: ZonePin | null): void => {
+  assertZoneId(zoneId)
   if (pin == null) {
     zonePins.delete(zoneId)
   } else {
@@ -2719,6 +2734,7 @@ ipcMain.handle('wf:service:slides', async (_e, serviceId: number): Promise<{ id:
   return out
 })
 ipcMain.handle('wf:live:goLiveAt', async (_e, track: TrackId, itemId: number, slideIndex: number) => {
+  assertTrackId(track)
   await handleTabletLoadItem(track, itemId)  // loads the item live (index 0) + broadcasts + resolves theme
   const t = tracks[track]
   const last = t.song.lines.length - 1
@@ -2738,6 +2754,7 @@ ipcMain.handle('wf:songs:setBackground', (_e, id: number, path: string | null) =
 // index/timer/other live state (used by the Live-tab drawer's Backgrounds tab so
 // a background change mid-service doesn't jump back to the first slide/reset a timer).
 ipcMain.handle('wf:live:setBackground', (_e, track: TrackId, path: string) => {
+  assertTrackId(track)
   const t = tracks[track]
   t.song = { ...t.song, background: path }
   broadcast()

@@ -10,9 +10,8 @@ import type { ServiceItem, ItemStyle, ThemeColors, SongFull } from '../../shared
 import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 import BackgroundLibraryGrid from './BackgroundLibraryGrid'
 import { resolveBackgroundApply } from './drawer/resolveBackgroundApply'
-import { useAutosave } from './useAutosave'
-import { combineSaveStatus } from './saveQueue'
 import SaveStatusBadge from './SaveStatusBadge'
+import type { SaveStatus } from './useAutosave'
 
 export interface ItemBackgroundPanelProps {
   item: ServiceItem
@@ -20,30 +19,29 @@ export interface ItemBackgroundPanelProps {
   // panel needs the loaded song to show which one is currently selected.
   songFull?: SongFull | null
   onChanged: () => void
+  // Save queues are owned by CardEditPanel (the parent item editor) and passed
+  // down rather than created here — this panel used to run its own separate
+  // useAutosave queues even though it's editing the same item/song record
+  // CardEditPanel's other fields (lyrics, notes, payload) also write to, so a
+  // rapid theme click here and a text edit elsewhere could reach the DB out
+  // of order. One shared set of queues per record closes that gap.
+  savePayload: (payload: Record<string, unknown>) => void
+  applySongBackground: (path: string | null) => void
+  onToggleSongBlur: () => void
+  applyItemStyle: (style: ItemStyle | null) => void
+  saveStatus: SaveStatus
+  saveError: string | null
+  onRetrySave: () => void
 }
 
-export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemBackgroundPanelProps): JSX.Element {
+export default function ItemBackgroundPanel({
+  item, songFull, savePayload, applySongBackground, onToggleSongBlur, applyItemStyle,
+  saveStatus, saveError, onRetrySave
+}: ItemBackgroundPanelProps): JSX.Element {
   const [tab, setTab] = useState<'library' | 'presets'>('library')
 
-  // Serialized + retryable saves (see saveQueue.ts) — this panel's clicks
-  // (theme swatches, color drags, background picks) previously fired
-  // `window.wf...().then(onChanged)` with no catch: a rejected save vanished
-  // silently while the swatch still looked selected.
-  const styleQueue = useAutosave<ItemStyle | null>((style) => window.wf.serviceSetItemStyle(item.id, style).then(() => onChanged()))
-  const payloadQueue = useAutosave<Record<string, unknown>>((next) => window.wf.serviceSetItemPayload(item.id, next).then(() => onChanged()))
-  const songBgQueue = useAutosave<{ refId: number; path: string | null }>(({ refId, path }) =>
-    window.wf.songSetBackground(refId, path).then(() => onChanged())
-  )
-  const songBlurQueue = useAutosave<{ refId: number; value: boolean }>(({ refId, value }) =>
-    window.wf.songSetBlurBehindText(refId, value).then(() => onChanged())
-  )
-  const saveStatus = combineSaveStatus([styleQueue.status, payloadQueue.status, songBgQueue.status, songBlurQueue.status])
-  const saveError = styleQueue.error ?? payloadQueue.error ?? songBgQueue.error ?? songBlurQueue.error ?? null
-  const retrySave = (): void => { styleQueue.retry(); payloadQueue.retry(); songBgQueue.retry(); songBlurQueue.retry() }
-
-  const apply = (style: ItemStyle): void => styleQueue.trigger(style)
-  const clearStyle = (): void => styleQueue.trigger(null)
-  const savePayload = (next: Record<string, unknown>): void => payloadQueue.trigger(next)
+  const apply = (style: ItemStyle): void => applyItemStyle(style)
+  const clearStyle = (): void => applyItemStyle(null)
 
   const motionThemes = THEMES.filter((t) => t.kind === 'motion')
   const overrideThemeId = item.style?.theme
@@ -70,7 +68,7 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
   // the same split the Live drawer's Backgrounds tab already goes through.
   const applyBackground = (path: string | null): void => {
     if (isSong && item.ref_id != null) {
-      songBgQueue.trigger({ refId: item.ref_id, path })
+      applySongBackground(path)
       return
     }
     const action = resolveBackgroundApply(item, path ?? '')
@@ -81,7 +79,7 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
 
   const toggleBlur = (): void => {
     if (isSong && item.ref_id != null) {
-      songBlurQueue.trigger({ refId: item.ref_id, value: !blurBehindText })
+      onToggleSongBlur()
       return
     }
     savePayload({ ...payload, blurBehindText: !blurBehindText })
@@ -220,12 +218,12 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
         <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
           Background &amp; Color
         </span>
-        <SaveStatusBadge status={saveStatus} error={saveError} onRetry={retrySave} />
+        <SaveStatusBadge status={saveStatus} error={saveError} onRetry={onRetrySave} />
       </div>
 
       {/* ── Blur behind text ── */}
       <button
-        onClick={() => void toggleBlur()}
+        onClick={() => toggleBlur()}
         className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
           blurBehindText ? 'border-blue-400 bg-blue-500/10' : 'border-slate-200 bg-white'
         }`}
@@ -262,7 +260,7 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
                 {fileBg.split(/[\\/]/).pop()}
               </span>
               <button
-                onClick={() => void applyBackground(null)}
+                onClick={() => applyBackground(null)}
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600/90 text-white hover:bg-red-500"
                 title="Remove background"
               >
@@ -272,7 +270,7 @@ export default function ItemBackgroundPanel({ item, songFull, onChanged }: ItemB
           )}
           <BackgroundLibraryGrid
             activePath={fileBg ?? null}
-            onApply={(path) => void applyBackground(path || null)}
+            onApply={(path) => applyBackground(path || null)}
           />
         </div>
       )}
