@@ -94,6 +94,7 @@ import { OBS_HTML } from './obsHtml'
 import { ZONE_HTML } from './zoneHtml'
 import { MULTIVIEW_HTML } from './multiviewHtml'
 import { parsePptx, parsePptxService } from './pptx'
+import { mapPlanItems } from './planImport'
 import {
   connectObs,
   disconnectObs,
@@ -2691,34 +2692,17 @@ ipcMain.handle(
     const name = plan.title?.trim()
       ? `${plan.title.trim()} — ${plan.service ?? ''} ${plan.date ?? ''}`.trim()
       : `${plan.service ?? 'Service'} — ${plan.date ?? ''}`.trim()
+
+    const findSongId = (t: string): number | null => {
+      const f = listSongs(t).find((s) => s.title.toLowerCase() === t.toLowerCase())
+      return f ? f.id : null
+    }
+    const { mapped, matched, missing } = mapPlanItems(plan.items, findSongId)
+
     const serviceId = createService(name, plan.date || undefined)
-
-    const missing: string[] = []
-    let matched = 0
-    for (const it of plan.items) {
-      const title = (it.title ?? '').trim()
-      const leader = (it.leader ?? '').trim()
-      const detail = (it.detail ?? '').trim()
-      const notes = [leader ? `Led by ${leader}` : '', detail].filter(Boolean).join(' · ') || null
-
-      let itemId: number
-      if (it.type === 'song') {
-        const found = listSongs(title).find((s) => s.title.toLowerCase() === title.toLowerCase())
-        if (found) {
-          matched++
-          itemId = addServiceItem(serviceId, { type: 'song', ref_id: found.id })
-        } else {
-          missing.push(title)
-          itemId = addServiceItem(serviceId, { type: 'placeholder', payload: { label: `Song: ${title}` } })
-        }
-      } else if (it.type === 'scripture') {
-        itemId = addServiceItem(serviceId, { type: 'scripture', payload: { reference: title } })
-      } else if (it.type === 'sermon') {
-        itemId = addServiceItem(serviceId, { type: 'sermon', payload: { title, speaker: leader || undefined } })
-      } else {
-        itemId = addServiceItem(serviceId, { type: 'placeholder', payload: { label: title || it.type } })
-      }
-      if (notes) updateServiceItemNotes(itemId, notes)
+    for (const m of mapped) {
+      const itemId = addServiceItem(serviceId, { type: m.type, ref_id: m.ref_id, payload: m.payload })
+      if (m.notes) updateServiceItemNotes(itemId, m.notes)
     }
 
     return { canceled: false, serviceId, matched, missing }
