@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ServiceItem, ThemeColors, SongFull, ZoneId, ZoneRouting } from '../../../shared/types'
+import { NON_LIVE_TYPES } from '../../../shared/types'
 import type { SceneConfig, ZoneRole } from '../../../shared/zoneScenes'
 import { effectiveRouting, matchScene, expandScene, modeForRole } from '../../../shared/zoneScenes'
 import type { ZoneSlide } from '../../../shared/zoneSlides'
@@ -30,6 +31,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
   const [config, setConfig] = useState<SceneConfig | null>(null)
   const [logoPath, setLogoPath] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showSafeArea, setShowSafeArea] = useState(false)
   const [selectedSlide, setSelectedSlide] = useState(0)
   const [deck, setDeck] = useState<ZoneSlide[] | null>(null)
   const [selectedDeckSlide, setSelectedDeckSlide] = useState(0)
@@ -55,7 +57,12 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
   // verses. Songs, scripture-alone, etc. keep the plain routing UI untouched.
   // Announcements join sermon and text: a block has many things to say per
   // screen, which is exactly what a deck expresses.
-  const canDeck = item.type === 'sermon' || item.type === 'text' || item.type === 'announcement'
+  // Opened up to every item that has content of its own. The composer is the
+  // only place a slide can give each screen something different — a picture on
+  // one, typed text on another — so gating it by type meant a song or a
+  // scripture reading could never do that at all. NON_LIVE_TYPES stay out
+  // because a section header and a placeholder never reach a screen.
+  const canDeck = !NON_LIVE_TYPES.includes(item.type)
 
   const save = (next: ZoneRouting): void => {
     void window.wf.zoneSetRouting(item.id, next).then(onChanged)
@@ -140,15 +147,24 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
 
           <div className="flex items-center justify-between gap-2">
             <ZoneRolePalette />
-            {canDeck && (
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => { void buildSlides() }}
-                disabled={buildingSlides}
-                className="shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-700 disabled:text-slate-400"
+                onClick={() => setShowSafeArea((v) => !v)}
+                className={`shrink-0 text-[10px] font-semibold ${showSafeArea ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                title="Show a guide for the margin most screens actually respect"
               >
-                {buildingSlides ? 'Building…' : 'Build slides'}
+                Safe area {showSafeArea ? 'on' : 'off'}
               </button>
-            )}
+              {canDeck && (
+                <button
+                  onClick={() => { void buildSlides() }}
+                  disabled={buildingSlides}
+                  className="shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-700 disabled:text-slate-400"
+                >
+                  {buildingSlides ? 'Building…' : 'Build slides'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* An item only ever reaches zones tuned to its own track — a zone
@@ -171,6 +187,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
                   offTrack={offTrack}
                   offTrackLabel={trackAssignment[zoneId] === 'main' ? 'Follows Main' : 'Follows Second'}
                   slideText={slides[selectedSlide]}
+                  showSafeArea={showSafeArea}
                   onRoleChange={(role) => setRole(zoneId, role)}
                 />
               )

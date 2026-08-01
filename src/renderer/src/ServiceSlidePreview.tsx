@@ -30,6 +30,10 @@ export interface ServiceSlidePreviewProps {
   // slide for a sermon item previewed as the item's own title card regardless
   // of what that particular slot actually held.
   deckSlot?: { kind: 'text' | 'scripture' | 'sermon'; text?: string; reference?: string }
+  // Dashed title-safe guide, toggled from the Build Service screen grid — lets
+  // an operator catch text that would clip near a screen's edge before it goes
+  // live, instead of only during it.
+  showSafeArea?: boolean
 }
 
 export default function ServiceSlidePreview({
@@ -39,7 +43,8 @@ export default function ServiceSlidePreview({
   songFull,
   className,
   overrideLine,
-  deckSlot
+  deckSlot,
+  showSafeArea
 }: ServiceSlidePreviewProps): JSX.Element {
   const payload = (item.payload ?? {}) as Record<string, unknown>
 
@@ -325,6 +330,12 @@ export default function ServiceSlidePreview({
             renderContent()
           )}
         </div>
+
+        {/* Title-safe guide: ~10% margin is what most of these screens actually
+            respect (matches the zone pages' own 8-10vw text padding). */}
+        {showSafeArea && (
+          <div className="pointer-events-none absolute inset-[6%] rounded border border-dashed border-yellow-300/70" />
+        )}
       </div>
     </div>
   )
