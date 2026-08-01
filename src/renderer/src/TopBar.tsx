@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User, Monitor, Palette, Tablet, Stethoscope } from 'lucide-react'
+import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User, Monitor, Palette, Tablet, Stethoscope, Camera } from 'lucide-react'
 import type { AppInfo, ObsStatus } from '../../shared/types'
 import type { View } from './AppShell'
 import BrandMark from './BrandMark'
@@ -45,6 +45,7 @@ const SETUP_ITEMS: NavMenuItem<View>[] = [
   { id: 'obs', Icon: Video, label: 'OBS connect' },
   { id: 'settings', Icon: Palette, label: 'Logo & branding' },
   { id: 'tablet', Icon: Tablet, label: 'Tablet remote' },
+  { id: 'roomfeed', Icon: Camera, label: 'Room feed' },
   { id: 'diagnostics', Icon: Stethoscope, label: 'Diagnostics & backups' }
 ]
 

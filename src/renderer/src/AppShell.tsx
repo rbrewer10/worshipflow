@@ -17,6 +17,7 @@ import BackgroundsTab from './BackgroundsTab'
 import ScreensZonesTab from './setup/ScreensZonesTab'
 import TabletRemoteTab from './setup/TabletRemoteTab'
 import DiagnosticsTab from './setup/DiagnosticsTab'
+import RoomFeedTab from './setup/RoomFeedTab'
 import { getRelay } from './livecall/useLiveCall'
 import NotifyToasts from './NotifyToasts'
 import { hasFailedSaves } from './saveRegistry'
@@ -24,7 +25,7 @@ import { hasFailedSaves } from './saveRegistry'
 export type View =
   | 'home' | 'live' | 'service'
   | 'songs' | 'announcements' | 'scripture' | 'backgrounds'
-  | 'zones' | 'obs' | 'settings' | 'tablet' | 'diagnostics'
+  | 'zones' | 'obs' | 'settings' | 'tablet' | 'diagnostics' | 'roomfeed'
   | 'volunteer' | 'soundcheck'
 
 function AppShell(): JSX.Element {
@@ -165,6 +166,8 @@ function AppShell(): JSX.Element {
             <ScreensZonesTab />
           ) : view === 'tablet' ? (
             <TabletRemoteTab />
+          ) : view === 'roomfeed' ? (
+            <RoomFeedTab />
           ) : view === 'diagnostics' ? (
             <DiagnosticsTab />
           ) : view === 'obs' ? (
