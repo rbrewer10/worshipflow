@@ -2,13 +2,16 @@ import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } fro
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
-import { randomUUID, randomInt } from 'crypto'
+import { randomUUID, randomInt, randomBytes } from 'crypto'
 import { createServer, type IncomingMessage } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
 import os from 'os'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+const execFileAsync = promisify(execFile)
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
@@ -94,8 +97,10 @@ import { lookupScripture } from './scripture'
 import { autoDeckFor } from './autoDeck'
 import type { AutoDeckDeps } from './autoDeck'
 import { TABLET_PORT, tabletHtml } from './tabletHtml'
+import { attachLivecallSignaling } from './livecallSignaling'
+import { phoneClientHtml } from './phoneClientHtml'
 import { OBS_HTML } from './obsHtml'
-import { ZONE_HTML } from './zoneHtml'
+import { zoneHtmlFor } from './zoneHtml'
 import { MULTIVIEW_HTML } from './multiviewHtml'
 import { parsePptx, parsePptxService } from './pptx'
 import { mapPlanItems } from './planImport'
@@ -344,6 +349,9 @@ const tabletClients = new Set<WsSocket>()
 // that port was taken and we fell back to the next one).
 let tabletHttpServer: ReturnType<typeof createServer> | null = null
 let tabletWss: WebSocketServer | null = null
+// Live Call signaling runs on the same port under /livecall, but in its own
+// WebSocketServer with its own client set — see the upgrade router below.
+let livecallWss: WebSocketServer | null = null
 let tabletHeartbeat: ReturnType<typeof setInterval> | null = null
 let boundTabletPort = TABLET_PORT
 
@@ -1161,6 +1169,26 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
   if (item) void loadDeckOnto(track, item, t.loadGeneration)
 }
 
+// Live Call: hand the screens over to the incoming video. There is no slide
+// content to load — the pixels arrive over WebRTC, and every screen negotiates
+// for them itself. All this does is put the track in the mode that tells them to.
+function doLoadLiveCall(track: TrackId, title: string): void {
+  const t = tracks[track]
+  t.loadGeneration++
+  t.hasLiveContent = true
+  clearCountdown(track)
+  clearAutoAdvance(track)
+  t.songId = null
+  t.scriptureRef = null
+  clearSongMeta(track)
+  t.deckSlides = null
+  t.song = { title, lines: [''], background: null }
+  t.songTextColor = null; t.songFont = null
+  t.blurBehindText = false
+  t.mode = 'livecall'
+  t.index = 0
+}
+
 // Fills t.song.lines with one summary per deck slide, so the EXISTING cursor,
 // next/prev and auto-advance all work unchanged — the deck needs no second
 // cursor. Pre-resolves every scripture slot because computeZoneStates is
@@ -1629,6 +1657,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
       item,
       item.payload.bgFit as 'cover' | 'contain' | undefined
     )
+  } else if (item.type === 'livecall') {
+    doLoadLiveCall(track, item.title)
   } else {
     return
   }
@@ -1659,6 +1689,54 @@ function zoneChunkBudget(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : 90
 }
 
+// The machine's Tailscale HTTPS base, e.g. https://desktop.tailxxxx.ts.net.
+//
+// This matters because phones refuse camera access on a plain-http origin, so
+// the LAN address in the QR code can never carry a real call — it just fails at
+// the camera prompt. Asking Ryan to type a MagicDNS name would be one more thing
+// to get wrong, so read it from Tailscale directly.
+//
+// Cached: shelling out per HTTP request would be silly, and the name is stable.
+// null means Tailscale isn't installed or isn't up, and we fall back to the LAN
+// address with a warning in the UI.
+// Async and cached: this shells out, and doing it synchronously would block the
+// main process — a hung Tailscale CLI would freeze the whole app mid-service.
+let tailscaleBaseCache: string | null | undefined
+async function tailscaleHttpsBase(): Promise<string | null> {
+  if (tailscaleBaseCache !== undefined) return tailscaleBaseCache
+  const candidates = [
+    'tailscale',
+    'C:\\Program Files\\Tailscale\\tailscale.exe',
+    'C:\\Program Files (x86)\\Tailscale\\tailscale.exe',
+  ]
+  let found: string | null = null
+  for (const exe of candidates) {
+    try {
+      const { stdout } = await execFileAsync(exe, ['status', '--json'], { timeout: 4000 })
+      const dns = (JSON.parse(stdout) as { Self?: { DNSName?: string } }).Self?.DNSName
+      if (dns) {
+        found = `https://${dns.replace(/\.$/, '')}`
+        break
+      }
+    } catch { /* not installed at this path, or not running — try the next */ }
+  }
+  tailscaleBaseCache = found
+  logInfo(`[livecall] tailscale base: ${found ?? 'not detected'}`)
+  return found
+}
+
+// Shared secret for Live Call signaling. Generated once on first use and
+// persisted; both the phone client and the relay present it. Anyone on the
+// tailnet with this value can join the call room, so it is a password.
+function livecallToken(): string {
+  let t = getSetting('livecall_token')
+  if (!t) {
+    t = randomBytes(32).toString('hex')
+    setSetting('livecall_token', t)
+  }
+  return t
+}
+
 // --- Tablet HTTP + WebSocket server ---
 function startTabletServer(): void {
   const server = createServer((req, res) => {
@@ -1672,15 +1750,24 @@ function startTabletServer(): void {
       'Pragma': 'no-cache',
       'Expires': '0',
     }
-    if (zoneId && ZONE_HTML[zoneId]) {
+    const zonePage = zoneId ? zoneHtmlFor(zoneId, livecallToken(), 'sanctuary') : null
+    if (zonePage) {
       res.writeHead(200, htmlHeaders)
-      res.end(ZONE_HTML[zoneId])
+      res.end(zonePage)
     } else if (path === '/multiview') {
       res.writeHead(200, htmlHeaders)
       res.end(MULTIVIEW_HTML)
     } else if (isObs) {
       res.writeHead(200, htmlHeaders)
       res.end(OBS_HTML)
+    } else if (path === '/phone') {
+      const host = req.headers.host ?? `localhost:${boundTabletPort}`
+      // Match the scheme the page was loaded over: Tailscale Serve terminates
+      // HTTPS in front of this plain-HTTP server, and a page served over https
+      // cannot open a ws:// socket.
+      const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
+      res.writeHead(200, htmlHeaders)
+      res.end(phoneClientHtml(`${proto}://${host}/livecall`, livecallToken(), 'sanctuary'))
     } else if (path === '/file') {
       // Serve local media files (images, videos) to Pi browsers and multiview iframes.
       const qs = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
@@ -1750,7 +1837,18 @@ function startTabletServer(): void {
     }
   })
 
-  const wss = new WebSocketServer({ server })
+  // Two protocols share this port and must not mix: tablet/zone/OBS clients get
+  // broadcast service state on connect, and a livecall client (the preacher's
+  // phone, off-site) must never receive that. Routing by URL path at the upgrade
+  // keeps them in separate WebSocketServers with separate client sets.
+  const wss = new WebSocketServer({ noServer: true })
+  livecallWss = new WebSocketServer({ noServer: true })
+  server.on('upgrade', (req, socket, head) => {
+    const path = (req.url ?? '').split('?')[0].replace(/\/+$/, '')
+    const target = path === '/livecall' ? livecallWss! : wss
+    target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req))
+  })
+  attachLivecallSignaling(livecallWss, livecallToken())
   tabletHttpServer = server
   tabletWss = wss
 
@@ -2081,6 +2179,10 @@ ipcMain.handle('wf:live:loadText', (_e, track: TrackId, title: string, body: str
 ipcMain.handle('wf:live:loadSermon', (_e, track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean) => {
   assertTrackId(track)
   doLoadSermon(track, title, speaker, passage, background ?? null, blurBehindText); broadcast()
+})
+
+ipcMain.handle('wf:live:loadLiveCall', (_e, track: TrackId, title: string) => {
+  doLoadLiveCall(track, title); broadcast()
 })
 
 ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean) => {
@@ -2611,6 +2713,23 @@ ipcMain.handle('wf:scenes:set', (_e, config: SceneConfig) => {
 
 ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {
   return boundTabletPort
+})
+
+// Everything a renderer needs to reach Live Call signaling. The renderer runs on
+// the Vite dev server (or file://) in packaged builds, so it cannot derive the
+// tablet server's origin from location.host — it has to be told.
+ipcMain.handle('wf:livecall:config', async (): Promise<LivecallConfig> => {
+  // Prefer the Tailscale HTTPS name: it is the only address a phone will grant
+  // camera access on, and the only one reachable when he is out of town.
+  const ts = await tailscaleHttpsBase()
+  return {
+    url: `ws://127.0.0.1:${boundTabletPort}/livecall`,
+    phoneUrl: ts ? `${ts}/phone` : `http://${getLocalIp()}:${boundTabletPort}/phone`,
+    phoneUrlIsSecure: ts !== null,
+    tabletPort: boundTabletPort,
+    token: livecallToken(),
+    room: 'sanctuary',
+  }
 })
 
 ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => {

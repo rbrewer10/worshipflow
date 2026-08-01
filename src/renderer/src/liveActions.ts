@@ -65,7 +65,10 @@ export function canGoLive(item: ServiceItem): boolean {
     // ref_id at all, so requiring one would make it un-airable.
     (item.type === 'announcement' &&
       (item.ref_id != null || ((item.payload.refIds as number[] | undefined)?.length ?? 0) > 0)) ||
-    (item.type === 'sermon')
+    (item.type === 'sermon') ||
+    // Nothing to configure — the call either connects or it doesn't, and the
+    // operator needs to be able to hand the screens over before it does.
+    (item.type === 'livecall')
   )
 }
 
@@ -115,6 +118,8 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
       item.payload.background as string | null | undefined,
       item.payload.blurBehindText as boolean | undefined
     )
+  } else if (item.type === 'livecall') {
+    await window.wf.liveLoadLiveCall(track, item.title)
   } else {
     return false
   }

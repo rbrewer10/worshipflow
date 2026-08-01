@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion, Minus, HelpCircle, Copy } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion, Minus, HelpCircle, Copy, Video } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
 import { NON_LIVE_TYPES } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
@@ -11,7 +11,7 @@ import type { ZoneTrackAssignment } from '../../shared/zoneTrack'
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
 const TYPE_ICON: Record<ServiceItem['type'], IconType> = {
-  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic,
+  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic, livecall: Video,
   header: Minus, placeholder: HelpCircle
 }
 
@@ -23,6 +23,7 @@ const ADD_TYPES: { type: ServiceItem['type']; label: string; Icon: IconType }[] 
   { type: 'welcome',   label: 'Welcome',   Icon: Hand },
   { type: 'ticker',    label: 'Ticker',    Icon: ScrollText },
   { type: 'sermon',    label: 'Sermon',    Icon: Mic },
+  { type: 'livecall',  label: 'Live Call', Icon: Video },
   { type: 'header',      label: 'Section header', Icon: Minus },
   { type: 'placeholder', label: 'Placeholder (TBD)', Icon: HelpCircle },
 ]

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { LiveCallViewer } from './livecall/LiveCallViewer'
 import type { LiveState, Mode, ThemeColors } from '../../shared/types'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
 import type { MotionEffect } from '../../shared/themes'
@@ -126,6 +127,28 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
   const black = mode === 'black'
   const logo = mode === 'logo'
   const countdown = mode === 'countdown'
+  // The call fills the frame, so everything else on the audience screen is
+  // suppressed — theme background, lyric layers, CCLI footer, and ticker.
+  const livecall = mode === 'livecall'
+  const livecallVideoRef = useRef<HTMLVideoElement | null>(null)
+
+  useEffect(() => {
+    if (!livecall) return
+    let viewer: LiveCallViewer | null = null
+    let cancelled = false
+    void window.wf.livecallConfig().then((cfg) => {
+      if (cancelled) return
+      viewer = new LiveCallViewer(cfg.url, cfg.token, cfg.room, (stream) => {
+        if (livecallVideoRef.current) livecallVideoRef.current.srcObject = stream
+      })
+      viewer.start()
+    })
+    return () => {
+      cancelled = true
+      viewer?.stop()
+      if (livecallVideoRef.current) livecallVideoRef.current.srcObject = null
+    }
+  }, [livecall])
   const bgVisibility = black ? 'hidden' : 'visible'
   const isThemeBg = bgSrc?.startsWith('theme:') ?? false
   const showVideo = bgSrc !== null && !isThemeBg && bgReady
@@ -151,14 +174,14 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black" style={{ containerType: 'size' }}>
       {/* Theme background — shown when no per-item background is active and not black */}
-      {!black && !showVideo && (
+      {!black && !livecall && !showVideo && (
         theme.kind === 'static'
           ? <div className="absolute inset-0" style={{ background: staticBackgroundCss(theme, colors) }} />
           : <MotionBackground effect={theme.effect!} colors={colors} />
       )}
 
       {/* Per-song background — video or image, fades in when ready */}
-      {bgSrc && !isThemeBg && (
+      {bgSrc && !isThemeBg && !livecall && (
         isVideo(bgSrc) ? (
           <video
             key={bgSrc}
@@ -202,7 +225,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
         )
       )}
 
-      {!black && !logo && !countdown && (
+      {!black && !logo && !countdown && !livecall && (
         <>
           <LyricLayer text={layers.a} show={layers.front === 0} fontScale={fontScale}
             fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText} />
@@ -212,7 +235,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
       )}
 
       {/* CCLI copyright footer — shown on song slides when copyright info exists */}
-      {!black && !logo && !countdown && (ccli.author || ccli.copyright || ccli.ccli) && (
+      {!black && !logo && !countdown && !livecall && (ccli.author || ccli.copyright || ccli.ccli) && (
         <div className="absolute bottom-0 left-0 right-0 px-[3cqw] pb-[1.5cqh] text-center">
           <div
             className="mx-auto text-[1.1cqw] font-medium leading-snug text-white/75"
@@ -228,6 +251,19 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
               .join('  ·  ')}
           </div>
         </div>
+      )}
+
+      {/* Muted on purpose: the relay in the control window is the only thing
+          that plays the caller's audio, so the room hears one voice, not six. */}
+      {livecall && (
+        <video
+          ref={livecallVideoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 h-full w-full"
+          style={{ objectFit: 'contain', background: '#000' }}
+        />
       )}
 
       {countdown && (
@@ -250,7 +286,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
         </div>
       )}
 
-      {tickerText && !black && !logo && !countdown && (
+      {tickerText && !black && !logo && !countdown && !livecall && (
         <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t-4 border-amber-500 bg-gradient-to-r from-amber-900/85 via-amber-800/85 to-amber-900/85">
           <div
             className="wf-ticker-track py-[1cqh] text-[1.6cqw] font-bold text-amber-100"

@@ -26,7 +26,8 @@ import type {
   Announcement,
   AnnouncementInput,
   TrackId,
-  ScriptureRefCheck
+  ScriptureRefCheck,
+  LivecallConfig
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
@@ -151,6 +152,8 @@ const wf = {
     ipcRenderer.invoke('wf:live:loadText', track, title, body, background ?? null, fontScale, blurBehindText),
   liveLoadSermon: (track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadSermon', track, title, speaker, passage, background ?? null, blurBehindText),
+  liveLoadLiveCall: (track: TrackId, title: string): Promise<void> =>
+    ipcRenderer.invoke('wf:live:loadLiveCall', track, title),
   liveLoadCountdown: (track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadCountdown', track, seconds, background, blurBehindText),
   liveLoadMedia: (track: TrackId, filePath: string, title: string): Promise<void> =>
@@ -338,6 +341,8 @@ const wf = {
   scenesSet: (config: SceneConfig): Promise<void> => ipcRenderer.invoke('wf:scenes:set', config),
   getTabletPort: (): Promise<number> =>
     ipcRenderer.invoke('wf:app:getTabletPort'),
+  livecallConfig: (): Promise<LivecallConfig> =>
+    ipcRenderer.invoke('wf:livecall:config'),
   restoreRecovery: (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> =>
     ipcRenderer.invoke('wf:app:restoreRecovery'),
   multiviewOpen: (): Promise<void> =>

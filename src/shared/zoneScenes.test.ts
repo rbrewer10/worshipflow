@@ -21,6 +21,20 @@ describe('contentModeFor', () => {
     expect(contentModeFor('countdown')).toBe('countdown')
     expect(contentModeFor('welcome')).toBe('countdown')
     expect(contentModeFor('image')).toBe('image')
+    expect(contentModeFor('livecall')).toBe('livecall')
+  })
+})
+
+describe('livecall', () => {
+  it('puts the call on every audience screen and leaves stage alone', () => {
+    expect(ZONE_ROUTING_DEFAULTS.livecall).toEqual({
+      1: 'livecall', 2: 'livecall', 3: 'livecall', 4: 'stage'
+    })
+  })
+
+  it('is expressible as a content role, so the zone grid can set it', () => {
+    expect(roleForMode('livecall')).toBe('content')
+    expect(modeForRole('content', 'livecall')).toBe('livecall')
   })
 })
 

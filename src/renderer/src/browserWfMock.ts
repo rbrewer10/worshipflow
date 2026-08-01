@@ -24,7 +24,8 @@ import type {
   ZoneId,
   ZoneRouting,
   ZoneState,
-  TrackId
+  TrackId,
+  LivecallConfig
 } from '../../shared/types'
 import { parseReferenceList } from '../../shared/scriptureRefs'
 import { starterConfig } from '../../shared/zoneScenes'
@@ -342,6 +343,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     liveLoadScripture: async (_track: TrackId, reference: string): Promise<boolean> => { publish({ songTitle: reference, line: 'Browser preview scripture text.', next: '', total: 1, index: 0 }); return true },
     liveLoadText: async (_track: TrackId, title: string, body: string): Promise<void> => publish({ songTitle: title || 'Announcement', line: body || title, next: '', total: 1, index: 0 }),
     liveLoadSermon: async (_track: TrackId, title: string, speaker: string, passage: string): Promise<void> => publish({ songTitle: title || 'Sermon', line: [speaker, passage].filter(Boolean).join('\n'), next: '', total: 1, index: 0 }),
+    liveLoadLiveCall: async (_track: TrackId, title: string): Promise<void> => publish({ mode: 'livecall', songTitle: title || 'Live Call', line: '', next: '', total: 1, index: 0 }),
     liveLoadCountdown: async (_track: TrackId, seconds: number): Promise<void> => publish({ mode: 'countdown', songTitle: 'Countdown', line: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, next: '', total: 1, index: 0 }),
     liveLoadMedia: async (_track: TrackId, _filePath: string, title: string): Promise<void> => publish({ songTitle: title || 'Media', line: '', next: '', total: 1, index: 0 }),
 
@@ -462,6 +464,14 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     scenesGet: async () => starterConfig(),
     scenesSet: noop,
     getTabletPort: async (): Promise<number> => 3691,
+    livecallConfig: async (): Promise<LivecallConfig> => ({
+      url: 'ws://127.0.0.1:3691/livecall',
+      phoneUrl: 'http://127.0.0.1:3691/phone',
+      phoneUrlIsSecure: false,
+      tabletPort: 3691,
+      token: '',
+      room: 'sanctuary',
+    }),
     restoreRecovery: async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => ({ ok: true, restored: false }),
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),

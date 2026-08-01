@@ -11,6 +11,7 @@ import { ImageEditor } from './editors/ImageEditor'
 import { CountdownEditor } from './editors/CountdownEditor'
 import { TickerEditor } from './editors/TickerEditor'
 import { SermonEditor } from './editors/SermonEditor'
+import LiveCallEditor from './editors/LiveCallEditor'
 import AnnouncementItemEditor from './AnnouncementItemEditor'
 import { HeaderEditor } from './editors/HeaderEditor'
 import { PlaceholderEditor } from './editors/PlaceholderEditor'
@@ -221,8 +222,13 @@ export const ItemEditor = memo(function ItemEditor({
         />
       )}
 
-      {/* ── Background & Color — headers/placeholders never render on screen ── */}
-      {!NON_LIVE_TYPES.includes(item.type) && (
+      {/* The call itself is the on-screen content — nothing to configure beyond
+          whether it's connected, which LiveCallEditor shows directly. */}
+      {item.type === 'livecall' && <LiveCallEditor />}
+
+      {/* ── Background & Color — headers/placeholders never render on screen,
+          and a live call has no background to pick: the video IS the screen. ── */}
+      {!NON_LIVE_TYPES.includes(item.type) && item.type !== 'livecall' && (
         <div className="border-t border-slate-200 pt-3">
           <ItemBackgroundPanel
             item={item}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play, Mic, FileQuestion, Minus, HelpCircle, Hourglass } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, Play, Mic, FileQuestion, Minus, HelpCircle, Hourglass, Video } from 'lucide-react'
 import type { LiveState, ServiceItem, TrackId } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
@@ -9,7 +9,7 @@ import { canGoLive, itemThumbBackground, usePendingConfirm } from './liveActions
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
 const ICON: Record<ServiceItem['type'], IconType> = {
-  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic,
+  song: Music, scripture: BookOpen, text: Type, countdown: Timer, image: ImageIcon, welcome: Hand, ticker: ScrollText, announcement: Megaphone, sermon: Mic, livecall: Video,
   header: Minus, placeholder: HelpCircle
 }
 

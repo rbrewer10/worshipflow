@@ -3,7 +3,7 @@
 import type { ThemeColors, FontKey } from './themes'
 export type { ThemeColors } from './themes'
 
-export type Mode = 'lyrics' | 'black' | 'logo' | 'countdown'
+export type Mode = 'lyrics' | 'black' | 'logo' | 'countdown' | 'livecall'
 export type Intent = 'next' | 'prev' | 'black' | 'logo' | 'lyrics'
 export type TrackId = 'main' | 'second'
 export type Theme = 'modern-church' | 'minimalist' | 'vibrant' | 'dark-premium'
@@ -153,8 +153,9 @@ export interface SongUsage {
 // 'header' and 'placeholder' are organizational-only: they never go live and
 // carry no zone routing. 'header' is a colored section divider (Welcome /
 // Worship / Sermon / Response); 'placeholder' reserves a labeled TBD slot in
-// the running order before its real content exists.
-export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement' | 'sermon' | 'header' | 'placeholder'
+// the running order before its real content exists. 'livecall' brings a
+// traveling preacher's phone onto the sanctuary screens — see LivecallConfig.
+export type ServiceItemType = 'song' | 'scripture' | 'text' | 'countdown' | 'image' | 'welcome' | 'ticker' | 'announcement' | 'sermon' | 'header' | 'placeholder' | 'livecall'
 
 // Item types that never go live — no zone routing, no "Go Live" action, no
 // zone-screen preview. Purely organizational rows in the service list.
@@ -208,11 +209,24 @@ export interface NewServiceItem {
   track?: TrackId
 }
 
+// Everything a renderer needs to reach Live Call signaling. `url` is loopback
+// because the relay and the output windows run on this machine; `phoneUrl` is
+// the LAN address for the QR code (swap for a Tailscale name off-site).
+export interface LivecallConfig {
+  url: string
+  phoneUrl: string
+  /** False when we fell back to the LAN address, which can never use a camera. */
+  phoneUrlIsSecure: boolean
+  tabletPort: number
+  token: string
+  room: string
+}
+
 // --- Multi-zone display system ---
 export type ZoneId = 1 | 2 | 3 | 4
 // 'sermon' is the designed sermon backdrop (title card behind the pastor) —
 // distinct from 'text', which renders the same content as a plain live line.
-export type ZoneMode = 'lyrics' | 'stage' | 'black' | 'logo' | 'countdown' | 'text' | 'image' | 'sermon' | 'off'
+export type ZoneMode = 'lyrics' | 'stage' | 'black' | 'logo' | 'countdown' | 'text' | 'image' | 'sermon' | 'livecall' | 'off'
 
 export interface ZoneState {
   mode: ZoneMode
@@ -270,6 +284,9 @@ export const ZONE_ROUTING_DEFAULTS: Record<ServiceItemType, ZoneRouting> = {
   // Back screens get the designed sermon backdrop (title/speaker/passage) —
   // the Lyrics TVs stay on the logo so the room isn't reading the same card twice.
   sermon:    { 1: 'sermon',    2: 'sermon',    3: 'logo',      4: 'stage' },
+  // The call is the content — every audience screen shows him. Stage monitors
+  // keep their normal view so the platform team still sees what they need.
+  livecall:  { 1: 'livecall',  2: 'livecall',  3: 'livecall',  4: 'stage' },
   // Never go live — see NON_LIVE_TYPES.
   header:      { 1: 'off', 2: 'off', 3: 'off', 4: 'off' },
   placeholder: { 1: 'off', 2: 'off', 3: 'off', 4: 'off' },

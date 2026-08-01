@@ -3,10 +3,11 @@ import { ZONE_NAMES } from '../../shared/types'
 
 export const MODE_LABELS: Record<ZoneState['mode'], string> = {
   lyrics: 'Lyrics', stage: 'Stage', black: 'Black', logo: 'Logo',
-  countdown: 'Countdown', text: 'Text', image: 'Image', sermon: 'Sermon', off: 'Off',
+  countdown: 'Countdown', text: 'Text', image: 'Image', sermon: 'Sermon',
+  livecall: 'Live Call', off: 'Off',
 }
 
-const ZONE_MODE_OPTIONS: ZoneState['mode'][] = ['lyrics', 'stage', 'black', 'logo', 'countdown', 'text', 'image', 'sermon', 'off']
+const ZONE_MODE_OPTIONS: ZoneState['mode'][] = ['lyrics', 'stage', 'black', 'logo', 'countdown', 'text', 'image', 'sermon', 'livecall', 'off']
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
 // Only Zone 4's physical template (STAGE_SCRIPT in zoneHtml.ts) actually
