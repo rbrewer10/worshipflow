@@ -25,7 +25,7 @@ import { hasFailedSaves } from './saveRegistry'
 export type View =
   | 'home' | 'live' | 'service'
   | 'songs' | 'announcements' | 'scripture' | 'backgrounds'
-  | 'zones' | 'obs' | 'settings' | 'tablet' | 'diagnostics' | 'roomfeed'
+  | 'zones' | 'obs' | 'settings' | 'tablet' | 'roomfeed' | 'diagnostics'
   | 'volunteer' | 'soundcheck'
 
 function AppShell(): JSX.Element {
