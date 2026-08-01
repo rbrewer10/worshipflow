@@ -789,8 +789,12 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
         if (mountedRef.current) setIsCapturing(false)
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
       } else {
-        await window.wf.soundCheck.startAudioCapture()
-        if (mountedRef.current) setIsCapturing(true)
+        const result = await window.wf.soundCheck.startAudioCapture()
+        if (!result.success) {
+          if (mountedRef.current) setCaptureError(result.reason ?? 'Could not start audio capture.')
+          return
+        }
+        if (mountedRef.current) { setCaptureError(null); setIsCapturing(true) }
         // Poll live heuristics every 100ms
         pollIntervalRef.current = setInterval(async () => {
           try {

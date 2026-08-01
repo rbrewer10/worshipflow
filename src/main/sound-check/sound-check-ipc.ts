@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type { SoundCheckState } from './sound-check-state'
 import type { AutomationRule } from '../types/sound-check-types'
+import { isRoomFeedActive } from '../roomFeedPrecedence'
 
 /**
  * Register all `wf:sound-check:*` IPC handlers against a single shared
@@ -67,6 +68,9 @@ export function registerSoundCheckHandlers(state: SoundCheckState): void {
   })
 
   ipcMain.handle('wf:sound-check:startAudioCapture', async (_e, deviceId?: string) => {
+    if (isRoomFeedActive()) {
+      return { success: false, reason: 'The room feed is using the audio input right now — stop it first.' }
+    }
     await state.audioCapture.start(deviceId)
     return { success: true }
   })

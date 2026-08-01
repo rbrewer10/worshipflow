@@ -384,7 +384,7 @@ const wf = {
       ipcRenderer.invoke('wf:sound-check:getAutomationRules'),
     deleteAutomationRule: (id: string): Promise<void> =>
       ipcRenderer.invoke('wf:sound-check:deleteAutomationRule', id),
-    startAudioCapture: (deviceId?: string): Promise<{ success: boolean }> =>
+    startAudioCapture: (deviceId?: string): Promise<{ success: boolean; reason?: string }> =>
       ipcRenderer.invoke('wf:sound-check:startAudioCapture', deviceId),
     stopAudioCapture: (): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('wf:sound-check:stopAudioCapture'),
