@@ -236,7 +236,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
             type="date"
             value={service.service_date ?? ''}
             onChange={(e) => {
-              void window.wf.serviceSetDate(serviceId, e.target.value || null).then(reload)
+              void window.wf.serviceSetDate(serviceId, e.target.value || null).then(() => reload())
             }}
             title="The date this service is for"
             className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"

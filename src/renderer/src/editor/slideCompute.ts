@@ -69,3 +69,57 @@ export function applySlideEdit(
     return { ...sec, lyrics: lines.join('\n') }
   })
 }
+
+// Deletes ONE slide — the specific chunk of lines the operator is looking at —
+// not the whole section that owns it.
+//
+// This used to be `sections.filter(s => s.ordinal !== slide.sectionOrdinal)`,
+// which removed the entire section. Since computeEditorSlides splits a section
+// into a slide per `linesPerSlide` lines, deleting one slide of a three-slide
+// verse silently took all three, and the surviving index then showed unrelated
+// content — so it looked like the wrong slide had been deleted.
+//
+// Emptying the last line of a section removes the section itself, which shifts
+// every later index in `arrangement` (it holds positions into the
+// ordinal-sorted section list, not ordinals), so the arrangement is remapped
+// here rather than left pointing at the wrong sections.
+export function deleteSlideFromSong(
+  song: SongFull,
+  slide: EditorSlide
+): { sections: SongSection[]; arrangement: number[] | null } {
+  const target = song.sections.find((s) => s.ordinal === slide.sectionOrdinal)
+  if (!target) return { sections: song.sections, arrangement: song.arrangement ?? null }
+
+  const lines = target.lyrics.split('\n')
+  lines.splice(slide.lineStart, slide.lineCount)
+  const sectionSurvives = lines.some((l) => l.trim() !== '')
+
+  // Never leave a song with nothing in it — the caller disables the control at
+  // one slide remaining, but don't rely on the UI for a data-shape guarantee.
+  if (!sectionSurvives && song.sections.length <= 1) {
+    return { sections: song.sections, arrangement: song.arrangement ?? null }
+  }
+
+  if (sectionSurvives) {
+    return {
+      sections: song.sections.map((s) =>
+        s.ordinal === slide.sectionOrdinal ? { ...s, lyrics: lines.join('\n') } : s
+      ),
+      arrangement: song.arrangement ?? null
+    }
+  }
+
+  const removedIndex = [...song.sections]
+    .sort((a, b) => a.ordinal - b.ordinal)
+    .findIndex((s) => s.ordinal === slide.sectionOrdinal)
+
+  return {
+    sections: song.sections.filter((s) => s.ordinal !== slide.sectionOrdinal),
+    arrangement:
+      song.arrangement && song.arrangement.length > 0
+        ? song.arrangement
+            .filter((i) => i !== removedIndex)
+            .map((i) => (i > removedIndex ? i - 1 : i))
+        : (song.arrangement ?? null)
+  }
+}

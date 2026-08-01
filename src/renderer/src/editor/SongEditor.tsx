@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Pencil, Trash2, ExternalLink, ArrowLeft } from 'lucide-react'
 import type { SongFull, SongInput, SongSection } from '../../../shared/types'
-import { computeEditorSlides, applySlideEdit } from './slideCompute'
+import { computeEditorSlides, applySlideEdit, deleteSlideFromSong } from './slideCompute'
 import SlideStrip from './SlideStrip'
 import SlideCanvas from './SlideCanvas'
 import BackgroundPanel from './BackgroundPanel'
@@ -123,13 +123,13 @@ export default function SongEditor({ songId, onSaved }: {
     setActiveSlideIndex(Math.max(0, newSlides.length - 1))
   }
 
-  // --- Delete the section that owns the active slide ---
+  // --- Delete just the active slide ---
   const handleDeleteSlide = async (): Promise<void> => {
     if (!song || !activeSlide) return
-    // Guard: never delete the last remaining section.
-    if (song.sections.length <= 1) return
-    const updatedSections = song.sections.filter((s) => s.ordinal !== activeSlide.sectionOrdinal)
-    const updated = { ...song, sections: updatedSections }
+    // Guard: never delete the last remaining slide.
+    if (slides.length <= 1) return
+    const { sections, arrangement } = deleteSlideFromSong(song, activeSlide)
+    const updated = { ...song, sections, arrangement }
     setSong(updated)
     await saveSong(updated)
     const newSlides = computeEditorSlides(updated)
@@ -182,7 +182,7 @@ export default function SongEditor({ songId, onSaved }: {
   ]
   const activeColor = song.textColor ?? '#ffffff'
 
-  const canDelete = song.sections.length > 1 && !!activeSlide
+  const canDelete = slides.length > 1 && !!activeSlide
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">

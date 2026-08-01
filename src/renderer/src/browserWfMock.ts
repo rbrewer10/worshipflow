@@ -300,6 +300,10 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
         service.themeColors = colors
       }
     },
+    serviceSetDate: async (serviceId: number, serviceDate: string | null): Promise<void> => {
+      const service = services.find((svc) => svc.id === serviceId)
+      if (service) service.service_date = serviceDate
+    },
     serviceSetItemStyle: async (_itemId: number, _style: ItemStyle | null): Promise<void> => {},
     serviceSetItemPayload: noop,
     serviceReorder: noop,
