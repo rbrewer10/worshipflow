@@ -26,6 +26,7 @@ import type { ZonePin, ZonePins } from '../shared/zonePins'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
+import { setRoomFeedActive } from './roomFeedPrecedence'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
 import {
   initDb,
@@ -3430,6 +3431,16 @@ app.whenReady().then(async () => {
   const soundCheckState = new SoundCheckState()
   await soundCheckState.initialize()
   registerSoundCheckHandlers(soundCheckState)
+
+  ipcMain.handle('wf:roomfeed:notifyCapturing', (_e, active: boolean) => {
+    setRoomFeedActive(active)
+    // Room feed always wins — see roomFeedPrecedence.ts. Stopping Sound Check
+    // here does not restart it when the room feed later stops; the operator
+    // starts it again if they still want it.
+    if (active && soundCheckState.audioCapture.isActive()) {
+      soundCheckState.audioCapture.stop()
+    }
+  })
 
   startTabletServer()
   createOperator()

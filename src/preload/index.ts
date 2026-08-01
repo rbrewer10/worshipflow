@@ -345,6 +345,8 @@ const wf = {
     ipcRenderer.invoke('wf:livecall:config'),
   roomFeedConfig: (): Promise<LivecallConfig> =>
     ipcRenderer.invoke('wf:roomfeed:config'),
+  roomFeedNotifyCapturing: (active: boolean): Promise<void> =>
+    ipcRenderer.invoke('wf:roomfeed:notifyCapturing', active),
   restoreRecovery: (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> =>
     ipcRenderer.invoke('wf:app:restoreRecovery'),
   multiviewOpen: (): Promise<void> =>
