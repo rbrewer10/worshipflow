@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion, Minus, HelpCircle, Copy } from 'lucide-react'
-import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId, ZoneId } from '../../shared/types'
-import { ZONE_NAMES, NON_LIVE_TYPES } from '../../shared/types'
+import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
+import { NON_LIVE_TYPES } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
 import { effectiveRouting, matchScene } from '../../shared/zoneScenes'
 import ZoneStripBadge from './ZoneStripBadge'
 import type { ZoneTrackAssignment } from '../../shared/zoneTrack'
-import ZoneTrackStripBadge from './ZoneTrackStripBadge'
-import ZoneTrackToggle from './ZoneTrackToggle'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
@@ -28,8 +26,6 @@ const ADD_TYPES: { type: ServiceItem['type']; label: string; Icon: IconType }[] 
   { type: 'header',      label: 'Section header', Icon: Minus },
   { type: 'placeholder', label: 'Placeholder (TBD)', Icon: HelpCircle },
 ]
-
-const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
 function itemPreview(it: ServiceItem): string {
   const p = it.payload ?? {}
@@ -77,34 +73,6 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
   const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
   useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [service])
   const items = service.items.filter((it) => it.track === track)
-  const hasSecond = service.items.some((it) => it.track === 'second')
-
-  const [showZonePopover, setShowZonePopover] = useState(false)
-  const popoverRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    // Close the popover on every service switch too — without this, switching to
-    // a service with no Second track (which unmounts the trigger/popover, so the
-    // outside-click handler's popoverRef.current goes null and can never close it
-    // again) then back to one with a Second track re-renders it already open.
-    setShowZonePopover(false)
-  }, [service.id])
-
-  useEffect(() => {
-    if (!showZonePopover) return
-    const onClickOutside = (e: MouseEvent): void => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) setShowZonePopover(false)
-    }
-    const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setShowZonePopover(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', onClickOutside)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [showZonePopover])
 
   const onDrop = (targetId: number): void => {
     if (dragId == null) return
@@ -167,50 +135,12 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Track tabs — Second only appears once the service actually has second-track items,
-          or once you're currently viewing it (so you can still see/empty it). The zone-
-          assignment strip only appears once there's a Second track to distinguish from Main. */}
-      {(hasSecond || track === 'second') && (
-        <div className="mb-2 flex items-center gap-2">
-          <div className="flex flex-1 gap-1 rounded-lg bg-slate-100 p-1">
-            {(['main', 'second'] as TrackId[]).map((tb) => (
-              <button
-                key={tb}
-                onClick={() => onTrackChange(tb)}
-                className={`flex-1 rounded-md py-1 text-xs font-semibold transition-colors ${
-                  track === tb ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {tb === 'main' ? 'Main' : 'Second'}
-              </button>
-            ))}
-          </div>
-          {hasSecond && (
-            <div ref={popoverRef} className="relative shrink-0">
-              <button
-                onClick={() => setShowZonePopover((v) => !v)}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 hover:bg-slate-50"
-                title="Which screens Main and Second feed"
-              >
-                <ZoneTrackStripBadge assignment={trackAssignment} />
-              </button>
-              {showZonePopover && (
-                <div className="absolute right-0 top-full z-10 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
-                  <div className="mb-2 text-xs font-semibold text-slate-600">Screens</div>
-                  <div className="space-y-1.5">
-                    {ZONE_IDS.map((zoneId) => (
-                      <div key={zoneId} className="flex items-center justify-between">
-                        <span className="text-xs text-slate-700">{ZONE_NAMES[zoneId]}</span>
-                        <ZoneTrackToggle serviceId={service.id} zoneId={zoneId} assignment={trackAssignment} onChanged={onTrackAssignmentChange} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      {/* The Main/Second track tabs and the zone-assignment badge used to live
+          here. Removed: in the whole production database the second track had
+          never held a single item, and its only lasting effect was one service
+          left with Back Right pointed at a track that had no content — a dark
+          screen with no obvious cause. The engine still has both tracks; there
+          is simply no longer a way to route a screen onto the empty one. */}
 
       {multiSelected.size > 0 && (
         <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5">
@@ -401,14 +331,6 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
               </button>
             ))}
           </div>
-          {track === 'main' && !hasSecond && (
-            <button
-              onClick={() => { onTrackChange('second'); setShowAdd(false) }}
-              className="mt-3 w-full text-center text-xs font-medium text-blue-700 hover:underline"
-            >
-              + Start a Second track (independent second screen)
-            </button>
-          )}
         </div>
       ) : (
         <button

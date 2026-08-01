@@ -181,6 +181,7 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE recording ADD COLUMN ai_state TEXT') } catch { /* already exists */ }
   normalizeSectionLyrics()
   normalizeTitles()
+  clearSecondTrackAssignments()
   persist()
 }
 
@@ -196,6 +197,26 @@ export function normalizeTitleText(title: string): string {
 // audit found several already in the library from before createSong/
 // createAnnouncement defensively trimmed on write. Only rows that actually
 // change are rewritten, same idiom as normalizeSectionLyrics below.
+// Repairs services left pointing a screen at the retired second track.
+//
+// The second track let a zone follow an independent second set of items. It was
+// removed because no service in production ever had a single second-track item,
+// while one service was left with Back Right assigned to it — and a zone
+// following a track with no content renders the idle logo, so that screen just
+// looked broken with nothing on screen to explain why. With the assignment UI
+// gone there would be no way to undo it, so clear it here instead of stranding
+// it. Idempotent: services already on all-main are left untouched.
+function clearSecondTrackAssignments(): void {
+  const rows: { id: number; value: string | null }[] = []
+  const stmt = db.prepare('SELECT id, zone_track_assignment AS value FROM service WHERE zone_track_assignment IS NOT NULL')
+  while (stmt.step()) rows.push(stmt.getAsObject() as unknown as { id: number; value: string | null })
+  stmt.free()
+  for (const row of rows) {
+    if (row.value == null || !row.value.includes('second')) continue
+    db.run('UPDATE service SET zone_track_assignment = NULL WHERE id = ?', [row.id])
+  }
+}
+
 function normalizeTitles(): void {
   const targets: [string, string][] = [['song', 'title'], ['song', 'author'], ['announcement', 'title']]
   for (const [table, column] of targets) {
