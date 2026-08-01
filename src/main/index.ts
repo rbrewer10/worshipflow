@@ -13,7 +13,7 @@ import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
-import { parseReferenceList } from '../shared/scriptureRefs'
+import { parseReferenceList, formatReferenceList } from '../shared/scriptureRefs'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides'
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
@@ -513,7 +513,12 @@ function clearSongMeta(track: TrackId): void {
 // Are we on the last slide of the last go-live item (nothing further to advance to)?
 function atEndOfContent(track: TrackId): boolean {
   const t = tracks[track]
-  const atLastSlide = t.mode === 'lyrics' ? t.index >= t.song.lines.length - 1 : true
+  // A deck advances on its own index regardless of t.mode — a sermon deck sits
+  // at mode 'logo' by design, and treating that as "nothing left to advance to"
+  // reported every sermon as finished the moment it went live, which fed
+  // auto-advance's loop/stop decision the wrong answer.
+  const followsIndex = t.mode === 'lyrics' || !!t.deckSlides
+  const atLastSlide = followsIndex ? t.index >= t.song.lines.length - 1 : true
   return atLastSlide && !adjacentLiveItem(track, 1)
 }
 
@@ -1068,8 +1073,15 @@ function processIntent(track: TrackId, type: Intent): void {
       // Nothing after the countdown — go to the logo hold screen instead of
       // stranding the frozen timer value (e.g. "0:42") as a lyric slide.
       clearCountdown(track); t.song = { title: '', lines: [], background: null }; t.mode = 'logo'
-    } else if (t.mode !== 'lyrics') {
+    } else if (t.mode !== 'lyrics' && !t.deckSlides) {
       // Black/logo were operator-blanked — Next un-blanks back to the slide.
+      //
+      // Skipped when a deck is loaded. A sermon deliberately loads at
+      // mode 'logo' (see doLoadSermon), and the deck path in computeZoneStates
+      // ignores t.mode entirely — so this branch used to eat the operator's
+      // FIRST Next press after going live on a sermon, changing nothing on any
+      // screen. It read as "Next is broken"; it took two presses to reach
+      // verse one.
       clearCountdown(track); t.mode = 'lyrics'
     } else if (t.index < last) {
       t.index++; logServiceEvent(`next: ${t.index}/${last}`)
@@ -1305,7 +1317,7 @@ async function fetchScripture(reference: string, translation: BibleTranslation):
 // Returns false (leaving the current slide untouched) when the reference can't be
 // resolved, so callers don't mark a failed scripture "live" and strand the wrong
 // content on the projector.
-async function doLoadScripture(track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean, fontScale?: number, bgFit?: 'cover' | 'contain'): Promise<boolean> {
+async function doLoadScripture(track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean, fontScale?: number, bgFit?: 'cover' | 'contain', item?: ServiceItem | null): Promise<boolean> {
   // Bump the generation synchronously, before the (possibly slow, non-KJV)
   // network await, and remember our value. If anything else loads onto this
   // track while we're waiting — including another scripture lookup — that call
@@ -1313,18 +1325,40 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   // superseded and bail out without touching live state. See
   // LiveTrackState.loadGeneration.
   const generation = ++tracks[track].loadGeneration
-  const result = bibleTranslation === 'kjv'
-    ? lookupScripture(reference)
-    : await fetchScripture(reference, bibleTranslation)
-  if (!result.ok || !result.verses) {
-    logWarn(`[scripture] lookup failed for reference="${reference}" translation=${bibleTranslation}`)
-    return false
+  // A scripture item can hold a whole reading ("John 3:16-18; Romans 8:1").
+  // This used to hand the raw field straight to lookupScripture, whose pattern
+  // must match the WHOLE string — so a multi-passage item failed to resolve,
+  // returned false, and went live as nothing at all with no error shown.
+  const refs = parseReferenceList(reference)
+  if (!refs.length) return false
+
+  const lines: string[] = []
+  let resolvedTitle: string | null = null
+  let sawFallback = false
+  for (const ref of refs) {
+    const result = bibleTranslation === 'kjv'
+      ? lookupScripture(ref)
+      : await fetchScripture(ref, bibleTranslation)
+    if (!result.ok || !result.verses?.length) {
+      logWarn(`[scripture] lookup failed for reference="${ref}" translation=${bibleTranslation}`)
+      continue
+    }
+    if (result.usedFallback) sawFallback = true
+    if (!resolvedTitle) resolvedTitle = result.reference ?? ref
+    lines.push(
+      ...(result.verses.length === 1
+        ? [result.verses[0].text]
+        : result.verses.map((v) => `${v.n}  ${v.text}`))
+    )
   }
+  // Only a reading where NOTHING resolved is a failure; one bad reference among
+  // several still shows the passages either side of it.
+  if (!lines.length) return false
   if (tracks[track].loadGeneration !== generation) {
     logWarn(`[scripture] discarding stale lookup for reference="${reference}" — track "${track}" moved on while fetching`)
     return false
   }
-  if (result.usedFallback) {
+  if (sawFallback) {
     notifyOperator(`Online lookup failed — showing KJV for "${reference}"`, 'warn')
   }
   const t = tracks[track]
@@ -1335,17 +1369,22 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   t.scriptureRef = reference
   clearSongMeta(track)
   t.bgFit = bgFit ?? 'cover'
-  t.deckSlides = null  // ad-hoc scripture loads never carry a deck
-  const lines =
-    result.verses.length === 1
-      ? [result.verses[0].text]
-      : result.verses.map((v) => `${v.n}  ${v.text}`)
-  t.song = { title: result.reference!, lines, background: background ?? null }
+  t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
+  t.song = {
+    title: refs.length > 1 ? formatReferenceList(refs) : (resolvedTitle ?? reference),
+    lines,
+    background: background ?? null
+  }
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = blurBehindText ?? false
   if (fontScale != null) t.fontScale = fontScale
   t.mode = 'lyrics'
   t.index = 0
+  // Same as doLoadText/doLoadSermon: an ad-hoc Quick Scripture passes no item
+  // and keeps the flat verse list, but a real scripture SERVICE item gets its
+  // generated deck (reference on Back Left, verse on the rest). Without this
+  // the deck autoDeckFor builds was never applied to anything.
+  if (item) void loadDeckOnto(track, item, generation)
   return true
 }
 
@@ -1432,8 +1471,20 @@ async function doLoadAnnouncement(track: TrackId, id: number | null, item?: Serv
 // grid). Checks for an authored deck first — when one exists, ITS summaries
 // are what the item "shows". Otherwise delegates to computeItemSourceSlides.
 async function computeItemSlides(item: ServiceItem): Promise<string[]> {
-  const deck = parseZoneSlides(getItemZoneSlides(item.id))
-  if (deck) return deck.map((s) => slideSummary(s))
+  const authored = parseZoneSlides(getItemZoneSlides(item.id))
+  if (authored) return authored.map((s) => slideSummary(s))
+  // Fall back to the GENERATED deck before the item's flat content, because a
+  // generated deck is what actually goes live for sermon/scripture/announcement
+  // items. Building the operator's grid from the flat content instead meant the
+  // thumbnails and the live index described different things: a sermon showed a
+  // single thumbnail while the reading had one slide per verse chunk, so the
+  // "live" ring stopped matching anything the moment the operator advanced, and
+  // there was no way to click ahead to a specific verse.
+  const generated = await autoDeckFor(item, autoDeckDeps())
+  if (generated) {
+    const source = await computeItemSourceSlides(item)
+    return generated.map((s) => slideSummary(s, source))
+  }
   return computeItemSourceSlides(item)
 }
 
@@ -1536,7 +1587,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.payload.fontScale as number | undefined, item.payload.bgFit as 'cover' | 'contain' | undefined))) return  // lookup failed → don't mark it live
+    if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.payload.fontScale as number | undefined, item.payload.bgFit as 'cover' | 'contain' | undefined, item))) return  // lookup failed → don't mark it live
   } else if (item.type === 'text') {
     doLoadText(
       track,
@@ -2083,7 +2134,7 @@ ipcMain.handle('wf:live:setItemId', (_e, track: TrackId, id: number | null) => {
   // available, so it's the deck-load chokepoint for "Go Live". (The other path,
   // Next/Prev via handleTabletLoadItem, never calls wf:live:setItemId — it
   // already loaded the deck itself, straight from the ServiceItem it has.)
-  if (item && (item.type === 'text' || item.type === 'sermon')) {
+  if (item && (item.type === 'text' || item.type === 'sermon' || item.type === 'scripture')) {
     void loadDeckOnto(track, item, t.loadGeneration)
   }
   broadcast()
