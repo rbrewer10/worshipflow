@@ -19,3 +19,6 @@ desktop.ini
 # Playwright E2E output
 /test-results
 /playwright-report
+
+# /code-review scratch output (scope notes, run state) — not source
+/.full-review/
