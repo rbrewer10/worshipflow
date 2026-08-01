@@ -1,6 +1,6 @@
 // Pure keyboard/open-state logic for NavMenu, kept free of React and the DOM so
 // it is testable under this repo's Node-only Vitest config (see saveQueue.ts,
-// saveRegistry.ts, ipcValidate.ts for the same pattern). NavMenu.tsx owns the
+// saveRegistry.ts, songDuplicates.ts for the same pattern). NavMenu.tsx owns the
 // rendering and focus side effects; every decision about *what* the state
 // should become lives here.
 export interface NavMenuState {
@@ -11,7 +11,6 @@ export interface NavMenuState {
 }
 
 export type NavMenuAction =
-  | { type: 'open' }
   | { type: 'openAtFirst' }
   | { type: 'openAtLast' }
   | { type: 'close' }
@@ -33,8 +32,6 @@ export function navMenuReducer(
 ): NavMenuState {
   const last = itemCount - 1
   switch (action.type) {
-    case 'open':
-      return { open: true, highlighted: -1 }
     case 'openAtFirst':
       return { open: true, highlighted: itemCount > 0 ? 0 : -1 }
     case 'openAtLast':

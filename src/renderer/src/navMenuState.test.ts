@@ -13,10 +13,6 @@ describe('navMenuState', () => {
     expect(initialNavMenuState).toEqual({ open: false, highlighted: -1 })
   })
 
-  it('opens from a mouse click with nothing highlighted', () => {
-    expect(reduce(initialNavMenuState, { type: 'open' })).toEqual({ open: true, highlighted: -1 })
-  })
-
   it('opens onto the first item for ArrowDown on the trigger', () => {
     expect(reduce(initialNavMenuState, { type: 'openAtFirst' })).toEqual({ open: true, highlighted: 0 })
   })
@@ -75,5 +71,18 @@ describe('navMenuState', () => {
   it('leaves nothing highlighted when the menu has no items', () => {
     expect(navMenuReducer(initialNavMenuState, { type: 'openAtFirst' }, 0)).toEqual({ open: true, highlighted: -1 })
     expect(navMenuReducer({ open: true, highlighted: -1 }, { type: 'next' }, 0).highlighted).toBe(-1)
+  })
+
+  it('opens onto nothing rather than a negative index when the menu is empty', () => {
+    expect(navMenuReducer(initialNavMenuState, { type: 'openAtLast' }, 0)).toEqual({ open: true, highlighted: -1 })
+  })
+
+  it('never jumps to first or last while closed', () => {
+    expect(reduce(initialNavMenuState, { type: 'first' })).toEqual(initialNavMenuState)
+    expect(reduce(initialNavMenuState, { type: 'last' })).toEqual(initialNavMenuState)
+  })
+
+  it('ignores hover highlighting while closed', () => {
+    expect(reduce(initialNavMenuState, { type: 'highlight', index: 1 })).toEqual(initialNavMenuState)
   })
 })
