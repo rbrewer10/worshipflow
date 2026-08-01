@@ -100,6 +100,7 @@ import type { AutoDeckDeps } from './autoDeck'
 import { TABLET_PORT, tabletHtml } from './tabletHtml'
 import { attachLivecallSignaling } from './livecallSignaling'
 import { phoneClientHtml } from './phoneClientHtml'
+import { roomFeedViewerHtml } from './roomFeedViewerHtml'
 import { OBS_HTML } from './obsHtml'
 import { zoneHtmlFor } from './zoneHtml'
 import { MULTIVIEW_HTML } from './multiviewHtml'
@@ -1793,6 +1794,11 @@ function startTabletServer(): void {
       const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
       res.writeHead(200, htmlHeaders)
       res.end(phoneClientHtml(`${proto}://${host}/livecall`, livecallToken(), 'sanctuary'))
+    } else if (path === '/room-feed') {
+      const host = req.headers.host ?? `localhost:${boundTabletPort}`
+      const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
+      res.writeHead(200, htmlHeaders)
+      res.end(roomFeedViewerHtml(`${proto}://${host}/livecall`, livecallToken(), 'room-feed'))
     } else if (path === '/file') {
       // Serve local media files (images, videos) to Pi browsers and multiview iframes.
       const qs = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
