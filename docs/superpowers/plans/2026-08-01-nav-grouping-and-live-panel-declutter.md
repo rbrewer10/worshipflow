@@ -1077,11 +1077,13 @@ So after Task 4 the renderer holds 58 `gray-` tokens: 46 in `LogoSettings.tsx` a
 - [ ] **Step 1: Confirm the starting counts**
 
 ```bash
-grep -cohE "\b(bg|text|border|ring|from|to|via|divide|placeholder)-gray-[0-9]{2,3}\b" src/renderer/src/LogoSettings.tsx
+grep -ohE "\b(bg|text|border|ring|from|to|via|divide|placeholder)-gray-[0-9]{2,3}\b" src/renderer/src/LogoSettings.tsx | wc -l
 git status --short src/renderer/src/ObsConnectTab.tsx
 ```
 
 Expected: `46`, and `?? src/renderer/src/ObsConnectTab.tsx`.
+
+Note the `grep -o … | wc -l` idiom rather than `grep -c`: every count in this plan is an **occurrence** count, and `-c` counts matching *lines*, silently collapsing the several lines here that carry two `gray-` tokens each. `grep -c` on this file returns 32, not 46.
 
 If `LogoSettings.tsx` still reports 56, Task 4 was not completed — go back and finish it before continuing, or the deleted `BackupsPanel` will be re-styled pointlessly.
 
@@ -1096,7 +1098,7 @@ sed -i -E 's/\b(bg|text|border|ring|from|to|via|divide|placeholder)-gray-([0-9]{
 - [ ] **Step 3: Confirm the swap landed and nothing else moved**
 
 ```bash
-grep -cohE "\b(bg|text|border|ring|from|to|via|divide|placeholder)-gray-[0-9]{2,3}\b" src/renderer/src/LogoSettings.tsx
+grep -ohE "\b(bg|text|border|ring|from|to|via|divide|placeholder)-gray-[0-9]{2,3}\b" src/renderer/src/LogoSettings.tsx | wc -l
 git status --short src/renderer/src
 ```
 
