@@ -11,6 +11,8 @@
  * milliseconds apart is comb-filtered mush.
  */
 
+import { ICE_SERVERS } from './iceServers'
+
 export type CallState = 'idle' | 'ringing' | 'live' | 'reconnecting'
 
 export interface RelayCallbacks {
@@ -19,7 +21,6 @@ export interface RelayCallbacks {
   onViewerCount?: (n: number) => void
 }
 
-const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
 const MAX_BACKOFF_MS = 15000
 
 export class LiveCallRelay {

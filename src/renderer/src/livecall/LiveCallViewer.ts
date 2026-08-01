@@ -8,7 +8,8 @@
  * MediaStream object and have to negotiate for it like any other screen.
  */
 
-const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
+import { ICE_SERVERS } from './iceServers'
+
 const MAX_BACKOFF_MS = 15000
 
 export class LiveCallViewer {
