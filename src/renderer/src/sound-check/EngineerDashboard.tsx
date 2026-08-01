@@ -783,6 +783,7 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
 
   // Start/stop audio capture
   const toggleAudioCapture = async (): Promise<void> => {
+    setCaptureError(null)
     try {
       if (isCapturing) {
         await window.wf.soundCheck.stopAudioCapture()
@@ -905,7 +906,6 @@ function LiveView({ channels, onRefresh }: { channels: Channel[]; onRefresh: () 
         <div className="flex flex-col gap-2.5">
           <button
             onClick={toggleAudioCapture}
-            disabled={!!captureError}
             className="inline-flex items-center justify-center gap-1.5 rounded-[6px] border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-blue-700 hover:bg-blue-500/10 disabled:opacity-50"
           >
             {isCapturing ? <CircleStop size={13} /> : <Play size={13} />}
