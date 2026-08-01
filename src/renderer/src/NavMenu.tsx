@@ -32,11 +32,11 @@ function NavMenu<T extends string>({ label, items, activeId, onSelect }: {
 
   useEffect(() => {
     if (!state.open) return
-    const onPointerDown = (e: MouseEvent): void => {
+    const onMouseDown = (e: MouseEvent): void => {
       if (!rootRef.current?.contains(e.target as Node)) dispatch({ type: 'close' })
     }
-    document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
   }, [state.open])
 
   // DOM focus follows the reducer's highlight, so screen readers announce the
@@ -67,7 +67,10 @@ function NavMenu<T extends string>({ label, items, activeId, onSelect }: {
     else if (e.key === 'Home') { e.preventDefault(); dispatch({ type: 'first' }) }
     else if (e.key === 'End') { e.preventDefault(); dispatch({ type: 'last' }) }
     else if (e.key === 'Escape') { e.preventDefault(); close(true) }
-    else if (e.key === 'Tab') close(false)
+    // Focus the trigger BEFORE closing: Tab's default action resolves against
+    // whatever is focused right now, and the item under focus is about to be
+    // unmounted — leaving focus to fall back to <body> instead of moving on.
+    else if (e.key === 'Tab') { triggerRef.current?.focus(); dispatch({ type: 'close' }) }
   }
 
   const containsActive = items.some((it) => it.id === activeId)
