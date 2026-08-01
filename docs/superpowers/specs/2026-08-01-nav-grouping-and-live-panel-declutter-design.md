@@ -239,8 +239,24 @@ instead of 10, with Black/Logo/Live at the top and no collapsible "More". Every
 relocated control is reachable and working from its new Setup or Library home,
 and nothing that was reachable before is unreachable now. Backgrounds has a
 destination of its own. `gray-*` no longer appears in any tracked renderer file,
-and `purple`/`sky`/`indigo`/`rose` no longer carry accent meaning. The E2E spec
-is updated and passes. Volunteer mode is byte-for-byte unchanged.
+and `rose` no longer duplicates `red`. The E2E spec is updated and passes.
+Volunteer mode is byte-for-byte unchanged.
+
+**Amended during implementation.** This criterion originally also required
+retiring `purple`, `sky` and `indigo`. Inspecting every call site showed all
+three encode meaning rather than decoration, so they are kept:
+
+- `ServiceDeck.tsx` uses indigo for the multi-select state specifically to
+  distinguish it from blue single-select; both render in the same list, so
+  merging them would make two different states look identical.
+- `ZoneTrackStripBadge.tsx` pairs blue (main track) with purple (second track).
+- `sound-check/*` uses purple (Track) against blue (Mic) as a channel-category
+  distinction — and that tab is an unreachable prototype whose `Variant*` files
+  are design mockups.
+
+Only `rose` was a true duplicate of an existing role. The design principle still
+holds — one hue, one meaning — but §4's assumption that these four were all
+strays was wrong, and enforcing it would have been a visual regression.
 
 **Carve-out:** `ObsConnectTab.tsx` is an untracked, uncommitted file belonging to
 other in-flight work on this branch, and holds 12 of the renderer's `gray-`
