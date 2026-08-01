@@ -1082,6 +1082,18 @@ function processIntent(track: TrackId, type: Intent): void {
       // Nothing after the countdown — go to the logo hold screen instead of
       // stranding the frozen timer value (e.g. "0:42") as a lyric slide.
       clearCountdown(track); t.song = { title: '', lines: [], background: null }; t.mode = 'logo'
+    } else if (t.mode === 'livecall') {
+      // A call is one continuous view, not a sequence of slides — there is
+      // nothing to un-blank or step through within it. Before this branch
+      // existed, the general "un-blank" case below caught mode 'livecall' too
+      // (it is never 'lyrics') and flipped it straight to 'lyrics' on the
+      // FIRST Next press, silently kicking the operator's own preview/output
+      // window off the call while the zone screens — routed by item type, not
+      // by t.mode — kept showing it. That split, with no error anywhere, is
+      // worse than any other mode's swallowed-press bug this session found.
+      const nextItem = adjacentLiveItem(track, 1)
+      if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
+      t.mode = 'logo'
     } else if (t.mode !== 'lyrics' && !t.deckSlides) {
       // Black/logo were operator-blanked — Next un-blanks back to the slide.
       //
@@ -1100,7 +1112,19 @@ function processIntent(track: TrackId, type: Intent): void {
       if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
     }
   } else if (type === 'prev') {
-    if (t.mode !== 'lyrics') { clearCountdown(track); t.mode = 'lyrics' }
+    if (t.mode === 'livecall') {
+      // See the mirroring 'next' branch above — one continuous view, step to
+      // the previous item rather than un-blanking to nothing.
+      const prevItem = adjacentLiveItem(track, -1)
+      if (prevItem) { void handleTabletLoadItem(track, prevItem.id); return }
+      t.mode = 'logo'
+    } else if (t.mode !== 'lyrics' && !t.deckSlides) {
+      // Same "un-blank eats the first press" bug the 'next' branch documents
+      // above, mirrored here: this had no deck exception at all, so pressing
+      // Prev right after going live on a sermon (mode 'logo', index 0) only
+      // flipped the mode and never stepped back to the previous item.
+      clearCountdown(track); t.mode = 'lyrics'
+    }
     else if (t.index > 0) { t.index--; logServiceEvent(`prev: ${t.index}/${last}`) }
     else {
       // At the first slide — step back to the previous service item.

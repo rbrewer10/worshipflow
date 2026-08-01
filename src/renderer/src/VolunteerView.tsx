@@ -44,8 +44,15 @@ function canGoLive(item: ServiceItem): boolean {
     (item.type === 'image' && !!(item.payload.path as string)) ||
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
     (item.type === 'ticker' && !!(item.payload.text as string)) ||
-    (item.type === 'announcement' && item.ref_id != null) ||
-    (item.type === 'sermon')
+    // A block carries its announcements in payload.refIds and may have no
+    // ref_id at all, so requiring one would make it un-airable. Mirrors the
+    // liveActions.ts fix — this file keeps its own copy of canGoLive/loadItem
+    // for the simplified Volunteer surface, so the fix has to land here too.
+    (item.type === 'announcement' &&
+      (item.ref_id != null || ((item.payload.refIds as number[] | undefined)?.length ?? 0) > 0)) ||
+    (item.type === 'sermon') ||
+    // Nothing to configure — the call either connects or it doesn't.
+    (item.type === 'livecall')
   )
 }
 
@@ -80,8 +87,12 @@ async function loadItem(item: ServiceItem): Promise<void> {
     const txt = item.payload.text as string
     if (!txt) return
     await window.wf.liveLoadText('main', 'Announcement', txt)
-  } else if (item.type === 'announcement' && item.ref_id != null) {
-    await window.wf.liveLoadAnnouncement('main', item.ref_id)
+  } else if (item.type === 'announcement') {
+    // itemId is required for a refIds-only block — the main process looks its
+    // announcement list up by item id when there's no single ref_id to load.
+    // Omitting it here meant canGoLive could say yes while this silently did
+    // nothing for a block with no ref_id.
+    await window.wf.liveLoadAnnouncement('main', item.ref_id, item.id)
   } else if (item.type === 'sermon') {
     await window.wf.liveLoadSermon(
       'main',
@@ -91,6 +102,8 @@ async function loadItem(item: ServiceItem): Promise<void> {
       item.payload.background as string | null | undefined,
       item.payload.blurBehindText as boolean | undefined
     )
+  } else if (item.type === 'livecall') {
+    await window.wf.liveLoadLiveCall('main', item.title)
   } else {
     return
   }
