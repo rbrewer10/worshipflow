@@ -6,7 +6,7 @@
 // set of tags, everywhere a background gets picked.
 
 import { useState, useEffect, useRef } from 'react'
-import { Check, X, Pencil, Tag, Upload, FolderOpen } from 'lucide-react'
+import { Check, X, Pencil, Tag, Upload, FolderOpen, RefreshCw } from 'lucide-react'
 import Modal from './Modal'
 
 function toAssetUrl(p: string): string {
@@ -35,21 +35,41 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
   const [editingTags, setEditingTags] = useState<string>('')
   const dropRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => { loadUploads() }, [])
+  useEffect(() => {
+    void loadUploads()
+    // "Open folder" sends the operator to the file manager to bulk-copy images
+    // in — its own tooltip says "drop in as many as you want, then come back
+    // here" — but nothing re-scanned the folder on return, so a batch of newly
+    // added backgrounds stayed invisible until this component happened to
+    // remount. Re-reading on window focus makes coming back actually work.
+    const onFocus = (): void => { void loadUploads() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
 
   async function loadUploads(): Promise<void> {
+    let list: BgEntry[]
     try {
-      const list = await window.wf.bgList()
-      const withTags = await Promise.all(
-        list.map(async (bg) => ({
-          ...bg,
-          tags: await window.wf.bgGetTags(bg.path)
-        }))
-      )
-      setUploads(withTags)
+      list = await window.wf.bgList()
     } catch {
       setUploads([])
+      return
     }
+    // Tags are decoration. Fetching them with a bare Promise.all under one
+    // catch meant a single failed lookup rejected the batch and blanked the
+    // ENTIRE library — increasingly likely as the folder grows, since this is
+    // one IPC round-trip per file (200+ of them here). Failing per-item keeps
+    // the background visible with no tags instead of losing everything.
+    const withTags = await Promise.all(
+      list.map(async (bg) => {
+        try {
+          return { ...bg, tags: await window.wf.bgGetTags(bg.path) }
+        } catch {
+          return { ...bg, tags: [] as string[] }
+        }
+      })
+    )
+    setUploads(withTags)
   }
 
   async function handleSaveTags(filePath: string, tags: string[]): Promise<void> {
@@ -180,6 +200,23 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
         >
           <FolderOpen size={20} />
           <span className="text-[10px] font-medium">Open folder</span>
+        </button>
+      </div>
+
+      {/* How many are actually loaded, plus a manual re-scan. The count is here
+          so "did it pick up everything I just added?" is answerable at a glance
+          rather than by counting thumbnails. */}
+      <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span>
+          {uploads.length} background{uploads.length === 1 ? '' : 's'}
+          {searchTags.length > 0 && ` · ${filteredUploads.length} matching`}
+        </span>
+        <button
+          onClick={() => void loadUploads()}
+          title="Re-scan the backgrounds folder"
+          className="inline-flex items-center gap-1 font-medium text-blue-700 hover:underline"
+        >
+          <RefreshCw size={11} /> Refresh
         </button>
       </div>
 
