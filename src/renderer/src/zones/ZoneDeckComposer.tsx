@@ -87,6 +87,21 @@ export default function ZoneDeckComposer({
     onSaveDeck(next)
   }
 
+  // Picking a kind used to produce a bare { kind } — an empty slot, which the
+  // engine renders as a blank card or (for an unresolvable verse) a black
+  // screen, with nothing in the composer saying it still needed filling in. A
+  // sermon already knows its own title and passage, so start from those instead
+  // of from nothing; the operator can still overwrite either field.
+  const defaultsForKind = (kind: ZoneSlot['kind']): ZoneSlot => {
+    const payload = item.payload ?? {}
+    const title = (payload.title as string | undefined) || item.title || ''
+    const passage = (payload.passage as string | undefined) || (payload.reference as string | undefined) || ''
+    if (kind === 'sermon') return { kind, text: title, reference: passage }
+    if (kind === 'scripture') return { kind, reference: passage }
+    if (kind === 'text') return { kind, text: '' }
+    return { kind }
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <ZoneDeckStrip
@@ -119,7 +134,12 @@ export default function ZoneDeckComposer({
                 deckSlot={slotToDeckSlot(resolved, slides)}
                 onSlideDrop={(sourceIndex) => setSlot(zoneId, { kind: 'slide', index: sourceIndex })}
               />
-              <ZoneSlotEditor slot={rawSlot} zoneId={zoneId} onChange={(next) => setSlot(zoneId, next)} />
+              <ZoneSlotEditor
+                slot={rawSlot}
+                zoneId={zoneId}
+                defaultsForKind={defaultsForKind}
+                onChange={(next) => setSlot(zoneId, next)}
+              />
             </div>
           )
         })}

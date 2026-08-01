@@ -25,9 +25,11 @@ const INPUT_CLASS = 'w-full rounded border border-slate-200 px-2 py-1 text-xs ou
 // One zone's content for one deck slide. 'Hold' repeats whatever this screen
 // showed on the previous slide, which is how a sermon title spans a whole
 // deck without being retyped on every slide.
-export default function ZoneSlotEditor({ slot, zoneId, onChange }: {
+export default function ZoneSlotEditor({ slot, zoneId, defaultsForKind, onChange }: {
   slot: ZoneSlot
   zoneId: ZoneId
+  // Seeds a newly-picked kind from the item's own data — see the composer.
+  defaultsForKind?: (kind: ZoneSlotKind) => ZoneSlot
   onChange: (next: ZoneSlot) => void
 }): JSX.Element {
   const sizable = slot.kind === 'text' || slot.kind === 'scripture'
@@ -35,6 +37,11 @@ export default function ZoneSlotEditor({ slot, zoneId, onChange }: {
   // actually renders smaller than the room-facing screens when nothing is set.
   const defaultScale = zoneId === 4 ? 5 : 14
   const [picking, setPicking] = useState(false)
+  const needsContent =
+    (slot.kind === 'scripture' && !slot.reference?.trim()) ||
+    (slot.kind === 'text' && !slot.text?.trim()) ||
+    (slot.kind === 'sermon' && !slot.text?.trim() && !slot.reference?.trim()) ||
+    (slot.kind === 'image' && !slot.path)
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -42,7 +49,20 @@ export default function ZoneSlotEditor({ slot, zoneId, onChange }: {
         {KINDS.map(({ kind, label }) => (
           <button
             key={kind}
-            onClick={() => onChange({ kind })}
+            // Carry across anything already typed, then fall back to the item's
+            // own title/passage. Previously this was onChange({ kind }), which
+            // wiped the slot: switching kind to compare options and switching
+            // back silently lost the text, and a fresh pick started empty.
+            onClick={() => {
+              const seeded = defaultsForKind?.(kind) ?? { kind }
+              onChange({
+                ...seeded,
+                text: slot.text ?? seeded.text,
+                reference: slot.reference ?? seeded.reference,
+                path: slot.path ?? seeded.path,
+                fontScale: slot.fontScale
+              })
+            }}
             className={`rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
               slot.kind === kind ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
@@ -51,6 +71,18 @@ export default function ZoneSlotEditor({ slot, zoneId, onChange }: {
           </button>
         ))}
       </div>
+      {needsContent && (
+        // An empty slot is invisible until it reaches a screen — a verse with no
+        // reference renders BLACK, and a title card with no title renders an
+        // empty card. Say so here, while it can still be fixed.
+        <p className="text-[10px] text-amber-700">
+          {slot.kind === 'scripture'
+            ? 'No reference — this screen will go black.'
+            : slot.kind === 'image'
+              ? 'No picture chosen — this screen will go black.'
+              : 'Empty — this screen will show nothing.'}
+        </p>
+      )}
       {slot.kind === 'text' && (
         <textarea
           value={slot.text ?? ''}
