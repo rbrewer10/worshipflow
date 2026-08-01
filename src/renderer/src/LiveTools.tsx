@@ -1,44 +1,31 @@
 import { useEffect, useState } from 'react'
-import { MonitorOff, Image as ImageIcon, Play, Timer, ChevronUp, ChevronDown, Keyboard, FileText, Tablet, FolderOpen } from 'lucide-react'
-import type { AppInfo, LiveState, TrackId } from '../../shared/types'
-import ZonePanel from './ZonePanel'
+import { MonitorOff, Image as ImageIcon, Play, Timer } from 'lucide-react'
+import type { LiveState, TrackId } from '../../shared/types'
 import { useService } from './ServiceContext'
 import { PresenterPanel } from './PresenterPanel'
 import { StageMessagePanel } from './StageMessagePanel'
-import { ScripturePanel } from './ScripturePanel'
 import { TimingPanel } from './TimingPanel'
 import { notifyLocal } from './NotifyToasts'
 
-// The Live tab's right-hand control panel for the Main track: stage message,
-// scripture, font, auto-advance, and a collapsible "More" with the rarely-used
-// controls. OBS setup/streaming lives on its own "OBS Connect" tab now — it
-// needed more room than this sidebar could give it. (Second track gets the
-// leaner SecondTrackTools.)
+// The Live tab's right-hand control panel for the Main track. Deliberately holds
+// only what an operator reaches for *during* a service: the panic row, presenter
+// notes, stage messages, and text size/auto-advance. Everything configured once
+// and then left alone (zones, tablet PIN, logs, displays) lives under Setup, and
+// quick scripture lives in the app-wide bottom drawer — see the 2026-08-01 spec.
+// A control added back here should be one that is genuinely used mid-service.
+// (Second track gets the leaner SecondTrackTools.)
 function LiveTools({ track }: { track: TrackId }): JSX.Element {
   const { activeService } = useService()
-  const [info, setInfo] = useState<AppInfo | null>(null)
   const [live, setLive] = useState<LiveState | null>(null)
-  const [scriptureRef, setScriptureRef] = useState('')
   const [stageMsg, setStageMsg] = useState('')
   const [msgSent, setMsgSent] = useState(false)
-  const [tabletUrl, setTabletUrl] = useState('')
-  const [tabletPin, setTabletPin] = useState('')
   const [autoAdvanceSecs, setAutoAdvanceSecs] = useState('10')
   const [autoAdvanceLoop, setAutoAdvanceLoop] = useState(false)
-  const [bibleTranslation, setBibleTranslation] = useState<'kjv' | 'web' | 'bbe'>('kjv')
-  const [showCheatSheet, setShowCheatSheet] = useState(false)
-  const [serviceLog, setServiceLog] = useState<Array<{ ts: number; event: string }>>([])
-  const [showMore, setShowMore] = useState(false)
 
   useEffect(() => {
-    window.wf.getInfo().then(setInfo)
-    const t = setTimeout(() => window.wf.getInfo().then(setInfo), 900)
     const off = window.wf.onState((s) => setLive(track === 'main' ? s.main : s.second))
-    window.wf.getTabletUrl().then(setTabletUrl)
-    window.wf.getTabletPin().then(setTabletPin)
-    return () => { clearTimeout(t); off() }
+    return off
   }, [track])
-  useEffect(() => { if (live?.songTitle) window.wf.getInfo().then(setInfo) }, [live?.songTitle])
   useEffect(() => { if (!live?.stageMessage) setStageMsg('') }, [live?.stageMessage])
 
   const liveItem = activeService?.items.find((it) => it.id === live?.liveServiceItemId && it.track === track) ?? null
@@ -46,16 +33,6 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
   const hmsElapsedSecs = live?.hmsLoadedAt ? Math.floor((Date.now() - live.hmsLoadedAt) / 1000) : 0
   const autoAdvanceRunning = live?.autoAdvanceMs != null && live.autoAdvanceMs > 0
 
-  const quickScripture = async (): Promise<void> => {
-    const ref = scriptureRef.trim()
-    if (!ref) return
-    // On a failed lookup keep the typed reference and leave the current item live
-    // rather than clearing both silently.
-    const ok = await window.wf.liveLoadScripture(track, ref)
-    if (!ok) return
-    window.wf.liveSetItemId(track, null)
-    setScriptureRef('')
-  }
   const sendStageMessage = (preset?: string): void => {
     const msg = (preset ?? stageMsg).trim()
     if (!msg) return
@@ -115,18 +92,6 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       {/* Divider */}
       <div className="border-t border-slate-200" />
 
-      {/* Quick scripture + Bible translation */}
-      <ScripturePanel
-        scriptureRef={scriptureRef}
-        bibleTranslation={bibleTranslation}
-        onReferenceChange={setScriptureRef}
-        onGoLive={quickScripture}
-        onTranslationChange={(t) => { setBibleTranslation(t); window.wf.featuresSetBibleTranslation(t) }}
-      />
-
-      {/* Divider */}
-      <div className="border-t border-slate-200" />
-
       {/* Text size + Auto-advance */}
       <TimingPanel
         fontScale={live?.fontScale ?? 6}
@@ -161,59 +126,6 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
         </div>
       )}
 
-      {/* Divider */}
-      <div className="border-t border-slate-200" />
-
-      <button onClick={() => setShowMore((v) => !v)} className="w-full btn">
-        {showMore ? <><ChevronUp size={14} /> Less</> : <><ChevronDown size={14} /> More</>}
-      </button>
-      {showMore && (
-        <div className="space-y-3">
-          <button onClick={() => setShowCheatSheet(!showCheatSheet)} className="w-full btn-secondary text-xs"><Keyboard size={13} /> Keyboard Shortcuts</button>
-          {showCheatSheet && (
-            <div className="surface max-h-40 space-y-1 overflow-auto text-xs text-slate-600">
-              <div><span className="font-semibold text-slate-700">Space / →</span> Next slide</div>
-              <div><span className="font-semibold text-slate-700">←</span> Previous slide</div>
-              <div><span className="font-semibold text-slate-700">B</span> Black screen</div>
-              <div><span className="font-semibold text-slate-700">L</span> Logo screen</div>
-              <div><span className="font-semibold text-slate-700">S</span> Back to lyrics</div>
-            </div>
-          )}
-          <button onClick={() => window.wf.featuresGetServiceLog().then(setServiceLog)} className="w-full btn text-xs"><FileText size={13} /> View Service Log ({serviceLog.length})</button>
-          <button onClick={() => window.wf.logsOpenFolder()} className="w-full btn text-xs"><FolderOpen size={13} /> Open Log Folder</button>
-          {serviceLog.length > 0 && (
-            <div className="surface max-h-32 space-y-0.5 overflow-auto text-xs text-slate-600">
-              {serviceLog.slice(-10).reverse().map((e, i) => (
-                <div key={i} className="text-slate-500"><span className="text-slate-400">{new Date(e.ts).toLocaleTimeString()}</span> {e.event}</div>
-              ))}
-            </div>
-          )}
-          <div className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-xs text-slate-600">
-            <div className="mb-1 font-semibold text-slate-700">Displays</div>
-            <div><b className="text-slate-900">{info?.displays.length ?? '…'}</b> display(s) · <span className={info && info.outputs > 0 ? 'text-blue-700' : 'text-amber-700'}>{info?.outputs ?? 0} live</span></div>
-            {info?.displays.map((d) => (<div key={d.id}>• {d.bounds.width}×{d.bounds.height}{d.primary && <span className="ml-1 text-blue-700">(primary)</span>}</div>))}
-          </div>
-          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-2">
-            <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700"><Tablet size={13} /> Tablet Remote</div>
-            <div className="break-all rounded bg-slate-100 px-2 py-1 text-center font-mono text-[11px] text-blue-700">{tabletUrl || 'Starting server…'}</div>
-            <div className="mt-1 flex items-center justify-center gap-2">
-              <span className="rounded bg-slate-900 px-2 py-0.5 font-mono text-xs tracking-widest text-emerald-400">{tabletPin || '······'}</span>
-              <button
-                onClick={() => { if (window.confirm('Generate a new PIN? Any tablet already unlocked will need the new one.')) window.wf.regenerateTabletPin().then(setTabletPin) }}
-                className="text-[10px] font-semibold text-blue-700 hover:underline"
-              >
-                New PIN
-              </button>
-            </div>
-            <div className="mt-1 text-[10px] text-slate-500">Open on an iPad/phone as a wireless stage monitor. Give volunteers the PIN to unlock controls.</div>
-          </div>
-        </div>
-      )}
-
-      {/* Zone display system */}
-      <section className="rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
-        <ZonePanel />
-      </section>
     </aside>
   )
 }
