@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera, Monitor, QrCode } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useRoomFeed } from '../livecall/useRoomFeed'
+import type { SenderState } from '../livecall/RoomFeedSender'
 
-const STATE_LABEL: Record<string, { label: string; className: string }> = {
+const STATE_LABEL: Record<SenderState, { label: string; className: string }> = {
   idle: { label: 'Standby', className: 'bg-slate-100 text-slate-500 ring-slate-200' },
   starting: { label: 'Starting…', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
   live: { label: 'Live', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
@@ -22,6 +23,11 @@ function RoomFeedTab(): JSX.Element {
   const [cameraId, setCameraId] = useState('')
   const [audioId, setAudioId] = useState('')
   const [qr, setQr] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = stream
+  }, [stream])
 
   useEffect(() => {
     if (!feedUrl) return
@@ -37,7 +43,7 @@ function RoomFeedTab(): JSX.Element {
     if (microphones.length && !audioId) setAudioId(microphones[0].deviceId)
   }, [microphones, audioId])
 
-  const pill = STATE_LABEL[state] ?? STATE_LABEL.idle
+  const pill = STATE_LABEL[state]
   const canStart = state === 'idle' && !!cameraId && !!audioId
   const hasLabels = cameras.some((c) => c.label) || microphones.some((m) => m.label)
 
@@ -111,7 +117,7 @@ function RoomFeedTab(): JSX.Element {
 
           <div className="relative mb-3 aspect-video w-full overflow-hidden rounded-lg bg-black">
             <video
-              ref={(el) => { if (el) el.srcObject = stream }}
+              ref={videoRef}
               autoPlay
               playsInline
               muted
