@@ -19,6 +19,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0c0c10;color:#fff;f
 .cell-bar .name{font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);letter-spacing:0.05em}
 .cell-bar .zid{font-size:10px;font-weight:700;color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);padding:1px 6px;border-radius:3px}
 .cell iframe{flex:1;border:none;width:100%;display:block}
+.cell.overflow{border-color:#dc2626}
+.overflow-dot{display:none;width:7px;height:7px;border-radius:50%;background:#dc2626;box-shadow:0 0 6px #dc2626;margin-right:6px}
+.cell.overflow .overflow-dot{display:inline-block}
 </style>
 </head>
 <body>
@@ -30,20 +33,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0c0c10;color:#fff;f
   <div id="clock"></div>
 </div>
 <div id="grid">
-  <div class="cell">
-    <div class="cell-bar"><span class="name">${ZONE_NAMES[1]}</span><span class="zid">Z1</span></div>
+  <div class="cell" id="cell-1">
+    <div class="cell-bar"><span class="name"><span class="overflow-dot" title="Text is clipping on this screen"></span>${ZONE_NAMES[1]}</span><span class="zid">Z1</span></div>
     <iframe src="/zone/1"></iframe>
   </div>
-  <div class="cell">
-    <div class="cell-bar"><span class="name">${ZONE_NAMES[2]}</span><span class="zid">Z2</span></div>
+  <div class="cell" id="cell-2">
+    <div class="cell-bar"><span class="name"><span class="overflow-dot" title="Text is clipping on this screen"></span>${ZONE_NAMES[2]}</span><span class="zid">Z2</span></div>
     <iframe src="/zone/2"></iframe>
   </div>
-  <div class="cell">
-    <div class="cell-bar"><span class="name">${ZONE_NAMES[3]}</span><span class="zid">Z3</span></div>
+  <div class="cell" id="cell-3">
+    <div class="cell-bar"><span class="name"><span class="overflow-dot" title="Text is clipping on this screen"></span>${ZONE_NAMES[3]}</span><span class="zid">Z3</span></div>
     <iframe src="/zone/3"></iframe>
   </div>
-  <div class="cell">
-    <div class="cell-bar"><span class="name">${ZONE_NAMES[4]}</span><span class="zid">Z4</span></div>
+  <div class="cell" id="cell-4">
+    <div class="cell-bar"><span class="name"><span class="overflow-dot" title="Text is clipping on this screen"></span>${ZONE_NAMES[4]}</span><span class="zid">Z4</span></div>
     <iframe src="/zone/4"></iframe>
   </div>
 </div>
@@ -53,6 +56,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0c0c10;color:#fff;f
     document.getElementById('clock').textContent=h+':'+(m<10?'0':'')+m+' '+ap;
   }
   tick();setInterval(tick,1000);
+
+  // Each zone iframe is same-origin (both served off this app's own local
+  // server), so its window is reachable directly — no postMessage plumbing
+  // needed. __wfOverflow is set by that zone page's own fitText/render logic.
+  function checkOverflow(){
+    for(var z=1;z<=4;z++){
+      var cell=document.getElementById('cell-'+z);
+      var frame=cell&&cell.querySelector('iframe');
+      var flagged=false;
+      try{ flagged=!!(frame&&frame.contentWindow&&frame.contentWindow.__wfOverflow); }catch(ex){}
+      if(cell) cell.classList.toggle('overflow',flagged);
+    }
+  }
+  setInterval(checkOverflow,1000);
 <\/script>
 </body>
 </html>`
