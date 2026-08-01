@@ -223,8 +223,25 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="truncate text-lg font-semibold text-slate-900">{service.name}</h2>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <h2 className="truncate text-lg font-semibold text-slate-900">{service.name}</h2>
+          {/* Which Sunday this is for. Drives the scheduled-announcements list
+              and the printed order's date line — both of which used to be
+              unreachable for hand-built services, since only the church-app
+              plan import ever set a date. */}
+          <label htmlFor="service-date" className="sr-only">Service date</label>
+          <input
+            id="service-date"
+            type="date"
+            value={service.service_date ?? ''}
+            onChange={(e) => {
+              void window.wf.serviceSetDate(serviceId, e.target.value || null).then(reload)
+            }}
+            title="The date this service is for"
+            className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+          />
+        </div>
         {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
       </div>
 

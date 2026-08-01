@@ -48,3 +48,24 @@ export function isIntent(v: unknown): v is Intent {
 export function isPositiveInt(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v > 0
 }
+
+// Service dates are stored as bare YYYY-MM-DD strings and compared as strings
+// (see announcementMatchesDate) — never parsed as Date, which would drag the
+// operator's timezone into what is meant to be a plain calendar day. So the
+// guard checks the literal shape AND that the numbers describe a real date:
+// '2026-02-30' matches the pattern but is not a day, and would silently never
+// match an announcement window.
+export function isIsoDate(v: unknown): v is string {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false
+  const [y, m, d] = v.split('-').map(Number)
+  if (m < 1 || m > 12 || d < 1) return false
+  // Day 0 of the next month is the last day of this one. Month is 1-based here
+  // because Date's month argument is 0-based, so `m` already means "next month".
+  return d <= new Date(y, m, 0).getDate()
+}
+
+export function assertIsoDateOrNull(v: unknown, paramName = 'date'): string | null {
+  if (v == null) return null
+  if (!isIsoDate(v)) throw new Error(`Invalid ${paramName}: expected YYYY-MM-DD, got ${JSON.stringify(v)}`)
+  return v
+}

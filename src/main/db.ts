@@ -808,6 +808,14 @@ export function updateServiceItemNotes(itemId: number, notes: string | null): vo
   persist()
 }
 
+// Stored as a bare YYYY-MM-DD string, never a timestamp — it means "the Sunday
+// this service is for", which is a calendar day, not an instant. Announcement
+// scheduling compares it as a string for the same reason.
+export function setServiceDate(serviceId: number, serviceDate: string | null): void {
+  db.run('UPDATE service SET service_date = ? WHERE id = ?', [serviceDate, serviceId])
+  persist()
+}
+
 export function setServiceTheme(serviceId: number, themeId: string | null, colors: ThemeColors | null): void {
   db.run('UPDATE service SET theme = ?, theme_colors = ? WHERE id = ?', [
     themeId,

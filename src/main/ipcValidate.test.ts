@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isTrackId, isZoneId, assertTrackId, assertZoneId, isIntent, isPositiveInt } from './ipcValidate'
+import { isTrackId, isZoneId, assertTrackId, assertZoneId, isIntent, isPositiveInt, isIsoDate, assertIsoDateOrNull } from './ipcValidate'
 
 describe('isTrackId', () => {
   it('accepts main and second', () => {
@@ -67,5 +67,46 @@ describe('isPositiveInt', () => {
     expect(isPositiveInt(1.5)).toBe(false)
     expect(isPositiveInt('1')).toBe(false)
     expect(isPositiveInt(undefined)).toBe(false)
+  })
+})
+
+describe('isIsoDate', () => {
+  it('accepts a real calendar day', () => {
+    expect(isIsoDate('2026-08-01')).toBe(true)
+    expect(isIsoDate('2026-12-31')).toBe(true)
+  })
+  it('accepts a leap day in a leap year and rejects it otherwise', () => {
+    expect(isIsoDate('2024-02-29')).toBe(true)
+    expect(isIsoDate('2026-02-29')).toBe(false)
+  })
+  it('rejects a day the month does not have', () => {
+    expect(isIsoDate('2026-02-30')).toBe(false)
+    expect(isIsoDate('2026-04-31')).toBe(false)
+  })
+  it('rejects out-of-range months and days', () => {
+    expect(isIsoDate('2026-13-01')).toBe(false)
+    expect(isIsoDate('2026-00-10')).toBe(false)
+    expect(isIsoDate('2026-08-00')).toBe(false)
+  })
+  it('rejects anything that is not a bare YYYY-MM-DD string', () => {
+    expect(isIsoDate('2026-8-1')).toBe(false)
+    expect(isIsoDate('08/01/2026')).toBe(false)
+    expect(isIsoDate('2026-08-01T00:00:00Z')).toBe(false)
+    expect(isIsoDate('')).toBe(false)
+    expect(isIsoDate(null)).toBe(false)
+    expect(isIsoDate(20260801)).toBe(false)
+  })
+})
+
+describe('assertIsoDateOrNull', () => {
+  it('passes a valid date straight through', () => {
+    expect(assertIsoDateOrNull('2026-08-01')).toBe('2026-08-01')
+  })
+  it('treats null and undefined as "no date set"', () => {
+    expect(assertIsoDateOrNull(null)).toBeNull()
+    expect(assertIsoDateOrNull(undefined)).toBeNull()
+  })
+  it('throws a message naming the parameter and the bad value', () => {
+    expect(() => assertIsoDateOrNull('nope', 'serviceDate')).toThrow(/serviceDate.*nope/)
   })
 })

@@ -21,7 +21,7 @@ import type { ZonePin, ZonePins } from '../shared/zonePins'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
-import { assertTrackId, assertZoneId, isIntent, isPositiveInt } from './ipcValidate'
+import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
 import {
   initDb,
   onPersistError,
@@ -55,6 +55,7 @@ import {
   listSongUsage,
   clearSongUsage,
   setServiceTheme,
+  setServiceDate,
   setServiceItemStyle,
   setServiceItemPayload,
   reorderServiceItems,
@@ -2192,6 +2193,16 @@ ipcMain.handle('wf:getActiveServiceId', () => activeServiceId)
 // adding an item), not when switching which service is open.
 ipcMain.handle('wf:services:refreshActiveItems', (_e, serviceId: number) => {
   refreshActiveServiceItems(serviceId)
+})
+
+ipcMain.handle('wf:service:setDate', (_e, serviceId: number, serviceDate: string | null) => {
+  const date = assertIsoDateOrNull(serviceDate, 'serviceDate')
+  setServiceDate(serviceId, date)
+  // Recordings stamp the service date into their metadata at the moment an item
+  // goes live, so the cached copy has to follow — otherwise changing the date
+  // mid-session keeps filing recordings under the old one until the service is
+  // reselected.
+  if (activeServiceId === serviceId) activeServiceDate = date
 })
 
 ipcMain.handle('wf:service:setTheme', (_e, serviceId: number, themeId: string | null, colors: ThemeColors | null) => {

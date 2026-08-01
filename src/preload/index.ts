@@ -85,6 +85,8 @@ const wf = {
     ipcRenderer.invoke('wf:services:updateItemNotes', itemId, notes),
   serviceSetTheme: (serviceId: number, themeId: string | null, colors: ThemeColors | null): Promise<void> =>
     ipcRenderer.invoke('wf:service:setTheme', serviceId, themeId, colors),
+  serviceSetDate: (serviceId: number, serviceDate: string | null): Promise<void> =>
+    ipcRenderer.invoke('wf:service:setDate', serviceId, serviceDate),
   serviceSetItemStyle: (itemId: number, style: ItemStyle | null): Promise<void> =>
     ipcRenderer.invoke('wf:services:setItemStyle', itemId, style),
   serviceSetItemPayload: (itemId: number, payload: Record<string, unknown>): Promise<void> =>
