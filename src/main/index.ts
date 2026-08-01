@@ -13,7 +13,8 @@ import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
-import { parseReferenceList, formatReferenceList } from '../shared/scriptureRefs'
+import { parseReferenceList, formatReferenceList, subReference } from '../shared/scriptureRefs'
+import { chunkVerses } from '../shared/chunkText'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides'
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
@@ -2824,6 +2825,22 @@ ipcMain.handle('wf:scripture:lookup', (_e, reference: string) => lookupScripture
 // KJV only and deliberately synchronous: this fires on every keystroke, and the
 // online translations are a network round-trip. A reference that resolves in KJV
 // resolves in the others too — the text differs, the addressing does not.
+// How a reference should break across slides, as sub-references. The composer
+// uses this to expand a long passage the operator typed into one Verse slot:
+// resolving it as a single slot joins every verse onto ONE slide, and
+// shrink-to-fit then makes the words unreadable — which is exactly the problem
+// the 90-character budget exists to prevent, and which only the generated deck
+// was benefiting from. Returns one entry for a passage that already fits.
+ipcMain.handle('wf:scripture:chunkRefs', (_e, reference: string): string[] => {
+  const ref = typeof reference === 'string' ? reference.trim() : ''
+  if (!ref) return []
+  const result = lookupScripture(ref)
+  if (!result.ok || !result.verses?.length) return []
+  return chunkVerses(result.verses, zoneChunkBudget()).map((range) =>
+    subReference(result.reference ?? ref, range.from, range.to)
+  )
+})
+
 ipcMain.handle('wf:scripture:validate', (_e, field: string) => {
   return parseReferenceList(typeof field === 'string' ? field : '').map((reference) => {
     const result = lookupScripture(reference)

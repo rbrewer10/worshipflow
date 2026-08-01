@@ -112,6 +112,8 @@ const wf = {
     ipcRenderer.invoke('wf:scripture:lookup', reference),
   scriptureValidate: (field: string): Promise<ScriptureRefCheck[]> =>
     ipcRenderer.invoke('wf:scripture:validate', field),
+  scriptureChunkRefs: (reference: string): Promise<string[]> =>
+    ipcRenderer.invoke('wf:scripture:chunkRefs', reference),
 
   // Live engine
   stageOpen: (): Promise<void> => ipcRenderer.invoke('wf:stage:open'),

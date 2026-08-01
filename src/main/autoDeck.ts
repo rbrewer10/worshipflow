@@ -12,7 +12,7 @@
 import type { ScriptureResult, ServiceItem, ZoneId } from '../shared/types'
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
 import { chunkProse, chunkVerses } from '../shared/chunkText'
-import { parseReferenceList } from '../shared/scriptureRefs'
+import { parseReferenceList, subReference } from '../shared/scriptureRefs'
 
 export interface AutoDeckAnnouncement {
   id: number
@@ -30,18 +30,6 @@ const LOGO: ZoneSlot = { kind: 'logo' }
 
 function slide(z1: ZoneSlot, z2: ZoneSlot, z3: ZoneSlot, z4: ZoneSlot): ZoneSlide {
   return { zones: { 1: z1, 2: z2, 3: z3, 4: z4 } as Record<ZoneId, ZoneSlot> }
-}
-
-/** "John 3" from "John 3:16-18" — the book/chapter part a sub-reference reuses. */
-function bookChapter(reference: string): string | null {
-  const match = reference.match(/^(.*?)\s*:\s*\d/)
-  return match ? match[1].trim() : null
-}
-
-function subReference(reference: string, from: number, to: number): string {
-  const base = bookChapter(reference)
-  if (!base) return reference
-  return from === to ? `${base}:${from}` : `${base}:${from}-${to}`
 }
 
 async function sermonDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSlide[] | null> {

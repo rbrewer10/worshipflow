@@ -319,6 +319,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     }),
     scriptureValidate: async (field: string) =>
       parseReferenceList(field).map((reference) => ({ reference, ok: true, resolved: reference, verseCount: 1 })),
+    scriptureChunkRefs: async (reference: string): Promise<string[]> => (reference.trim() ? [reference.trim()] : []),
 
     stageOpen: noop,
     outputOpen: noop,

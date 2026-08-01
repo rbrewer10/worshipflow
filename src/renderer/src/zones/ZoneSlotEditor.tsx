@@ -25,11 +25,14 @@ const INPUT_CLASS = 'w-full rounded border border-slate-200 px-2 py-1 text-xs ou
 // One zone's content for one deck slide. 'Hold' repeats whatever this screen
 // showed on the previous slide, which is how a sermon title spans a whole
 // deck without being retyped on every slide.
-export default function ZoneSlotEditor({ slot, zoneId, defaultsForKind, onChange }: {
+export default function ZoneSlotEditor({ slot, zoneId, defaultsForKind, onCommitReference, onChange }: {
   slot: ZoneSlot
   zoneId: ZoneId
   // Seeds a newly-picked kind from the item's own data — see the composer.
   defaultsForKind?: (kind: ZoneSlotKind) => ZoneSlot
+  // Fired when a verse reference is finished (blur / Enter), so the composer can
+  // split a long passage across slides rather than on every keystroke.
+  onCommitReference?: (reference: string) => void
   onChange: (next: ZoneSlot) => void
 }): JSX.Element {
   const sizable = slot.kind === 'text' || slot.kind === 'scripture'
@@ -96,6 +99,8 @@ export default function ZoneSlotEditor({ slot, zoneId, defaultsForKind, onChange
         <input
           value={slot.reference ?? ''}
           onChange={(e) => onChange({ ...slot, kind: 'scripture', reference: e.target.value })}
+          onBlur={(e) => onCommitReference?.(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
           placeholder="John 3:16"
           className={INPUT_CLASS}
         />

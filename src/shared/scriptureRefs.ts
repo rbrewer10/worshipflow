@@ -34,3 +34,18 @@ export function formatReferenceList(refs: string[]): string {
 export function isMultiReference(input: string): boolean {
   return parseReferenceList(input).length > 1
 }
+
+/** "John 3" from "John 3:16-18" — the book/chapter part a sub-reference reuses. */
+export function bookChapter(reference: string): string | null {
+  const match = reference.match(/^(.*?)\s*:\s*\d/)
+  return match ? match[1].trim() : null
+}
+
+// "John 3:16-18" + verses 16..17 -> "John 3:16-17". Falls back to the original
+// when the reference has no chapter:verse shape to rebuild from (a whole-chapter
+// reference like "Psalm 23"), which is correct: there is nothing to narrow to.
+export function subReference(reference: string, from: number, to: number): string {
+  const base = bookChapter(reference)
+  if (!base) return reference
+  return from === to ? `${base}:${from}` : `${base}:${from}-${to}`
+}

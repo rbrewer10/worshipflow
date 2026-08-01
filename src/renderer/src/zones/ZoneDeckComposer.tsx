@@ -92,6 +92,27 @@ export default function ZoneDeckComposer({
   // screen, with nothing in the composer saying it still needed filling in. A
   // sermon already knows its own title and passage, so start from those instead
   // of from nothing; the operator can still overwrite either field.
+  // A Verse slot holds ONE reference, and the engine resolves it by joining
+  // every verse in it onto that single slide — so typing a long passage gave
+  // one slide of unreadable shrink-to-fit text. The 90-character budget that
+  // exists to prevent exactly this only ever ran inside the generated deck.
+  // Committing a reference now expands it across slides the same way, with each
+  // slide carrying its own sub-reference. Other zones become 'same', so
+  // whatever they were showing simply holds across the new slides.
+  const expandVerseAcrossSlides = async (zoneId: ZoneId, reference: string): Promise<void> => {
+    const refs = await window.wf.scriptureChunkRefs(reference)
+    if (refs.length <= 1) return
+    const current = deck[selectedDeckSlide]
+    if (!current) return
+    const expanded: ZoneSlide[] = refs.map((ref, i) => ({
+      zones: (i === 0
+        ? { ...current.zones, [zoneId]: { kind: 'scripture', reference: ref } }
+        : { 1: { kind: 'same' }, 2: { kind: 'same' }, 3: { kind: 'same' }, 4: { kind: 'same' }, [zoneId]: { kind: 'scripture', reference: ref } }
+      ) as ZoneSlide['zones']
+    }))
+    onSaveDeck([...deck.slice(0, selectedDeckSlide), ...expanded, ...deck.slice(selectedDeckSlide + 1)])
+  }
+
   const defaultsForKind = (kind: ZoneSlot['kind']): ZoneSlot => {
     const payload = item.payload ?? {}
     const title = (payload.title as string | undefined) || item.title || ''
@@ -139,6 +160,7 @@ export default function ZoneDeckComposer({
                 zoneId={zoneId}
                 defaultsForKind={defaultsForKind}
                 onChange={(next) => setSlot(zoneId, next)}
+                onCommitReference={(ref) => void expandVerseAcrossSlides(zoneId, ref)}
               />
             </div>
           )
