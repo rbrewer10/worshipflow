@@ -25,7 +25,8 @@ import type {
   AnnouncementSummary,
   Announcement,
   AnnouncementInput,
-  TrackId
+  TrackId,
+  ScriptureRefCheck
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
@@ -109,6 +110,8 @@ const wf = {
   // Scripture
   scriptureLookup: (reference: string): Promise<ScriptureResult> =>
     ipcRenderer.invoke('wf:scripture:lookup', reference),
+  scriptureValidate: (field: string): Promise<ScriptureRefCheck[]> =>
+    ipcRenderer.invoke('wf:scripture:validate', field),
 
   // Live engine
   stageOpen: (): Promise<void> => ipcRenderer.invoke('wf:stage:open'),

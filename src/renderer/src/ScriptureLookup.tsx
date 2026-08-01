@@ -1,12 +1,52 @@
 import { useState } from 'react'
+import { ListPlus, Play } from 'lucide-react'
 import type { ScriptureResult } from '../../shared/types'
+import { useService } from './ServiceContext'
+import { notifyLocal } from './NotifyToasts'
 
 const QUICK = ['John 3:16', 'Psalm 23', 'Romans 8:28', 'Philippians 4:6-7', 'Proverbs 3:5-6']
 
 function ScriptureLookup(): JSX.Element {
+  const { activeServiceId, reloadActiveService } = useService()
   const [ref, setRef] = useState('')
   const [result, setResult] = useState<ScriptureResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [added, setAdded] = useState(false)
+
+  // Use the reference the lookup settled on, not the raw typed text — "john
+  // 3 16" resolves fine but is not what should be stored on the item.
+  const canonical = (): string => (result?.ok ? (result.reference ?? ref) : ref).trim()
+
+  const addToService = async (): Promise<void> => {
+    if (activeServiceId == null) return
+    setBusy(true)
+    try {
+      await window.wf.serviceAddItem(activeServiceId, {
+        type: 'scripture',
+        ref_id: null,
+        payload: { reference: canonical() }
+      })
+      reloadActiveService()
+      setAdded(true)
+      setTimeout(() => setAdded(false), 2500)
+    } catch (err) {
+      notifyLocal(`Couldn't add to the service: ${err instanceof Error ? err.message : String(err)}`, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const sendLive = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      const ok = await window.wf.liveLoadScripture('main', canonical())
+      if (!ok) { notifyLocal('That passage could not be sent live.', 'warn'); return }
+      window.wf.liveSetItemId('main', null)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const lookup = async (q = ref): Promise<void> => {
     if (!q.trim()) return
@@ -65,7 +105,23 @@ function ScriptureLookup(): JSX.Element {
         )}
         {result && result.ok && (
           <>
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">{result.reference}</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold text-slate-900">{result.reference}</h2>
+              {/* This screen could look a passage up but not put it anywhere,
+                  so finding a verse and using it were two unconnected jobs.
+                  Adding appends to the loaded service; sending skips the
+                  service entirely for something the pastor just called out. */}
+              <div className="flex shrink-0 gap-2">
+                <button onClick={addToService} disabled={activeServiceId == null || busy} className="btn text-xs disabled:opacity-40"
+                  title={activeServiceId == null ? 'Open a service in Build service first' : 'Add this passage to the end of the loaded service'}>
+                  <ListPlus size={13} /> {added ? 'Added' : 'Add to service'}
+                </button>
+                <button onClick={sendLive} disabled={busy} className="btn-primary text-xs"
+                  title="Put this passage on the screens now, without adding it to the service">
+                  <Play size={13} /> Send live
+                </button>
+              </div>
+            </div>
             <div className="space-y-2 leading-relaxed">
               {result.verses!.map((v) => (
                 <p key={v.n} className="text-slate-900">

@@ -293,6 +293,16 @@ export interface ScriptureVerse {
   text: string
 }
 
+// One entry per reference in a scripture item's field, for validating the whole
+// reading as it is typed. 'resolved' is the canonical form the lookup settled
+// on, which is what the operator should see confirmed back to them.
+export interface ScriptureRefCheck {
+  reference: string
+  ok: boolean
+  resolved: string | null
+  verseCount: number
+}
+
 export interface ScriptureResult {
   ok: boolean
   reference?: string

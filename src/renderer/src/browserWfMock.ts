@@ -26,6 +26,7 @@ import type {
   ZoneState,
   TrackId
 } from '../../shared/types'
+import { parseReferenceList } from '../../shared/scriptureRefs'
 import { starterConfig } from '../../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
 import type { ZoneSlide } from '../../shared/zoneSlides'
@@ -316,6 +317,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       reference,
       verses: [{ n: 1, text: 'Browser preview scripture text. Open the Electron app for the full offline KJV lookup.' }]
     }),
+    scriptureValidate: async (field: string) =>
+      parseReferenceList(field).map((reference) => ({ reference, ok: true, resolved: reference, verseCount: 1 })),
 
     stageOpen: noop,
     outputOpen: noop,

@@ -13,6 +13,7 @@ import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
+import { parseReferenceList } from '../shared/scriptureRefs'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides'
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
@@ -1448,11 +1449,22 @@ async function computeItemSourceSlides(item: ServiceItem): Promise<string[]> {
     return full ? songLines(full) : []
   }
   if (item.type === 'scripture') {
-    const ref = item.payload.reference as string
-    if (!ref) return []
-    const result = bibleTranslation === 'kjv' ? lookupScripture(ref) : await fetchScripture(ref, bibleTranslation)
-    if (!result.ok || !result.verses) return []
-    return result.verses.length === 1 ? [result.verses[0].text] : result.verses.map((v) => `${v.n}  ${v.text}`)
+    // A scripture item can hold a whole reading ("John 3:16-18; Romans 8:1"),
+    // so resolve every passage and lay them end to end in the order typed. A
+    // reference that fails to resolve drops out rather than emptying the item.
+    const refs = parseReferenceList((item.payload.reference as string | undefined) ?? '')
+    if (!refs.length) return []
+    const lines: string[] = []
+    for (const ref of refs) {
+      const result = bibleTranslation === 'kjv' ? lookupScripture(ref) : await fetchScripture(ref, bibleTranslation)
+      if (!result.ok || !result.verses?.length) continue
+      lines.push(
+        ...(result.verses.length === 1
+          ? [result.verses[0].text]
+          : result.verses.map((v) => `${v.n}  ${v.text}`))
+      )
+    }
+    return lines
   }
   if (item.type === 'text' || item.type === 'ticker') {
     const title = (item.payload.title as string) ?? ''
@@ -2755,6 +2767,23 @@ ipcMain.handle('wf:live:goLiveAt', async (_e, track: TrackId, itemId: number, sl
 
 // --- Scripture IPC ---
 ipcMain.handle('wf:scripture:lookup', (_e, reference: string) => lookupScripture(reference))
+
+// Validates a whole scripture field as it is typed, so a mistyped reference is
+// caught while building rather than discovered as a blank screen mid-service.
+// KJV only and deliberately synchronous: this fires on every keystroke, and the
+// online translations are a network round-trip. A reference that resolves in KJV
+// resolves in the others too — the text differs, the addressing does not.
+ipcMain.handle('wf:scripture:validate', (_e, field: string) => {
+  return parseReferenceList(typeof field === 'string' ? field : '').map((reference) => {
+    const result = lookupScripture(reference)
+    return {
+      reference,
+      ok: result.ok && !!result.verses?.length,
+      resolved: result.ok ? (result.reference ?? reference) : null,
+      verseCount: result.verses?.length ?? 0
+    }
+  })
+})
 
 // --- Song background / file dialog ---
 ipcMain.handle('wf:songs:setBackground', (_e, id: number, path: string | null) =>
