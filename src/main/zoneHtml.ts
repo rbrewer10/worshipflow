@@ -333,8 +333,14 @@ const LYRICS_SCRIPT = `
       titleEl.innerHTML='';slideNum.innerHTML='';return;
     }
     if(m==='countdown'){
-      document.body.style.background='#050a14';
-      bgvid.style.opacity='0';bgimg.style.opacity='0';gradient.style.opacity='1';
+      if(state.background){
+        document.body.style.background='#000';
+        applyBg(state.background);
+      } else {
+        document.body.style.background='#050a14';
+        bgvid.style.opacity='0';bgimg.style.opacity='0';prevBg=null;
+      }
+      gradient.style.opacity='1';
       blob1.style.opacity='0';blob2.style.opacity='0';
       if(state.blurBehindText){lineEl.style.backdropFilter='blur(10px)';lineEl.style.webkitBackdropFilter='blur(10px)';lineEl.style.background='rgba(20,20,30,.3)';lineEl.style.padding='2vh 8vw';}
       var mins=Math.floor(state.secondsLeft/60),secs=state.secondsLeft%60;
