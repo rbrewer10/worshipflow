@@ -219,7 +219,7 @@ export default function SongEditor({ songId, onSaved }: {
         <button
           onClick={handleDeleteSlide}
           disabled={!canDelete}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-500/10 hover:text-rose-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent"
           title={canDelete ? 'Delete current slide' : 'Cannot delete the last slide'}
         >
           <Trash2 size={13} /> Delete slide

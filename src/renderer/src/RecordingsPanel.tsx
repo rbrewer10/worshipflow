@@ -55,7 +55,7 @@ export function RecordingsPanel(): JSX.Element {
               <div className="h-1.5 w-full overflow-hidden rounded bg-slate-200">
                 <div className="h-full bg-blue-500 transition-all" style={{ width: `${Math.round((progress[r.id] ?? 0) * 100)}%` }} />
               </div>
-              <button onClick={() => void window.wf.cancelRender(r.id)} className="mt-1 text-rose-600 hover:underline">Cancel</button>
+              <button onClick={() => void window.wf.cancelRender(r.id)} className="mt-1 text-red-600 hover:underline">Cancel</button>
             </div>
           ) : r.renderState === 'done' && r.outputPath ? (
             <div className="mt-1">
@@ -68,7 +68,7 @@ export function RecordingsPanel(): JSX.Element {
             </div>
           ) : (
             <div className="mt-1 flex items-center gap-2">
-              {r.renderState === 'failed' && <span className="text-rose-600">Failed</span>}
+              {r.renderState === 'failed' && <span className="text-red-600">Failed</span>}
               {r.filePath ? <ProduceButton row={r} onDone={refresh} label="Produce video" />
                           : <span className="text-slate-400">No file</span>}
             </div>
@@ -139,7 +139,7 @@ function AiBlock({ row, step, onChanged }: { row: RecordingRow; step?: string; o
   }
   return (
     <div className="mt-1 flex items-center gap-2">
-      {row.aiState === 'failed' && <span className="text-rose-600">AI failed</span>}
+      {row.aiState === 'failed' && <span className="text-red-600">AI failed</span>}
       <button onClick={() => void generate()} className="text-blue-700 hover:underline">Generate content</button>
     </div>
   )
