@@ -1,18 +1,24 @@
+import { useState } from 'react'
 import type { ZoneId } from '../../../shared/types'
 import type { ZoneSlot, ZoneSlotKind } from '../../../shared/zoneSlides'
+import Modal from '../Modal'
+import BackgroundLibraryGrid from '../BackgroundLibraryGrid'
 
 // 'slide' is produced only by dragging a filmstrip slide onto the card, never
-// by a button here. 'image' slots reuse the existing Backgrounds drawer and
-// are out of scope for this editor — selecting one there is a separate flow,
-// not something this compact panel needs to offer.
+// by a button here.
 const KINDS: { kind: ZoneSlotKind; label: string }[] = [
   { kind: 'text', label: 'Text' },
   { kind: 'scripture', label: 'Verse' },
   { kind: 'sermon', label: 'Title card' },
+  { kind: 'image', label: 'Image' },
   { kind: 'logo', label: 'Logo' },
   { kind: 'black', label: 'Black' },
   { kind: 'same', label: 'Hold' },
 ]
+
+function toAssetUrl(p: string): string {
+  return 'wf-asset://?path=' + encodeURIComponent(p)
+}
 
 const INPUT_CLASS = 'w-full rounded border border-slate-200 px-2 py-1 text-xs outline-none focus:border-blue-500/50'
 
@@ -28,6 +34,7 @@ export default function ZoneSlotEditor({ slot, zoneId, onChange }: {
   // Just for the slider's unset-state display — the stage monitor (zone 4)
   // actually renders smaller than the room-facing screens when nothing is set.
   const defaultScale = zoneId === 4 ? 5 : 14
+  const [picking, setPicking] = useState(false)
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -76,6 +83,43 @@ export default function ZoneSlotEditor({ slot, zoneId, onChange }: {
             className={INPUT_CLASS}
           />
         </div>
+      )}
+      {slot.kind === 'image' && (
+        // The engine and the zone pages already render image slots end to end;
+        // this panel just never offered a way to choose one, so a screen could
+        // hold its own picture in the data model but not in practice.
+        <div className="flex flex-col gap-1">
+          {slot.path ? (
+            <button
+              onClick={() => setPicking(true)}
+              className="overflow-hidden rounded border border-slate-200"
+              title="Choose a different picture for this screen"
+            >
+              <img src={toAssetUrl(slot.path)} alt="" className="h-14 w-full object-cover" />
+            </button>
+          ) : (
+            <button onClick={() => setPicking(true)} className={`${INPUT_CLASS} text-slate-500`}>
+              Choose a picture…
+            </button>
+          )}
+          {slot.path && (
+            <button
+              onClick={() => onChange({ kind: 'image' })}
+              className="self-start text-[10px] text-slate-400 hover:text-slate-600"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+      {picking && (
+        <Modal onClose={() => setPicking(false)} labelledBy="zone-slot-image-title" className="card-lg max-w-3xl">
+          <h3 id="zone-slot-image-title" className="section-title">Picture for this screen</h3>
+          <BackgroundLibraryGrid
+            activePath={slot.path ?? null}
+            onApply={(path) => { onChange({ ...slot, kind: 'image', path: path || undefined }); setPicking(false) }}
+          />
+        </Modal>
       )}
       {slot.kind === 'slide' && (
         // Read-only: this slot was set by dragging, not typing, so the
