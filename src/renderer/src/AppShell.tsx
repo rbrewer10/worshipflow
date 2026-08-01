@@ -13,10 +13,18 @@ import VolunteerView from './VolunteerView'
 import LogoSettings from './LogoSettings'
 import SoundCheckTab from './sound-check/SoundCheckTab'
 import ObsConnectTab from './ObsConnectTab'
+import BackgroundsTab from './BackgroundsTab'
+import ScreensZonesTab from './setup/ScreensZonesTab'
+import TabletRemoteTab from './setup/TabletRemoteTab'
+import DiagnosticsTab from './setup/DiagnosticsTab'
 import NotifyToasts from './NotifyToasts'
 import { hasFailedSaves } from './saveRegistry'
 
-export type View = 'home' | 'live' | 'service' | 'songs' | 'announcements' | 'scripture' | 'volunteer' | 'settings' | 'soundcheck' | 'obs'
+export type View =
+  | 'home' | 'live' | 'service'
+  | 'songs' | 'announcements' | 'scripture' | 'backgrounds'
+  | 'zones' | 'obs' | 'settings' | 'tablet' | 'diagnostics'
+  | 'volunteer' | 'soundcheck'
 
 function AppShell(): JSX.Element {
   const [view, setViewRaw] = useState<View>('home')
@@ -140,6 +148,14 @@ function AppShell(): JSX.Element {
             <SongLibrary />
           ) : view === 'announcements' ? (
             <AnnouncementsLibrary />
+          ) : view === 'backgrounds' ? (
+            <BackgroundsTab />
+          ) : view === 'zones' ? (
+            <ScreensZonesTab />
+          ) : view === 'tablet' ? (
+            <TabletRemoteTab />
+          ) : view === 'diagnostics' ? (
+            <DiagnosticsTab />
           ) : view === 'obs' ? (
             <ObsConnectTab />
           ) : view === 'soundcheck' ? (
