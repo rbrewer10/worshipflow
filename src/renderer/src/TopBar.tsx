@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User } from 'lucide-react'
+import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User, Monitor, Palette, Tablet, Stethoscope } from 'lucide-react'
 import type { AppInfo, ObsStatus } from '../../shared/types'
 import type { View } from './AppShell'
 import BrandMark from './BrandMark'
+import NavMenu from './NavMenu'
+import type { NavMenuItem } from './NavMenu'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
@@ -18,18 +20,32 @@ function elapsed(startedAt: number | null, now: number): string {
     : `${m}:${String(sec).padStart(2, '0')}`
 }
 
-const NAV_ITEMS: { id: View; Icon: IconType; label: string }[] = [
+// Three destinations stay visible because they are what gets switched between
+// week to week; the rest are entered deliberately, so a menu costs nothing.
+// This is the grouping the 2026-07-23 top bar spec deferred until the bottom
+// dock went app-wide — it has, so this is that phase, not a reversal.
+const PRIMARY_ITEMS: { id: View; Icon: IconType; label: string }[] = [
   { id: 'home', Icon: Home, label: 'Home' },
   { id: 'live', Icon: Play, label: 'Live' },
-  { id: 'service', Icon: ListMusic, label: 'Build Service' },
+  { id: 'service', Icon: ListMusic, label: 'Build service' }
+]
+
+const LIBRARY_ITEMS: NavMenuItem<View>[] = [
   { id: 'songs', Icon: Music, label: 'Songs' },
   { id: 'announcements', Icon: Megaphone, label: 'Announcements' },
   { id: 'scripture', Icon: BookOpen, label: 'Scripture' },
-  { id: 'obs', Icon: Video, label: 'OBS Connect' },
-  // Sound Check (Yamaha TF-Rack) is a prototype — fake channel data, unverified
-  // OSC addresses/fader curve (see yamaha-controller.ts). Hidden from nav until
-  // it's real; the tab/route/controller code is untouched, just unreachable.
-  { id: 'settings', Icon: ImageIcon, label: 'Logo & BG' }
+  { id: 'backgrounds', Icon: ImageIcon, label: 'Backgrounds' }
+]
+
+// Sound Check (Yamaha TF-Rack) is a prototype — fake channel data, unverified
+// OSC addresses/fader curve (see yamaha-controller.ts). Still absent from the
+// nav until it's real; the tab/route/controller code is untouched.
+const SETUP_ITEMS: NavMenuItem<View>[] = [
+  { id: 'zones', Icon: Monitor, label: 'Screens & zones' },
+  { id: 'obs', Icon: Video, label: 'OBS connect' },
+  { id: 'settings', Icon: Palette, label: 'Logo & branding' },
+  { id: 'tablet', Icon: Tablet, label: 'Tablet remote' },
+  { id: 'diagnostics', Icon: Stethoscope, label: 'Diagnostics & backups' }
 ]
 
 function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): JSX.Element {
@@ -83,8 +99,11 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
         </div>
       </div>
 
-      <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {NAV_ITEMS.map(({ id, Icon, label }) => (
+      {/* Named so tests and screen readers can address this nav specifically —
+          the app-wide bottom drawer renders its own buttons with the same
+          labels as some of these destinations. */}
+      <nav aria-label="Main" className="flex min-w-0 flex-1 items-center gap-1">
+        {PRIMARY_ITEMS.map(({ id, Icon, label }) => (
           <button
             key={id}
             onClick={() => setView(id)}
@@ -98,6 +117,8 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
             {label}
           </button>
         ))}
+        <NavMenu label="Library" items={LIBRARY_ITEMS} activeId={view} onSelect={setView} />
+        <NavMenu label="Setup" items={SETUP_ITEMS} activeId={view} onSelect={setView} />
       </nav>
 
       <div className="flex flex-shrink-0 items-center gap-2">
