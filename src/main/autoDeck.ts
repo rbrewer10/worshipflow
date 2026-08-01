@@ -99,8 +99,32 @@ async function announcementDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<
   return slides.length ? slides : null
 }
 
+async function scriptureDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSlide[] | null> {
+  const reference = (item.payload.reference as string | undefined)?.trim()
+  if (!reference) return null
+
+  const result = await deps.lookupScripture(reference)
+  if (!result.ok || !result.verses?.length) return null
+
+  const ranges = chunkVerses(result.verses, deps.budget)
+  if (!ranges.length) return null
+
+  return ranges.map((range) => {
+    const ref = subReference(result.reference ?? reference, range.from, range.to)
+    const verse: ZoneSlot = { kind: 'scripture', reference: ref }
+    // Back Left carries the reference on its own, so the room can always see
+    // where the reading is even once the text has scrolled on. Unlike the
+    // sermon deck, the Lyrics TVs get the verse rather than the logo: that is
+    // the screen the congregation actually reads scripture from, and blanking
+    // it during a reading is the exact mistake computeZoneStates already had
+    // to fix once for Quick Scripture.
+    return slide({ kind: 'text', text: ref }, verse, verse, verse)
+  })
+}
+
 export async function autoDeckFor(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSlide[] | null> {
   if (item.type === 'sermon') return sermonDeck(item, deps)
+  if (item.type === 'scripture') return scriptureDeck(item, deps)
   if (item.type === 'announcement') return announcementDeck(item, deps)
   return null
 }

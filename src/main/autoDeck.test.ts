@@ -165,3 +165,45 @@ describe('autoDeckFor — other types', () => {
     expect(await autoDeckFor(item({ type: 'song', ref_id: 5 }), deps())).toBeNull()
   })
 })
+
+describe('autoDeckFor — scripture', () => {
+  const scripture = { type: 'scripture' as const, payload: { reference: 'John 3:16-18' } }
+
+  it('puts the reference alone on Back Left and the verse on Back Right', async () => {
+    const deck = await autoDeckFor(item(scripture), deps())
+    expect(deck).not.toBeNull()
+    expect(deck![0].zones[1]).toEqual({ kind: 'text', text: 'John 3:16-17' })
+    expect(deck![0].zones[2]).toEqual({ kind: 'scripture', reference: 'John 3:16-17' })
+  })
+
+  it('keeps the verse on the Lyrics TVs — the screen the congregation reads from', async () => {
+    const deck = await autoDeckFor(item(scripture), deps())
+    expect(deck![0].zones[3]).toEqual({ kind: 'scripture', reference: 'John 3:16-17' })
+  })
+
+  it('carries the verse to the stage monitor too', async () => {
+    const deck = await autoDeckFor(item(scripture), deps())
+    expect(deck![0].zones[4]).toEqual({ kind: 'scripture', reference: 'John 3:16-17' })
+  })
+
+  it('chunks a long passage and advances the reference with the reading', async () => {
+    const deck = await autoDeckFor(item(scripture), deps())
+    expect(deck).toHaveLength(2)
+    expect(deck![1].zones[1]).toEqual({ kind: 'text', text: 'John 3:18' })
+    expect(deck![1].zones[2]).toEqual({ kind: 'scripture', reference: 'John 3:18' })
+  })
+
+  it('has no intro card — a reading starts at the first verse', async () => {
+    const deck = await autoDeckFor(item(scripture), deps())
+    expect(deck![0].zones[2].kind).toBe('scripture')
+  })
+
+  it('generates nothing without a reference, so the item behaves as before', async () => {
+    expect(await autoDeckFor(item({ type: 'scripture', payload: {} }), deps())).toBeNull()
+  })
+
+  it('generates nothing when the lookup fails', async () => {
+    const failing = deps({ lookupScripture: async () => ({ ok: false }) })
+    expect(await autoDeckFor(item(scripture), failing)).toBeNull()
+  })
+})
