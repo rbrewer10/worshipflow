@@ -2756,6 +2756,20 @@ ipcMain.handle('wf:livecall:config', async (): Promise<LivecallConfig> => {
   }
 })
 
+ipcMain.handle('wf:roomfeed:config', async (): Promise<LivecallConfig> => {
+  // Same server, same shared token, same Tailscale-detection logic as the
+  // outbound call — just a different room and a different served page.
+  const ts = await tailscaleHttpsBase()
+  return {
+    url: `ws://127.0.0.1:${boundTabletPort}/livecall`,
+    phoneUrl: ts ? `${ts}/room-feed` : `http://${getLocalIp()}:${boundTabletPort}/room-feed`,
+    phoneUrlIsSecure: ts !== null,
+    tabletPort: boundTabletPort,
+    token: livecallToken(),
+    room: 'room-feed',
+  }
+})
+
 ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => {
   // At this point, the renderer has been created and activeServiceItems is populated
   const recovered = readRecovery()

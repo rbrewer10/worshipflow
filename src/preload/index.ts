@@ -343,6 +343,8 @@ const wf = {
     ipcRenderer.invoke('wf:app:getTabletPort'),
   livecallConfig: (): Promise<LivecallConfig> =>
     ipcRenderer.invoke('wf:livecall:config'),
+  roomFeedConfig: (): Promise<LivecallConfig> =>
+    ipcRenderer.invoke('wf:roomfeed:config'),
   restoreRecovery: (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> =>
     ipcRenderer.invoke('wf:app:restoreRecovery'),
   multiviewOpen: (): Promise<void> =>
