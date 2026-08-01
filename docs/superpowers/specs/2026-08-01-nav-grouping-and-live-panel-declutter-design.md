@@ -238,6 +238,12 @@ with both menus fully keyboard-operable. The Live right panel shows 4 sections
 instead of 10, with Black/Logo/Live at the top and no collapsible "More". Every
 relocated control is reachable and working from its new Setup or Library home,
 and nothing that was reachable before is unreachable now. Backgrounds has a
-destination of its own. `gray-*` no longer appears in the renderer, and
-`purple`/`sky`/`indigo`/`rose` no longer carry accent meaning. The E2E spec is
-updated and passes. Volunteer mode is byte-for-byte unchanged.
+destination of its own. `gray-*` no longer appears in any tracked renderer file,
+and `purple`/`sky`/`indigo`/`rose` no longer carry accent meaning. The E2E spec
+is updated and passes. Volunteer mode is byte-for-byte unchanged.
+
+**Carve-out:** `ObsConnectTab.tsx` is an untracked, uncommitted file belonging to
+other in-flight work on this branch, and holds 12 of the renderer's `gray-`
+tokens. It is deliberately left alone — restyling a file its author has not yet
+committed would pull their work into this change. Those 12 tokens are the one
+known exception to the criterion above, to be swept up whenever that file lands.
