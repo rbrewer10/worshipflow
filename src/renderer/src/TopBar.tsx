@@ -57,6 +57,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
   const [obs, setObs] = useState<ObsStatus | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [rehearsal, setRehearsal] = useState(false)
+  const [updateReady, setUpdateReady] = useState(false)
   useEffect(() => {
     const load = (): void => {
       window.wf.getInfo().then((i: AppInfo) => {
@@ -70,7 +71,8 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
     window.wf.obsGetStatus().then(setObs)
     const off = window.wf.obsOnStatus(setObs)
     window.wf.getRehearsalMode().then(setRehearsal)
-    return () => { clearInterval(t); off() }
+    const offUpdate = window.wf.onUpdateReady(() => setUpdateReady(true))
+    return () => { clearInterval(t); off(); offUpdate() }
   }, [])
 
   const toggleRehearsal = (): void => {
@@ -101,6 +103,15 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
             <span>v{build?.version ?? '…'}</span>
             {build && !build.isPackaged && (
               <span className="rounded bg-amber-100 px-1 font-bold text-amber-700">DEV</span>
+            )}
+            {updateReady && (
+              <button
+                onClick={() => window.wf.updateInstallNow()}
+                title="A new version has finished downloading — click to restart and install it"
+                className="rounded bg-emerald-600 px-1.5 py-0.5 font-bold text-white hover:bg-emerald-700"
+              >
+                Restart to update
+              </button>
             )}
           </div>
         </div>
