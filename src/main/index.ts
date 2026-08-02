@@ -1722,14 +1722,23 @@ function zoneChunkBudget(): number {
 // the camera prompt. Asking Ryan to type a MagicDNS name would be one more thing
 // to get wrong, so read it from Tailscale directly.
 //
-// Cached: shelling out per HTTP request would be silly, and the name is stable.
+// Cached briefly: shelling out on every call would be silly, since both callers
+// are IPC handlers fired by a human opening a panel, not a hot path — but caching
+// forever meant a `null` result (checked before Tailscale was installed) stuck
+// around for the rest of the app's life, requiring a full restart to notice
+// Tailscale had shown up. A short TTL keeps the "don't shell out twice in the
+// same instant" benefit while self-healing within seconds of the next check.
 // null means Tailscale isn't installed or isn't up, and we fall back to the LAN
 // address with a warning in the UI.
 // Async and cached: this shells out, and doing it synchronously would block the
 // main process — a hung Tailscale CLI would freeze the whole app mid-service.
 let tailscaleBaseCache: string | null | undefined
+let tailscaleBaseCacheAt = 0
+const TAILSCALE_CACHE_MS = 30_000
 async function tailscaleHttpsBase(): Promise<string | null> {
-  if (tailscaleBaseCache !== undefined) return tailscaleBaseCache
+  if (tailscaleBaseCache !== undefined && Date.now() - tailscaleBaseCacheAt < TAILSCALE_CACHE_MS) {
+    return tailscaleBaseCache
+  }
   const candidates = [
     'tailscale',
     'C:\\Program Files\\Tailscale\\tailscale.exe',
@@ -1747,6 +1756,7 @@ async function tailscaleHttpsBase(): Promise<string | null> {
     } catch { /* not installed at this path, or not running — try the next */ }
   }
   tailscaleBaseCache = found
+  tailscaleBaseCacheAt = Date.now()
   logInfo(`[livecall] tailscale base: ${found ?? 'not detected'}`)
   return found
 }
