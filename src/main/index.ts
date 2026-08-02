@@ -27,6 +27,7 @@ import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
 import { setRoomFeedActive } from './roomFeedPrecedence'
+import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
 import {
   initDb,
@@ -1900,6 +1901,10 @@ function startTabletServer(): void {
 
   wss.on('connection', (ws: WsSocket, req: IncomingMessage) => {
     const remoteIp = req.socket.remoteAddress ?? 'unknown'
+    // Set when this connection's zone identifies itself via `hello` — used
+    // both to feed zoneConnections and to know which entry to release if
+    // this exact socket later closes (see the close/error handlers below).
+    let helloZoneId: ZoneId | null = null
     tabletClients.add(ws)
     aliveClients.add(ws)
     ws.on('pong', () => aliveClients.add(ws))
@@ -1917,7 +1922,19 @@ function startTabletServer(): void {
     // on the 'main' track, same reasoning as tabletBroadcast/maybeAutoSwitchScene.
     ws.on('message', (data) => {
       try {
-        const msg = JSON.parse(data.toString()) as { type: string; intent?: string; itemId?: number; pin?: string }
+        const msg = JSON.parse(data.toString()) as { type: string; intent?: string; itemId?: number; pin?: string; zone?: number }
+
+        // Zone screens never authenticate — they're a read-only display, not
+        // a control surface — so this must be handled and return here, ahead
+        // of the "everything below requires auth" guard a few lines down.
+        // Placing it after that guard would mean a zone's hello silently hits
+        // the same authResult:false dead end its already-sent-but-unread
+        // hello hits today (see the 2026-08-02 design spec).
+        if (msg.type === 'hello' && typeof msg.zone === 'number' && Number.isInteger(msg.zone) && msg.zone >= 1 && msg.zone <= 4) {
+          helloZoneId = msg.zone as ZoneId
+          markZoneConnected(helloZoneId, ws)
+          return
+        }
 
         if (msg.type === 'auth') {
           const failure = tabletAuthFailures.get(remoteIp)
@@ -1957,8 +1974,16 @@ function startTabletServer(): void {
       } catch { /* ignore malformed messages */ }
     })
 
-    ws.on('close', () => { tabletClients.delete(ws); aliveClients.delete(ws) })
-    ws.on('error', () => { tabletClients.delete(ws); aliveClients.delete(ws) })
+    ws.on('close', () => {
+      tabletClients.delete(ws)
+      aliveClients.delete(ws)
+      if (helloZoneId !== null) markZoneDisconnected(helloZoneId, ws)
+    })
+    ws.on('error', () => {
+      tabletClients.delete(ws)
+      aliveClients.delete(ws)
+      if (helloZoneId !== null) markZoneDisconnected(helloZoneId, ws)
+    })
   })
 
   tabletHeartbeat = setInterval(() => {
@@ -2216,6 +2241,7 @@ ipcMain.handle('wf:getInfo', (): AppInfo => ({
   state: renderState('main'),
   displays: describeDisplays(),
   outputs: outputWins.size,
+  zonesConnected: getConnectedZoneIds(),
   startupMs: Date.now() - startTime,
   appVersion: app.getVersion(),
   isPackaged: app.isPackaged

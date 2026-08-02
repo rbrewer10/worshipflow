@@ -77,6 +77,7 @@ export interface AppInfo {
   state: LiveState
   displays: DisplayInfo[]
   outputs: number
+  zonesConnected: ZoneId[]
   startupMs: number
   appVersion: string   // package.json version of the running build
   isPackaged: boolean  // false when running via `npm run dev`
@@ -298,6 +299,8 @@ export const ZONE_NAMES: Record<ZoneId, string> = {
   3: 'Lyrics TVs',
   4: 'Stage Monitors',
 }
+
+export const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
 // Which track a zone follows when a service has no explicit zone_track_assignment.
 // All zones default to Main so an existing (pre-dual-track) service's screens are

@@ -158,6 +158,7 @@ function appInfo(): AppInfo {
     state: clone(liveState),
     displays,
     outputs: 0,
+    zonesConnected: [],
     startupMs: 0,
     appVersion: '0.0.0-browser',
     isPackaged: false
