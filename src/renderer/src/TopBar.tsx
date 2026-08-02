@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User, Monitor, Palette, Tablet, Stethoscope, Camera } from 'lucide-react'
-import type { AppInfo, ObsStatus } from '../../shared/types'
+import type { AppInfo, ObsStatus, ZoneId } from '../../shared/types'
+import { ZONE_IDS, ZONE_NAMES } from '../../shared/types'
 import type { View } from './AppShell'
 import BrandMark from './BrandMark'
 import NavMenu from './NavMenu'
@@ -51,6 +52,7 @@ const SETUP_ITEMS: NavMenuItem<View>[] = [
 
 function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): JSX.Element {
   const [outputs, setOutputs] = useState(0)
+  const [zonesConnected, setZonesConnected] = useState<ZoneId[]>([])
   const [build, setBuild] = useState<{ version: string; isPackaged: boolean } | null>(null)
   const [obs, setObs] = useState<ObsStatus | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -59,6 +61,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
     const load = (): void => {
       window.wf.getInfo().then((i: AppInfo) => {
         setOutputs(i.outputs)
+        setZonesConnected(i.zonesConnected)
         setBuild({ version: i.appVersion, isPackaged: i.isPackaged })
       })
     }
@@ -75,6 +78,9 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
     setRehearsal(next)
     void window.wf.setRehearsalMode(next)
   }
+
+  const screenCount = outputs + zonesConnected.length
+  const missingZoneNames = ZONE_IDS.filter((id) => !zonesConnected.includes(id)).map((id) => ZONE_NAMES[id])
 
   const onAir = Boolean(obs?.streaming || obs?.recording)
   useEffect(() => {
@@ -140,11 +146,16 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
               Outputs held back
             </span>
           </div>
-        ) : outputs > 0 ? (
-          <div className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 ring-1 ring-red-500/30" title="Real screens are connected — anything sent live reaches the congregation">
+        ) : screenCount > 0 ? (
+          <div
+            className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 ring-1 ring-red-500/30"
+            title={missingZoneNames.length > 0
+              ? `Real screens are connected — anything sent live reaches the congregation. Not connected: ${missingZoneNames.join(', ')}.`
+              : 'Real screens are connected — anything sent live reaches the congregation'}
+          >
             <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-red-500" />
             <span className="text-xs font-bold uppercase tracking-wide text-red-700">
-              Live armed · {outputs} screen{outputs !== 1 ? 's' : ''}
+              Live armed · {screenCount} screen{screenCount !== 1 ? 's' : ''}
             </span>
           </div>
         ) : (
