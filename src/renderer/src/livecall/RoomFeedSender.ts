@@ -48,8 +48,9 @@ export class RoomFeedSender {
   async start(cameraId: string, audioId: string): Promise<void> {
     if (this.state !== 'idle') return
     this.setState('starting')
+    let stream: MediaStream
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: cameraId } },
         audio: { deviceId: { exact: audioId } },
       })
@@ -58,6 +59,14 @@ export class RoomFeedSender {
       this.cb.onError?.(err instanceof Error ? err.message : String(err))
       return
     }
+    if (this.closing) {
+      // stop() ran while getUserMedia was pending — release what we just
+      // captured instead of silently reviving a call the caller already
+      // cancelled.
+      stream.getTracks().forEach((t) => t.stop())
+      return
+    }
+    this.localStream = stream
     this.closing = false
     this.connect()
   }

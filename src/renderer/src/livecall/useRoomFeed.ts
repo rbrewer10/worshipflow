@@ -28,6 +28,7 @@ export interface RoomFeedUi {
 
 export function useRoomFeed(): RoomFeedUi {
   const senderRef = useRef<RoomFeedSender | null>(null)
+  const unmountedRef = useRef(false)
   const [state, setState] = useState<SenderState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [viewerCount, setViewerCount] = useState(0)
@@ -49,6 +50,7 @@ export function useRoomFeed(): RoomFeedUi {
     void refreshDevices()
     return () => {
       cancelled = true
+      unmountedRef.current = true
       // Stop on unmount: this is the one component that ever shows Room Feed
       // is running, so leaving it running with the panel gone would be a
       // camera/mic active with nothing telling the operator so.
@@ -79,6 +81,7 @@ export function useRoomFeed(): RoomFeedUi {
   async function start(cameraId: string, audioId: string): Promise<void> {
     setError(null)
     const cfg = await window.wf.roomFeedConfig()
+    if (unmountedRef.current) return
     const sender = new RoomFeedSender(cfg.url, cfg.token, cfg.room)
     senderRef.current = sender
     sender.setCallbacks({
@@ -87,6 +90,10 @@ export function useRoomFeed(): RoomFeedUi {
       onViewerCount: setViewerCount,
     })
     await sender.start(cameraId, audioId)
+    if (unmountedRef.current) {
+      sender.stop()
+      return
+    }
     if (sender.getState() === 'error') return
     void window.wf.roomFeedNotifyCapturing(true)
   }

@@ -2089,6 +2089,15 @@ function createOperator(): void {
     return { action: 'deny' }
   })
   operatorWin.on('closed', () => { operatorWin = null })
+  operatorWin.webContents.on('did-finish-load', () => {
+    // A renderer reload discards the JS realm without running React's
+    // unmount cleanup, so useRoomFeed's roomFeedNotifyCapturing(false) call
+    // never fires. The reload itself already tore down any real capture
+    // (getUserMedia/RTCPeerConnection state doesn't survive navigation), so
+    // resetting here just brings the flag back in line with reality instead
+    // of leaving Sound Check blocked with no visible cause or way to clear it.
+    setRoomFeedActive(false)
+  })
   loadRoute(operatorWin, '/')
 }
 
