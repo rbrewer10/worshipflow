@@ -5,38 +5,11 @@ import { ZONE_NAMES, DEFAULT_ZONE_TRACK } from '../../../shared/types'
 import type { ZonePin, ZonePins } from '../../../shared/zonePins'
 import { pinLabel } from '../../../shared/zonePins'
 import type { ZoneTrackAssignment } from '../../../shared/zoneTrack'
-import { MODE_LABELS } from '../ZoneRoutingGrid'
 import { useService } from '../ServiceContext'
 import ZonePinPicker from './ZonePinPicker'
+import ZoneStatusBox from './ZoneStatusBox'
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
-
-function mmss(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds))
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-
-// What this screen is showing RIGHT NOW, in the operator's words. The old panel
-// showed only a mode chip, which meant a screen holding the wrong sermon and a
-// screen following the service looked identical.
-function readout(zs: ZoneState | undefined): { primary: string; secondary: string | null } {
-  if (!zs) return { primary: '…', secondary: null }
-  switch (zs.mode) {
-    case 'off': return { primary: 'Off', secondary: null }
-    case 'black': return { primary: 'Black', secondary: null }
-    case 'logo': return { primary: 'Logo', secondary: null }
-    case 'image': return { primary: zs.title || 'Image', secondary: null }
-    case 'countdown': return { primary: mmss(zs.secondsLeft), secondary: zs.title || null }
-    case 'stage': return { primary: zs.stageMessage || zs.line || 'Stage', secondary: zs.title || null }
-    case 'sermon': return {
-      primary: zs.title || 'Sermon',
-      secondary: [zs.speaker, zs.passage].filter(Boolean).join(' · ') || null
-    }
-    case 'livecall': return { primary: 'Live Call', secondary: zs.title || null }
-    case 'lyrics':
-    case 'text': return { primary: zs.line || zs.title || '—', secondary: zs.line ? zs.title || null : null }
-  }
-}
 
 // The Live tab's four screens: what each one shows, and one click to hold it.
 // Pinned state is read back from the main process on every change — the panel
@@ -123,7 +96,6 @@ function ZoneLiveGrid(): JSX.Element {
         {ZONE_IDS.map((zoneId) => {
           const zs = zoneStates?.[zoneId]
           const pin = pins[zoneId] ?? null
-          const { primary, secondary } = readout(zs)
           return (
             <div key={zoneId} className="relative">
               <div
@@ -136,23 +108,7 @@ function ZoneLiveGrid(): JSX.Element {
                   pin ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-400/30' : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
               >
-                <div className="mb-1.5 flex items-center justify-between gap-1">
-                  <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500">{ZONE_NAMES[zoneId]}</span>
-                  <span className="shrink-0 text-[10px] font-semibold text-slate-400">{MODE_LABELS[zs?.mode ?? 'off']}</span>
-                </div>
-                {/* Same 16:9 box the Build Service zone cards use, so the two
-                    screens of the app describe the same hardware the same way. */}
-                <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                  <div
-                    className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg px-1.5 ring-1 ring-white/10"
-                    style={{ background: zs?.mode === 'black' ? '#000' : '#2b2f36' }}
-                  >
-                    <span className="max-h-full overflow-hidden text-center text-[10px] font-medium leading-tight text-white/80">{primary}</span>
-                    {secondary && (
-                      <span className="max-h-full overflow-hidden text-center text-[9px] leading-tight text-white/40">{secondary}</span>
-                    )}
-                  </div>
-                </div>
+                <ZoneStatusBox zoneId={zoneId} zoneState={zs} />
                 {pin && (
                   <div className="mt-1.5 flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5">
                     <Pin size={10} className="shrink-0 text-amber-600" />
