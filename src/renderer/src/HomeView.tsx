@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 import { Play, LayoutGrid, MonitorSpeaker, ListMusic, Music, BookOpen, User, Check, TriangleAlert } from 'lucide-react'
 import type { View } from './AppShell'
-import type { AppInfo, ObsStatus } from '../../shared/types'
+import type { AppInfo, ObsStatus, ZoneId } from '../../shared/types'
+import { ZONE_IDS, ZONE_NAMES } from '../../shared/types'
 import { useService } from './ServiceContext'
 import BrandMark from './BrandMark'
 
@@ -32,6 +33,7 @@ type PreflightLevel = 'ok' | 'warn' | 'info'
 function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
   const { activeService } = useService()
   const [outputs, setOutputs] = useState(0)
+  const [zonesConnected, setZonesConnected] = useState<ZoneId[]>([])
   const [rehearsal, setRehearsal] = useState(false)
   const [obs, setObs] = useState<ObsStatus | null>(null)
 
@@ -41,7 +43,7 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
   // up front instead of leaving the operator to discover it live.
   useEffect(() => {
     const load = (): void => {
-      window.wf.getInfo().then((i: AppInfo) => setOutputs(i.outputs))
+      window.wf.getInfo().then((i: AppInfo) => { setOutputs(i.outputs); setZonesConnected(i.zonesConnected) })
       window.wf.getRehearsalMode().then(setRehearsal)
     }
     load()
@@ -51,13 +53,18 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
     return () => { clearInterval(t); off() }
   }, [])
 
+  const screenCount = outputs + zonesConnected.length
+  const missingZoneNames = ZONE_IDS.filter((id) => !zonesConnected.includes(id)).map((id) => ZONE_NAMES[id])
+
   const checks: { level: PreflightLevel; label: string }[] = [
     rehearsal
       ? { level: 'warn', label: 'Rehearsal mode is armed — real outputs are showing nothing' }
       : { level: 'ok', label: 'Rehearsal mode off' },
-    outputs > 0
-      ? { level: 'ok', label: `${outputs} output${outputs !== 1 ? 's' : ''} connected` }
-      : { level: 'warn', label: 'No outputs connected yet' },
+    screenCount === 0
+      ? { level: 'warn', label: 'No screens connected yet' }
+      : missingZoneNames.length > 0
+      ? { level: 'warn', label: `${screenCount} screen${screenCount !== 1 ? 's' : ''} connected — ${missingZoneNames.join(', ')} not connected` }
+      : { level: 'ok', label: `${screenCount} screen${screenCount !== 1 ? 's' : ''} connected` },
     activeService
       ? { level: 'ok', label: `"${activeService.name}" loaded` }
       : { level: 'warn', label: 'No service loaded yet' },
