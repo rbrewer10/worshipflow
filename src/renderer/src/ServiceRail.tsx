@@ -3,10 +3,10 @@ import { Hourglass } from 'lucide-react'
 import type { LiveState, ServiceItem } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
-import OutputPreview from './OutputPreview'
+import LiveZoneStatus from './zones/LiveZoneStatus'
 import { sendItemLive, itemThumbBackground, usePendingConfirm } from './liveActions'
 
-// Persistent left rail: the loaded service's items + the pinned output preview.
+// Persistent left rail: the loaded service's items + the pinned zone status.
 function ServiceRail(): JSX.Element {
   const { activeService } = useService()
   const [live, setLive] = useState<LiveState | null>(null)
@@ -48,7 +48,7 @@ function ServiceRail(): JSX.Element {
       </div>
       <div className="min-h-0 flex-1 space-y-0.5 overflow-auto p-2">
         {(() => {
-          // This rail is Main-only (same scope as the OutputPreview it's pinned
+          // This rail is Main-only (same scope as the zone status it's pinned
           // above) — without this filter, Second-track items would interleave by
           // per-track ordinal and tapping one would incorrectly go live on Main.
           const mainItems = activeService?.items.filter((it) => it.track === 'main') ?? []
@@ -87,7 +87,7 @@ function ServiceRail(): JSX.Element {
         })()}
       </div>
       <div className="border-t border-slate-200">
-        <OutputPreview />
+        <LiveZoneStatus />
       </div>
     </aside>
   )
