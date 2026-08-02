@@ -120,6 +120,7 @@ import {
   initObsAutoConnect
 } from './obs'
 import { logInfo, logWarn, logError, getRecentLogLines, getLogsDir } from './logger'
+import { initAutoUpdate } from './autoUpdate'
 import { createRecordingSession } from './recording'
 import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
@@ -3502,6 +3503,9 @@ app.whenReady().then(async () => {
   broadcast()
   // Reconnect to OBS in the background if the operator connected before (non-blocking).
   void initObsAutoConnect()
+  // Startup-only update check (never repeats while the app stays open) — see
+  // the 2026-08-02 design spec.
+  initAutoUpdate()
   // Debounced + change-guarded so DPI/resolution/sleep-wake churn doesn't tear
   // down and rebuild the live output (a mid-service black flash).
   screen.on('display-added', scheduleLayoutOutputs)
