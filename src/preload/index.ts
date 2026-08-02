@@ -46,6 +46,12 @@ const wf = {
   },
   getInfo: (): Promise<AppInfo> => ipcRenderer.invoke('wf:getInfo'),
   getState: (track?: TrackId): Promise<LiveState> => ipcRenderer.invoke('wf:getState', track),
+  updateInstallNow: (): void => ipcRenderer.send('wf:update:installNow'),
+  onUpdateReady: (cb: () => void): (() => void) => {
+    const handler = (): void => cb()
+    ipcRenderer.on('wf:update:ready', handler)
+    return () => ipcRenderer.removeListener('wf:update:ready', handler)
+  },
 
   // Song library
   songsList: (search?: string): Promise<SongSummary[]> => ipcRenderer.invoke('wf:songs:list', search),

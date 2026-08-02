@@ -225,6 +225,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     },
     getInfo: async (): Promise<AppInfo> => appInfo(),
     getState: async (_track?: TrackId): Promise<LiveState> => clone(liveState),
+    updateInstallNow: (): void => {},
+    onUpdateReady: (_cb: () => void): (() => void) => () => {},
 
     songsList: async (search?: string): Promise<SongSummary[]> =>
       songs
