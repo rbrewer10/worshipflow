@@ -48,3 +48,14 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: WorshipFlow Pro
   uninstallDisplayName: WorshipFlow Pro
+
+# Where `npm run dist` looks to check "is there a newer release" at runtime
+# (electron-updater reads this, packaged into the app as app-update.yml) and
+# where electron-builder generates latest.yml at build time. The repo is
+# public — created 2026-08-02 specifically so update checks need no auth
+# token embedded in the shipped app. See the 2026-08-02 auto-update design
+# spec for why.
+publish:
+  provider: github
+  owner: rbrewer10
+  repo: worshipflow
