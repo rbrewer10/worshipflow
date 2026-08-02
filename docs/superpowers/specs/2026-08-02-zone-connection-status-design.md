@@ -33,10 +33,15 @@ concepts that need to coexist ambiguously in this fix.
 
 Also confirmed by reading the WebSocket server: zone screens, tablet remotes,
 and the OBS lyrics overlay all connect to the same `wss` (`src/main/index.ts`,
-`startTabletServer()`) with no way for the server to tell them apart — no
-zone ID is ever sent by a zone page today. Building an accurate zone-specific
-count requires a small identification handshake; there's no way to derive it
-from data that already exists.
+`startTabletServer()`) with no way for the server to tell them apart today.
+**Correction found while writing the implementation plan** (reading
+`zoneHtml.ts` in full, not just grepping the server's handler): the zone
+client already sends `ws.send(JSON.stringify({type:'hello', zone: ZONE}))`
+the moment its socket opens — the handshake this design calls for already
+exists on the wire. The server's `ws.on('message', ...)` handler just has no
+branch for `msg.type === 'hello'`, so it's silently dropped today. This means
+the fix is server-only: no client-side change to `zoneHtml.ts` at all, just
+adding the missing handler branch and the tracking Map it feeds.
 
 ## Decisions locked with the user
 
@@ -63,27 +68,26 @@ from data that already exists.
 
 ```
  Zone Pi (browser)                      Main process                    Renderer (Home/TopBar)
- ┌──────────────┐   ws open + hello    ┌─────────────────────┐  wf:getInfo  ┌────────────────────┐
+ ┌──────────────┐  ws open + existing  ┌─────────────────────┐  wf:getInfo  ┌────────────────────┐
  │ /zone/2 page  │─────────────────────▶│ zoneConnections Map  │─────────────▶│ combined "N screens │
- │ (zoneHtml.ts) │  {kind:'zone',       │ (ZoneId → WsSocket)  │  zonesConnected│  connected" + named │
- └──────────────┘   zoneId: 2}         └─────────────────────┘  ZoneId[]     │  missing zones      │
-                                                                              └────────────────────┘
+ │ (zoneHtml.ts) │  hello {zone:2}      │ (ZoneId → WsSocket)  │  zonesConnected│  connected" + named │
+ └──────────────┘  (already sent,      └─────────────────────┘  ZoneId[]     │  missing zones      │
+                    just unread today)                                       └────────────────────┘
 ```
 
 Same WebSocket server every zone page already connects to — no new port, no
-new endpoint. Just one new message type on an existing connection, and one
-new field on an existing IPC response.
+new endpoint, no client-side change. The `hello` message is already on the
+wire; this just adds the server-side branch that reads it and a Map it
+feeds, plus one new field on an existing IPC response.
 
 ### 2. Component structure
 
 **Changed:**
 
-- `src/main/zoneHtml.ts` — the zone page's client-side JS sends
-  `{ type: 'hello', kind: 'zone', zoneId }` immediately after its existing
-  `new WebSocket('ws://'+location.host)` call opens. `zoneId` is already a
-  value baked into the generated page (it's how `zoneHtmlFor(zoneId, ...)`
-  renders the page in the first place) — no new data needed, just sending
-  something that already exists.
+- `src/main/zoneHtml.ts` — **no change.** Its client-side JS already sends
+  `ws.send(JSON.stringify({type:'hello', zone: ZONE}))` the instant its
+  WebSocket opens (confirmed by reading the file) — the handshake this
+  design needs is already on the wire, unread by the server.
 - `src/main/index.ts`:
   - New `const zoneConnections = new Map<ZoneId, WsSocket>()` alongside the
     existing `tabletClients`/`authedTabletClients` sets, declared in the same
@@ -91,7 +95,7 @@ new field on an existing IPC response.
   - Inside `wss.on('connection', (ws, req) => {...})`, a per-connection
     `let helloZoneId: ZoneId | null = null` closure variable. The existing
     `ws.on('message', ...)` handler gains a new branch: `msg.type === 'hello'
-    && msg.kind === 'zone'` validates `msg.zoneId` is `1|2|3|4`, sets
+    && typeof msg.zone === 'number'` validates it's `1|2|3|4`, sets
     `helloZoneId`, and does `zoneConnections.set(helloZoneId, ws)`.
   - The existing `ws.on('close', ...)` / `ws.on('error', ...)` handlers gain
     one line each: if `helloZoneId !== null && zoneConnections.get(helloZoneId)
@@ -130,8 +134,8 @@ purely about connection presence, not content).
 
 1. A zone Pi loads `/zone/2`, gets `zoneHtmlFor(2, ...)`, and its embedded JS
    opens a WebSocket to the same host, same as it already does today.
-2. Immediately after `ws.onopen`, the page sends the new `hello` message.
-   This happens once per connection, not repeated.
+2. `ws.onopen` already sends `{type:'hello', zone:2}` today — this design
+   doesn't add that send, it adds the server-side read of it.
 3. Main records `zoneConnections.set(2, ws)`. The zone's existing behavior —
    receiving `state`/`zones` broadcasts and rendering — is completely
    unaffected; this is an additive message the server now also understands.
@@ -151,8 +155,8 @@ purely about connection presence, not content).
   types:** already handled — the existing `ws.on('message')` handler only
   acts on message types it recognizes and silently ignores the rest (this is
   existing behavior, unchanged).
-- **Malformed `hello` (missing/invalid `zoneId`):** the handler validates
-  `msg.zoneId` is one of `1|2|3|4` before registering anything; anything else
+- **Malformed `hello` (missing/invalid `zone`):** the handler validates
+  `msg.zone` is one of `1|2|3|4` before registering anything; anything else
   is ignored, same permissive-but-safe posture the existing `auth`/`intent`
   handlers already take toward malformed messages.
 - **Duplicate hello from the same zone (e.g. a Pi's browser reloads without a
