@@ -48,6 +48,15 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: WorshipFlow Pro
   uninstallDisplayName: WorshipFlow Pro
+  # The default artifact name ("${productName} Setup ${version}.${ext}")
+  # contains spaces, because productName ("WorshipFlow Pro") does. That
+  # broke auto-update in practice: electron-builder's own latest.yml writer
+  # replaces spaces with HYPHENS when recording the expected filename, the
+  # actual built .exe keeps the literal spaces, and GitHub's manual-upload
+  # UI replaces spaces with DOTS — three different names for the same file,
+  # so electron-updater 404'd trying to download it. A space-free
+  # artifactName makes all three converge on one name.
+  artifactName: WorshipFlow-Pro-Setup-${version}.${ext}
 
 # Where `npm run dist` looks to check "is there a newer release" at runtime
 # (electron-updater reads this, packaged into the app as app-update.yml) and
