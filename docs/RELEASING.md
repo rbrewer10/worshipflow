@@ -18,11 +18,19 @@ scripting.
    npm run dist
    ```
    This produces, in `dist-installer/`:
-   - `WorshipFlow Pro Setup X.Y.Z.exe` — the installer itself.
-   - `WorshipFlow Pro Setup X.Y.Z.exe.blockmap` — used by electron-updater
+   - `WorshipFlow-Pro-Setup-X.Y.Z.exe` — the installer itself.
+   - `WorshipFlow-Pro-Setup-X.Y.Z.exe.blockmap` — used by electron-updater
      for efficient differential downloads.
    - `latest.yml` — the manifest electron-updater reads to know the latest
      version number and the installer's checksum.
+
+   The filename is deliberately hyphenated, not "WorshipFlow Pro Setup
+   X.Y.Z.exe" — a space-containing name broke auto-update the first time
+   this was tried (GitHub's upload UI turns spaces into dots, while
+   electron-builder's own `latest.yml` turns them into hyphens, so the file
+   electron-updater looks for never matched what was actually hosted). Don't
+   rename the built files before uploading — they're already named to match
+   `latest.yml` exactly.
 
 3. **Commit and push the version bump** (don't skip this — the next
    session needs `package.json` to reflect what was actually shipped):
