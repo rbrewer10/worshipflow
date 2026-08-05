@@ -103,4 +103,56 @@ describe('backgroundFolders', () => {
     expect(moves).toEqual([])
     expect(existsSync(join(uploadsDir, 'Empty'))).toBe(false)
   })
+
+  it('rejects folder names containing path traversal or separators', () => {
+    expect(() => createFolderIn(uploadsDir, [uploadsDir, generatedDir], '../evil')).toThrow()
+    expect(() => createFolderIn(uploadsDir, [uploadsDir, generatedDir], 'a/b')).toThrow()
+    expect(() => createFolderIn(uploadsDir, [uploadsDir, generatedDir], 'a\\b')).toThrow()
+    expect(existsSync(join(uploadsDir, '..', 'evil'))).toBe(false)
+  })
+
+  it('rejects renaming to or from an invalid folder name', () => {
+    mkdirSync(join(uploadsDir, 'Easter'), { recursive: true })
+    expect(() => renameFolderIn([uploadsDir, generatedDir], 'Easter', '../evil')).toThrow()
+    expect(() => renameFolderIn([uploadsDir, generatedDir], '../evil', 'Easter')).toThrow()
+  })
+
+  it('rejects moving a file into a folder name with path traversal', () => {
+    const filePath = join(uploadsDir, 'photo.jpg')
+    writeFileSync(filePath, 'x')
+    expect(() => moveFileToFolder([uploadsDir, generatedDir], filePath, '../evil')).toThrow()
+  })
+
+  it('rejects renaming a folder that does not exist', () => {
+    expect(() => renameFolderIn([uploadsDir, generatedDir], 'Nope', 'Spring')).toThrow()
+  })
+
+  it('rejects moving a file into a folder when it would overwrite an existing file', () => {
+    mkdirSync(join(uploadsDir, 'Easter'), { recursive: true })
+    writeFileSync(join(uploadsDir, 'Easter', 'photo.jpg'), 'existing')
+    const filePath = join(uploadsDir, 'photo.jpg')
+    writeFileSync(filePath, 'incoming')
+    expect(() => moveFileToFolder([uploadsDir, generatedDir], filePath, 'Easter')).toThrow()
+    // Neither file should have been touched.
+    expect(existsSync(filePath)).toBe(true)
+    expect(existsSync(join(uploadsDir, 'Easter', 'photo.jpg'))).toBe(true)
+  })
+
+  it('rejects renaming a folder when the destination name is already taken', () => {
+    mkdirSync(join(uploadsDir, 'Easter'), { recursive: true })
+    writeFileSync(join(uploadsDir, 'Easter', 'a.jpg'), 'incoming')
+    mkdirSync(join(generatedDir, 'Spring'), { recursive: true })
+    writeFileSync(join(generatedDir, 'Spring', 'a.jpg'), 'existing')
+    expect(() => renameFolderIn([uploadsDir, generatedDir], 'Easter', 'Spring')).toThrow()
+    // Nothing should have moved.
+    expect(existsSync(join(uploadsDir, 'Easter', 'a.jpg'))).toBe(true)
+    expect(existsSync(join(generatedDir, 'Spring', 'a.jpg'))).toBe(true)
+  })
+
+  it('rejects deleting a folder when it would overwrite a file already in Uncategorized', () => {
+    mkdirSync(join(uploadsDir, 'Easter'), { recursive: true })
+    writeFileSync(join(uploadsDir, 'Easter', 'a.jpg'), 'incoming')
+    writeFileSync(join(uploadsDir, 'a.jpg'), 'existing')
+    expect(() => deleteFolderIn([uploadsDir, generatedDir], 'Easter')).toThrow()
+  })
 })
