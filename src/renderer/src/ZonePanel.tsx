@@ -12,8 +12,9 @@ const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 function ZonePanel(): JSX.Element {
   const [serverIp, setServerIp] = useState<string>('...')
   const [port, setPort] = useState<number | null>(null)
-  const [savingLook, setSavingLook] = useState(false)
+  const [showLookForm, setShowLookForm] = useState(false)
   const [lookName, setLookName] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     void window.wf.zoneGetIp().then(setServerIp)
@@ -24,11 +25,19 @@ function ZonePanel(): JSX.Element {
   }, [])
 
   const saveLook = async (): Promise<void> => {
+    if (saving) return
     const name = lookName.trim()
     if (!name) return
-    await window.wf.looksSave(name)
-    setLookName('')
-    setSavingLook(false)
+    try {
+      setSaving(true)
+      await window.wf.looksSave(name)
+      setLookName('')
+      setShowLookForm(false)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not save that Look.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -37,7 +46,7 @@ function ZonePanel(): JSX.Element {
 
       {/* Save the 4 zones' current pins as a one-click preset, recalled from the Live tab */}
       <div className="rounded-lg border border-slate-200 bg-slate-100/70 p-2.5">
-        {savingLook ? (
+        {showLookForm ? (
           <div className="flex items-center gap-1.5">
             <input
               // eslint-disable-next-line jsx-a11y/no-autofocus -- continuation of the operator's own "+ Save..." click, matching this session's existing convention (e.g. SongLibrary.tsx)
@@ -45,18 +54,21 @@ function ZonePanel(): JSX.Element {
               value={lookName}
               onChange={(e) => setLookName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void saveLook()
-                if (e.key === 'Escape') { setSavingLook(false); setLookName('') }
+                if (e.key === 'Enter' && !saving) void saveLook()
+                if (e.key === 'Escape') { setShowLookForm(false); setLookName('') }
               }}
               placeholder="Name this Look"
               aria-label="Name this Look"
-              className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-blue-500"
+              disabled={saving}
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-blue-500 disabled:opacity-50"
             />
-            <button onClick={saveLook} className="shrink-0 text-xs font-semibold text-blue-700">Save</button>
+            <button onClick={saveLook} disabled={saving} className="shrink-0 text-xs font-semibold text-blue-700 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
           </div>
         ) : (
           <button
-            onClick={() => setSavingLook(true)}
+            onClick={() => setShowLookForm(true)}
             className="w-full rounded-lg border border-dashed border-slate-300 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:border-slate-400 hover:text-slate-800"
           >
             + Save current pins as a Look
