@@ -181,7 +181,17 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE recording ADD COLUMN thumbnail_path TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN ai_state TEXT') } catch { /* already exists */ }
   normalizeSectionLyrics()
-  migrateReflowBreaks()
+  // Unlike the other one-time passes here, this one genuinely needs a real
+  // "have I already run" flag rather than re-inspecting content: its
+  // "no blank line yet" heuristic only means "not yet migrated" for the
+  // very first run. After Reflow ships, an ordinary freshly-typed section
+  // with no blank line is simply a normal single slide — re-running the
+  // heuristic on every startup would silently re-fragment it. See the
+  // 2026-08-05 design spec.
+  if (getSetting('reflow_migration_done') !== '1') {
+    migrateReflowBreaks()
+    setSetting('reflow_migration_done', '1')
+  }
   normalizeTitles()
   clearSecondTrackAssignments()
   persist()
@@ -263,18 +273,23 @@ function insertLegacySlideBreaks(lyrics: string, perSlide: number): string {
   return groups.join('\n\n')
 }
 
-// One-time (idempotent) pass converting existing songs from the old
-// mechanical "every linesPerSlide lines" splitting to explicit blank-line
-// slide breaks, so nothing changes visually after upgrading to Reflow-style
-// editing. Idempotent by inspection, not a flag: no code path in this
-// codebase has ever written a blank line into song_section.lyrics before
-// this feature, so a section that already contains one reliably means
-// "already migrated" (or edited under the new model since) — either way,
-// leave it alone. Must run after normalizeSectionLyrics(): that function can
-// re-wrap one long crammed line into several physical lines, and the
-// mechanical split this reproduces has always operated on lyrics AFTER that
-// normalization (songLines() ran after it too), so migrating before it would
-// compute different break points than the old live behavior actually had.
+// One-time pass converting existing songs from the old mechanical "every
+// linesPerSlide lines" splitting to explicit blank-line slide breaks, so
+// nothing changes visually after upgrading to Reflow-style editing. The
+// caller (initDb()) gates this behind a real 'reflow_migration_done' setting
+// flag rather than the content-inspection idiom this file's other one-time
+// passes use — "does this section already have a blank line" is only a
+// reliable proxy for "not yet migrated" on the very first run. Once Reflow
+// ships, an ordinary freshly-typed section with no blank line is simply a
+// normal single slide, not evidence of stale data; re-running this
+// unconditionally would silently re-fragment it on every subsequent
+// startup. The per-row "already has a break" check below is kept anyway as
+// a cheap secondary guard, not the actual idempotency mechanism. Must run
+// after normalizeSectionLyrics(): that function can re-wrap one long crammed
+// line into several physical lines, and the mechanical split this
+// reproduces has always operated on lyrics AFTER that normalization
+// (songLines() ran after it too), so migrating before it would compute
+// different break points than the old live behavior actually had.
 function migrateReflowBreaks(): void {
   const rows: { id: number; lyrics: string; lines_per_slide: number | null }[] = []
   const stmt = db.prepare(
