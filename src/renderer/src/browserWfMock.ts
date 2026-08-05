@@ -32,8 +32,10 @@ import { starterConfig } from '../../shared/zoneScenes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
 import type { ZoneSlide } from '../../shared/zoneSlides'
 import type { ZonePin, ZonePins } from '../../shared/zonePins'
+import type { Look } from '../../shared/zoneLooks'
 
 const mockPins: ZonePins = {}
+const mockLooks: Look[] = []
 
 const demoLines = [
   'Amazing grace, how sweet the sound',
@@ -461,6 +463,26 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       for (const key of Object.keys(mockPins)) delete mockPins[Number(key) as ZoneId]
     },
     zoneGetPins: async (): Promise<ZonePins> => ({ ...mockPins }),
+    looksList: async (): Promise<Look[]> => mockLooks.map((l) => ({ ...l })),
+    looksSave: async (name: string): Promise<void> => {
+      mockLooks.push({ id: String(mockLooks.length + 1), name, pins: { ...mockPins } })
+    },
+    looksDelete: async (lookId: string): Promise<void> => {
+      const idx = mockLooks.findIndex((l) => l.id === lookId)
+      if (idx >= 0) mockLooks.splice(idx, 1)
+    },
+    looksApply: async (lookId: string): Promise<void> => {
+      const look = mockLooks.find((l) => l.id === lookId)
+      if (!look) return
+      for (const key of Object.keys(mockPins)) delete mockPins[Number(key) as ZoneId]
+      Object.assign(mockPins, look.pins)
+    },
+    zoneSafetyReset: async (): Promise<void> => {
+      mockPins[1] = { kind: 'mode', mode: 'logo' }
+      mockPins[2] = { kind: 'mode', mode: 'logo' }
+      mockPins[3] = { kind: 'mode', mode: 'logo' }
+      mockPins[4] = { kind: 'mode', mode: 'logo' }
+    },
     zoneGetStates: async (): Promise<Record<ZoneId, ZoneState>> => ({
       1: clone(emptyZone),
       2: clone(emptyZone),

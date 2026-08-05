@@ -34,6 +34,7 @@ import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/t
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import type { ZoneSlide } from '../shared/zoneSlides'
 import type { ZonePin, ZonePins } from '../shared/zonePins'
+import type { Look } from '../shared/zoneLooks'
 
 const wf = {
   // The real build version comes from the main process via getInfo() — don't
@@ -344,6 +345,11 @@ const wf = {
     ipcRenderer.invoke('wf:zone:clearPins'),
   zoneGetPins: (): Promise<ZonePins> =>
     ipcRenderer.invoke('wf:zone:getPins'),
+  looksList: (): Promise<Look[]> => ipcRenderer.invoke('wf:looks:list'),
+  looksSave: (name: string): Promise<void> => ipcRenderer.invoke('wf:looks:save', name),
+  looksDelete: (lookId: string): Promise<void> => ipcRenderer.invoke('wf:looks:delete', lookId),
+  looksApply: (lookId: string): Promise<void> => ipcRenderer.invoke('wf:looks:apply', lookId),
+  zoneSafetyReset: (): Promise<void> => ipcRenderer.invoke('wf:zone:safetyReset'),
   zoneGetStates: (): Promise<Record<ZoneId, ZoneState>> =>
     ipcRenderer.invoke('wf:zone:getStates'),
   zoneGetIp: (): Promise<string> =>
