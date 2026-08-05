@@ -8,6 +8,10 @@
 //
 // It is idempotent: lines already within the target length are left untouched, so
 // running it repeatedly (or over an already-well-formatted song) changes nothing.
+//
+// A blank line is preserved verbatim, never dropped or altered — in the Reflow
+// editing model it marks an explicit slide break the operator typed, so this
+// function must never treat it as noise to filter away.
 
 // Target visual line length. Phrases up to this stay on one line; longer lines are
 // broken. Chosen generously so natural worship phrases (~45–55 chars) stay intact.
