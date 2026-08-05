@@ -18,6 +18,7 @@ interface BgEntry {
   path: string
   kind: 'upload' | 'generated'
   isVideo: boolean
+  folder: string | null
 }
 
 interface BackgroundWithTags extends BgEntry {
@@ -34,18 +35,32 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const [editingTags, setEditingTags] = useState<string>('')
   const dropRef = useRef<HTMLButtonElement>(null)
+  const [folders, setFolders] = useState<string[]>([])
+  const [selectedFolder, setSelectedFolder] = useState<string | null | 'ALL'>('ALL')
+  const [newFolderName, setNewFolderName] = useState('')
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [draggedPath, setDraggedPath] = useState<string | null>(null)
 
   useEffect(() => {
     void loadUploads()
+    void loadFolders()
     // "Open folder" sends the operator to the file manager to bulk-copy images
     // in — its own tooltip says "drop in as many as you want, then come back
     // here" — but nothing re-scanned the folder on return, so a batch of newly
     // added backgrounds stayed invisible until this component happened to
     // remount. Re-reading on window focus makes coming back actually work.
-    const onFocus = (): void => { void loadUploads() }
+    const onFocus = (): void => { void loadUploads(); void loadFolders() }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [])
+
+  async function loadFolders(): Promise<void> {
+    try {
+      setFolders(await window.wf.bgListFolders())
+    } catch {
+      setFolders([])
+    }
+  }
 
   async function loadUploads(): Promise<void> {
     let list: BgEntry[]
@@ -93,9 +108,13 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
     }
   }
 
-  const filteredUploads = searchTags.length === 0
+  const folderScoped = selectedFolder === 'ALL'
     ? uploads
-    : uploads.filter((bg) => bg.tags?.some((t) => searchTags.includes(t)))
+    : uploads.filter((bg) => bg.folder === selectedFolder)
+
+  const filteredUploads = searchTags.length === 0
+    ? folderScoped
+    : folderScoped.filter((bg) => bg.tags?.some((t) => searchTags.includes(t)))
 
   async function handleUploadFile(file: File): Promise<void> {
     const path = (file as File & { path?: string }).path
@@ -118,10 +137,56 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
     }
   }
 
+  async function warnIfInUse(filePath: string, action: 'move' | 'delete'): Promise<boolean> {
+    const usage = await window.wf.bgUsage(filePath)
+    const names = [...usage.songs, ...usage.announcements, ...usage.items.map((t) => `a ${t} item`)]
+    if (names.length === 0) return true
+    return confirm(
+      `This background is currently used by: ${names.join(', ')}. ${action === 'delete' ? 'Delete' : 'Move'} it anyway?`
+    )
+  }
+
   async function handleDelete(filePath: string): Promise<void> {
+    if (!(await warnIfInUse(filePath, 'delete'))) return
     await window.wf.bgDelete(filePath)
     await loadUploads()
     if (activePath === filePath) onApply('')
+  }
+
+  async function handleMoveToFolder(filePath: string, folderName: string | null): Promise<void> {
+    if (!(await warnIfInUse(filePath, 'move'))) return
+    const newPath = await window.wf.bgMove(filePath, folderName)
+    if (activePath === filePath) onApply(newPath)
+    await loadUploads()
+  }
+
+  async function handleCreateFolder(): Promise<void> {
+    const name = newFolderName.trim()
+    if (!name) return
+    try {
+      await window.wf.bgCreateFolder(name)
+      setNewFolderName('')
+      setCreatingFolder(false)
+      await loadFolders()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not create that folder.')
+    }
+  }
+
+  async function handleDeleteFolder(name: string): Promise<void> {
+    if (!confirm(`Delete the "${name}" folder? Its backgrounds move to Uncategorized — nothing is deleted.`)) return
+    await window.wf.bgDeleteFolder(name)
+    if (selectedFolder === name) setSelectedFolder('ALL')
+    await loadFolders()
+    await loadUploads()
+  }
+
+  function onFolderDrop(folderName: string | null): (e: React.DragEvent) => void {
+    return (e: React.DragEvent) => {
+      e.preventDefault()
+      if (draggedPath) void handleMoveToFolder(draggedPath, folderName)
+      setDraggedPath(null)
+    }
   }
 
   function onDragOver(e: React.DragEvent): void {
@@ -168,6 +233,76 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
             className="mt-2 text-[10px] text-slate-500 hover:text-slate-700"
           >
             Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* Folder rail */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          onClick={() => setSelectedFolder('ALL')}
+          className={[
+            'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all',
+            selectedFolder === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+          ].join(' ')}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setSelectedFolder(null)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onFolderDrop(null)}
+          className={[
+            'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all',
+            selectedFolder === null ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+          ].join(' ')}
+        >
+          Uncategorized
+        </button>
+        {folders.map((f) => (
+          <div key={f} className="group relative">
+            <button
+              onClick={() => setSelectedFolder(f)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={onFolderDrop(f)}
+              className={[
+                'rounded-full px-2.5 py-1 pr-5 text-[11px] font-semibold transition-all',
+                selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+              ].join(' ')}
+            >
+              {f}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDeleteFolder(f) }}
+              title={`Delete "${f}" folder`}
+              className="absolute right-1 top-1/2 hidden -translate-y-1/2 text-[10px] opacity-70 hover:opacity-100 group-hover:block"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        ))}
+        {creatingFolder ? (
+          <div className="flex items-center gap-1">
+            <input
+              // This input only renders because the operator just clicked "+ New
+              // folder" — autofocusing it is the deliberate continuation of that
+              // action, not an unexpected focus steal.
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateFolder(); if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName('') } }}
+              placeholder="Folder name"
+              className="w-28 rounded-full border border-slate-300 px-2.5 py-1 text-[11px] outline-none focus:border-blue-500"
+            />
+            <button onClick={handleCreateFolder} className="text-[11px] font-semibold text-blue-700">Add</button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setCreatingFolder(true)}
+            className="rounded-full border border-dashed border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:border-slate-400 hover:text-slate-700"
+          >
+            + New folder
           </button>
         )}
       </div>
@@ -234,6 +369,9 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 key={u.path}
                 role="button"
                 tabIndex={0}
+                draggable
+                onDragStart={() => setDraggedPath(u.path)}
+                onDragEnd={() => setDraggedPath(null)}
                 onClick={() => onApply(u.path)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onApply(u.path) } }}
                 aria-label={`Use background: ${u.path.split(/[/\\]/).pop()}`}
@@ -261,6 +399,20 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                   </div>
                 )}
 
+                {folders.length > 0 && (
+                  <select
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => { const v = e.target.value; handleMoveToFolder(u.path, v === '' ? null : v); e.target.value = '' }}
+                    value=""
+                    title="Move to folder"
+                    aria-label="Move to folder"
+                    className="absolute left-1 top-1 hidden w-6 rounded bg-black/60 text-[9px] text-transparent group-hover:block"
+                  >
+                    <option value="" disabled>Move to…</option>
+                    <option value="">Uncategorized</option>
+                    {folders.map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                )}
                 <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
                   <button
                     onClick={(e) => { e.stopPropagation(); handleAutoTag(u.path) }}
