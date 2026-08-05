@@ -17,6 +17,7 @@ import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../sha
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseReferenceList, formatReferenceList, subReference } from '../shared/scriptureRefs'
+import { reflowSlideTexts } from '../shared/reflowText'
 import { chunkVerses } from '../shared/chunkText'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides'
@@ -584,15 +585,6 @@ function armAutoAdvance(track: TrackId, durationMs: number, loop: boolean): void
 }
 function logServiceEvent(event: string): void {
   serviceLog.push({ ts: Date.now(), event })
-}
-
-function groupLines(lines: string[], n: number): string[] {
-  if (n <= 1) return lines
-  const result: string[] = []
-  for (let i = 0; i < lines.length; i += n) {
-    result.push(lines.slice(i, i + n).join('\n'))
-  }
-  return result
 }
 
 function getLocalIp(): string {
@@ -1450,22 +1442,12 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   return true
 }
 
-// Order a song's sections (honoring arrangement) and group into slide lines.
-// Grouping happens WITHIN each section so a slide never mixes the end of one
-// section with the start of the next (e.g. a verse and the chorus). Mirrors the
-// editor's computeEditorSlides so the projector matches the editor preview.
+// Order a song's sections (honoring arrangement) and split into slide lines,
+// using the same shared rule the editors use (src/shared/reflowText.ts) —
+// this used to be an independently-maintained mirror of the editor's own
+// slide logic; now both read from one place.
 function songLines(full: SongFull): string[] {
-  const sorted = [...full.sections].sort((a, b) => a.ordinal - b.ordinal)
-  const ordered = full.arrangement && full.arrangement.length > 0
-    ? full.arrangement.map((i) => sorted[i]).filter(Boolean)
-    : sorted
-  const perSlide = full.linesPerSlide ?? 2
-  const slides: string[] = []
-  for (const section of ordered) {
-    const lines = section.lyrics.split('\n').map((l) => l.trim()).filter(Boolean)
-    for (const slide of groupLines(lines, perSlide)) slides.push(slide)
-  }
-  return slides
+  return reflowSlideTexts(full.sections, full.arrangement)
 }
 
 async function doLoadSong(track: TrackId, id: number): Promise<void> {
