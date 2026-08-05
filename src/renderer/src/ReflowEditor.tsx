@@ -5,7 +5,7 @@
 // its own; only the read-only preview pane is derived from it. See the
 // 2026-08-05 design spec and this plan's "critical interaction-design point"
 // note for why the textarea must never round-trip through parse+serialize.
-import { useRef } from 'react'
+import { useRef, useLayoutEffect } from 'react'
 import type { ClipboardEvent } from 'react'
 import { getTheme, resolveColors, FONT_FAMILY } from '../../shared/themes'
 import { parseReflowText, computeReflowSlides, autoBreakPastedText } from '../../shared/reflowText'
@@ -22,9 +22,25 @@ export default function ReflowEditor({ song, value, onChange }: {
   onChange: (text: string) => void
 }): JSX.Element {
   const textRef = useRef<HTMLTextAreaElement>(null)
+  // A scripted `.value` write on a controlled textarea (our onChange path,
+  // since preventDefault() stops the browser's own paste from ever touching
+  // the DOM) resets the caret to the very end of the whole value, not to
+  // where the edit happened. Harmless when pasting into an empty textarea
+  // (end-of-value and end-of-paste coincide) but wrong for a mid-document
+  // paste — the caret would jump past any trailing lyrics. This ref carries
+  // the intended caret position across the render triggered by a transformed
+  // paste so the effect below can restore it.
+  const pendingCaretRef = useRef<number | null>(null)
 
   const sections = parseReflowText(value)
   const slides = computeReflowSlides(sections, song.arrangement ?? null)
+
+  useLayoutEffect(() => {
+    const caret = pendingCaretRef.current
+    if (caret === null) return
+    pendingCaretRef.current = null
+    textRef.current?.setSelectionRange(caret, caret)
+  }, [value])
 
   const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>): void => {
     const pasted = e.clipboardData.getData('text/plain')
@@ -36,6 +52,7 @@ export default function ReflowEditor({ song, value, onChange }: {
     if (!el) return
     const { selectionStart, selectionEnd } = el
     const next = value.slice(0, selectionStart) + transformed + value.slice(selectionEnd)
+    pendingCaretRef.current = selectionStart + transformed.length
     onChange(next)
   }
 
