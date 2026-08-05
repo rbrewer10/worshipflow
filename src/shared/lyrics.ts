@@ -19,8 +19,13 @@ const HARD = 64
 export function splitLyricLines(lyrics: string): string {
   return lyrics
     .split('\n')
-    .flatMap((line) => splitLine(line.trim()))
-    .filter((l) => l.length > 0)
+    .flatMap((line) => {
+      const trimmed = line.trim()
+      // A blank line is a meaningful slide break in the Reflow model — keep it
+      // exactly as one blank line rather than running it through splitLine
+      // (which would otherwise collapse it away, same as it always has).
+      return trimmed === '' ? [''] : splitLine(trimmed)
+    })
     .join('\n')
 }
 

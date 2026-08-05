@@ -34,7 +34,11 @@ describe('splitLyricLines', () => {
     }
   })
 
-  it('drops blank lines and trims whitespace', () => {
-    expect(splitLyricLines('  hello  \n\n  world  ')).toBe('hello\nworld')
+  it('preserves blank lines — they mark slide breaks in the Reflow model', () => {
+    expect(splitLyricLines('  hello  \n\n  world  ')).toBe('hello\n\nworld')
+  })
+
+  it('preserves multiple consecutive blank lines as-is (collapsing is the parser\'s job, not this function\'s)', () => {
+    expect(splitLyricLines('hello\n\n\n\nworld')).toBe('hello\n\n\n\nworld')
   })
 })
