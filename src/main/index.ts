@@ -24,7 +24,7 @@ import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
 import { validateZonePins } from '../shared/zonePins'
 import type { ZonePin, ZonePins } from '../shared/zonePins'
-import { parseLooksConfig } from '../shared/zoneLooks'
+import { parseLooksConfig, validateLook } from '../shared/zoneLooks'
 import type { Look } from '../shared/zoneLooks'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
@@ -2753,7 +2753,14 @@ ipcMain.handle('wf:looks:list', (): Look[] => parseLooksConfig(getSetting('zone_
 
 ipcMain.handle('wf:looks:save', (_e: unknown, name: string): void => {
   const looks = parseLooksConfig(getSetting('zone_looks'))
-  const look: Look = { id: randomUUID(), name, pins: zonePinsRecord() }
+  const look: Look = { id: randomUUID(), name: name.trim(), pins: zonePinsRecord() }
+  // parseLooksConfig validates the WHOLE stored array atomically — one
+  // blank-named entry slipping in would make every future read of this
+  // setting (including the next save/delete's own read-modify-write) treat
+  // the entire list as corrupt and silently discard every previously saved
+  // Look, not just the bad one. Guard here, the same way wf:scenes:set
+  // validates before persisting.
+  if (!validateLook(look)) throw new Error('A Look needs a name')
   setSetting('zone_looks', JSON.stringify([...looks, look]))
 })
 
