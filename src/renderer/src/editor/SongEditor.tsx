@@ -74,18 +74,19 @@ export default function SongEditor({ songId, onSaved }: {
     blurQueue.retry(); fontScaleQueue.retry(); textColorQueue.retry(); fontQueue.retry()
   }
 
-  const saveSong = async (updated: SongFull): Promise<void> => {
-    // Continuous editing can add/remove sections as a byproduct of ordinary
-    // typing (delete a verse's text and label, add a "Bridge"), which can
-    // leave `arrangement` — a list of indices into the sections array —
-    // pointing past the end or at a since-shifted section. Filtering here
-    // (mirroring CardEditPanel.tsx's buildSongInput, which guards the exact
-    // same staleness for the Card editor) keeps a stale index from silently
-    // dropping or misrouting a slide on save.
+  // Continuous editing can add/remove sections as a byproduct of ordinary
+  // typing (delete a verse's text and label, add a "Bridge"), which can leave
+  // `arrangement` — a list of indices into the sections array — pointing
+  // past the end or at a since-shifted section. Filtering here (mirroring
+  // CardEditPanel.tsx's buildSongInput, which guards the exact same
+  // staleness for the Card editor) keeps a stale index from silently
+  // dropping or misrouting a slide on save. Shared by both the normal
+  // (queued) save path and the direct unmount-flush path below.
+  const buildSongInput = (updated: SongFull): SongInput => {
     const validArrangement = updated.arrangement && updated.arrangement.length > 0
       ? updated.arrangement.filter((i) => i < updated.sections.length)
       : null
-    const input: SongInput = {
+    return {
       title: updated.title,
       author: updated.author ?? undefined,
       ccli: updated.ccli ?? undefined,
@@ -101,7 +102,10 @@ export default function SongEditor({ songId, onSaved }: {
       font: updated.font,
       blurBehindText: updated.blurBehindText
     }
-    songQueue.trigger(input)
+  }
+
+  const saveSong = async (updated: SongFull): Promise<void> => {
+    songQueue.trigger(buildSongInput(updated))
   }
 
   // Debounced autosave for lyrics: useAutosave's queue only coalesces triggers
@@ -116,7 +120,19 @@ export default function SongEditor({ songId, onSaved }: {
     if (justLoadedRef.current) { justLoadedRef.current = false; return }
     if (!song) return
     const currentSong = song
-    pendingLyricsSaveRef.current = () => { void saveSong(currentSong) }
+    // The unmount flush (below) calls window.wf.songUpdate directly instead
+    // of going through saveSong/songQueue.trigger. useAutosave's own
+    // unregister-on-unmount effect (useAutosave.ts) runs as part of this same
+    // component's unmount, in the same hook-declaration order as everything
+    // else — if the flush went through the queue, it could re-register this
+    // save's status with saveRegistry just after (or before) that cleanup
+    // fires, permanently corrupting the "any save failed?" bookkeeping
+    // AppShell's navigation guard depends on. There's no future save left to
+    // serialize against once this component is gone, so bypassing the queue
+    // here is safe.
+    pendingLyricsSaveRef.current = () => {
+      void window.wf.songUpdate(songId, buildSongInput(currentSong)).then(() => onSaved?.())
+    }
     const t = setTimeout(() => {
       pendingLyricsSaveRef.current = null
       void saveSong(currentSong)
