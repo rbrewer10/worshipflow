@@ -24,6 +24,8 @@ import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
 import { validateZonePins } from '../shared/zonePins'
 import type { ZonePin, ZonePins } from '../shared/zonePins'
+import { parseLooksConfig } from '../shared/zoneLooks'
+import type { Look } from '../shared/zoneLooks'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -2744,6 +2746,53 @@ ipcMain.handle('wf:zone:clearPins', (): void => {
 })
 
 ipcMain.handle('wf:zone:getPins', (): ZonePins => zonePinsRecord())
+
+// --- Looks (saved zone-pin presets) ---
+
+ipcMain.handle('wf:looks:list', (): Look[] => parseLooksConfig(getSetting('zone_looks')))
+
+ipcMain.handle('wf:looks:save', (_e: unknown, name: string): void => {
+  const looks = parseLooksConfig(getSetting('zone_looks'))
+  const look: Look = { id: randomUUID(), name, pins: zonePinsRecord() }
+  setSetting('zone_looks', JSON.stringify([...looks, look]))
+})
+
+ipcMain.handle('wf:looks:delete', (_e: unknown, lookId: string): void => {
+  const looks = parseLooksConfig(getSetting('zone_looks'))
+  setSetting('zone_looks', JSON.stringify(looks.filter((l) => l.id !== lookId)))
+})
+
+// Applying a Look sets exactly what was saved for all 4 zones — a zone
+// absent from look.pins is explicitly unpinned here, not left alone, so a
+// recall always reproduces the saved combination regardless of whatever the
+// zones were doing beforehand. looks came from parseLooksConfig, which
+// already ran validateZonePins over the whole pins object, so no per-zone
+// re-validation is needed here. A pinned item that's since been deleted
+// isn't this handler's problem to solve — computeZoneStates() already
+// degrades a missing pinned item to 'logo' on its own.
+ipcMain.handle('wf:looks:apply', (_e: unknown, lookId: string): void => {
+  const looks = parseLooksConfig(getSetting('zone_looks'))
+  const look = looks.find((l) => l.id === lookId)
+  if (!look) throw new Error('Look not found')
+  for (const zoneId of [1, 2, 3, 4] as ZoneId[]) {
+    const pin = look.pins[zoneId] ?? null
+    if (pin == null) zonePins.delete(zoneId)
+    else zonePins.set(zoneId, pin)
+  }
+  warnedMissingPins.clear()
+  broadcast()
+})
+
+// Hardcoded, not a user-editable Look — always available, never accidentally
+// renamed or deleted. Screens only: no Sound Check, Room Feed, or track
+// changes, per the design's explicit scope decision.
+ipcMain.handle('wf:zone:safetyReset', (): void => {
+  for (const zoneId of [1, 2, 3, 4] as ZoneId[]) {
+    zonePins.set(zoneId, { kind: 'mode', mode: 'logo' })
+  }
+  warnedMissingPins.clear()
+  broadcast()
+})
 
 ipcMain.handle('wf:zone:getStates', (): Record<ZoneId, ZoneState> => {
   return computeZoneStates()
