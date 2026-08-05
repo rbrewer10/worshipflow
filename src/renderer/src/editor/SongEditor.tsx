@@ -21,6 +21,11 @@ export default function SongEditor({ songId, onSaved }: {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const titleRef = useRef<HTMLInputElement>(null)
+  // Holds the not-yet-fired debounced save, if any, so it can be flushed
+  // immediately on unmount (switching songs, navigating away, closing the
+  // pop-out window) instead of silently discarded — see the flush effect
+  // near the bottom of this component for why this matters.
+  const pendingLyricsSaveRef = useRef<(() => void) | null>(null)
 
   // Guards the debounced-save effect below against firing on the lyricsText
   // change caused by loading a song, rather than an actual edit — set true
@@ -110,9 +115,28 @@ export default function SongEditor({ songId, onSaved }: {
   useEffect(() => {
     if (justLoadedRef.current) { justLoadedRef.current = false; return }
     if (!song) return
-    const t = setTimeout(() => { void saveSong(song) }, 600)
+    const currentSong = song
+    pendingLyricsSaveRef.current = () => { void saveSong(currentSong) }
+    const t = setTimeout(() => {
+      pendingLyricsSaveRef.current = null
+      void saveSong(currentSong)
+    }, 600)
     return () => clearTimeout(t)
   }, [lyricsText])
+
+  // Flushes a still-pending debounced lyrics save when this editor unmounts.
+  // Without this, the last keystroke or two before switching songs or
+  // navigating away would be silently lost: the debounce timer above is
+  // cancelled on unmount along with everything else, and — because
+  // songQueue's status only becomes 'saving' once the timer actually
+  // fires — AppShell's existing "unsaved changes" navigation guard has no
+  // way to know an edit is still waiting to be saved during that window.
+  // Deliberately a separate effect with an empty dependency array (not
+  // folded into the debounce effect above), so its cleanup only runs on a
+  // true unmount, never on an ordinary lyricsText change while still typing.
+  useEffect(() => {
+    return () => { pendingLyricsSaveRef.current?.() }
+  }, [])
 
   if (!song) {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>
