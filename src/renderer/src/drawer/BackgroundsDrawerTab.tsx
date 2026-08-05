@@ -32,7 +32,20 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
     // the same getState()+onState() pattern ServiceRail.tsx already uses).
     window.wf.getState('main').then(setLive)
     const off = window.wf.onState((s) => setLive(s.main))
-    return off
+    // This drawer can stay mounted while the operator renames/deletes a folder
+    // elsewhere (e.g. a song/item's own background picker on the same Build
+    // Service screen) — without a refetch, this tab would show stale folder
+    // pills and stale paths. Re-reading on window focus matches the same fix
+    // BackgroundLibraryGrid.tsx already applies for the same staleness risk.
+    const onFocus = (): void => {
+      window.wf.bgList().then(setBackgrounds)
+      window.wf.bgListFolders().then(setFolders)
+    }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      off()
+      window.removeEventListener('focus', onFocus)
+    }
   }, [])
 
   const folderScoped = selectedFolder === 'ALL'
@@ -86,6 +99,7 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
 
   return (
     <div className="flex flex-col gap-2">
+      {/* Folder rail */}
       {folders.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <button
@@ -121,25 +135,28 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
         </div>
       )}
       <div className="grid grid-cols-6 gap-2">
-      {folderScoped.length === 0 && (
-        <p className="col-span-6 text-xs text-slate-400">No backgrounds yet — add some in Build Service.</p>
-      )}
-      {folderScoped.map((bg) => (
-        <button
-          key={bg.path}
-          onClick={() => void pick(bg.path)}
-          disabled={busy}
-          className="overflow-hidden rounded border border-slate-200 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ aspectRatio: '16/9' }}
-          title={bg.filename}
-        >
-          {bg.isVideo ? (
-            <video src={toAssetUrl(bg.path)} className="h-full w-full object-cover" muted />
-          ) : (
-            <img src={toAssetUrl(bg.path)} className="h-full w-full object-cover" alt={bg.filename} />
-          )}
-        </button>
-      ))}
+        {backgrounds.length === 0 ? (
+          <p className="col-span-6 text-xs text-slate-400">No backgrounds yet — add some in Build Service.</p>
+        ) : folderScoped.length === 0 ? (
+          <p className="col-span-6 text-xs text-slate-400">Nothing in this folder yet.</p>
+        ) : (
+          folderScoped.map((bg) => (
+            <button
+              key={bg.path}
+              onClick={() => void pick(bg.path)}
+              disabled={busy}
+              className="overflow-hidden rounded border border-slate-200 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ aspectRatio: '16/9' }}
+              title={bg.filename}
+            >
+              {bg.isVideo ? (
+                <video src={toAssetUrl(bg.path)} className="h-full w-full object-cover" muted />
+              ) : (
+                <img src={toAssetUrl(bg.path)} className="h-full w-full object-cover" alt={bg.filename} />
+              )}
+            </button>
+          ))
+        )}
       </div>
     </div>
   )
