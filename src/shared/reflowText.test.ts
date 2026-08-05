@@ -100,6 +100,16 @@ describe('sectionsToReflowText', () => {
     expect(sectionsToReflowText(sections)).toBe('Chorus\nHoly holy holy')
   })
 
+  it('never synthesizes a label that collides with an explicit label already in use', () => {
+    const sections: SongSection[] = [
+      { kind: 'verse', label: null, ordinal: 0, lyrics: 'Some intro lyrics without a label' },
+      { kind: 'verse', label: 'Verse 1', ordinal: 1, lyrics: 'More lyrics' }
+    ]
+    expect(sectionsToReflowText(sections)).toBe(
+      'Verse 2\nSome intro lyrics without a label\n\nVerse 1\nMore lyrics'
+    )
+  })
+
   it('sorts sections by ordinal before joining, regardless of input order', () => {
     const sections: SongSection[] = [
       { kind: 'verse', label: 'Verse 2', ordinal: 1, lyrics: 'second' },
@@ -192,6 +202,15 @@ describe('computeReflowSlides', () => {
     ]
     const slides = computeReflowSlides(sections, null)
     expect(slides.map((s) => s.sectionLabel)).toEqual(['Verse 1', 'Verse 2'])
+  })
+
+  it('never synthesizes a label that collides with an explicit label already in use', () => {
+    const sections: SongSection[] = [
+      { kind: 'verse', label: null, ordinal: 0, lyrics: 'Some intro lyrics without a label' },
+      { kind: 'verse', label: 'Verse 1', ordinal: 1, lyrics: 'More lyrics' }
+    ]
+    const slides = computeReflowSlides(sections, null)
+    expect(slides.map((s) => s.sectionLabel)).toEqual(['Verse 2', 'Verse 1'])
   })
 
   it('returns an empty array for no sections', () => {

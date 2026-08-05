@@ -30,6 +30,40 @@ function trimBlankEdges(lines: string[]): string[] {
   return lines.slice(start, end)
 }
 
+// Computes a display label for every section in an already-ordered list,
+// used by both sectionsToReflowText and computeReflowSlides. A section with
+// an explicit label always uses it verbatim. A section with none gets a
+// synthesized label ("Verse", or "Verse 2" when there's more than one of
+// that kind) — but the synthesized number must never collide with a label
+// (explicit OR already-synthesized earlier in this same pass) that's already
+// in use, since a label is the only thing that marks a section boundary on
+// the next parse: two sections sharing one would be ambiguous.
+function computeSectionLabels(ordered: SongSection[]): string[] {
+  const used = new Set(ordered.filter((s) => s.label).map((s) => s.label as string))
+  // kindTotals counts ALL sections of a kind (explicit-labeled + unlabeled) —
+  // this is what decides whether an unlabeled section's default needs a
+  // number at all ("Verse" alone vs "Verse 1"/"Verse 2"), matching the
+  // pre-existing rule. kindSeen counts only the unlabeled ones actually
+  // synthesized so far, to number them in order.
+  const kindTotals: Record<string, number> = {}
+  for (const sec of ordered) kindTotals[sec.kind] = (kindTotals[sec.kind] ?? 0) + 1
+  const kindSeen: Record<string, number> = {}
+  return ordered.map((sec) => {
+    if (sec.label) return sec.label
+    const kind = sec.kind.charAt(0).toUpperCase() + sec.kind.slice(1)
+    let n = (kindSeen[sec.kind] = (kindSeen[sec.kind] ?? 0) + 1)
+    let candidate = kindTotals[sec.kind] > 1 ? `${kind} ${n}` : kind
+    // Skip past any number an explicit label (or an earlier synthesized
+    // label in this same pass) already claims.
+    while (used.has(candidate)) {
+      n = (kindSeen[sec.kind] = kindSeen[sec.kind] + 1)
+      candidate = `${kind} ${n}`
+    }
+    used.add(candidate)
+    return candidate
+  })
+}
+
 // Parses a whole song's lyrics, typed/edited as one continuous document.
 export function parseReflowText(text: string): SongSection[] {
   const lines = text.split('\n')
@@ -75,16 +109,8 @@ export function parseReflowText(text: string): SongSection[] {
 // the next parse.
 export function sectionsToReflowText(sections: SongSection[]): string {
   const ordered = [...sections].sort((a, b) => a.ordinal - b.ordinal)
-  const kindTotals: Record<string, number> = {}
-  for (const sec of ordered) kindTotals[sec.kind] = (kindTotals[sec.kind] ?? 0) + 1
-  const kindSeen: Record<string, number> = {}
-  const labelFor = (sec: SongSection): string => {
-    if (sec.label) return sec.label
-    const kind = sec.kind.charAt(0).toUpperCase() + sec.kind.slice(1)
-    const n = (kindSeen[sec.kind] = (kindSeen[sec.kind] ?? 0) + 1)
-    return kindTotals[sec.kind] > 1 ? `${kind} ${n}` : kind
-  }
-  return ordered.map((sec) => `${labelFor(sec)}\n${sec.lyrics}`).join('\n\n')
+  const labels = computeSectionLabels(ordered)
+  return ordered.map((sec, i) => `${labels[i]}\n${sec.lyrics}`).join('\n\n')
 }
 
 // Splits ONE section's lyrics into slide texts, on blank-line boundaries.
@@ -127,24 +153,16 @@ export function computeReflowSlides(sections: SongSection[], arrangement: number
     ? arrangement.map((i) => sorted[i]).filter(Boolean)
     : sorted
 
-  const kindTotals: Record<string, number> = {}
-  for (const sec of ordered) kindTotals[sec.kind] = (kindTotals[sec.kind] ?? 0) + 1
-  const kindSeen: Record<string, number> = {}
-  const labelFor = (sec: SongSection): string => {
-    if (sec.label) return sec.label
-    const kind = sec.kind.charAt(0).toUpperCase() + sec.kind.slice(1)
-    const n = (kindSeen[sec.kind] = (kindSeen[sec.kind] ?? 0) + 1)
-    return kindTotals[sec.kind] > 1 ? `${kind} ${n}` : kind
-  }
+  const labels = computeSectionLabels(ordered)
 
   const result: ReflowSlide[] = []
   let keyIdx = 0
-  for (const sec of ordered) {
-    const label = labelFor(sec)
+  ordered.forEach((sec, i) => {
+    const label = labels[i]
     for (const text of reflowSlidesForSection(sec.lyrics)) {
       result.push({ key: `${sec.ordinal}-${keyIdx++}`, sectionOrdinal: sec.ordinal, sectionLabel: label, text })
     }
-  }
+  })
   return result
 }
 
