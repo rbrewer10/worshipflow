@@ -13,6 +13,12 @@ function assertValidFolderName(name: string): void {
   if (name.includes('/') || name.includes('\\') || name.includes('..')) {
     throw new Error('Folder names can\'t contain path separators or "..".')
   }
+  // 'ALL' is the sentinel the renderer uses for "no folder filter, show
+  // everything" (selectedFolder === 'ALL'). A real folder with that exact
+  // name would collide with it and become impossible to view in isolation.
+  if (name === 'ALL') {
+    throw new Error('Folder names can\'t be "ALL" — that name is reserved.')
+  }
 }
 
 export function listFoldersIn(baseDirs: string[]): string[] {

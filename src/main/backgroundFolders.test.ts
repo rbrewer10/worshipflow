@@ -127,6 +127,12 @@ describe('backgroundFolders', () => {
     expect(() => renameFolderIn([uploadsDir, generatedDir], 'Nope', 'Spring')).toThrow()
   })
 
+  it('rejects a folder named "ALL" — it collides with the UI\'s show-everything sentinel', () => {
+    expect(() => createFolderIn(uploadsDir, [uploadsDir, generatedDir], 'ALL')).toThrow()
+    mkdirSync(join(uploadsDir, 'Easter'), { recursive: true })
+    expect(() => renameFolderIn([uploadsDir, generatedDir], 'Easter', 'ALL')).toThrow()
+  })
+
   it('rejects moving a file into a folder when it would overwrite an existing file', () => {
     mkdirSync(join(uploadsDir, 'Easter'), { recursive: true })
     writeFileSync(join(uploadsDir, 'Easter', 'photo.jpg'), 'existing')

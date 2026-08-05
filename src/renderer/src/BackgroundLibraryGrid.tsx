@@ -39,6 +39,8 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
   const [selectedFolder, setSelectedFolder] = useState<string | null | 'ALL'>('ALL')
   const [newFolderName, setNewFolderName] = useState('')
   const [creatingFolder, setCreatingFolder] = useState(false)
+  const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   // undefined = no pill currently being dragged over; null = the Uncategorized
   // pill (which, like a real folder, needs its own distinct "hovering" state
@@ -181,6 +183,25 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
     }
   }
 
+  async function handleRenameFolder(oldName: string): Promise<void> {
+    const newName = renameValue.trim()
+    if (!newName || newName === oldName) {
+      setRenamingFolder(null)
+      setRenameValue('')
+      return
+    }
+    try {
+      await window.wf.bgRenameFolder(oldName, newName)
+      if (selectedFolder === oldName) setSelectedFolder(newName)
+      setRenamingFolder(null)
+      setRenameValue('')
+      await loadFolders()
+      await loadUploads()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not rename that folder.')
+    }
+  }
+
   async function handleDeleteFolder(name: string): Promise<void> {
     if (!confirm(`Delete the "${name}" folder? Its backgrounds move to Uncategorized — nothing is deleted.`)) return
     try {
@@ -274,30 +295,58 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
         >
           Uncategorized
         </button>
-        {folders.map((f) => (
-          <div key={f} className="group relative">
-            <button
-              onClick={() => setSelectedFolder(f)}
-              onDragOver={(e) => { e.preventDefault(); setDragOverFolder(f) }}
-              onDragLeave={() => setDragOverFolder(undefined)}
-              onDrop={onFolderDrop(f)}
-              className={[
-                'rounded-full px-2.5 py-1 pr-5 text-[11px] font-semibold transition-all',
-                selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                dragOverFolder === f ? 'ring-2 ring-blue-400 ring-offset-1' : '',
-              ].join(' ')}
-            >
-              {f}
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleDeleteFolder(f) }}
-              title={`Delete "${f}" folder`}
-              className="absolute right-1 top-1/2 hidden -translate-y-1/2 text-[10px] opacity-70 hover:opacity-100 group-hover:block"
-            >
-              <X size={10} />
-            </button>
-          </div>
-        ))}
+        {folders.map((f) =>
+          renamingFolder === f ? (
+            <div key={f} className="flex items-center gap-1">
+              <input
+                // This input only renders because the operator just clicked the
+                // rename pencil on this specific pill — autofocusing it is the
+                // deliberate continuation of that action.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleRenameFolder(f)
+                  if (e.key === 'Escape') { setRenamingFolder(null); setRenameValue('') }
+                }}
+                placeholder="Folder name"
+                className="w-28 rounded-full border border-slate-300 px-2.5 py-1 text-[11px] outline-none focus:border-blue-500"
+              />
+              <button onClick={() => handleRenameFolder(f)} className="text-[11px] font-semibold text-blue-700">Save</button>
+            </div>
+          ) : (
+            <div key={f} className="group relative">
+              <button
+                onClick={() => setSelectedFolder(f)}
+                onDragOver={(e) => { e.preventDefault(); setDragOverFolder(f) }}
+                onDragLeave={() => setDragOverFolder(undefined)}
+                onDrop={onFolderDrop(f)}
+                className={[
+                  'rounded-full px-2.5 py-1 pr-9 text-[11px] font-semibold transition-all',
+                  selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                  dragOverFolder === f ? 'ring-2 ring-blue-400 ring-offset-1' : '',
+                ].join(' ')}
+              >
+                {f}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setRenamingFolder(f); setRenameValue(f) }}
+                title={`Rename "${f}" folder`}
+                className="absolute right-5 top-1/2 hidden -translate-y-1/2 text-[10px] opacity-70 hover:opacity-100 group-hover:block"
+              >
+                <Pencil size={10} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteFolder(f) }}
+                title={`Delete "${f}" folder`}
+                className="absolute right-1 top-1/2 hidden -translate-y-1/2 text-[10px] opacity-70 hover:opacity-100 group-hover:block"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          )
+        )}
         {creatingFolder ? (
           <div className="flex items-center gap-1">
             <input

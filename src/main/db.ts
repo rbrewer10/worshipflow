@@ -25,6 +25,7 @@ import type {
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
 import { splitLyricLines } from '../shared/lyrics'
+import type { ZoneSlide } from '../shared/zoneSlides'
 
 let db: Database
 let dbPath = ''
@@ -1299,6 +1300,25 @@ export function findBackgroundUsage(filePath: string): BackgroundUsage {
       }
     }
     itemStmt.free()
+
+    // A background can also live inside a zone deck's per-slide, per-zone
+    // slots (service_item.zone_slides), a separate TEXT column from
+    // payload_json. Same LIKE-prefilter + JSON.parse + exact-match pattern.
+    const zoneStmt = db.prepare('SELECT type, zone_slides FROM service_item WHERE zone_slides LIKE ?')
+    zoneStmt.bind([`%${filePath}%`])
+    while (zoneStmt.step()) {
+      const r = zoneStmt.getAsObject() as any
+      try {
+        const slides = JSON.parse(r.zone_slides) as ZoneSlide[]
+        const hit = slides.some((slide) =>
+          Object.values(slide.zones ?? {}).some((slot) => slot?.path === filePath)
+        )
+        if (hit) items.push(r.type as string)
+      } catch {
+        /* skip malformed zone_slides */
+      }
+    }
+    zoneStmt.free()
   } catch (err) {
     console.error('[db] Failed to check background usage:', err)
   }
