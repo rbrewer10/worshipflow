@@ -181,6 +181,7 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE recording ADD COLUMN thumbnail_path TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE recording ADD COLUMN ai_state TEXT') } catch { /* already exists */ }
   normalizeSectionLyrics()
+  migrateReflowBreaks()
   normalizeTitles()
   clearSecondTrackAssignments()
   persist()
@@ -244,6 +245,53 @@ function normalizeSectionLyrics(): void {
   for (const row of rows) {
     const next = splitLyricLines(row.lyrics ?? '')
     if (next !== row.lyrics) {
+      db.run('UPDATE song_section SET lyrics = ? WHERE id = ?', [next, row.id])
+    }
+  }
+}
+
+// Old mechanical "every N lines is a slide" split, reproduced here ONLY for
+// the one-time migration below — this is deliberately NOT part of the shared
+// reflowText.ts module, since it represents retired behavior, not the new
+// forward-looking rule. Mirrors exactly what songLines()/computeEditorSlides()
+// used to do: trim and drop blank lines, then group every N.
+function insertLegacySlideBreaks(lyrics: string, perSlide: number): string {
+  if (perSlide <= 1) return lyrics
+  const lines = lyrics.split('\n').map((l) => l.trim()).filter(Boolean)
+  const groups: string[] = []
+  for (let i = 0; i < lines.length; i += perSlide) groups.push(lines.slice(i, i + perSlide).join('\n'))
+  return groups.join('\n\n')
+}
+
+// One-time (idempotent) pass converting existing songs from the old
+// mechanical "every linesPerSlide lines" splitting to explicit blank-line
+// slide breaks, so nothing changes visually after upgrading to Reflow-style
+// editing. Idempotent by inspection, not a flag: no code path in this
+// codebase has ever written a blank line into song_section.lyrics before
+// this feature, so a section that already contains one reliably means
+// "already migrated" (or edited under the new model since) — either way,
+// leave it alone. Must run after normalizeSectionLyrics(): that function can
+// re-wrap one long crammed line into several physical lines, and the
+// mechanical split this reproduces has always operated on lyrics AFTER that
+// normalization (songLines() ran after it too), so migrating before it would
+// compute different break points than the old live behavior actually had.
+function migrateReflowBreaks(): void {
+  const rows: { id: number; lyrics: string; lines_per_slide: number | null }[] = []
+  const stmt = db.prepare(
+    'SELECT ss.id AS id, ss.lyrics AS lyrics, s.lines_per_slide AS lines_per_slide FROM song_section ss JOIN song s ON s.id = ss.song_id'
+  )
+  while (stmt.step()) {
+    rows.push(stmt.getAsObject() as unknown as { id: number; lyrics: string; lines_per_slide: number | null })
+  }
+  stmt.free()
+  for (const row of rows) {
+    const lyrics = row.lyrics ?? ''
+    if (lyrics.trim() === '') continue
+    const alreadyHasBreak = lyrics.split('\n').some((l) => l.trim() === '')
+    if (alreadyHasBreak) continue
+    const perSlide = row.lines_per_slide ?? 2
+    const next = insertLegacySlideBreaks(lyrics, perSlide)
+    if (next !== lyrics) {
       db.run('UPDATE song_section SET lyrics = ? WHERE id = ?', [next, row.id])
     }
   }
