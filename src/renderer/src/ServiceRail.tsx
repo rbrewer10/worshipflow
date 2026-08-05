@@ -4,6 +4,7 @@ import type { LiveState, ServiceItem } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
 import LiveZoneStatus from './zones/LiveZoneStatus'
+import LooksPanel from './zones/LooksPanel'
 import { sendItemLive, itemThumbBackground, usePendingConfirm } from './liveActions'
 
 // Persistent left rail: the loaded service's items + the pinned zone status.
@@ -88,6 +89,9 @@ function ServiceRail(): JSX.Element {
       </div>
       <div className="border-t border-slate-200">
         <LiveZoneStatus />
+      </div>
+      <div className="border-t border-slate-200">
+        <LooksPanel />
       </div>
     </aside>
   )
