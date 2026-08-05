@@ -1243,6 +1243,68 @@ export function setBackgroundTags(filePath: string, tags: string[]): void {
   }
 }
 
+// Keeps a background's tags attached to it when it moves — background_tags
+// is keyed by absolute file path, so a move/rename that doesn't update this
+// row silently orphans the tags. Only called when the app itself moves a
+// file (folder rename, move to folder); a manual move outside the app is
+// still not tracked, same limitation this table already had.
+export function renameBackgroundTagPath(oldPath: string, newPath: string): void {
+  try {
+    db.run('UPDATE background_tags SET file_path = ? WHERE file_path = ?', [newPath, oldPath])
+    persist()
+  } catch (err) {
+    console.error('[db] Failed to rename background tag path:', err)
+  }
+}
+
+export interface BackgroundUsage {
+  songs: string[]
+  announcements: string[]
+  items: string[]
+}
+
+// Best-effort check for whether a background is currently referenced
+// anywhere, so moving/deleting it can warn instead of silently breaking a
+// song, announcement, or item. This is advisory, not a guarantee — per the
+// design, moving/deleting proceeds either way, so a missed edge case here
+// isn't a correctness bug, just a warning that didn't fire.
+export function findBackgroundUsage(filePath: string): BackgroundUsage {
+  const songs: string[] = []
+  const announcements: string[] = []
+  const items: string[] = []
+  try {
+    const songStmt = db.prepare('SELECT title FROM song WHERE background = ?')
+    songStmt.bind([filePath])
+    while (songStmt.step()) songs.push((songStmt.getAsObject() as any).title)
+    songStmt.free()
+
+    const annStmt = db.prepare('SELECT title FROM announcement WHERE background = ?')
+    annStmt.bind([filePath])
+    while (annStmt.step()) announcements.push((annStmt.getAsObject() as any).title)
+    annStmt.free()
+
+    // Non-song item types store their background inside payload_json. A
+    // LIKE match narrows candidates cheaply; the JSON.parse + exact-field
+    // check after that confirms it's a real match, not just a coincidental
+    // substring.
+    const itemStmt = db.prepare('SELECT type, payload_json FROM service_item WHERE payload_json LIKE ?')
+    itemStmt.bind([`%${filePath}%`])
+    while (itemStmt.step()) {
+      const r = itemStmt.getAsObject() as any
+      try {
+        const payload = JSON.parse(r.payload_json)
+        if (payload?.background === filePath) items.push(r.type as string)
+      } catch {
+        /* skip malformed payload */
+      }
+    }
+    itemStmt.free()
+  } catch (err) {
+    console.error('[db] Failed to check background usage:', err)
+  }
+  return { songs, announcements, items }
+}
+
 export function searchBackgroundsByTags(searchTags: string[]): string[] {
   try {
     const stmt = db.prepare('SELECT file_path, tags_json FROM background_tags')
