@@ -36,6 +36,12 @@ import type { Look } from '../../shared/zoneLooks'
 
 const mockPins: ZonePins = {}
 const mockLooks: Look[] = []
+// A length-derived id would collide after delete-then-save (e.g. save 3,
+// delete the middle one, save a 4th — its id would match the survivor's),
+// letting looksDelete/looksApply's find-by-id silently act on the wrong
+// entry. A monotonically increasing counter never repeats regardless of
+// what's been deleted.
+let nextMockLookId = 1
 
 const demoLines = [
   'Amazing grace, how sweet the sound',
@@ -465,7 +471,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     zoneGetPins: async (): Promise<ZonePins> => ({ ...mockPins }),
     looksList: async (): Promise<Look[]> => mockLooks.map((l) => ({ ...l })),
     looksSave: async (name: string): Promise<void> => {
-      mockLooks.push({ id: String(mockLooks.length + 1), name, pins: { ...mockPins } })
+      mockLooks.push({ id: String(nextMockLookId++), name, pins: { ...mockPins } })
     },
     looksDelete: async (lookId: string): Promise<void> => {
       const idx = mockLooks.findIndex((l) => l.id === lookId)
