@@ -4,7 +4,7 @@ import type { ItemStyle, ServiceItem, SongFull, ThemeColors } from '../../shared
 import { NON_LIVE_TYPES } from '../../shared/types'
 import ServiceSlidePreview from './ServiceSlidePreview'
 import ItemBackgroundPanel from './ItemBackgroundPanel'
-import { SongEditor } from './editors/SongEditor'
+import { CardSongEditor } from './editors/CardSongEditor'
 import { ScriptureEditor } from './editors/ScriptureEditor'
 import { TextEditor } from './editors/TextEditor'
 import { ImageEditor } from './editors/ImageEditor'
@@ -121,7 +121,7 @@ export const ItemEditor = memo(function ItemEditor({
 
       {/* Type-specific editors */}
       {item.type === 'song' && (
-        <SongEditor
+        <CardSongEditor
           songFull={songFull}
           lyrics={lyrics}
           showChords={showChords}

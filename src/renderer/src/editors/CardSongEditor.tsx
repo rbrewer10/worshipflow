@@ -5,8 +5,9 @@ import type { SongFull } from '../../../shared/types'
 import { memo } from 'react'
 import { Guitar, Tag, Film, Image as ImageIcon, X, Check, Minus, Plus } from 'lucide-react'
 import Modal from '../Modal'
+import ReflowEditor from '../ReflowEditor'
 
-interface SongEditorProps {
+interface CardSongEditorProps {
   songFull: SongFull | null
   lyrics: string
   showChords: boolean
@@ -26,7 +27,7 @@ interface SongEditorProps {
   setShowAutoLabelPreview: (show: boolean) => void
 }
 
-export const SongEditor = memo(function SongEditor({
+export const CardSongEditor = memo(function CardSongEditor({
   songFull,
   lyrics,
   showChords,
@@ -44,7 +45,7 @@ export const SongEditor = memo(function SongEditor({
   setAutoLabelPreview,
   setAutoLabelAnalyses,
   setShowAutoLabelPreview
-}: SongEditorProps): JSX.Element {
+}: CardSongEditorProps): JSX.Element {
   const handleAutoLabel = (): void => {
     const analyses = analyzeAndLabelSections(lyrics)
     const preview = previewAutoLabels(lyrics, analyses)
@@ -56,13 +57,10 @@ export const SongEditor = memo(function SongEditor({
   return (
     <div className="space-y-4">
       {/* Lyrics */}
-      <div className="space-y-2">
-        <label htmlFor="song-lyrics" className="section-header block">Lyrics</label>
-        <p className="text-xs text-slate-500">Separate sections with blank lines</p>
-        <textarea id="song-lyrics" value={lyrics} onChange={(e) => onLyricsChange(e.target.value)} rows={8}
-          placeholder="Enter lyrics — one section per paragraph (separated by blank lines)…"
-          aria-label="Song lyrics"
-          className="font-mono text-xs leading-relaxed" />
+      <div className="flex min-h-0 flex-col gap-2" style={{ height: '320px' }}>
+        <span className="section-header block">Lyrics</span>
+        <p className="text-xs text-slate-500">A blank line starts a new slide — a label like "Chorus" starts a new section</p>
+        {songFull && <ReflowEditor song={songFull} value={lyrics} onChange={onLyricsChange} />}
       </div>
 
       {/* Lyrics controls */}
