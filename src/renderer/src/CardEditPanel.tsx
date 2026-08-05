@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ItemStyle, ServiceItem, SongFull, SongInput, ThemeColors } from '../../shared/types'
 import { ItemEditor } from './ItemEditor'
-import { parseSections, sectionsToText } from './songText'
+import { parseReflowText, sectionsToReflowText } from '../../shared/reflowText'
 import { analyzeAndLabelSections, previewAutoLabels } from './autoLabel'
 import { useAutosave } from './useAutosave'
 import { combineSaveStatus } from './saveQueue'
@@ -27,7 +27,7 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   useEffect(() => {
     setP(item.payload ?? {}); setNotes(item.notes ?? '')
     if (item.type === 'song' && item.ref_id != null) {
-      window.wf.songGet(item.ref_id).then((s) => { setSongFull(s); setLyrics(s ? sectionsToText(s) : '') })
+      window.wf.songGet(item.ref_id).then((s) => { setSongFull(s); setLyrics(s ? sectionsToReflowText(s.sections) : '') })
     } else {
       setSongFull(null); setLyrics('')
     }
@@ -61,7 +61,7 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
 
   const buildSongInput = (overrides: Partial<SongInput> = {}): (SongInput & { __id: number }) | null => {
     if (!songFull) return null
-    const sections = parseSections(lyrics)
+    const sections = parseReflowText(lyrics)
     const validArr = (songFull.arrangement ?? []).filter((i) => i < sections.length)
     return {
       __id: songFull.id,
