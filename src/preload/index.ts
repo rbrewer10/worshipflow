@@ -176,9 +176,18 @@ const wf = {
     ipcRenderer.invoke('wf:dialog:openFile'),
 
   // Background library
-  bgList: (): Promise<{ filename: string; path: string; kind: 'upload' | 'generated'; isVideo: boolean }[]> =>
+  bgList: (): Promise<{ filename: string; path: string; kind: 'upload' | 'generated'; isVideo: boolean; folder: string | null }[]> =>
     ipcRenderer.invoke('wf:bg:list'),
   bgOpenFolder: (): Promise<void> => ipcRenderer.invoke('wf:bg:openFolder'),
+  bgListFolders: (): Promise<string[]> => ipcRenderer.invoke('wf:bg:listFolders'),
+  bgCreateFolder: (name: string): Promise<void> => ipcRenderer.invoke('wf:bg:createFolder', name),
+  bgRenameFolder: (oldName: string, newName: string): Promise<void> =>
+    ipcRenderer.invoke('wf:bg:renameFolder', oldName, newName),
+  bgDeleteFolder: (name: string): Promise<void> => ipcRenderer.invoke('wf:bg:deleteFolder', name),
+  bgMove: (filePath: string, folderName: string | null): Promise<string> =>
+    ipcRenderer.invoke('wf:bg:move', filePath, folderName),
+  bgUsage: (filePath: string): Promise<{ songs: string[]; announcements: string[]; items: string[] }> =>
+    ipcRenderer.invoke('wf:bg:usage', filePath),
   bgUpload: (srcPath: string): Promise<string> => ipcRenderer.invoke('wf:bg:upload', srcPath),
   bgDelete: (filePath: string): Promise<void> => ipcRenderer.invoke('wf:bg:delete', filePath),
   bgGenerate: (prompt: string): Promise<string> => ipcRenderer.invoke('wf:bg:generate', prompt),

@@ -82,6 +82,8 @@ import {
   getBackgroundTags,
   setBackgroundTags,
   searchBackgroundsByTags,
+  renameBackgroundTagPath,
+  findBackgroundUsage,
   createRecording,
   addRecordingMarker,
   finalizeRecording,
@@ -92,7 +94,10 @@ import {
   setRecordingRender,
   setRecordingAi
 } from './db'
-import { listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder } from './backgroundLib'
+import {
+  listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder,
+  listBackgroundFolders, createBackgroundFolder, renameBackgroundFolder, moveBackground, deleteBackgroundFolder
+} from './backgroundLib'
 import { generateBackgroundImage } from './replicateApi'
 import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
@@ -3080,6 +3085,32 @@ ipcMain.handle('wf:live:setBackground', (_e, track: TrackId, path: string) => {
 
 // Background library
 ipcMain.handle('wf:bg:list', () => listBackgrounds())
+
+ipcMain.handle('wf:bg:listFolders', () => listBackgroundFolders())
+
+ipcMain.handle('wf:bg:createFolder', (_e: unknown, name: string) => {
+  createBackgroundFolder(name)
+})
+
+ipcMain.handle('wf:bg:renameFolder', (_e: unknown, oldName: string, newName: string) => {
+  const moves = renameBackgroundFolder(oldName, newName)
+  for (const m of moves) renameBackgroundTagPath(m.oldPath, m.newPath)
+})
+
+ipcMain.handle('wf:bg:deleteFolder', (_e: unknown, name: string) => {
+  const moves = deleteBackgroundFolder(name)
+  for (const m of moves) renameBackgroundTagPath(m.oldPath, m.newPath)
+})
+
+ipcMain.handle('wf:bg:move', (_e: unknown, filePath: string, folderName: string | null) => {
+  const newPath = moveBackground(filePath, folderName)
+  if (newPath !== filePath) renameBackgroundTagPath(filePath, newPath)
+  return newPath
+})
+
+ipcMain.handle('wf:bg:usage', (_e: unknown, filePath: string) => {
+  return findBackgroundUsage(filePath)
+})
 
 ipcMain.handle('wf:bg:openFolder', () => openBackgroundsFolder())
 
