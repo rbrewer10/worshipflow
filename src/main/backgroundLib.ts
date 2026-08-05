@@ -5,6 +5,10 @@ import { join, extname } from 'path'
 import { mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync, createWriteStream } from 'fs'
 import { createHash } from 'crypto'
 import https from 'https'
+import {
+  listFoldersIn, createFolderIn, renameFolderIn, moveFileToFolder, deleteFolderIn
+} from './backgroundFolders'
+import type { FileMove } from './backgroundFolders'
 
 function uploadsDir(): string {
   const d = join(app.getPath('userData'), 'backgrounds', 'uploads')
@@ -33,22 +37,54 @@ export type BgEntry = {
   path: string
   kind: 'upload' | 'generated'
   isVideo: boolean
+  folder: string | null
 }
+
+const IMAGE_EXT = /\.(jpg|jpeg|png|webp|gif)$/i
+const VIDEO_EXT = /\.(mp4|webm|mov|avi)$/i
 
 export function listBackgrounds(): BgEntry[] {
   const results: BgEntry[] = []
-  const IMAGE_EXT = /\.(jpg|jpeg|png|webp|gif)$/i
-  const VIDEO_EXT = /\.(mp4|webm|mov|avi)$/i
 
   for (const dir of [uploadsDir(), generatedDir()]) {
     const kind = dir.includes('generated') ? 'generated' : 'upload'
     if (!existsSync(dir)) continue
-    for (const f of readdirSync(dir)) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        // One level deep only — flat folders, no nested subfolders.
+        const subDir = join(dir, entry.name)
+        for (const f of readdirSync(subDir)) {
+          if (!IMAGE_EXT.test(f) && !VIDEO_EXT.test(f)) continue
+          results.push({ filename: f, path: join(subDir, f), kind, isVideo: VIDEO_EXT.test(f), folder: entry.name })
+        }
+        continue
+      }
+      const f = entry.name
       if (!IMAGE_EXT.test(f) && !VIDEO_EXT.test(f)) continue
-      results.push({ filename: f, path: join(dir, f), kind, isVideo: VIDEO_EXT.test(f) })
+      results.push({ filename: f, path: join(dir, f), kind, isVideo: VIDEO_EXT.test(f), folder: null })
     }
   }
   return results
+}
+
+export function listBackgroundFolders(): string[] {
+  return listFoldersIn([uploadsDir(), generatedDir()])
+}
+
+export function createBackgroundFolder(name: string): void {
+  createFolderIn(uploadsDir(), [uploadsDir(), generatedDir()], name)
+}
+
+export function renameBackgroundFolder(oldName: string, newName: string): FileMove[] {
+  return renameFolderIn([uploadsDir(), generatedDir()], oldName, newName)
+}
+
+export function moveBackground(filePath: string, folderName: string | null): string {
+  return moveFileToFolder([uploadsDir(), generatedDir()], filePath, folderName)
+}
+
+export function deleteBackgroundFolder(name: string): FileMove[] {
+  return deleteFolderIn([uploadsDir(), generatedDir()], name)
 }
 
 export function copyBackground(srcPath: string): string {
