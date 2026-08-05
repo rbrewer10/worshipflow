@@ -1,13 +1,12 @@
 // src/renderer/src/editor/SongEditor.tsx
-// Top-level editor: SlideStrip + SlideCanvas + BackgroundPanel
+// Top-level editor: continuous-lyrics ReflowEditor + BackgroundPanel
 // Replaces the right-side form panel in SongLibrary.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Pencil, Trash2, ExternalLink, ArrowLeft } from 'lucide-react'
-import type { SongFull, SongInput, SongSection } from '../../../shared/types'
-import { computeEditorSlides, applySlideEdit, deleteSlideFromSong } from './slideCompute'
-import SlideStrip from './SlideStrip'
-import SlideCanvas from './SlideCanvas'
+import { Pencil, ExternalLink, ArrowLeft } from 'lucide-react'
+import type { SongFull, SongInput } from '../../../shared/types'
+import { parseReflowText, sectionsToReflowText, computeReflowSlides } from '../../../shared/reflowText'
+import ReflowEditor from '../ReflowEditor'
 import BackgroundPanel from './BackgroundPanel'
 import { useAutosave } from '../useAutosave'
 import { combineSaveStatus } from '../saveQueue'
@@ -18,7 +17,7 @@ export default function SongEditor({ songId, onSaved }: {
   onSaved?: () => void
 }): JSX.Element {
   const [song, setSong] = useState<SongFull | null>(null)
-  const [activeSlideIndex, setActiveSlideIndex] = useState(0)
+  const [lyricsText, setLyricsText] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const titleRef = useRef<HTMLInputElement>(null)
@@ -26,7 +25,7 @@ export default function SongEditor({ songId, onSaved }: {
   const load = useCallback(async () => {
     const s = await window.wf.songGet(songId)
     setSong(s)
-    setActiveSlideIndex(0)
+    setLyricsText(s ? sectionsToReflowText(s.sections) : '')
   }, [songId])
 
   useEffect(() => { load() }, [load])
@@ -63,8 +62,7 @@ export default function SongEditor({ songId, onSaved }: {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>
   }
 
-  const slides = computeEditorSlides(song)
-  const activeSlide = slides[activeSlideIndex] ?? null
+  const slides = computeReflowSlides(parseReflowText(lyricsText), song.arrangement ?? null)
 
   const saveSong = async (updated: SongFull): Promise<void> => {
     const input: SongInput = {
@@ -86,12 +84,18 @@ export default function SongEditor({ songId, onSaved }: {
     songQueue.trigger(input)
   }
 
-  const handleTextChange = async (sectionOrdinal: number, lineStart: number, lineCount: number, newText: string): Promise<void> => {
-    if (!song || !activeSlide) return
-    const updatedSections = applySlideEdit(song, { ...activeSlide, sectionOrdinal, lineStart, lineCount }, newText)
+  // The textarea's own state (lyricsText) is set directly, unconditionally —
+  // never re-derived from song.sections — so the operator's literal keystrokes
+  // are never fought with a reformatted value. song.sections is kept as a
+  // derived cache purely so the rest of this component (BackgroundPanel,
+  // title, the autosave payload) still has a valid SongFull to work with;
+  // parsing only happens here, not on every render.
+  const handleLyricsChange = (text: string): void => {
+    setLyricsText(text)
+    const updatedSections = parseReflowText(text)
     const updated = { ...song, sections: updatedSections }
     setSong(updated)
-    await saveSong(updated)
+    void saveSong(updated)
   }
 
   // --- Inline title rename ---
@@ -108,32 +112,6 @@ export default function SongEditor({ songId, onSaved }: {
     const updated = { ...song, title: next }
     setSong(updated)
     await saveSong(updated)
-  }
-
-  // --- Add a new empty slide (section) ---
-  const handleAddSlide = async (): Promise<void> => {
-    if (!song) return
-    const maxOrdinal = song.sections.reduce((m, s) => Math.max(m, s.ordinal), 0)
-    const newSection: SongSection = { kind: 'verse', ordinal: maxOrdinal + 1, lyrics: '' }
-    const updated = { ...song, sections: [...song.sections, newSection] }
-    setSong(updated)
-    await saveSong(updated)
-    // Select the new slide (last one in the recomputed list).
-    const newSlides = computeEditorSlides(updated)
-    setActiveSlideIndex(Math.max(0, newSlides.length - 1))
-  }
-
-  // --- Delete just the active slide ---
-  const handleDeleteSlide = async (): Promise<void> => {
-    if (!song || !activeSlide) return
-    // Guard: never delete the last remaining slide.
-    if (slides.length <= 1) return
-    const { sections, arrangement } = deleteSlideFromSong(song, activeSlide)
-    const updated = { ...song, sections, arrangement }
-    setSong(updated)
-    await saveSong(updated)
-    const newSlides = computeEditorSlides(updated)
-    setActiveSlideIndex((i) => Math.min(i, Math.max(0, newSlides.length - 1)))
   }
 
   const handleApplyBackground = (bgPath: string): void => {
@@ -182,8 +160,6 @@ export default function SongEditor({ songId, onSaved }: {
   ]
   const activeColor = song.textColor ?? '#ffffff'
 
-  const canDelete = slides.length > 1 && !!activeSlide
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {/* Header bar */}
@@ -217,14 +193,6 @@ export default function SongEditor({ songId, onSaved }: {
         <SaveStatusBadge status={saveStatus} error={saveError} onRetry={retrySave} />
 
         <button
-          onClick={handleDeleteSlide}
-          disabled={!canDelete}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent"
-          title={canDelete ? 'Delete current slide' : 'Cannot delete the last slide'}
-        >
-          <Trash2 size={13} /> Delete slide
-        </button>
-        <button
           onClick={() => window.wf.editorOpen(songId)}
           className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-500/10 hover:text-blue-800"
           title="Open editor in its own window"
@@ -241,20 +209,11 @@ export default function SongEditor({ songId, onSaved }: {
         )}
       </div>
 
-      {/* Editor body: strip + canvas + background panel */}
+      {/* Editor body: continuous lyrics editor + background panel */}
       <div className="flex min-h-0 flex-1 gap-3">
-        {/* Left: slide strip */}
-        <SlideStrip
-          song={song}
-          slides={slides}
-          activeIndex={activeSlideIndex}
-          onSelect={setActiveSlideIndex}
-          onAddSlide={handleAddSlide}
-        />
-
-        {/* Center: big centered WYSIWYG canvas */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Text toolbar: font + color */}
+        {/* Center: continuous lyrics editor + live slide preview */}
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          {/* Text toolbar: font, color, font size */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-[#f4f6f9] px-3 py-2">
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-slate-600">Font</span>
@@ -290,17 +249,22 @@ export default function SongEditor({ songId, onSaved }: {
                 />
               ))}
             </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-600">Size</span>
+              <select
+                value={song.fontScale ?? 4}
+                onChange={(e) => handleFontScaleChange(Number(e.target.value))}
+                className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-xs text-slate-900"
+              >
+                {[3, 4, 5, 6, 7, 8, 9, 10].map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden p-4">
-            <SlideCanvas
-              song={song}
-              slide={activeSlide}
-              onTextChange={handleTextChange}
-              onFontScaleChange={handleFontScaleChange}
-            />
+          <div className="flex min-h-0 flex-1">
+            <ReflowEditor song={song} value={lyricsText} onChange={handleLyricsChange} />
           </div>
           <p className="text-center text-[10px] text-slate-400">
-            Click lyrics to edit • {slides.length} slide{slides.length !== 1 ? 's' : ''} total
+            A blank line starts a new slide, a label like "Chorus" starts a new section • {slides.length} slide{slides.length !== 1 ? 's' : ''} total
           </p>
         </div>
 
