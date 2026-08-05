@@ -40,6 +40,10 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
   const [newFolderName, setNewFolderName] = useState('')
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
+  // undefined = no pill currently being dragged over; null = the Uncategorized
+  // pill (which, like a real folder, needs its own distinct "hovering" state
+  // separate from "nothing is being hovered").
+  const [dragOverFolder, setDragOverFolder] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
     void loadUploads()
@@ -155,9 +159,13 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
 
   async function handleMoveToFolder(filePath: string, folderName: string | null): Promise<void> {
     if (!(await warnIfInUse(filePath, 'move'))) return
-    const newPath = await window.wf.bgMove(filePath, folderName)
-    if (activePath === filePath) onApply(newPath)
-    await loadUploads()
+    try {
+      const newPath = await window.wf.bgMove(filePath, folderName)
+      if (activePath === filePath) onApply(newPath)
+      await loadUploads()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not move that background.')
+    }
   }
 
   async function handleCreateFolder(): Promise<void> {
@@ -175,10 +183,14 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
 
   async function handleDeleteFolder(name: string): Promise<void> {
     if (!confirm(`Delete the "${name}" folder? Its backgrounds move to Uncategorized — nothing is deleted.`)) return
-    await window.wf.bgDeleteFolder(name)
-    if (selectedFolder === name) setSelectedFolder('ALL')
-    await loadFolders()
-    await loadUploads()
+    try {
+      await window.wf.bgDeleteFolder(name)
+      if (selectedFolder === name) setSelectedFolder('ALL')
+      await loadFolders()
+      await loadUploads()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete that folder.')
+    }
   }
 
   function onFolderDrop(folderName: string | null): (e: React.DragEvent) => void {
@@ -186,6 +198,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
       e.preventDefault()
       if (draggedPath) void handleMoveToFolder(draggedPath, folderName)
       setDraggedPath(null)
+      setDragOverFolder(undefined)
     }
   }
 
@@ -250,11 +263,13 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
         </button>
         <button
           onClick={() => setSelectedFolder(null)}
-          onDragOver={(e) => e.preventDefault()}
+          onDragOver={(e) => { e.preventDefault(); setDragOverFolder(null) }}
+          onDragLeave={() => setDragOverFolder(undefined)}
           onDrop={onFolderDrop(null)}
           className={[
             'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all',
             selectedFolder === null ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+            dragOverFolder === null ? 'ring-2 ring-blue-400 ring-offset-1' : '',
           ].join(' ')}
         >
           Uncategorized
@@ -263,11 +278,13 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
           <div key={f} className="group relative">
             <button
               onClick={() => setSelectedFolder(f)}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => { e.preventDefault(); setDragOverFolder(f) }}
+              onDragLeave={() => setDragOverFolder(undefined)}
               onDrop={onFolderDrop(f)}
               className={[
                 'rounded-full px-2.5 py-1 pr-5 text-[11px] font-semibold transition-all',
                 selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                dragOverFolder === f ? 'ring-2 ring-blue-400 ring-offset-1' : '',
               ].join(' ')}
             >
               {f}
@@ -371,7 +388,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 tabIndex={0}
                 draggable
                 onDragStart={() => setDraggedPath(u.path)}
-                onDragEnd={() => setDraggedPath(null)}
+                onDragEnd={() => { setDraggedPath(null); setDragOverFolder(undefined) }}
                 onClick={() => onApply(u.path)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onApply(u.path) } }}
                 aria-label={`Use background: ${u.path.split(/[/\\]/).pop()}`}
@@ -400,18 +417,23 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 )}
 
                 {folders.length > 0 && (
-                  <select
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => { const v = e.target.value; handleMoveToFolder(u.path, v === '' ? null : v); e.target.value = '' }}
-                    value=""
+                  <div
                     title="Move to folder"
-                    aria-label="Move to folder"
-                    className="absolute left-1 top-1 hidden w-6 rounded bg-black/60 text-[9px] text-transparent group-hover:block"
+                    className="absolute left-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white shadow hover:bg-black/80 group-hover:flex"
                   >
-                    <option value="" disabled>Move to…</option>
-                    <option value="">Uncategorized</option>
-                    {folders.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
+                    <FolderOpen size={11} />
+                    <select
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => { const v = e.target.value; handleMoveToFolder(u.path, v === '' ? null : v); e.target.value = '' }}
+                      value=""
+                      aria-label="Move to folder"
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    >
+                      <option value="" disabled>Move to…</option>
+                      <option value="">Uncategorized</option>
+                      {folders.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
                 )}
                 <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
                   <button
