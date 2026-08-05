@@ -11,6 +11,7 @@ import BackgroundPanel from './BackgroundPanel'
 import { useAutosave } from '../useAutosave'
 import { combineSaveStatus } from '../saveQueue'
 import SaveStatusBadge from '../SaveStatusBadge'
+import { notifyLocal } from '../NotifyToasts'
 
 export default function SongEditor({ songId, onSaved }: {
   songId: number
@@ -129,9 +130,16 @@ export default function SongEditor({ songId, onSaved }: {
     // fires, permanently corrupting the "any save failed?" bookkeeping
     // AppShell's navigation guard depends on. There's no future save left to
     // serialize against once this component is gone, so bypassing the queue
-    // here is safe.
+    // here is safe. notifyLocal is a plain module-level toast function (not
+    // scoped to this component), so a failure here can still surface a
+    // toast even after unmount, without touching saveRegistry at all.
     pendingLyricsSaveRef.current = () => {
-      void window.wf.songUpdate(songId, buildSongInput(currentSong)).then(() => onSaved?.())
+      window.wf.songUpdate(songId, buildSongInput(currentSong))
+        .then(() => onSaved?.())
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err)
+          notifyLocal(`Save failed: ${message}`, 'error')
+        })
     }
     const t = setTimeout(() => {
       pendingLyricsSaveRef.current = null
