@@ -22,9 +22,20 @@ export default function SongEditor({ songId, onSaved }: {
   const [titleDraft, setTitleDraft] = useState('')
   const titleRef = useRef<HTMLInputElement>(null)
 
+  // Guards the debounced-save effect below against firing on the lyricsText
+  // change caused by loading a song, rather than an actual edit — set true
+  // whenever load() replaces lyricsText, set false only inside
+  // handleLyricsChange (the sole path for a real operator edit), so the
+  // effect can tell "this change is a load" from "this change is a
+  // keystroke" regardless of whether the loaded text happens to differ from
+  // whatever was there before (a plain lyricsText-changed check alone can't
+  // tell these apart, e.g. for a song whose lyrics happen to be empty).
+  const justLoadedRef = useRef(true)
+
   const load = useCallback(async () => {
     const s = await window.wf.songGet(songId)
     setSong(s)
+    justLoadedRef.current = true
     setLyricsText(s ? sectionsToReflowText(s.sections) : '')
   }, [songId])
 
@@ -58,13 +69,17 @@ export default function SongEditor({ songId, onSaved }: {
     blurQueue.retry(); fontScaleQueue.retry(); textColorQueue.retry(); fontQueue.retry()
   }
 
-  if (!song) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>
-  }
-
-  const slides = computeReflowSlides(parseReflowText(lyricsText), song.arrangement ?? null)
-
   const saveSong = async (updated: SongFull): Promise<void> => {
+    // Continuous editing can add/remove sections as a byproduct of ordinary
+    // typing (delete a verse's text and label, add a "Bridge"), which can
+    // leave `arrangement` — a list of indices into the sections array —
+    // pointing past the end or at a since-shifted section. Filtering here
+    // (mirroring CardEditPanel.tsx's buildSongInput, which guards the exact
+    // same staleness for the Card editor) keeps a stale index from silently
+    // dropping or misrouting a slide on save.
+    const validArrangement = updated.arrangement && updated.arrangement.length > 0
+      ? updated.arrangement.filter((i) => i < updated.sections.length)
+      : null
     const input: SongInput = {
       title: updated.title,
       author: updated.author ?? undefined,
@@ -73,7 +88,7 @@ export default function SongEditor({ songId, onSaved }: {
       publisher: updated.publisher ?? undefined,
       background: updated.background ?? null,
       sections: updated.sections,
-      arrangement: updated.arrangement ?? null,
+      arrangement: validArrangement && validArrangement.length > 0 ? validArrangement : null,
       fontScale: updated.fontScale,
       linesPerSlide: updated.linesPerSlide,
       bgMotion: updated.bgMotion,
@@ -84,18 +99,41 @@ export default function SongEditor({ songId, onSaved }: {
     songQueue.trigger(input)
   }
 
+  // Debounced autosave for lyrics: useAutosave's queue only coalesces triggers
+  // that arrive while a save is already in flight, so without this, typing at
+  // normal speed would fire close to one full save per keystroke. Other
+  // fields (background, font, color, title) stay on their own immediate
+  // triggers below — those are discrete, infrequent actions, not continuous
+  // typing. Must sit before the `if (!song) return` below it, since hooks
+  // can't be called conditionally — the null check happens inside the effect
+  // body instead.
+  useEffect(() => {
+    if (justLoadedRef.current) { justLoadedRef.current = false; return }
+    if (!song) return
+    const t = setTimeout(() => { void saveSong(song) }, 600)
+    return () => clearTimeout(t)
+  }, [lyricsText])
+
+  if (!song) {
+    return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>
+  }
+
+  const slides = computeReflowSlides(parseReflowText(lyricsText), song.arrangement ?? null)
+
   // The textarea's own state (lyricsText) is set directly, unconditionally —
   // never re-derived from song.sections — so the operator's literal keystrokes
   // are never fought with a reformatted value. song.sections is kept as a
   // derived cache purely so the rest of this component (BackgroundPanel,
   // title, the autosave payload) still has a valid SongFull to work with;
-  // parsing only happens here, not on every render.
+  // parsing only happens here, not on every render. The actual save is
+  // debounced (see the effect below) rather than triggered here directly —
+  // saving on every keystroke would mean a full song-record write, and a
+  // full-database persist(), on every character typed.
   const handleLyricsChange = (text: string): void => {
+    justLoadedRef.current = false
     setLyricsText(text)
     const updatedSections = parseReflowText(text)
-    const updated = { ...song, sections: updatedSections }
-    setSong(updated)
-    void saveSong(updated)
+    setSong({ ...song, sections: updatedSections })
   }
 
   // --- Inline title rename ---

@@ -85,6 +85,11 @@ export default function ReflowEditor({ song, value, onChange }: {
 // version this replaces (editor/SlideStrip.tsx) minus the click-to-select
 // and "active" state, since this preview isn't independently editable —
 // editing only happens in the continuous textarea above.
+// Matches the w-36 (144px) thumbnail width below — kept as a constant since
+// the font-size formula needs the exact pixel width it's proportioning
+// against, not just the Tailwind class name.
+const THUMB_WIDTH_PX = 144
+
 function ReflowSlideThumb({ song, slide }: { song: SongFull; slide: ReflowSlide }): JSX.Element {
   const theme = getTheme(null)
   const bg = song.background && !song.background.startsWith('theme:') ? song.background : null
@@ -95,6 +100,12 @@ function ReflowSlideThumb({ song, slide }: { song: SongFull; slide: ReflowSlide 
   const bgStyle = bg
     ? `url(${toAssetUrl(bg)}) center/cover`
     : `linear-gradient(135deg, ${thumbColors.primary}, ${thumbColors.secondary})`
+  // Same proportion-of-canvas-width formula the old WYSIWYG canvas used
+  // (fontScale / 100 * width), scaled down to this thumbnail's width instead
+  // of the full editor canvas — otherwise changing the font-size picker had
+  // no visible effect until the operator went live. Floored so a very small
+  // fontScale doesn't shrink below legible even at thumbnail size.
+  const fontSizePx = Math.max(6, ((song.fontScale ?? 4) / 100) * THUMB_WIDTH_PX)
 
   return (
     <div className="w-36 shrink-0">
@@ -108,8 +119,9 @@ function ReflowSlideThumb({ song, slide }: { song: SongFull; slide: ReflowSlide 
         <div className="absolute inset-0 bg-black/35" />
         <div className="absolute inset-0 flex items-center justify-center px-1.5 text-center">
           <span
-            className="line-clamp-2 text-[8px] font-bold leading-tight"
+            className="line-clamp-2 font-bold leading-tight"
             style={{
+              fontSize: `${fontSizePx}px`,
               fontFamily: FONT_FAMILY[song.font ?? theme.font],
               color: song.textColor ?? '#fff',
               textShadow: '0 1px 4px rgba(0,0,0,.9)'
