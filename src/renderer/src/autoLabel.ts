@@ -128,21 +128,41 @@ function normalizeLyrics(block: string): string {
     .join('|')
 }
 
-// Apply detected labels to text, showing user the changes
+// Apply detected labels to text, showing user the changes.
+//
+// Under the Reflow model, a blank line no longer means "new section" — it's
+// only a slide break within whichever section the nearest preceding label
+// line opened. So a blank-line-separated block with no label of its own,
+// immediately following an already-labeled block, is a continuation slide of
+// that same section, not a fresh stanza that itself needs labeling.
+// Prepending a label to it here would fragment an already-correctly-labeled
+// section into two once parsed back on save (see the 2026-08-05 design
+// spec's parsing rule). Once inside a labeled section, every following
+// unlabeled block is left untouched until the next real label — this can't
+// distinguish "still the same section" from "a genuinely new but
+// accidentally unlabeled verse" (both look identical in raw text), so a
+// truly new verse in that position won't get an auto-suggested label; the
+// operator can label it directly, which is the normal Reflow workflow
+// anyway. This only affects text that already contains at least one real
+// label — a fully fresh, entirely unlabeled paste behaves exactly as before.
 export function previewAutoLabels(text: string, analyses: SectionAnalysis[]): string {
   const blocks = text.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean)
 
+  let inLabeledSection = false
   return blocks
     .map((block, idx) => {
       const analysis = analyses[idx]
       if (!analysis) return block
 
       const firstLine = block.split('\n')[0]
-      const restLines = block.split('\n').slice(1).join('\n')
       const alreadyHasLabel = isExplicitLabel(firstLine)
 
-      // If already has a label, keep it; otherwise prepend detected label
       if (alreadyHasLabel) {
+        inLabeledSection = true
+        return block
+      }
+
+      if (inLabeledSection) {
         return block
       }
 

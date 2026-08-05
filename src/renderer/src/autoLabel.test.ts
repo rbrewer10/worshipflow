@@ -97,4 +97,15 @@ describe('previewAutoLabels', () => {
   it('returns an empty string for empty input', () => {
     expect(previewAutoLabels('', [])).toBe('')
   })
+
+  it('does not fragment an already-labeled section by prepending a label to its continuation slide', () => {
+    // "Lord God almighty" is a second slide of the Chorus (a blank-line slide
+    // break under the Reflow model), not a fresh stanza — it must not gain a
+    // synthesized label, or re-parsing the applied preview would split one
+    // chorus into two sections.
+    const text = 'Chorus\nHoly holy holy\n\nLord God almighty'
+    const analyses = analyzeAndLabelSections(text)
+    const preview = previewAutoLabels(text, analyses)
+    expect(preview).toBe(text)
+  })
 })
