@@ -9,6 +9,7 @@ interface BgEntry {
   path: string
   kind: 'upload' | 'generated'
   isVideo: boolean
+  folder: string | null
 }
 
 function toAssetUrl(p: string): string {
@@ -20,9 +21,12 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
   const [backgrounds, setBackgrounds] = useState<BgEntry[]>([])
   const [live, setLive] = useState<LiveState | null>(null)
   const [busy, setBusy] = useState(false)
+  const [folders, setFolders] = useState<string[]>([])
+  const [selectedFolder, setSelectedFolder] = useState<string | null | 'ALL'>('ALL')
 
   useEffect(() => {
     window.wf.bgList().then(setBackgrounds)
+    window.wf.bgListFolders().then(setFolders)
     // onState only pushes future broadcasts — seed the current state too, or this
     // tab thinks nothing is live until the next unrelated state change (matches
     // the same getState()+onState() pattern ServiceRail.tsx already uses).
@@ -30,6 +34,10 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
     const off = window.wf.onState((s) => setLive(s.main))
     return off
   }, [])
+
+  const folderScoped = selectedFolder === 'ALL'
+    ? backgrounds
+    : backgrounds.filter((bg) => bg.folder === selectedFolder)
 
   const pick = async (path: string): Promise<void> => {
     if (busy) return
@@ -77,11 +85,46 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
   }
 
   return (
-    <div className="grid grid-cols-6 gap-2">
-      {backgrounds.length === 0 && (
+    <div className="flex flex-col gap-2">
+      {folders.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => setSelectedFolder('ALL')}
+            className={[
+              'rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all',
+              selectedFolder === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+            ].join(' ')}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setSelectedFolder(null)}
+            className={[
+              'rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all',
+              selectedFolder === null ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+            ].join(' ')}
+          >
+            Uncategorized
+          </button>
+          {folders.map((f) => (
+            <button
+              key={f}
+              onClick={() => setSelectedFolder(f)}
+              className={[
+                'rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all',
+                selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+              ].join(' ')}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-6 gap-2">
+      {folderScoped.length === 0 && (
         <p className="col-span-6 text-xs text-slate-400">No backgrounds yet — add some in Build Service.</p>
       )}
-      {backgrounds.map((bg) => (
+      {folderScoped.map((bg) => (
         <button
           key={bg.path}
           onClick={() => void pick(bg.path)}
@@ -97,6 +140,7 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
           )}
         </button>
       ))}
+      </div>
     </div>
   )
 }
