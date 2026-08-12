@@ -93,19 +93,27 @@ as a premium signal competitors' marketing materials lean on).
 
 ### 2. Shared component primitives
 
-New `src/renderer/src/ui/` directory holding the primitives every screen
-will be migrated to use, so the reskin lives in a handful of files instead
-of being hand-typed into 60+ component files:
+**Revised during implementation planning:** reading `main.css` turned up an
+existing centralized `@layer components` block (`.btn`, `.btn-primary`,
+`.card`, `.surface`, `.badge`, etc.) already used via plain `className="btn-primary"`
+strings in 28 `.tsx` files. That's a better vehicle for this goal than new
+React components would be — reskinning that one file's color values
+reaches all 28 consumers instantly with zero changes to their own code,
+and it follows the pattern the codebase already established rather than
+introducing a competing one. The plan reskins those existing classes
+in-place instead of building `Button.tsx`/`Panel.tsx`/`Badge.tsx`/etc.
 
-- `Button.tsx` — variants: primary (accent-filled), secondary (outline),
-  danger, ghost. Replaces the repeated `btn`/`btn-primary` className string
-  patterns already informally used across the app.
-- `Panel.tsx` / `Card.tsx` — the standard `bg-panel` + `border` + `rounded-lg`
-  container, replacing one-off `rounded-lg border border-slate-200 bg-white`
-  strings.
-- `Badge.tsx` — status pill (live/rehearsal/armed/etc.), replacing ad-hoc
-  colored `<div>`s like the current amber "Rehearsing" badge.
-- `IconButton.tsx` — icon-only button with consistent hover/press feedback.
+`src/renderer/src/ui/` still gets created for genuinely new infrastructure
+the CSS-class system doesn't cover: a `cn()` classnames helper (for the
+many components that build conditional className strings by hand today)
+and the Framer Motion presets module (below). Per-screen migration stages
+still replace raw one-off utility strings (`bg-white`, `border-slate-200`,
+etc.) with the new Tailwind semantic tokens from Section 1 as each screen
+is touched — that part of the plan is unchanged.
+
+- `IconButton.tsx` — icon-only button with consistent hover/press feedback,
+  still worth a small dedicated component since no existing class covers
+  it. Added when the first per-screen stage that needs it starts.
 - `Input.tsx` / `Select.tsx` — form controls with consistent focus-ring
   styling using the accent token.
 - `Modal.tsx` — the app already has a `Modal.tsx`; it gets restyled to the
