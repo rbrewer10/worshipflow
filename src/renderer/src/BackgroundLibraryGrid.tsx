@@ -451,11 +451,19 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 style={{ aspectRatio: '16/9' }}
               >
                 {u.isVideo ? (
-                  <video src={toAssetUrl(u.path)} className="h-full w-full object-cover" muted />
+                  <video
+                    src={toAssetUrl(u.path)}
+                    className="h-full w-full object-cover"
+                    muted
+                    preload="none"
+                  />
                 ) : (
-                  <div
-                    className="h-full w-full bg-cover bg-center"
-                    style={{ backgroundImage: `url(${toAssetUrl(u.path)})` }}
+                  <img
+                    src={toAssetUrl(u.path)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
                   />
                 )}
 
