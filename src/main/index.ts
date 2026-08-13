@@ -577,8 +577,10 @@ function atEndOfContent(track: TrackId): boolean {
   // A deck advances on its own index regardless of t.mode — a sermon deck sits
   // at mode 'logo' by design, and treating that as "nothing left to advance to"
   // reported every sermon as finished the moment it went live, which fed
-  // auto-advance's loop/stop decision the wrong answer.
-  const followsIndex = t.mode === 'lyrics' || !!t.deckSlides
+  // auto-advance's loop/stop decision the wrong answer. A verses-based sermon
+  // (see doLoadSermon) also sits at mode 'logo' with no deck (it deliberately
+  // skips loadDeckOnto), so it needs the same exception.
+  const followsIndex = t.mode === 'lyrics' || !!t.deckSlides || !!t.sermonSlides
   const atLastSlide = followsIndex ? t.index >= t.song.lines.length - 1 : true
   return atLastSlide && !adjacentLiveItem(track, 1)
 }
