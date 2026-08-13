@@ -2,6 +2,7 @@ import { memo, useEffect } from 'react'
 import { Trash2, X } from 'lucide-react'
 import type { ItemStyle, ServiceItem, SongFull, ThemeColors } from '../../shared/types'
 import { NON_LIVE_TYPES } from '../../shared/types'
+import type { SermonVerse } from '../../shared/sermonVerses'
 import ServiceSlidePreview from './ServiceSlidePreview'
 import ItemBackgroundPanel from './ItemBackgroundPanel'
 import { CardSongEditor } from './editors/CardSongEditor'
@@ -11,6 +12,7 @@ import { ImageEditor } from './editors/ImageEditor'
 import { CountdownEditor } from './editors/CountdownEditor'
 import { TickerEditor } from './editors/TickerEditor'
 import { SermonEditor } from './editors/SermonEditor'
+import { SermonVersesEditor } from './editors/SermonVersesEditor'
 import LiveCallEditor from './editors/LiveCallEditor'
 import AnnouncementItemEditor from './AnnouncementItemEditor'
 import { HeaderEditor } from './editors/HeaderEditor'
@@ -186,14 +188,20 @@ export const ItemEditor = memo(function ItemEditor({
       )}
 
       {item.type === 'sermon' && (
-        <SermonEditor
-          title={(payload.title as string) ?? ''}
-          speaker={(payload.speaker as string) ?? ''}
-          passage={(payload.passage as string) ?? ''}
-          onTitleChange={(title) => savePayload({ ...payload, title })}
-          onSpeakerChange={(speaker) => savePayload({ ...payload, speaker })}
-          onPassageChange={(passage) => savePayload({ ...payload, passage })}
-        />
+        <>
+          <SermonEditor
+            title={(payload.title as string) ?? ''}
+            speaker={(payload.speaker as string) ?? ''}
+            passage={(payload.passage as string) ?? ''}
+            onTitleChange={(title) => savePayload({ ...payload, title })}
+            onSpeakerChange={(speaker) => savePayload({ ...payload, speaker })}
+            onPassageChange={(passage) => savePayload({ ...payload, passage })}
+          />
+          <SermonVersesEditor
+            verses={(payload.verses as SermonVerse[] | undefined) ?? []}
+            onChange={(verses) => savePayload({ ...payload, verses })}
+          />
+        </>
       )}
 
       {item.type === 'announcement' && (
