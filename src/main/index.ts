@@ -1142,7 +1142,7 @@ function processIntent(track: TrackId, type: Intent): void {
       const nextItem = adjacentLiveItem(track, 1)
       if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
       t.mode = 'logo'
-    } else if (t.mode !== 'lyrics' && !t.deckSlides) {
+    } else if (t.mode !== 'lyrics' && !t.deckSlides && !t.sermonSlides) {
       // Black/logo were operator-blanked — Next un-blanks back to the slide.
       //
       // Skipped when a deck is loaded. A sermon deliberately loads at
@@ -1151,6 +1151,11 @@ function processIntent(track: TrackId, type: Intent): void {
       // FIRST Next press after going live on a sermon, changing nothing on any
       // screen. It read as "Next is broken"; it took two presses to reach
       // verse one.
+      //
+      // Also skipped when t.sermonSlides is set: a verses-based sermon skips
+      // the legacy deck entirely (doLoadSermon), leaving t.deckSlides null
+      // even though it's fully live — without this exception the same
+      // swallowed-first-press bug came back for verses sermons specifically.
       clearCountdown(track); t.mode = 'lyrics'
     } else if (t.index < last) {
       t.index++; logServiceEvent(`next: ${t.index}/${last}`)
@@ -1166,11 +1171,13 @@ function processIntent(track: TrackId, type: Intent): void {
       const prevItem = adjacentLiveItem(track, -1)
       if (prevItem) { void handleTabletLoadItem(track, prevItem.id); return }
       t.mode = 'logo'
-    } else if (t.mode !== 'lyrics' && !t.deckSlides) {
+    } else if (t.mode !== 'lyrics' && !t.deckSlides && !t.sermonSlides) {
       // Same "un-blank eats the first press" bug the 'next' branch documents
       // above, mirrored here: this had no deck exception at all, so pressing
       // Prev right after going live on a sermon (mode 'logo', index 0) only
-      // flipped the mode and never stepped back to the previous item.
+      // flipped the mode and never stepped back to the previous item. Also
+      // exempts verses-based sermons (t.sermonSlides set, t.deckSlides null)
+      // for the same reason as the 'next' branch above.
       clearCountdown(track); t.mode = 'lyrics'
     }
     else if (t.index > 0) { t.index--; logServiceEvent(`prev: ${t.index}/${last}`) }

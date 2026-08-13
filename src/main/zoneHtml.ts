@@ -43,7 +43,14 @@ const SHARED_JS = `
   // when the content key changes, so the 0.6s entrance plays once per sermon and
   // not again on every broadcast tick.
   var prevSermonKey='';
-  function sermonKey(s){return [s.title||'',s.line||'',s.speaker||'',s.passage||''].join('|');}
+  // Only the fields sermonHtml() actually renders (title/speaker/passage) —
+  // NOT s.line. Before the verses feature, a live no-deck sermon's line never
+  // changed, so including it was harmless. Now doLoadSermon builds a real
+  // per-verse t.song.lines array, so s.line changes on every Next/Prev even
+  // though the backdrop never displays verse body text — including it here
+  // made the card rebuild and replay its 0.6s entrance animation on every
+  // verse advance.
+  function sermonKey(s){return [s.title||'',s.speaker||'',s.passage||''].join('|');}
   // Prefer the explicit fields; fall back to splitting the "speaker\\npassage" line.
   function sermonParts(s){
     var sp=s.speaker||'',ps=s.passage||'';
