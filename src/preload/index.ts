@@ -35,13 +35,16 @@ import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import type { ZoneSlide } from '../shared/zoneSlides'
 import type { ZonePin, ZonePins } from '../shared/zonePins'
 import type { Look } from '../shared/zoneLooks'
+import type { StageRehearsalState } from '../shared/stageRehearsal'
+
+type StatePayload = { main: LiveState; second: LiveState | null; stageRehearsal: StageRehearsalState }
 
 const wf = {
   // The real build version comes from the main process via getInfo() — don't
   // hardcode it here (it silently went stale at 0.6.3).
   sendIntent: (track: TrackId, type: Intent): void => ipcRenderer.send('wf:intent', track, type),
-  onState: (cb: (s: { main: LiveState; second: LiveState | null }) => void): (() => void) => {
-    const handler = (_e: unknown, s: { main: LiveState; second: LiveState | null }): void => cb(s)
+  onState: (cb: (s: StatePayload) => void): (() => void) => {
+    const handler = (_e: unknown, s: StatePayload): void => cb(s)
     ipcRenderer.on('wf:state', handler)
     return () => ipcRenderer.removeListener('wf:state', handler)
   },
@@ -221,6 +224,19 @@ const wf = {
     ipcRenderer.invoke('wf:live:getRehearsalMode'),
   setRehearsalMode: (on: boolean): Promise<void> =>
     ipcRenderer.invoke('wf:live:setRehearsalMode', on),
+
+  // Stage Rehearsal — the active service's songs, in order, on the Stage
+  // Monitor only, via the Second track; announcements auto-loop on Main.
+  getStageRehearsal: (): Promise<StageRehearsalState> =>
+    ipcRenderer.invoke('wf:live:getStageRehearsal'),
+  setStageRehearsal: (on: boolean): Promise<void> =>
+    ipcRenderer.invoke('wf:live:setStageRehearsal', on),
+  stageRehearsalNextSong: (): Promise<void> =>
+    ipcRenderer.invoke('wf:live:stageRehearsalNextSong'),
+  stageRehearsalPrevSong: (): Promise<void> =>
+    ipcRenderer.invoke('wf:live:stageRehearsalPrevSong'),
+  stageRehearsalGoToSong: (index: number): Promise<void> =>
+    ipcRenderer.invoke('wf:live:stageRehearsalGoToSong', index),
 
   // Tablet remote
   getTabletUrl: (): Promise<string> =>

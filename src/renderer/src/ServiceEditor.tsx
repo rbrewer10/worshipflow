@@ -67,6 +67,17 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const reload = async (notify = true): Promise<void> => {
     const s = await window.wf.serviceGet(serviceId)
     setService(s)
+    // A song's own content (lyrics, background, font, etc.) lives on the song
+    // record, not the service item — serviceGet() above doesn't carry it, and
+    // the effect that loads selectedSongFull only re-runs when the SELECTED
+    // item changes, not when this same item's own record is edited. Without
+    // this, a background/lyrics save reflects on the real live output (which
+    // reads the song record directly) but the zone preview tiles here — which
+    // render off selectedSongFull — kept showing what was there before the edit.
+    const item = s.items.find((it) => it.id === selectedId)
+    if (item && item.type === 'song' && item.ref_id != null) {
+      void window.wf.songGet(item.ref_id).then(setSelectedSongFull)
+    }
     // Also refresh the main process's live-routing item cache — it's separate
     // from this component's local state and from ServiceContext, and nothing
     // else keeps it in sync after an edit (see wf:services:refreshActiveItems).

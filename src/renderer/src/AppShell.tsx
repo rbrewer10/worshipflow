@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import type { TrackId } from '../../shared/types'
 import { ServiceProvider } from './ServiceContext'
 import TopBar from './TopBar'
 import ServiceRail from './ServiceRail'
@@ -30,6 +31,16 @@ export type View =
 
 function AppShell(): JSX.Element {
   const [view, setViewRaw] = useState<View>('home')
+  // While Stage Rehearsal is armed, the operator's attention (and keyboard)
+  // is on advancing the song on the Stage Monitor, not the announcement loop
+  // quietly cycling on Main — so the global shortcuts below target whichever
+  // track rehearsal has actually put the operator in control of.
+  const [shortcutTrack, setShortcutTrack] = useState<TrackId>('main')
+  useEffect(() => {
+    window.wf.getStageRehearsal().then((s) => setShortcutTrack(s.active ? 'second' : 'main'))
+    const off = window.wf.onState((s) => setShortcutTrack(s.stageRehearsal.active ? 'second' : 'main'))
+    return off
+  }, [])
   // Autosave means most navigation is already safe — but a save that's
   // actively FAILED (not just in flight) means the edit sitting in that
   // editor's local state never actually reached the DB, and switching tabs
@@ -65,56 +76,56 @@ function AppShell(): JSX.Element {
       // B = black screen
       if (key === 'b') {
         e.preventDefault()
-        window.wf.sendIntent('main', 'black')
+        window.wf.sendIntent(shortcutTrack, 'black')
         return
       }
 
       // L = logo screen
       if (key === 'l') {
         e.preventDefault()
-        window.wf.sendIntent('main', 'logo')
+        window.wf.sendIntent(shortcutTrack, 'logo')
         return
       }
 
       // N = next slide/item
       if (key === 'n') {
         e.preventDefault()
-        window.wf.sendIntent('main', 'next')
+        window.wf.sendIntent(shortcutTrack, 'next')
         return
       }
 
       // P = previous slide/item
       if (key === 'p') {
         e.preventDefault()
-        window.wf.sendIntent('main', 'prev')
+        window.wf.sendIntent(shortcutTrack, 'prev')
         return
       }
 
       // S = toggle lyrics/slides display
       if (key === 's') {
         e.preventDefault()
-        window.wf.sendIntent('main', 'lyrics')
+        window.wf.sendIntent(shortcutTrack, 'lyrics')
         return
       }
 
       // Space or ArrowRight = next slide
       if (key === ' ' || key === 'arrowright') {
         e.preventDefault()
-        window.wf.sendIntent('main', 'next')
+        window.wf.sendIntent(shortcutTrack, 'next')
         return
       }
 
       // ArrowLeft = previous slide
       if (key === 'arrowleft') {
         e.preventDefault()
-        window.wf.sendIntent('main', 'prev')
+        window.wf.sendIntent(shortcutTrack, 'prev')
         return
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [view])
+  }, [view, shortcutTrack])
 
   // Restore recovery state after renderer is ready and activeServiceItems is populated
   useEffect(() => {

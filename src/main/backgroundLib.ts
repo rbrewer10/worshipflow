@@ -2,7 +2,7 @@
 // Manages the local background library: uploads + generated images.
 import { app, shell } from 'electron'
 import { join, extname } from 'path'
-import { mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync, createWriteStream } from 'fs'
+import { mkdirSync, copyFileSync, readdirSync, statSync, unlinkSync, existsSync, createWriteStream } from 'fs'
 import { createHash } from 'crypto'
 import https from 'https'
 import {
@@ -49,19 +49,22 @@ export function listBackgrounds(): BgEntry[] {
   for (const dir of [uploadsDir(), generatedDir()]) {
     const kind = dir.includes('generated') ? 'generated' : 'upload'
     if (!existsSync(dir)) continue
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
+    // Stat each entry directly rather than trusting readdirSync's withFileTypes
+    // Dirent — cheap insurance against directory entries being misclassified.
+    for (const name of readdirSync(dir)) {
+      const fullPath = join(dir, name)
+      if (statSync(fullPath).isDirectory()) {
         // One level deep only — flat folders, no nested subfolders.
-        const subDir = join(dir, entry.name)
+        const subDir = fullPath
         for (const f of readdirSync(subDir)) {
           if (!IMAGE_EXT.test(f) && !VIDEO_EXT.test(f)) continue
-          results.push({ filename: f, path: join(subDir, f), kind, isVideo: VIDEO_EXT.test(f), folder: entry.name })
+          results.push({ filename: f, path: join(subDir, f), kind, isVideo: VIDEO_EXT.test(f), folder: name })
         }
         continue
       }
-      const f = entry.name
+      const f = name
       if (!IMAGE_EXT.test(f) && !VIDEO_EXT.test(f)) continue
-      results.push({ filename: f, path: join(dir, f), kind, isVideo: VIDEO_EXT.test(f), folder: null })
+      results.push({ filename: f, path: fullPath, kind, isVideo: VIDEO_EXT.test(f), folder: null })
     }
   }
   return results

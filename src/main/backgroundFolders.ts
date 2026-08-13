@@ -4,7 +4,7 @@
 // directory. backgroundLib.ts wires this to the real uploads/generated
 // directories. See the 2026-08-03 design spec.
 import { join, basename, sep } from 'path'
-import { existsSync, mkdirSync, readdirSync, renameSync, rmdirSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, renameSync, rmdirSync, statSync } from 'fs'
 
 // Folder names come from user input (the "+ New folder" field, drag-and-drop,
 // rename) and this module is the only layer that actually touches the
@@ -25,8 +25,11 @@ export function listFoldersIn(baseDirs: string[]): string[] {
   const names = new Set<string>()
   for (const dir of baseDirs) {
     if (!existsSync(dir)) continue
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isDirectory()) names.add(entry.name)
+    // See the matching comment in backgroundLib.ts's listBackgrounds() —
+    // Dirent.isDirectory() from withFileTypes can misreport on Windows, so
+    // stat each entry directly instead of trusting the dirent type.
+    for (const name of readdirSync(dir)) {
+      if (statSync(join(dir, name)).isDirectory()) names.add(name)
     }
   }
   return Array.from(names).sort()

@@ -26,6 +26,8 @@ import { validateZonePins } from '../shared/zonePins'
 import type { ZonePin, ZonePins } from '../shared/zonePins'
 import { parseLooksConfig, validateLook } from '../shared/zoneLooks'
 import type { Look } from '../shared/zoneLooks'
+import { zoneTrackFor, idleModeFor, clampSongIndex, STAGE_REHEARSAL_OFF } from '../shared/stageRehearsal'
+import type { StageRehearsalState } from '../shared/stageRehearsal'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery } from './recovery'
@@ -515,6 +517,37 @@ let lastAutoScene: string | null = null
 // operator-facing previews ignore it. See the field's comment in shared/types.ts.
 let rehearsalMode = false
 
+// Stage Rehearsal: singers run through the active service's songs, in order,
+// on the Stage Monitor (Zone 4) via the Second track, while Zones 1-3 loop
+// through the service's announcements on Main. Session-only, same "never
+// persisted, always starts OFF" contract as rehearsalMode above — see
+// shared/stageRehearsal.ts for the zone precedence.
+let stageRehearsal: StageRehearsalState = STAGE_REHEARSAL_OFF
+let stageRehearsalAnnouncementTimer: ReturnType<typeof setInterval> | null = null
+let stageRehearsalAnnouncementIndex = 0
+
+function clearStageRehearsalAnnouncementTimer(): void {
+  if (stageRehearsalAnnouncementTimer) {
+    clearInterval(stageRehearsalAnnouncementTimer)
+    stageRehearsalAnnouncementTimer = null
+  }
+}
+
+// One announcement every 8s, looping — long enough to actually read, short
+// enough that a short rehearsal still sees the rotation.
+const STAGE_REHEARSAL_ANNOUNCEMENT_MS = 8000
+
+function armStageRehearsalAnnouncementLoop(queue: number[]): void {
+  clearStageRehearsalAnnouncementTimer()
+  if (queue.length === 0) return
+  stageRehearsalAnnouncementIndex = 0
+  stageRehearsalAnnouncementTimer = setInterval(() => {
+    if (!stageRehearsal.active || queue.length === 0) return
+    stageRehearsalAnnouncementIndex = (stageRehearsalAnnouncementIndex + 1) % queue.length
+    void doLoadAnnouncement('main', queue[stageRehearsalAnnouncementIndex]).then(() => broadcast())
+  }, STAGE_REHEARSAL_ANNOUNCEMENT_MS)
+}
+
 function clearCountdown(track: TrackId): void {
   const t = tracks[track]
   if (t.countdownTimer) { clearInterval(t.countdownTimer); t.countdownTimer = null }
@@ -710,7 +743,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
   // since this hits the DB and computeZoneStates can fire every 100ms during auto-advance.
   const sceneConfig = parseSceneConfig(getSetting('zone_scenes'))
   for (const zoneId of ZONE_IDS) {
-    const zoneTrack = activeZoneTrackAssignment[zoneId]
+    const zoneTrack = zoneTrackFor(zoneId, stageRehearsal, activeZoneTrackAssignment[zoneId])
     const live = renderState(zoneTrack)
     const t = tracks[zoneTrack]
 
@@ -786,7 +819,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     const idleContentMode: ZoneMode = t.mode === 'countdown' ? 'countdown' : 'text'
     const idleDefault: ZoneMode = trackShowingContent
       ? (zoneId === 4 ? 'stage' : idleContentMode)
-      : ((zoneId === 1 || zoneId === 2) ? 'logo' : 'off')
+      : idleModeFor(zoneId, stageRehearsal, (zoneId === 1 || zoneId === 2) ? 'logo' : 'off')
     const routedMode = pinnedMode ?? (routing ? routing[zoneId] : idleDefault)
     const mode = routedMode ?? 'off'
 
@@ -1010,9 +1043,12 @@ function maybeAutoSwitchScene(): void {
 // broadcast() and by every window's did-finish-load initial paint, so the
 // "is Second active" rule can never drift out of sync between call sites
 // (that drift is exactly what caused the stale-shape bug this helper fixes).
-function buildStatePayload(): { main: LiveState; second: LiveState | null } {
-  const secondActive = activeServiceItems.some((it) => it.track === 'second')
-  return { main: renderState('main'), second: secondActive ? renderState('second') : null }
+function buildStatePayload(): { main: LiveState; second: LiveState | null; stageRehearsal: StageRehearsalState } {
+  // Stage Rehearsal loads songs onto Second ad-hoc (no service item), so the
+  // old "does the service have any track:'second' items" check alone would
+  // miss it and ship second:null while a song is genuinely live there.
+  const secondActive = stageRehearsal.active || activeServiceItems.some((it) => it.track === 'second')
+  return { main: renderState('main'), second: secondActive ? renderState('second') : null, stageRehearsal }
 }
 
 function broadcast(): void {
@@ -2368,6 +2404,58 @@ ipcMain.handle('wf:live:setRehearsalMode', (_e, on: boolean) => {
   broadcast()
 })
 
+// --- Stage Rehearsal: the active service's songs, in order, on the Stage
+// Monitor only — Main loops the service's announcements on the other zones.
+// See shared/stageRehearsal.ts.
+ipcMain.handle('wf:live:getStageRehearsal', () => stageRehearsal)
+ipcMain.handle('wf:live:setStageRehearsal', async (_e, on: boolean) => {
+  if (on) {
+    const songQueue = activeServiceItems
+      .filter((it): it is ServiceItem & { ref_id: number } => it.type === 'song' && it.track === 'main' && it.ref_id != null)
+      .sort((a, b) => a.ordinal - b.ordinal)
+      .map((it) => it.ref_id)
+    if (songQueue.length === 0) throw new Error('This service has no songs to rehearse.')
+
+    // Mirror the Announcements tab: scheduled-for-this-date if the service
+    // has a date, else fall back to the whole library (active, not expired)
+    // rather than rehearsing with nothing looping on the other screens.
+    let announcementQueue = activeServiceDate ? listScheduledAnnouncements(activeServiceDate).map((a) => a.id) : []
+    if (announcementQueue.length === 0) {
+      announcementQueue = listAnnouncements('').filter((a) => a.active && !a.expired).map((a) => a.id)
+    }
+
+    // Rehearsal Mode blanks every real screen (including these zones) and
+    // always wins — arming it is how you'd defeat the entire point of Stage
+    // Rehearsal without realizing why nothing's showing. Starting Stage
+    // Rehearsal disarms it so the two features can't silently fight.
+    if (rehearsalMode) rehearsalMode = false
+
+    stageRehearsal = { active: true, songQueue, songIndex: 0, announcementQueue }
+    await doLoadSong('second', songQueue[0])
+    tracks.second.serviceItemId = null
+    if (announcementQueue.length > 0) {
+      await doLoadAnnouncement('main', announcementQueue[0])
+      armStageRehearsalAnnouncementLoop(announcementQueue)
+    }
+  } else {
+    clearStageRehearsalAnnouncementTimer()
+    stageRehearsal = STAGE_REHEARSAL_OFF
+  }
+  broadcast()
+})
+
+async function stageRehearsalGoToSong(newIndex: number): Promise<void> {
+  if (!stageRehearsal.active) return
+  const clamped = clampSongIndex(newIndex, stageRehearsal.songQueue.length)
+  stageRehearsal.songIndex = clamped
+  await doLoadSong('second', stageRehearsal.songQueue[clamped])
+  tracks.second.serviceItemId = null
+  broadcast()
+}
+ipcMain.handle('wf:live:stageRehearsalNextSong', () => stageRehearsalGoToSong(stageRehearsal.songIndex + 1))
+ipcMain.handle('wf:live:stageRehearsalPrevSong', () => stageRehearsalGoToSong(stageRehearsal.songIndex - 1))
+ipcMain.handle('wf:live:stageRehearsalGoToSong', (_e, index: number) => stageRehearsalGoToSong(index))
+
 ipcMain.handle('wf:getTabletUrl', () => `http://${getLocalIp()}:${boundTabletPort}`)
 ipcMain.handle('wf:getTabletPin', () => getTabletPin())
 ipcMain.handle('wf:regenerateTabletPin', () => regenerateTabletPin())
@@ -2573,7 +2661,28 @@ ipcMain.handle('wf:logs:openFolder', async () => { await shell.openPath(getLogsD
 ipcMain.handle('wf:songs:list', (_e, search?: string) => listSongs(search ?? ''))
 ipcMain.handle('wf:songs:get', (_e, id: number) => getSong(id))
 ipcMain.handle('wf:songs:create', (_e, input: SongInput) => createSong(input))
-ipcMain.handle('wf:songs:update', (_e, id: number, input: SongInput) => updateSong(id, input))
+ipcMain.handle('wf:songs:update', (_e, id: number, input: SongInput) => {
+  updateSong(id, input)
+  // A song already live on a track (e.g. its lyrics window) was rendering from
+  // the snapshot doLoadSong() cached at "go live" time — a background/lyrics/
+  // font edit here saved to the DB fine but never reached that snapshot, so
+  // the change silently didn't show until the song was reloaded. Re-sync the
+  // cached content fields (not playback position) for any track showing it.
+  const full = getSong(id)
+  if (!full) return
+  let changed = false
+  for (const track of ['main', 'second'] as TrackId[]) {
+    const t = tracks[track]
+    if (t.songId !== id) continue
+    t.song = { title: full.title, lines: songLines(full), background: full.background ?? null, bgMotion: full.bgMotion ?? null }
+    t.fontScale = full.fontScale ?? 6
+    t.songTextColor = full.textColor ?? null
+    t.songFont = full.font ?? null
+    t.blurBehindText = full.blurBehindText ?? false
+    changed = true
+  }
+  if (changed) broadcast()
+})
 ipcMain.handle('wf:songs:delete', (_e, id: number) => deleteSong(id))
 ipcMain.handle('wf:announcements:list', (_e, search?: string) => listAnnouncements(search ?? ''))
 ipcMain.handle('wf:announcements:get', (_e, id: number) => getAnnouncement(id))

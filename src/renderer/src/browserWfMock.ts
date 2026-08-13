@@ -33,6 +33,8 @@ import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../mai
 import type { ZoneSlide } from '../../shared/zoneSlides'
 import type { ZonePin, ZonePins } from '../../shared/zonePins'
 import type { Look } from '../../shared/zoneLooks'
+import { STAGE_REHEARSAL_OFF } from '../../shared/stageRehearsal'
+import type { StageRehearsalState } from '../../shared/stageRehearsal'
 
 const mockPins: ZonePins = {}
 const mockLooks: Look[] = []
@@ -225,8 +227,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
         publish({ mode: type })
       }
     },
-    onState: (cb: (s: { main: LiveState; second: LiveState | null }) => void): (() => void) => {
-      const wrapped = (main: LiveState): void => cb({ main, second: null })
+    onState: (cb: (s: { main: LiveState; second: LiveState | null; stageRehearsal: StageRehearsalState }) => void): (() => void) => {
+      const wrapped = (main: LiveState): void => cb({ main, second: null, stageRehearsal: STAGE_REHEARSAL_OFF })
       stateListeners.add(wrapped)
       wrapped(clone(liveState))
       return () => stateListeners.delete(wrapped)
@@ -393,6 +395,11 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
 
     getRehearsalMode: async (): Promise<boolean> => false,
     setRehearsalMode: async (): Promise<void> => {},
+    getStageRehearsal: async (): Promise<StageRehearsalState> => STAGE_REHEARSAL_OFF,
+    setStageRehearsal: async (): Promise<void> => {},
+    stageRehearsalNextSong: async (): Promise<void> => {},
+    stageRehearsalPrevSong: async (): Promise<void> => {},
+    stageRehearsalGoToSong: async (): Promise<void> => {},
     getTabletUrl: async (): Promise<string> => 'Browser preview only',
     getTabletPin: async (): Promise<string> => '000000',
     regenerateTabletPin: async (): Promise<string> => '000000',
