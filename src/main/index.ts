@@ -1199,6 +1199,7 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   clearSongMeta(track)
   t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
+  t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   const lines: string[] = []
   if (title) lines.push(title)
   body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
@@ -1256,6 +1257,7 @@ function doLoadLiveCall(track: TrackId, title: string): void {
   t.scriptureRef = null
   clearSongMeta(track)
   t.deckSlides = null
+  t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   t.song = { title, lines: [''], background: null }
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = false
@@ -1370,6 +1372,7 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
   clearSongMeta(track)
   t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // countdowns never carry a deck
+  t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   let remaining = seconds
   const bg = background ?? null
@@ -1473,6 +1476,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   clearSongMeta(track)
   t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
+  t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   t.song = {
     title: refs.length > 1 ? formatReferenceList(refs) : (resolvedTitle ?? reference),
     lines,
@@ -1511,6 +1515,7 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
   t.scriptureRef = null
   t.bgFit = 'cover'
   t.deckSlides = null  // songs never carry a deck
+  t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   t.song = { title: full.title, lines: songLines(full), background: full.background ?? null, bgMotion: full.bgMotion ?? null }
   t.fontScale = full.fontScale ?? 6
   t.songTextColor = full.textColor ?? null
@@ -1664,6 +1669,7 @@ function doLoadMedia(track: TrackId, filePath: string, title: string): void {
   clearSongMeta(track)
   t.bgFit = 'contain'  // a whole-slide image — fit it entirely on screen
   t.deckSlides = null  // media loads never carry a deck
+  t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   t.song = { title: title || 'Media', lines: [''], background: filePath }
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = false
