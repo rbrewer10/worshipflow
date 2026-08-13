@@ -1242,7 +1242,13 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
   // only the main projector's own mode-driven rendering is unaffected.
   t.mode = 'logo'
   t.index = 0
-  if (item) void loadDeckOnto(track, item, t.loadGeneration)
+  // The operator's own verse list is now the authoritative "what does this
+  // sermon step through" source — skip the legacy passage-auto-chunked deck
+  // entirely when verses exist, so t.song.lines (what's shown) and
+  // t.sermonSlides (reference/notes for it) never desync onto two different
+  // arrays sharing one t.index. Sermons with no verses keep the old behavior
+  // unchanged (auto-deck from passage, if the item has no hand-authored one).
+  if (item && verses.length === 0) void loadDeckOnto(track, item, t.loadGeneration)
 }
 
 // Live Call: hand the screens over to the incoming video. There is no slide
