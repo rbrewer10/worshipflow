@@ -110,6 +110,7 @@ import { buildSermonSlides, type SermonVerse, type SermonSlide } from '../shared
 import { autoDeckFor } from './autoDeck'
 import type { AutoDeckDeps } from './autoDeck'
 import { TABLET_PORT, tabletHtml } from './tabletHtml'
+import { pulpitHtml } from './pulpitHtml'
 import { attachLivecallSignaling } from './livecallSignaling'
 import { phoneClientHtml } from './phoneClientHtml'
 import { roomFeedViewerHtml } from './roomFeedViewerHtml'
@@ -1853,6 +1854,9 @@ function startTabletServer(): void {
       const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
       res.writeHead(200, htmlHeaders)
       res.end(roomFeedViewerHtml(`${proto}://${host}/livecall`, livecallToken(), 'room-feed'))
+    } else if (path === '/pulpit') {
+      res.writeHead(200, htmlHeaders)
+      res.end(pulpitHtml(getSetting('church_name')?.trim() || 'Snow Hill Church'))
     } else if (path === '/file') {
       // Serve local media files (images, videos) to Pi browsers and multiview iframes.
       const qs = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
