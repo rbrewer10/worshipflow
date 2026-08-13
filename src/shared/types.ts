@@ -57,6 +57,11 @@ export interface LiveState {
   // ServiceRail preview) ignore it and keep showing the real content, since the
   // whole point of rehearsing is to see what WOULD go out.
   rehearsal?: boolean
+  // The current sermon slide's scripture reference and the pastor's own notes
+  // for it — null on the intro slide (index 0) and for every non-sermon item.
+  // Populated by renderState() from the live track's sermonSlides array.
+  sermonReference?: string | null
+  sermonNotes?: string | null
 }
 
 export interface DisplayInfo {

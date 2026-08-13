@@ -106,6 +106,7 @@ import {
 import { generateBackgroundImage } from './replicateApi'
 import { generatePollinationsImage } from './pollinationsApi'
 import { lookupScripture } from './scripture'
+import { buildSermonSlides, type SermonVerse, type SermonSlide } from '../shared/sermonVerses'
 import { autoDeckFor } from './autoDeck'
 import type { AutoDeckDeps } from './autoDeck'
 import { TABLET_PORT, tabletHtml } from './tabletHtml'
@@ -293,6 +294,10 @@ interface LiveTrackState {
   // `${slideIndex}:${zoneId}`. Populated once at load time by loadDeckOnto —
   // computeZoneStates only ever reads this map, never triggers a lookup.
   deckScripture: Map<string, string>
+  // The current sermon's resolved slides (intro + one per verse), when the
+  // live item is a sermon with verses. Index-aligned with t.song.lines/t.index
+  // — see buildSermonSlides. null for every non-sermon item.
+  sermonSlides: SermonSlide[] | null
 }
 
 function createTrackState(song: LiveTrackState['song']): LiveTrackState {
@@ -324,7 +329,8 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     hasLiveContent: false,
     deckSlides: null,
     deckSource: [],
-    deckScripture: new Map()
+    deckScripture: new Map(),
+    sermonSlides: null
   }
 }
 
@@ -669,7 +675,9 @@ function renderState(track: TrackId = 'main'): LiveState {
     songTextColor: t.songTextColor,
     songFont: t.songFont,
     blurBehindText: t.blurBehindText,
-    rehearsal: rehearsalMode
+    rehearsal: rehearsalMode,
+    sermonReference: t.hasLiveContent ? (t.sermonSlides?.[t.index]?.reference ?? null) : null,
+    sermonNotes: t.hasLiveContent ? (t.sermonSlides?.[t.index]?.notes ?? null) : null
   }
 }
 
@@ -1219,7 +1227,10 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
   t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
   const line = [speaker, passage].filter(Boolean).join('\n')
-  t.song = { title, lines: [line], background: background ?? null }
+  const verses = (item?.payload.verses as SermonVerse[] | undefined) ?? []
+  const slides = buildSermonSlides(line, verses, lookupScripture)
+  t.song = { title, lines: slides.map((s) => s.text), background: background ?? null }
+  t.sermonSlides = slides
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = blurBehindText ?? false
   // Unlike every other loader, mode stays 'logo' — the main projector's
