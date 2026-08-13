@@ -3,13 +3,17 @@
 // WebSocket protocol (auth, state push, intent) wholesale — see tabletHtml.ts
 // for the pattern this borrows: PIN gate, cached PIN in localStorage, the
 // same {type:'auth'}/{type:'intent'} messages.
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 export function pulpitHtml(churchName: string): string {
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>${churchName} — Pulpit</title>
+<title>${escHtml(churchName)} — Pulpit</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-user-select:none;user-select:none}
 html,body{width:100%;height:100%;background:#0a0d10;color:#e8ebed;font-family:-apple-system,system-ui,sans-serif;overflow:hidden}
@@ -87,12 +91,6 @@ function submitPin() {
 function send(intent) {
   if (!authed) { showPinGate(); return }
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'intent', intent: intent }))
-}
-
-function esc(s) {
-  var d = document.createElement('div')
-  d.textContent = s == null ? '' : s
-  return d.innerHTML
 }
 
 function apply(msg) {
