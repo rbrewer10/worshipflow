@@ -564,11 +564,18 @@ let rehearsalMode = false
 let stageRehearsal: StageRehearsalState = STAGE_REHEARSAL_OFF
 let stageRehearsalAnnouncementTimer: ReturnType<typeof setInterval> | null = null
 let stageRehearsalAnnouncementIndex = 0
-// The Main serviceItemId the rehearsal loop itself most recently put there —
-// checked on every tick so a real "Go Live" or Next/Prev during rehearsal
-// (which stamps a different id onto tracks.main) is detected as a hijack
-// instead of getting silently overwritten by the next announcement.
-let stageRehearsalLastLoadedItemId: number | null = null
+// doLoadAnnouncement never sets serviceItemId, so this stays pinned to
+// whatever Main held when rehearsal armed; any REAL load (which does set
+// serviceItemId, via handleTabletLoadItem or the Go-Live IPC handler) breaks
+// the match and triggers disarm. Checked on every tick so a real "Go Live" or
+// Next/Prev during rehearsal is detected as a hijack instead of getting
+// silently overwritten by the next announcement.
+// This check-then-load-then-rebaseline sequence below is race-free only
+// because doLoadAnnouncement (and doLoadText, which it calls) has no real
+// await that yields to the event loop before resolving — if either ever
+// gains one, an operator's load landing in that window could get silently
+// absorbed into the rebaseline instead of triggering disarm.
+let stageRehearsalMainBaselineItemId: number | null = null
 
 function clearStageRehearsalAnnouncementTimer(): void {
   if (stageRehearsalAnnouncementTimer) {
@@ -592,7 +599,7 @@ function armStageRehearsalAnnouncementLoop(queue: number[]): void {
     // tick — the real service has started. Disarm instead of clobbering it
     // with another announcement; this is the same off-path as the manual
     // "turn rehearsal off" IPC handler below.
-    if (tracks.main.serviceItemId !== stageRehearsalLastLoadedItemId) {
+    if (tracks.main.serviceItemId !== stageRehearsalMainBaselineItemId) {
       clearStageRehearsalAnnouncementTimer()
       stageRehearsal = STAGE_REHEARSAL_OFF
       broadcast()
@@ -600,7 +607,7 @@ function armStageRehearsalAnnouncementLoop(queue: number[]): void {
     }
     stageRehearsalAnnouncementIndex = (stageRehearsalAnnouncementIndex + 1) % queue.length
     void doLoadAnnouncement('main', queue[stageRehearsalAnnouncementIndex]).then(() => {
-      stageRehearsalLastLoadedItemId = tracks.main.serviceItemId
+      stageRehearsalMainBaselineItemId = tracks.main.serviceItemId
       broadcast()
     })
   }, STAGE_REHEARSAL_ANNOUNCEMENT_MS)
@@ -2576,7 +2583,7 @@ ipcMain.handle('wf:live:setStageRehearsal', async (_e, on: boolean) => {
     tracks.second.serviceItemId = null
     if (announcementQueue.length > 0) {
       await doLoadAnnouncement('main', announcementQueue[0])
-      stageRehearsalLastLoadedItemId = tracks.main.serviceItemId
+      stageRehearsalMainBaselineItemId = tracks.main.serviceItemId
       armStageRehearsalAnnouncementLoop(announcementQueue)
     }
   } else {
