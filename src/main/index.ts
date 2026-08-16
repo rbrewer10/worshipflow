@@ -398,6 +398,38 @@ function regenerateTabletPin(): string {
   setSetting('tablet_pin', pin)
   return pin
 }
+
+// Shared PIN-lockout state check, reused by both the tablet WS 'auth' message
+// handler and the HTTP PIN gate on /phone and /room-feed below — one place
+// that knows the lockout window, so both surfaces stay in lockstep instead of
+// drifting into two counters with different reset behavior.
+function tabletLockoutMs(remoteIp: string): number {
+  const failure = tabletAuthFailures.get(remoteIp)
+  if (failure && failure.lockedUntil > Date.now()) return failure.lockedUntil - Date.now()
+  return 0
+}
+
+// Verifies a submitted PIN against getTabletPin(), recording the attempt in
+// tabletAuthFailures exactly like the WS path always has. Only call this for
+// an actual attempt (a PIN was submitted) — a bare page load with no PIN
+// should check tabletLockoutMs() instead so simply visiting the page doesn't
+// itself count as a failed guess.
+function checkTabletPin(remoteIp: string, pin: string | undefined): { ok: true } | { ok: false; lockedOutMs: number } {
+  const lockedOutMs = tabletLockoutMs(remoteIp)
+  if (lockedOutMs > 0) return { ok: false, lockedOutMs }
+  if (typeof pin === 'string' && pin === getTabletPin()) {
+    tabletAuthFailures.delete(remoteIp)
+    return { ok: true }
+  }
+  const failure = tabletAuthFailures.get(remoteIp)
+  const fails = (failure?.count ?? 0) + 1
+  tabletAuthFailures.set(remoteIp, {
+    count: fails,
+    lockedUntil: fails >= TABLET_AUTH_MAX_FAILURES ? Date.now() + TABLET_AUTH_LOCKOUT_MS : 0
+  })
+  return { ok: false, lockedOutMs: 0 }
+}
+
 let activeServiceItems: ServiceItem[] = []
 let activeServiceId: number | null = null  // which service is currently active (for Volunteer mode to honor)
 let activeServiceName = ''
@@ -1841,6 +1873,38 @@ function livecallToken(): string {
   return t
 }
 
+// Self-contained PIN-entry page shown in place of /phone or /room-feed when
+// the request didn't present the correct tablet PIN. These two routes embed
+// the raw livecallToken() in the real page (needed so the phone/room-feed
+// client can join the signaling room), so unlike /zone/1-4 — which are
+// read-only display endpoints and stay unauthenticated by design — they must
+// not hand that token to an unverified request. A plain GET form is enough:
+// this is a server-side gate on the page load itself, not the client-side
+// control gate tabletHtml.ts already does after the page has loaded.
+function tabletPinGateHtml(path: string, lockedOutMs: number): string {
+  const message = lockedOutMs > 0
+    ? `Too many incorrect PINs. Try again in ${Math.ceil(lockedOutMs / 1000)} seconds.`
+    : ''
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enter PIN</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#111;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+form{text-align:center;padding:24px}
+input{font-size:24px;padding:8px 12px;width:8em;text-align:center;border-radius:6px;border:1px solid #444;background:#222;color:#eee}
+button{font-size:18px;padding:8px 20px;margin-left:8px;border-radius:6px;border:none;background:#2a7;color:#fff}
+p{color:#f88}
+</style></head>
+<body>
+<form method="GET" action="${path}">
+<div>Enter tablet PIN</div>
+<input type="text" inputmode="numeric" pattern="[0-9]*" name="pin" autofocus autocomplete="off">
+<button type="submit">Go</button>
+${message ? `<p>${message}</p>` : ''}
+</form>
+</body></html>`
+}
+
 // --- Tablet HTTP + WebSocket server ---
 function startTabletServer(): void {
   const server = createServer((req, res) => {
@@ -1864,19 +1928,31 @@ function startTabletServer(): void {
     } else if (isObs) {
       res.writeHead(200, htmlHeaders)
       res.end(OBS_HTML)
-    } else if (path === '/phone') {
+    } else if (path === '/phone' || path === '/room-feed') {
+      // Unlike /zone/1-4, these routes let a caller actively JOIN the livecall
+      // room (not just display it), so the real page — which embeds the raw
+      // livecallToken() — is gated behind the same tablet PIN + lockout used
+      // for WS control auth above. See tabletPinGateHtml() for why.
+      const remoteIp = req.socket.remoteAddress ?? 'unknown'
+      const qs = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
+      const pinParam = qs.get('pin')
+      const authResult = pinParam === null
+        ? { ok: false as const, lockedOutMs: tabletLockoutMs(remoteIp) }
+        : checkTabletPin(remoteIp, pinParam)
+      if (!authResult.ok) {
+        res.writeHead(200, htmlHeaders)
+        res.end(tabletPinGateHtml(path, authResult.lockedOutMs))
+        return
+      }
       const host = req.headers.host ?? `localhost:${boundTabletPort}`
       // Match the scheme the page was loaded over: Tailscale Serve terminates
       // HTTPS in front of this plain-HTTP server, and a page served over https
       // cannot open a ws:// socket.
       const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
       res.writeHead(200, htmlHeaders)
-      res.end(phoneClientHtml(`${proto}://${host}/livecall`, livecallToken(), 'sanctuary'))
-    } else if (path === '/room-feed') {
-      const host = req.headers.host ?? `localhost:${boundTabletPort}`
-      const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
-      res.writeHead(200, htmlHeaders)
-      res.end(roomFeedViewerHtml(`${proto}://${host}/livecall`, livecallToken(), 'room-feed'))
+      res.end(path === '/phone'
+        ? phoneClientHtml(`${proto}://${host}/livecall`, livecallToken(), 'sanctuary')
+        : roomFeedViewerHtml(`${proto}://${host}/livecall`, livecallToken(), 'room-feed'))
     } else if (path === '/pulpit') {
       res.writeHead(200, htmlHeaders)
       res.end(pulpitHtml(getSetting('church_name')?.trim() || 'Snow Hill Church'))
@@ -2009,14 +2085,9 @@ function startTabletServer(): void {
         }
 
         if (msg.type === 'auth') {
-          const failure = tabletAuthFailures.get(remoteIp)
-          if (failure && failure.lockedUntil > Date.now()) {
-            ws.send(JSON.stringify({ type: 'authResult', ok: false, lockedOutMs: failure.lockedUntil - Date.now() }))
-            return
-          }
-          if (typeof msg.pin === 'string' && msg.pin === getTabletPin()) {
+          const result = checkTabletPin(remoteIp, msg.pin)
+          if (result.ok) {
             authedTabletClients.add(ws)
-            tabletAuthFailures.delete(remoteIp)
             ws.send(JSON.stringify({ type: 'authResult', ok: true }))
             // Immediately follow with the full state (sermon fields included) —
             // otherwise this client shows nothing sensitive until the next
@@ -2026,12 +2097,9 @@ function startTabletServer(): void {
             // fullPayload while every other connected client gets whatever
             // payload variant is already correct for it.
             tabletBroadcast()
+          } else if (result.lockedOutMs > 0) {
+            ws.send(JSON.stringify({ type: 'authResult', ok: false, lockedOutMs: result.lockedOutMs }))
           } else {
-            const fails = (failure?.count ?? 0) + 1
-            tabletAuthFailures.set(remoteIp, {
-              count: fails,
-              lockedUntil: fails >= TABLET_AUTH_MAX_FAILURES ? Date.now() + TABLET_AUTH_LOCKOUT_MS : 0
-            })
             ws.send(JSON.stringify({ type: 'authResult', ok: false }))
           }
           return
