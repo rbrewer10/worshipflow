@@ -30,7 +30,7 @@ import { zoneTrackFor, idleModeFor, clampSongIndex, STAGE_REHEARSAL_OFF } from '
 import type { StageRehearsalState } from '../shared/stageRehearsal'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
-import { readRecovery, writeRecovery, isRecoveryStale } from './recovery'
+import { readRecovery, writeRecovery, isRecoveryStale, type TrackSnapshot } from './recovery'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -550,6 +550,15 @@ const serviceLog: Array<{ ts: number; event: string }> = []  // Service recordin
 let obsAutoSwitch = false
 let obsSceneMap: Record<SceneContext, string> = { worship: '', word: '', countdown: '' }
 let lastAutoScene: string | null = null
+
+// Crash recovery throttle: writeRecovery() is a synchronous electron-store
+// disk write, and broadcast() runs ~10x/sec while auto-advance is armed. Skip
+// the write when nothing recoverable actually changed since the last one we
+// wrote. Deliberately excludes serviceId/ts (a timestamp always differs, and
+// a real service change always shows up as a track change too) — this is a
+// JSON snapshot of everything else "actually live": per-track item/index/mode
+// plus zone pins (a crash mid-hold must not silently drop a pinned screen).
+let lastWrittenRecoveryKey: string | null = null
 
 // Rehearsal mode: a global, session-only (never persisted — always starts OFF)
 // flag carried on LiveState. Real physical outputs check it and show nothing;
@@ -1133,17 +1142,24 @@ function broadcast(): void {
   for (const w of [operatorWin, stageWin, ...outputWins.values()]) {
     if (w && !w.isDestroyed()) w.webContents.send('wf:state', payload)
   }
-  writeRecovery({
-    serviceId: activeServiceId,
-    ts: Date.now(),
-    main: { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode },
-    second: payload.second
-      ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
-      : null,
-    // Pins are live-operation state, so a crash mid-sermon must not silently
-    // release a held screen — restoreRecovery puts them back.
-    pins: zonePinsRecord()
-  })
+  const recoveryMain: TrackSnapshot = { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode }
+  const recoverySecond: TrackSnapshot | null = payload.second
+    ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
+    : null
+  // Pins are live-operation state, so a crash mid-sermon must not silently
+  // release a held screen — restoreRecovery puts them back.
+  const recoveryPins = zonePinsRecord()
+  const recoveryKey = JSON.stringify({ main: recoveryMain, second: recoverySecond, pins: recoveryPins })
+  if (recoveryKey !== lastWrittenRecoveryKey) {
+    lastWrittenRecoveryKey = recoveryKey
+    writeRecovery({
+      serviceId: activeServiceId,
+      ts: Date.now(),
+      main: recoveryMain,
+      second: recoverySecond,
+      pins: recoveryPins
+    })
+  }
   tabletBroadcast(payload.main)
   zoneBroadcast()
   maybeAutoSwitchScene()
