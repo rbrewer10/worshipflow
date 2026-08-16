@@ -2020,13 +2020,12 @@ function startTabletServer(): void {
             ws.send(JSON.stringify({ type: 'authResult', ok: true }))
             // Immediately follow with the full state (sermon fields included) —
             // otherwise this client shows nothing sensitive until the next
-            // unrelated broadcast() tick.
-            ws.send(JSON.stringify({
-              type: 'state',
-              state: renderState('main'),
-              notes: tracks.main.itemNotes,
-              items: activeServiceItems.map((it) => ({ id: it.id, type: it.type, title: it.title }))
-            }))
+            // unrelated broadcast() tick. Route through tabletBroadcast() so
+            // there's one place that knows how to build/filter/gate this
+            // message; ws is already in authedTabletClients above, so it gets
+            // fullPayload while every other connected client gets whatever
+            // payload variant is already correct for it.
+            tabletBroadcast()
           } else {
             const fails = (failure?.count ?? 0) + 1
             tabletAuthFailures.set(remoteIp, {
