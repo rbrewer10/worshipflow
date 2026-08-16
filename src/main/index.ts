@@ -385,8 +385,9 @@ const tabletAuthFailures = new Map<string, { count: number; lockedUntil: number 
 const TABLET_AUTH_MAX_FAILURES = 5
 const TABLET_AUTH_LOCKOUT_MS = 60_000
 // Zone Pi kiosks are the screens the congregation is looking at, so a dropped
-// connection needs to surface fast — 8s means worst case one missed tick
-// (~16s) before markZoneDisconnected fires, not the old ~60s (two 30s ticks).
+// connection needs to surface fast. The loop below is single-strike (a client
+// that misses one ping/pong round trip is terminated on the very next tick),
+// so 8s means worst case ~8s before markZoneDisconnected fires, not the old ~30s.
 const TABLET_HEARTBEAT_INTERVAL_MS = 8_000
 
 function getTabletPin(): string {
