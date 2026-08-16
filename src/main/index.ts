@@ -30,7 +30,7 @@ import { zoneTrackFor, idleModeFor, clampSongIndex, STAGE_REHEARSAL_OFF } from '
 import type { StageRehearsalState } from '../shared/stageRehearsal'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
-import { readRecovery, writeRecovery } from './recovery'
+import { readRecovery, writeRecovery, isRecoveryStale, type TrackSnapshot } from './recovery'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -398,6 +398,38 @@ function regenerateTabletPin(): string {
   setSetting('tablet_pin', pin)
   return pin
 }
+
+// Shared PIN-lockout state check, reused by both the tablet WS 'auth' message
+// handler and the HTTP PIN gate on /phone and /room-feed below — one place
+// that knows the lockout window, so both surfaces stay in lockstep instead of
+// drifting into two counters with different reset behavior.
+function tabletLockoutMs(remoteIp: string): number {
+  const failure = tabletAuthFailures.get(remoteIp)
+  if (failure && failure.lockedUntil > Date.now()) return failure.lockedUntil - Date.now()
+  return 0
+}
+
+// Verifies a submitted PIN against getTabletPin(), recording the attempt in
+// tabletAuthFailures exactly like the WS path always has. Only call this for
+// an actual attempt (a PIN was submitted) — a bare page load with no PIN
+// should check tabletLockoutMs() instead so simply visiting the page doesn't
+// itself count as a failed guess.
+function checkTabletPin(remoteIp: string, pin: string | undefined): { ok: true } | { ok: false; lockedOutMs: number } {
+  const lockedOutMs = tabletLockoutMs(remoteIp)
+  if (lockedOutMs > 0) return { ok: false, lockedOutMs }
+  if (typeof pin === 'string' && pin === getTabletPin()) {
+    tabletAuthFailures.delete(remoteIp)
+    return { ok: true }
+  }
+  const failure = tabletAuthFailures.get(remoteIp)
+  const fails = (failure?.count ?? 0) + 1
+  tabletAuthFailures.set(remoteIp, {
+    count: fails,
+    lockedUntil: fails >= TABLET_AUTH_MAX_FAILURES ? Date.now() + TABLET_AUTH_LOCKOUT_MS : 0
+  })
+  return { ok: false, lockedOutMs: 0 }
+}
+
 let activeServiceItems: ServiceItem[] = []
 let activeServiceId: number | null = null  // which service is currently active (for Volunteer mode to honor)
 let activeServiceName = ''
@@ -519,6 +551,15 @@ let obsAutoSwitch = false
 let obsSceneMap: Record<SceneContext, string> = { worship: '', word: '', countdown: '' }
 let lastAutoScene: string | null = null
 
+// Crash recovery throttle: writeRecovery() is a synchronous electron-store
+// disk write, and broadcast() runs ~10x/sec while auto-advance is armed. Skip
+// the write when nothing recoverable actually changed since the last one we
+// wrote. Deliberately excludes serviceId/ts (a timestamp always differs, and
+// a real service change always shows up as a track change too) — this is a
+// JSON snapshot of everything else "actually live": per-track item/index/mode
+// plus zone pins (a crash mid-hold must not silently drop a pinned screen).
+let lastWrittenRecoveryKey: string | null = null
+
 // Rehearsal mode: a global, session-only (never persisted — always starts OFF)
 // flag carried on LiveState. Real physical outputs check it and show nothing;
 // operator-facing previews ignore it. See the field's comment in shared/types.ts.
@@ -532,6 +573,18 @@ let rehearsalMode = false
 let stageRehearsal: StageRehearsalState = STAGE_REHEARSAL_OFF
 let stageRehearsalAnnouncementTimer: ReturnType<typeof setInterval> | null = null
 let stageRehearsalAnnouncementIndex = 0
+// doLoadAnnouncement never sets serviceItemId, so this stays pinned to
+// whatever Main held when rehearsal armed; any REAL load (which does set
+// serviceItemId, via handleTabletLoadItem or the Go-Live IPC handler) breaks
+// the match and triggers disarm. Checked on every tick so a real "Go Live" or
+// Next/Prev during rehearsal is detected as a hijack instead of getting
+// silently overwritten by the next announcement.
+// This check-then-load-then-rebaseline sequence below is race-free only
+// because doLoadAnnouncement (and doLoadText, which it calls) has no real
+// await that yields to the event loop before resolving — if either ever
+// gains one, an operator's load landing in that window could get silently
+// absorbed into the rebaseline instead of triggering disarm.
+let stageRehearsalMainBaselineItemId: number | null = null
 
 function clearStageRehearsalAnnouncementTimer(): void {
   if (stageRehearsalAnnouncementTimer) {
@@ -550,8 +603,22 @@ function armStageRehearsalAnnouncementLoop(queue: number[]): void {
   stageRehearsalAnnouncementIndex = 0
   stageRehearsalAnnouncementTimer = setInterval(() => {
     if (!stageRehearsal.active || queue.length === 0) return
+    // If Main no longer holds what we last put there, the operator has
+    // loaded real content (Go Live, Next/Prev, tablet remote) since the last
+    // tick — the real service has started. Disarm instead of clobbering it
+    // with another announcement; this is the same off-path as the manual
+    // "turn rehearsal off" IPC handler below.
+    if (tracks.main.serviceItemId !== stageRehearsalMainBaselineItemId) {
+      clearStageRehearsalAnnouncementTimer()
+      stageRehearsal = STAGE_REHEARSAL_OFF
+      broadcast()
+      return
+    }
     stageRehearsalAnnouncementIndex = (stageRehearsalAnnouncementIndex + 1) % queue.length
-    void doLoadAnnouncement('main', queue[stageRehearsalAnnouncementIndex]).then(() => broadcast())
+    void doLoadAnnouncement('main', queue[stageRehearsalAnnouncementIndex]).then(() => {
+      stageRehearsalMainBaselineItemId = tracks.main.serviceItemId
+      broadcast()
+    })
   }, STAGE_REHEARSAL_ANNOUNCEMENT_MS)
 }
 
@@ -1016,16 +1083,24 @@ function describeDisplays(): DisplayInfo[] {
   }))
 }
 
+// Sermon notes/reference are the pastor's private prep material — never send
+// them to a socket that hasn't proven it holds the tablet PIN. Zone screens
+// intentionally never authenticate (see wss.on('connection') below), so this
+// strips just those two fields rather than gating the whole payload.
+function withoutSermonPrivateFields(state: LiveState): LiveState {
+  return { ...state, sermonReference: null, sermonNotes: null }
+}
+
 function tabletBroadcast(statePayload?: LiveState): void {
   if (tabletClients.size === 0) return
-  const payload = JSON.stringify({
-    type: 'state',
-    state: statePayload ?? renderState('main'),
-    notes: tracks.main.itemNotes,
-    items: activeServiceItems.filter((it) => it.track === 'main').map((it) => ({ id: it.id, type: it.type, title: it.title }))
-  })
+  const state = statePayload ?? renderState('main')
+  const notes = tracks.main.itemNotes
+  const items = activeServiceItems.filter((it) => it.track === 'main').map((it) => ({ id: it.id, type: it.type, title: it.title }))
+  const fullPayload = JSON.stringify({ type: 'state', state, notes, items })
+  const strippedPayload = JSON.stringify({ type: 'state', state: withoutSermonPrivateFields(state), notes, items })
   for (const client of tabletClients) {
-    if ((client as WsSocket).readyState === 1) (client as WsSocket).send(payload)
+    const socket = client as WsSocket
+    if (socket.readyState === 1) socket.send(authedTabletClients.has(socket) ? fullPayload : strippedPayload)
   }
 }
 
@@ -1067,15 +1142,24 @@ function broadcast(): void {
   for (const w of [operatorWin, stageWin, ...outputWins.values()]) {
     if (w && !w.isDestroyed()) w.webContents.send('wf:state', payload)
   }
-  writeRecovery({
-    main: { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode },
-    second: payload.second
-      ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
-      : null,
-    // Pins are live-operation state, so a crash mid-sermon must not silently
-    // release a held screen — restoreRecovery puts them back.
-    pins: zonePinsRecord()
-  })
+  const recoveryMain: TrackSnapshot = { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode }
+  const recoverySecond: TrackSnapshot | null = payload.second
+    ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
+    : null
+  // Pins are live-operation state, so a crash mid-sermon must not silently
+  // release a held screen — restoreRecovery puts them back.
+  const recoveryPins = zonePinsRecord()
+  const recoveryKey = JSON.stringify({ main: recoveryMain, second: recoverySecond, pins: recoveryPins })
+  if (recoveryKey !== lastWrittenRecoveryKey) {
+    lastWrittenRecoveryKey = recoveryKey
+    writeRecovery({
+      serviceId: activeServiceId,
+      ts: Date.now(),
+      main: recoveryMain,
+      second: recoverySecond,
+      pins: recoveryPins
+    })
+  }
   tabletBroadcast(payload.main)
   zoneBroadcast()
   maybeAutoSwitchScene()
@@ -1833,6 +1917,38 @@ function livecallToken(): string {
   return t
 }
 
+// Self-contained PIN-entry page shown in place of /phone or /room-feed when
+// the request didn't present the correct tablet PIN. These two routes embed
+// the raw livecallToken() in the real page (needed so the phone/room-feed
+// client can join the signaling room), so unlike /zone/1-4 — which are
+// read-only display endpoints and stay unauthenticated by design — they must
+// not hand that token to an unverified request. A plain GET form is enough:
+// this is a server-side gate on the page load itself, not the client-side
+// control gate tabletHtml.ts already does after the page has loaded.
+function tabletPinGateHtml(path: string, lockedOutMs: number): string {
+  const message = lockedOutMs > 0
+    ? `Too many incorrect PINs. Try again in ${Math.ceil(lockedOutMs / 1000)} seconds.`
+    : ''
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enter PIN</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#111;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+form{text-align:center;padding:24px}
+input{font-size:24px;padding:8px 12px;width:8em;text-align:center;border-radius:6px;border:1px solid #444;background:#222;color:#eee}
+button{font-size:18px;padding:8px 20px;margin-left:8px;border-radius:6px;border:none;background:#2a7;color:#fff}
+p{color:#f88}
+</style></head>
+<body>
+<form method="GET" action="${path}">
+<div>Enter tablet PIN</div>
+<input type="text" inputmode="numeric" pattern="[0-9]*" name="pin" autofocus autocomplete="off">
+<button type="submit">Go</button>
+${message ? `<p>${message}</p>` : ''}
+</form>
+</body></html>`
+}
+
 // --- Tablet HTTP + WebSocket server ---
 function startTabletServer(): void {
   const server = createServer((req, res) => {
@@ -1856,19 +1972,31 @@ function startTabletServer(): void {
     } else if (isObs) {
       res.writeHead(200, htmlHeaders)
       res.end(OBS_HTML)
-    } else if (path === '/phone') {
+    } else if (path === '/phone' || path === '/room-feed') {
+      // Unlike /zone/1-4, these routes let a caller actively JOIN the livecall
+      // room (not just display it), so the real page — which embeds the raw
+      // livecallToken() — is gated behind the same tablet PIN + lockout used
+      // for WS control auth above. See tabletPinGateHtml() for why.
+      const remoteIp = req.socket.remoteAddress ?? 'unknown'
+      const qs = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
+      const pinParam = qs.get('pin')
+      const authResult = pinParam === null
+        ? { ok: false as const, lockedOutMs: tabletLockoutMs(remoteIp) }
+        : checkTabletPin(remoteIp, pinParam)
+      if (!authResult.ok) {
+        res.writeHead(200, htmlHeaders)
+        res.end(tabletPinGateHtml(path, authResult.lockedOutMs))
+        return
+      }
       const host = req.headers.host ?? `localhost:${boundTabletPort}`
       // Match the scheme the page was loaded over: Tailscale Serve terminates
       // HTTPS in front of this plain-HTTP server, and a page served over https
       // cannot open a ws:// socket.
       const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
       res.writeHead(200, htmlHeaders)
-      res.end(phoneClientHtml(`${proto}://${host}/livecall`, livecallToken(), 'sanctuary'))
-    } else if (path === '/room-feed') {
-      const host = req.headers.host ?? `localhost:${boundTabletPort}`
-      const proto = req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws'
-      res.writeHead(200, htmlHeaders)
-      res.end(roomFeedViewerHtml(`${proto}://${host}/livecall`, livecallToken(), 'room-feed'))
+      res.end(path === '/phone'
+        ? phoneClientHtml(`${proto}://${host}/livecall`, livecallToken(), 'sanctuary')
+        : roomFeedViewerHtml(`${proto}://${host}/livecall`, livecallToken(), 'room-feed'))
     } else if (path === '/pulpit') {
       res.writeHead(200, htmlHeaders)
       res.end(pulpitHtml(getSetting('church_name')?.trim() || 'Snow Hill Church'))
@@ -1970,10 +2098,12 @@ function startTabletServer(): void {
     tabletClients.add(ws)
     aliveClients.add(ws)
     ws.on('pong', () => aliveClients.add(ws))
-    // Send current state immediately on connect.
+    // Send current state immediately on connect. No 'auth' message has been
+    // processed yet at this point, so this socket is always unauthenticated
+    // here — strip the sermon fields.
     ws.send(JSON.stringify({
       type: 'state',
-      state: renderState('main'),
+      state: withoutSermonPrivateFields(renderState('main')),
       notes: tracks.main.itemNotes,
       items: activeServiceItems.map((it) => ({ id: it.id, type: it.type, title: it.title }))
     }))
@@ -1999,21 +2129,21 @@ function startTabletServer(): void {
         }
 
         if (msg.type === 'auth') {
-          const failure = tabletAuthFailures.get(remoteIp)
-          if (failure && failure.lockedUntil > Date.now()) {
-            ws.send(JSON.stringify({ type: 'authResult', ok: false, lockedOutMs: failure.lockedUntil - Date.now() }))
-            return
-          }
-          if (typeof msg.pin === 'string' && msg.pin === getTabletPin()) {
+          const result = checkTabletPin(remoteIp, msg.pin)
+          if (result.ok) {
             authedTabletClients.add(ws)
-            tabletAuthFailures.delete(remoteIp)
             ws.send(JSON.stringify({ type: 'authResult', ok: true }))
+            // Immediately follow with the full state (sermon fields included) —
+            // otherwise this client shows nothing sensitive until the next
+            // unrelated broadcast() tick. Route through tabletBroadcast() so
+            // there's one place that knows how to build/filter/gate this
+            // message; ws is already in authedTabletClients above, so it gets
+            // fullPayload while every other connected client gets whatever
+            // payload variant is already correct for it.
+            tabletBroadcast()
+          } else if (result.lockedOutMs > 0) {
+            ws.send(JSON.stringify({ type: 'authResult', ok: false, lockedOutMs: result.lockedOutMs }))
           } else {
-            const fails = (failure?.count ?? 0) + 1
-            tabletAuthFailures.set(remoteIp, {
-              count: fails,
-              lockedUntil: fails >= TABLET_AUTH_MAX_FAILURES ? Date.now() + TABLET_AUTH_LOCKOUT_MS : 0
-            })
             ws.send(JSON.stringify({ type: 'authResult', ok: false }))
           }
           return
@@ -2471,6 +2601,7 @@ ipcMain.handle('wf:live:setStageRehearsal', async (_e, on: boolean) => {
     tracks.second.serviceItemId = null
     if (announcementQueue.length > 0) {
       await doLoadAnnouncement('main', announcementQueue[0])
+      stageRehearsalMainBaselineItemId = tracks.main.serviceItemId
       armStageRehearsalAnnouncementLoop(announcementQueue)
     }
   } else {
@@ -2504,7 +2635,10 @@ ipcMain.handle('wf:regenerateTabletPin', () => regenerateTabletPin())
 // live (found in the UI, invisible to the live-routing layer).
 function refreshActiveServiceItems(serviceId: number): void {
   const svc = getService(serviceId)
-  activeServiceId = serviceId
+  // A deleted/nonexistent serviceId (e.g. from a stale recovery snapshot) must not
+  // be left as the "active" one — otherwise later code trusting a non-null
+  // activeServiceId as proof it points at a real service would be wrong.
+  activeServiceId = svc ? serviceId : null
   activeServiceItems = (svc as { items: ServiceItem[] } | null)?.items ?? []
   activeServiceName = (svc as { name?: string } | null)?.name ?? ''
   activeServiceDate = (svc as { service_date?: string | null } | null)?.service_date ?? null
@@ -3011,10 +3145,39 @@ ipcMain.handle('wf:roomfeed:config', async (): Promise<LivecallConfig> => {
   }
 })
 
-ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => {
-  // At this point, the renderer has been created and activeServiceItems is populated
+// A crash-and-relaunch might not happen right away — nobody may notice the
+// app died until well into the service — so this needs to be generous enough
+// to cover "mid-service crash, relaunched a couple hours later" without
+// resurrecting a snapshot from a completely different day (e.g. Wednesday
+// rehearsal state showing up the following Sunday).
+const RECOVERY_STALE_MS = 12 * 60 * 60 * 1000 // 12 hours
+
+ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
+  ok: boolean
+  restored: boolean
+  fallback: boolean
+  stale: boolean
+  serviceName: string | null
+}> => {
   const recovered = readRecovery()
-  if (!recovered) return { ok: true, restored: false }
+  if (!recovered) return { ok: true, restored: false, fallback: false, stale: false, serviceName: null }
+
+  if (isRecoveryStale(recovered, Date.now(), RECOVERY_STALE_MS)) {
+    return { ok: true, restored: false, fallback: false, stale: true, serviceName: null }
+  }
+
+  // The renderer fires this on mount, before the operator has necessarily
+  // opened any service, so activeServiceItems is very likely still empty —
+  // self-load the service the snapshot was taken from rather than relying on
+  // the operator having navigated anywhere first. If the service was since
+  // deleted, this just leaves activeServiceItems empty and restore/fallback
+  // below both no-op gracefully.
+  if (recovered.serviceId != null) {
+    refreshActiveServiceItems(recovered.serviceId)
+  }
+  const serviceName = recovered.serviceId != null && activeServiceId === recovered.serviceId
+    ? activeServiceName || null
+    : null
 
   let restoredAny = false
   let fallbackAny = false
@@ -3060,7 +3223,19 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restor
   }
 
   broadcast()
-  return { ok: true, restored: restoredAny, fallback: fallbackAny }
+
+  if (restoredAny) {
+    notifyOperator(serviceName ? `Restored "${serviceName}" after a restart.` : 'Restored where you left off after a restart.', 'info')
+  } else if (fallbackAny) {
+    notifyOperator(
+      serviceName
+        ? `Couldn't find the exact spot in "${serviceName}" — showing the start instead.`
+        : "Couldn't find the exact spot after a restart — showing the start instead.",
+      'warn'
+    )
+  }
+
+  return { ok: true, restored: restoredAny, fallback: fallbackAny, stale: false, serviceName }
 })
 
 ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {

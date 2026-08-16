@@ -18,13 +18,16 @@ export function pulpitHtml(churchName: string): string {
 *{box-sizing:border-box;margin:0;padding:0;-webkit-user-select:none;user-select:none}
 html,body{width:100%;height:100%;background:#0a0d10;color:#e8ebed;font-family:-apple-system,system-ui,sans-serif;overflow:hidden}
 #root{display:flex;flex-direction:column;width:100vw;height:100vh}
-#header{flex:0 0 auto;padding:10px 20px;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a939c;border-bottom:1px solid #1c2226}
-#split{flex:1;display:flex;min-height:0}
+#header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a939c;border-bottom:1px solid #1c2226}
+#headerTitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dot{width:9px;height:9px;border-radius:50%;background:#ef4444;transition:background .3s;flex-shrink:0}
+#dot.ok{background:#60a5fa}
+#split{flex:1;display:flex;min-height:0;transition:opacity .3s}
 #notes,#verse{flex:1;padding:24px;overflow:auto;white-space:pre-line}
 #notes{background:#12171b;border-right:2px solid #1c2226;font-size:22px;line-height:1.5}
 #verse{background:#0a0d10;font-size:26px;line-height:1.55;font-weight:600}
 #verseRef{font-size:15px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8a939c;margin-bottom:12px}
-#stage{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
+#stage{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;transition:opacity .3s}
 #stage.on{display:flex}
 #split.hidden{display:none}
 #stageLine{font-size:34px;font-weight:800;line-height:1.35}
@@ -43,7 +46,10 @@ button.nav:active{background:#2a3238}
 </head>
 <body>
 <div id="root">
-  <div id="header">Not connected</div>
+  <div id="header">
+    <span id="headerTitle">Not connected</span>
+    <div id="dot" title="Connection status"></div>
+  </div>
   <div id="split">
     <div id="notes"></div>
     <div id="verse"><div id="verseRef"></div><div id="verseText"></div></div>
@@ -71,6 +77,18 @@ var ws = null
 var authed = false
 var cachedPin = localStorage.getItem('wf_pulpit_pin') || ''
 var latestItems = []
+var elDot = document.getElementById('dot')
+var elSplit = document.getElementById('split')
+var elStage = document.getElementById('stage')
+
+// Marks the notes/verse content as possibly stale while disconnected — this is
+// the pastor's own working tool, so (unlike the sanctuary zone screens) a
+// frozen last-known frame must not read as live.
+function setStale(isStale) {
+  elSplit.style.opacity = isStale ? '0.4' : ''
+  elStage.style.opacity = isStale ? '0.4' : ''
+}
+setStale(true)
 
 function showPinGate(err) {
   document.getElementById('pingate').className = 'on'
@@ -111,7 +129,7 @@ function apply(msg) {
   var s = msg.state || {}
   var liveItem = latestItems.find(function (it) { return it.id === s.liveServiceItemId })
   var isSermon = !!liveItem && liveItem.type === 'sermon'
-  document.getElementById('header').textContent = s.songTitle || 'Not live'
+  document.getElementById('headerTitle').textContent = s.songTitle || 'Not live'
   document.getElementById('split').className = isSermon ? '' : 'hidden'
   document.getElementById('stage').className = isSermon ? '' : 'on'
   if (isSermon) {
@@ -130,11 +148,21 @@ function connect() {
   var proto = location.protocol === 'https:' ? 'wss' : 'ws'
   ws = new WebSocket(proto + '://' + location.host + '/')
   ws.onopen = function () {
+    elDot.className = 'ok'
+    setStale(false)
     if (cachedPin) ws.send(JSON.stringify({ type: 'auth', pin: cachedPin }))
     else showPinGate()
   }
-  ws.onclose = function () { setTimeout(connect, 2000) }
-  ws.onerror = function () { ws.close() }
+  ws.onclose = function () {
+    elDot.className = ''
+    setStale(true)
+    setTimeout(connect, 2000)
+  }
+  ws.onerror = function () {
+    elDot.className = ''
+    setStale(true)
+    ws.close()
+  }
   ws.onmessage = function (ev) {
     try { apply(JSON.parse(ev.data)) } catch (e) { /* ignore malformed */ }
   }
