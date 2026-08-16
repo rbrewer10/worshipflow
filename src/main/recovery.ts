@@ -11,6 +11,12 @@ export interface TrackSnapshot {
 }
 
 export interface RecoverySnapshot {
+  // Which service was active when this snapshot was written. One service at a
+  // time is ever "active", so this lives at the top level, not per-track.
+  serviceId: number | null
+  // Date.now() at write time, used to decide whether a snapshot is fresh
+  // enough to be worth restoring (see RECOVERY_STALE_MS in index.ts).
+  ts: number
   main: TrackSnapshot
   second: TrackSnapshot | null
   // Live zone pins ("hold this screen on X"). Optional: snapshots written by
@@ -34,4 +40,10 @@ export function writeRecovery(snap: RecoverySnapshot): void {
   } catch {
     // Never let autosave crash the live engine.
   }
+}
+
+// Pure staleness check, extracted so it's testable without touching the store
+// or Electron. See RECOVERY_STALE_MS in index.ts for the threshold rationale.
+export function isRecoveryStale(snap: Pick<RecoverySnapshot, 'ts'>, now: number, staleMs: number): boolean {
+  return now - snap.ts > staleMs
 }

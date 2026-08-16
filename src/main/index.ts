@@ -30,7 +30,7 @@ import { zoneTrackFor, idleModeFor, clampSongIndex, STAGE_REHEARSAL_OFF } from '
 import type { StageRehearsalState } from '../shared/stageRehearsal'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
-import { readRecovery, writeRecovery } from './recovery'
+import { readRecovery, writeRecovery, isRecoveryStale } from './recovery'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -1134,6 +1134,8 @@ function broadcast(): void {
     if (w && !w.isDestroyed()) w.webContents.send('wf:state', payload)
   }
   writeRecovery({
+    serviceId: activeServiceId,
+    ts: Date.now(),
     main: { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode },
     second: payload.second
       ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
@@ -3124,10 +3126,39 @@ ipcMain.handle('wf:roomfeed:config', async (): Promise<LivecallConfig> => {
   }
 })
 
-ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restored?: boolean; fallback?: boolean }> => {
-  // At this point, the renderer has been created and activeServiceItems is populated
+// A crash-and-relaunch might not happen right away — nobody may notice the
+// app died until well into the service — so this needs to be generous enough
+// to cover "mid-service crash, relaunched a couple hours later" without
+// resurrecting a snapshot from a completely different day (e.g. Wednesday
+// rehearsal state showing up the following Sunday).
+const RECOVERY_STALE_MS = 12 * 60 * 60 * 1000 // 12 hours
+
+ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
+  ok: boolean
+  restored: boolean
+  fallback: boolean
+  stale: boolean
+  serviceName: string | null
+}> => {
   const recovered = readRecovery()
-  if (!recovered) return { ok: true, restored: false }
+  if (!recovered) return { ok: true, restored: false, fallback: false, stale: false, serviceName: null }
+
+  if (isRecoveryStale(recovered, Date.now(), RECOVERY_STALE_MS)) {
+    return { ok: true, restored: false, fallback: false, stale: true, serviceName: null }
+  }
+
+  // The renderer fires this on mount, before the operator has necessarily
+  // opened any service, so activeServiceItems is very likely still empty —
+  // self-load the service the snapshot was taken from rather than relying on
+  // the operator having navigated anywhere first. If the service was since
+  // deleted, this just leaves activeServiceItems empty and restore/fallback
+  // below both no-op gracefully.
+  if (recovered.serviceId != null) {
+    refreshActiveServiceItems(recovered.serviceId)
+  }
+  const serviceName = recovered.serviceId != null && activeServiceId === recovered.serviceId
+    ? activeServiceName || null
+    : null
 
   let restoredAny = false
   let fallbackAny = false
@@ -3173,7 +3204,19 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{ ok: boolean; restor
   }
 
   broadcast()
-  return { ok: true, restored: restoredAny, fallback: fallbackAny }
+
+  if (restoredAny) {
+    notifyOperator(serviceName ? `Restored "${serviceName}" after a restart.` : 'Restored where you left off after a restart.', 'info')
+  } else if (fallbackAny) {
+    notifyOperator(
+      serviceName
+        ? `Couldn't find the exact spot in "${serviceName}" — showing the start instead.`
+        : "Couldn't find the exact spot after a restart — showing the start instead.",
+      'warn'
+    )
+  }
+
+  return { ok: true, restored: restoredAny, fallback: fallbackAny, stale: false, serviceName }
 })
 
 ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {
