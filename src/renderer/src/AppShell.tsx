@@ -127,7 +127,9 @@ function AppShell(): JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [view, shortcutTrack])
 
-  // Restore recovery state after renderer is ready and activeServiceItems is populated
+  // Restore recovery state once the renderer is ready. The main process self-loads
+  // the recovered service before restoring tracks, so this doesn't depend on the
+  // operator having already navigated to a service.
   useEffect(() => {
     window.wf.restoreRecovery().catch(err => {
       console.error('Failed to restore recovery state:', err)

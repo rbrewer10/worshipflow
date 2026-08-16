@@ -2619,7 +2619,10 @@ ipcMain.handle('wf:regenerateTabletPin', () => regenerateTabletPin())
 // live (found in the UI, invisible to the live-routing layer).
 function refreshActiveServiceItems(serviceId: number): void {
   const svc = getService(serviceId)
-  activeServiceId = serviceId
+  // A deleted/nonexistent serviceId (e.g. from a stale recovery snapshot) must not
+  // be left as the "active" one — otherwise later code trusting a non-null
+  // activeServiceId as proof it points at a real service would be wrong.
+  activeServiceId = svc ? serviceId : null
   activeServiceItems = (svc as { items: ServiceItem[] } | null)?.items ?? []
   activeServiceName = (svc as { name?: string } | null)?.name ?? ''
   activeServiceDate = (svc as { service_date?: string | null } | null)?.service_date ?? null
