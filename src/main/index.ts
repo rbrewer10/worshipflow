@@ -1016,16 +1016,24 @@ function describeDisplays(): DisplayInfo[] {
   }))
 }
 
+// Sermon notes/reference are the pastor's private prep material — never send
+// them to a socket that hasn't proven it holds the tablet PIN. Zone screens
+// intentionally never authenticate (see wss.on('connection') below), so this
+// strips just those two fields rather than gating the whole payload.
+function withoutSermonPrivateFields(state: LiveState): LiveState {
+  return { ...state, sermonReference: null, sermonNotes: null }
+}
+
 function tabletBroadcast(statePayload?: LiveState): void {
   if (tabletClients.size === 0) return
-  const payload = JSON.stringify({
-    type: 'state',
-    state: statePayload ?? renderState('main'),
-    notes: tracks.main.itemNotes,
-    items: activeServiceItems.filter((it) => it.track === 'main').map((it) => ({ id: it.id, type: it.type, title: it.title }))
-  })
+  const state = statePayload ?? renderState('main')
+  const notes = tracks.main.itemNotes
+  const items = activeServiceItems.filter((it) => it.track === 'main').map((it) => ({ id: it.id, type: it.type, title: it.title }))
+  const fullPayload = JSON.stringify({ type: 'state', state, notes, items })
+  const strippedPayload = JSON.stringify({ type: 'state', state: withoutSermonPrivateFields(state), notes, items })
   for (const client of tabletClients) {
-    if ((client as WsSocket).readyState === 1) (client as WsSocket).send(payload)
+    const socket = client as WsSocket
+    if (socket.readyState === 1) socket.send(authedTabletClients.has(socket) ? fullPayload : strippedPayload)
   }
 }
 
@@ -1970,10 +1978,12 @@ function startTabletServer(): void {
     tabletClients.add(ws)
     aliveClients.add(ws)
     ws.on('pong', () => aliveClients.add(ws))
-    // Send current state immediately on connect.
+    // Send current state immediately on connect. No 'auth' message has been
+    // processed yet at this point, so this socket is always unauthenticated
+    // here — strip the sermon fields.
     ws.send(JSON.stringify({
       type: 'state',
-      state: renderState('main'),
+      state: withoutSermonPrivateFields(renderState('main')),
       notes: tracks.main.itemNotes,
       items: activeServiceItems.map((it) => ({ id: it.id, type: it.type, title: it.title }))
     }))
@@ -2008,6 +2018,15 @@ function startTabletServer(): void {
             authedTabletClients.add(ws)
             tabletAuthFailures.delete(remoteIp)
             ws.send(JSON.stringify({ type: 'authResult', ok: true }))
+            // Immediately follow with the full state (sermon fields included) —
+            // otherwise this client shows nothing sensitive until the next
+            // unrelated broadcast() tick.
+            ws.send(JSON.stringify({
+              type: 'state',
+              state: renderState('main'),
+              notes: tracks.main.itemNotes,
+              items: activeServiceItems.map((it) => ({ id: it.id, type: it.type, title: it.title }))
+            }))
           } else {
             const fails = (failure?.count ?? 0) + 1
             tabletAuthFailures.set(remoteIp, {
