@@ -564,6 +564,11 @@ let rehearsalMode = false
 let stageRehearsal: StageRehearsalState = STAGE_REHEARSAL_OFF
 let stageRehearsalAnnouncementTimer: ReturnType<typeof setInterval> | null = null
 let stageRehearsalAnnouncementIndex = 0
+// The Main serviceItemId the rehearsal loop itself most recently put there —
+// checked on every tick so a real "Go Live" or Next/Prev during rehearsal
+// (which stamps a different id onto tracks.main) is detected as a hijack
+// instead of getting silently overwritten by the next announcement.
+let stageRehearsalLastLoadedItemId: number | null = null
 
 function clearStageRehearsalAnnouncementTimer(): void {
   if (stageRehearsalAnnouncementTimer) {
@@ -582,8 +587,22 @@ function armStageRehearsalAnnouncementLoop(queue: number[]): void {
   stageRehearsalAnnouncementIndex = 0
   stageRehearsalAnnouncementTimer = setInterval(() => {
     if (!stageRehearsal.active || queue.length === 0) return
+    // If Main no longer holds what we last put there, the operator has
+    // loaded real content (Go Live, Next/Prev, tablet remote) since the last
+    // tick — the real service has started. Disarm instead of clobbering it
+    // with another announcement; this is the same off-path as the manual
+    // "turn rehearsal off" IPC handler below.
+    if (tracks.main.serviceItemId !== stageRehearsalLastLoadedItemId) {
+      clearStageRehearsalAnnouncementTimer()
+      stageRehearsal = STAGE_REHEARSAL_OFF
+      broadcast()
+      return
+    }
     stageRehearsalAnnouncementIndex = (stageRehearsalAnnouncementIndex + 1) % queue.length
-    void doLoadAnnouncement('main', queue[stageRehearsalAnnouncementIndex]).then(() => broadcast())
+    void doLoadAnnouncement('main', queue[stageRehearsalAnnouncementIndex]).then(() => {
+      stageRehearsalLastLoadedItemId = tracks.main.serviceItemId
+      broadcast()
+    })
   }, STAGE_REHEARSAL_ANNOUNCEMENT_MS)
 }
 
@@ -2557,6 +2576,7 @@ ipcMain.handle('wf:live:setStageRehearsal', async (_e, on: boolean) => {
     tracks.second.serviceItemId = null
     if (announcementQueue.length > 0) {
       await doLoadAnnouncement('main', announcementQueue[0])
+      stageRehearsalLastLoadedItemId = tracks.main.serviceItemId
       armStageRehearsalAnnouncementLoop(announcementQueue)
     }
   } else {
