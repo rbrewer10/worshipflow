@@ -320,6 +320,25 @@ export function onPersistError(cb: (err: unknown) => void): void {
   persistErrorHandler = cb
 }
 
+// Shifts existing backup generations one slot older (bakPath -> .1, .1 -> .2,
+// ...) before persist() overwrites bakPath with a fresh copy, so a single bad
+// write can't destroy the only "last known good" copy on the very next save.
+// renameSync overwrites an existing destination on both POSIX and Windows, so
+// the oldest generation (index `keep - 1`) is dropped automatically once it's
+// overwritten rather than needing an explicit delete. Processed from the
+// oldest slot inward so an in-progress shift never clobbers a file it still
+// needs to read from. Exported (like normalizeTitleText) purely so it's
+// unit-testable without spinning up a full sql.js database.
+export function rotateBackupGenerations(bakPath: string, keep = 3): void {
+  for (let gen = keep - 1; gen >= 1; gen--) {
+    const src = gen === 1 ? bakPath : `${bakPath}.${gen - 1}`
+    const dst = `${bakPath}.${gen}`
+    if (existsSync(src)) {
+      renameSync(src, dst)
+    }
+  }
+}
+
 function persist(): void {
   if (!dbPath) return
   const tmpPath = `${dbPath}.tmp`
@@ -328,6 +347,7 @@ function persist(): void {
   try {
     writeFileSync(tmpPath, Buffer.from(db.export()))
     if (existsSync(dbPath)) {
+      rotateBackupGenerations(bakPath)
       copyFileSync(dbPath, bakPath)
     }
     renameSync(tmpPath, dbPath)
