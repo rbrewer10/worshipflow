@@ -4,6 +4,45 @@
 **App:** WorshipFlow Pro (Electron + React + Tailwind v3)
 **Status:** Design approved, ready for implementation plan
 
+## Amendment — 2026-08-16
+
+Ryan refined the color story after seeing reference mockups (a Build Service
+run-of-show layout and a dark "Live Control" screen — current/next/after-next
+hierarchy, run-of-show rail, presenter notes drawer, stage message, quick
+cues, timer, output-routing grid, scene selector, prominent Safety Reset).
+He confirmed that Live Control layout is the right direction — it already
+matches this spec's planned Control Room screen closely (see the Live
+Control Room section below), so no structural change there, just this
+palette refinement:
+
+- **Background:** deep navy and graphite, not a neutral near-black — the
+  `bg-app`/`bg-panel`/`bg-panel-raised` tokens below should lean navy-tinted
+  rather than pure achromatic dark when implemented.
+- **Text:** warm ivory, not cool gray — `text-primary` should read warm, not
+  the cooler `#e8ebed` this doc originally specified.
+- **Accent role split (this changes the original single-accent decision):**
+  - **Snow Hill blue** — selection states and general actions (primary
+    buttons, focus rings, "this is selected"). This replaces emerald in that
+    role.
+  - **Champagne gold** — premium accents/highlights only (sparingly — a
+    detail, not a UI color).
+  - **Emerald** — narrowed to *only* ready/on-air/live state, not shared
+    with general primary actions anymore. This is a real state color now,
+    on par with the existing amber (Rehearsal)/violet (Stage
+    Rehearsal)/red (danger) tokens, not the app-wide accent.
+- **No gradients, no glow/"AI blob" effects.** Flat surfaces, the subtle-shadow
+  elevation approach already in this doc stays, but nothing resembling a
+  glowing orb or soft gradient wash.
+
+Exact hex values for the navy/graphite/ivory/blue/gold tokens weren't
+specified — pick and confirm specific values during implementation (Foundation
+plan Task 1, the token table below) rather than guessing them here; the
+above is the semantic direction to implement against. Everything else in
+this spec (scope, dark-only, motion, component-primitive approach) stands
+as originally approved.
+
+**Status:** Design approved, ready for implementation plan
+
 ## Context
 
 WorshipFlow is functionally solid but visually reads as a utility, not a
