@@ -384,6 +384,10 @@ const authedTabletClients = new WeakSet<WsSocket>()
 const tabletAuthFailures = new Map<string, { count: number; lockedUntil: number }>()
 const TABLET_AUTH_MAX_FAILURES = 5
 const TABLET_AUTH_LOCKOUT_MS = 60_000
+// Zone Pi kiosks are the screens the congregation is looking at, so a dropped
+// connection needs to surface fast — 8s means worst case one missed tick
+// (~16s) before markZoneDisconnected fires, not the old ~60s (two 30s ticks).
+const TABLET_HEARTBEAT_INTERVAL_MS = 8_000
 
 function getTabletPin(): string {
   const existing = getSetting('tablet_pin')
@@ -2188,7 +2192,7 @@ function startTabletServer(): void {
       aliveClients.delete(ws)
       try { ws.ping() } catch { /* ignore */ }
     }
-  }, 30000)
+  }, TABLET_HEARTBEAT_INTERVAL_MS)
 
   // If the preferred port is taken (leftover instance / second launch), fall back
   // to the next port instead of silently failing, and surface the port actually
