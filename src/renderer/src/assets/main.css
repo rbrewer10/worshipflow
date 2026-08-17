@@ -41,6 +41,11 @@ body,
   --wf-warning: #f59e0b;
   --wf-error: #ef4444;
   --wf-stage-rehearsal: #8b5cf6;
+  /* Dark-only app, no light/dark toggle — tells native-chrome controls
+     (date-picker icon/popup, select arrows, scrollbars) to render dark
+     themselves instead of defaulting to light and clashing with the
+     reskinned surfaces around them. */
+  color-scheme: dark;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════
