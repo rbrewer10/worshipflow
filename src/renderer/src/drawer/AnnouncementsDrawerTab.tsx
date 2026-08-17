@@ -36,19 +36,19 @@ export default function AnnouncementsDrawerTab({ onDone }: { onDone: () => void 
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search announcements…"
-        className="rounded border border-slate-300 px-2 py-1 text-sm"
+        className="rounded border border-border px-2 py-1 text-sm"
       />
       <div className="flex flex-col gap-1">
-        {items.length === 0 && <p className="text-xs text-slate-400">No announcements found.</p>}
+        {items.length === 0 && <p className="text-xs text-content-tertiary">No announcements found.</p>}
         {items.map((a) => (
           <button
             key={a.id}
             onClick={() => void pick(a.id)}
             disabled={busy}
-            className="flex items-center justify-between gap-2 rounded border border-slate-200 px-2 py-1.5 text-left text-sm hover:border-blue-400 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1.5 text-left text-sm hover:border-blue-400 hover:bg-blue-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="truncate">{a.title}</span>
-            <Play size={13} className="shrink-0 text-blue-600" />
+            <Play size={13} className="shrink-0 text-blue-400" />
           </button>
         ))}
       </div>
