@@ -5,6 +5,7 @@ import type { AppInfo, ObsStatus, ZoneId } from '../../shared/types'
 import { ZONE_IDS, ZONE_NAMES } from '../../shared/types'
 import type { View } from './AppShell'
 import BrandMark from './BrandMark'
+import IconButton from './IconButton'
 import NavMenu from './NavMenu'
 import type { NavMenuItem } from './NavMenu'
 import OnboardingHelp from './OnboardingHelp'
@@ -105,17 +106,17 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
   }, [onAir])
 
   return (
-    <header className="flex flex-shrink-0 items-center gap-1 border-b border-slate-200 bg-[#f4f6f9] px-3 py-2">
+    <header className="flex flex-shrink-0 items-center gap-1 border-b border-border bg-panel px-3 py-2">
       <div className="mr-3 flex flex-shrink-0 items-center gap-2">
         <BrandMark size={26} className="flex-shrink-0" />
         <div className="min-w-0">
-          <div className="text-sm font-medium leading-tight text-slate-900">
-            WorshipFlow <span className="font-normal text-slate-500">Pro</span>
+          <div className="text-sm font-medium leading-tight text-content-primary">
+            WorshipFlow <span className="font-normal text-content-secondary">Pro</span>
           </div>
-          <div className="flex items-center gap-1 text-[10px] leading-tight text-slate-500">
+          <div className="flex items-center gap-1 text-[10px] leading-tight text-content-secondary">
             <span>v{build?.version ?? '…'}</span>
             {build && !build.isPackaged && (
-              <span className="rounded bg-amber-100 px-1 font-bold text-amber-700">DEV</span>
+              <span className="rounded bg-amber-500/20 px-1 font-bold text-amber-300">DEV</span>
             )}
             {updateReady && (
               <button
@@ -141,7 +142,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
             className={`flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
               view === id
                 ? 'bg-blue-600 font-medium text-white'
-                : 'font-normal text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
+                : 'font-normal text-content-secondary hover:bg-panel-raised hover:text-content-primary'
             }`}
           >
             <Icon size={15} className="flex-shrink-0" />
@@ -157,7 +158,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
           onClick={toggleRehearsal}
           title={rehearsal ? 'Rehearsing — real outputs show nothing. Click to disarm.' : 'Arm rehearsal mode — real outputs will show nothing while you practice'}
           className={`rounded-lg px-2.5 py-1.5 text-xs font-bold uppercase tracking-wide transition-colors ${
-            rehearsal ? 'bg-amber-500 text-black' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
+            rehearsal ? 'bg-amber-500 text-black' : 'bg-panel-raised text-content-secondary hover:bg-border-strong'
           }`}
         >
           {rehearsal ? 'Rehearsing' : 'Rehearsal'}
@@ -170,7 +171,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
             className="flex items-center gap-1.5 rounded-lg bg-violet-500/10 px-3 py-1.5 ring-1 ring-violet-500/30 hover:bg-violet-500/20"
           >
             <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-violet-500" />
-            <span className="text-xs font-bold uppercase tracking-wide text-violet-700">
+            <span className="text-xs font-bold uppercase tracking-wide text-violet-400">
               Stage Rehearsal active
             </span>
           </button>
@@ -179,7 +180,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
         {rehearsal ? (
           <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 ring-1 ring-amber-500/30" title="Rehearsal mode is armed — real outputs are showing nothing, regardless of what's happening here">
             <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />
-            <span className="text-xs font-bold uppercase tracking-wide text-amber-700">
+            <span className="text-xs font-bold uppercase tracking-wide text-amber-400">
               Outputs held back
             </span>
           </div>
@@ -191,14 +192,14 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
               : 'Real screens are connected — anything sent live reaches the congregation'}
           >
             <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-red-500" />
-            <span className="text-xs font-bold uppercase tracking-wide text-red-700">
+            <span className="text-xs font-bold uppercase tracking-wide text-red-400">
               Live armed · {screenCount} screen{screenCount !== 1 ? 's' : ''}
             </span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-slate-400" />
-            <span className="text-xs text-slate-500">No output</span>
+            <span className="text-xs text-content-secondary">No output</span>
             <button
               onClick={() => window.wf.outputOpen()}
               className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
@@ -213,40 +214,39 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
             {obs?.streaming && (
               <div className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2.5 py-1">
                 <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-red-500" />
-                <span className="text-xs font-bold uppercase tracking-wide text-red-700">Live</span>
-                <span className="font-mono text-xs tabular-nums text-red-700">{elapsed(obs.streamStartedAt, now)}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-red-400">Live</span>
+                <span className="font-mono text-xs tabular-nums text-red-400">{elapsed(obs.streamStartedAt, now)}</span>
               </div>
             )}
             {obs?.recording && (
               <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1">
                 <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-amber-500" />
-                <span className="text-xs font-bold uppercase tracking-wide text-amber-700">Rec</span>
-                <span className="font-mono text-xs tabular-nums text-amber-700">{elapsed(obs.recordStartedAt, now)}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-amber-400">Rec</span>
+                <span className="font-mono text-xs tabular-nums text-amber-400">{elapsed(obs.recordStartedAt, now)}</span>
               </div>
             )}
           </>
         )}
       </div>
 
-      <div className="ml-2 flex flex-shrink-0 items-center border-l border-slate-200 pl-3">
+      <div className="ml-2 flex flex-shrink-0 items-center border-l border-border pl-3">
         <button
           onClick={() => setView('volunteer')}
           className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
             view === 'volunteer'
               ? 'border-blue-600 bg-blue-600 text-white'
-              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+              : 'border-border bg-panel text-content-secondary hover:bg-panel-raised'
           }`}
         >
           <User size={15} className="flex-shrink-0" />
           Volunteer mode
         </button>
-        <button
+        <IconButton
+          icon={HelpCircle}
           onClick={() => setHelpOpen(true)}
           title="Quick start help"
-          className="ml-1.5 flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100"
-        >
-          <HelpCircle size={15} />
-        </button>
+          className="ml-1.5"
+        />
       </div>
       {helpOpen && (
         <OnboardingHelp
