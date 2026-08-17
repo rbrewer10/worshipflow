@@ -196,7 +196,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
       <h1 className="sr-only">Volunteer Mode</h1>
       {/* ── Top bar ── */}
       <div className="flex items-center gap-2 border-b border-border bg-panel px-4 py-2">
-        <TopBtn active={isBlack} onClick={() => send('black')} className={isBlack ? 'bg-black text-white ring-1 ring-white/10' : ''}>
+        <TopBtn active={isBlack} onClick={() => send('black')} className={isBlack ? 'bg-border-strong text-white ring-1 ring-white/10' : ''}>
           <Square size={16} /> Black
         </TopBtn>
         <TopBtn active={isLogo} onClick={() => send('logo')} className={isLogo ? 'bg-blue-600 text-white' : ''}>
