@@ -24,14 +24,14 @@ export const ImageEditor = memo(function ImageEditor({ imagePath, onPathChange }
       {hasFile ? (
         <div className="surface flex items-center gap-2">
           {isVideoFile(imagePath)
-            ? <Film size={14} className="shrink-0 text-slate-600" />
-            : <ImageIcon size={14} className="shrink-0 text-slate-600" />}
-          <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-700" title={imagePath}>
+            ? <Film size={14} className="shrink-0 text-content-secondary" />
+            : <ImageIcon size={14} className="shrink-0 text-content-secondary" />}
+          <span className="min-w-0 flex-1 truncate text-xs font-medium text-content-secondary" title={imagePath}>
             {imagePath.split(/[/\\]/).pop()}
           </span>
         </div>
       ) : (
-        <p className="text-xs text-slate-500">No file selected</p>
+        <p className="text-xs text-content-secondary">No file selected</p>
       )}
       <button onClick={pickFile} className="w-full btn-secondary text-xs">
         <Upload size={13} /> {hasFile ? 'Change file…' : 'Choose file…'}

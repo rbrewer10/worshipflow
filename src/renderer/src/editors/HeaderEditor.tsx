@@ -33,13 +33,13 @@ export const HeaderEditor = memo(function HeaderEditor({
               key={c}
               onClick={() => onColorChange(c)}
               aria-label={`Set header color to ${c}`}
-              className={`h-7 w-7 rounded-full transition-transform ${color === c ? 'ring-2 ring-offset-2 ring-slate-900 scale-110' : 'hover:scale-105'}`}
+              className={`h-7 w-7 rounded-full transition-transform ${color === c ? 'ring-2 ring-offset-2 ring-white ring-offset-panel scale-110' : 'hover:scale-105'}`}
               style={{ background: c }}
             />
           ))}
         </div>
       </div>
-      <p className="text-[11px] leading-snug text-slate-400">
+      <p className="text-[11px] leading-snug text-content-tertiary">
         A section divider — never goes live, just breaks up a long list into readable chunks.
       </p>
     </div>

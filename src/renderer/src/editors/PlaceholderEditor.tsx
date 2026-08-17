@@ -21,7 +21,7 @@ export const PlaceholderEditor = memo(function PlaceholderEditor({
           onChange={(e) => onLabelChange(e.target.value)}
           aria-label="Placeholder label" />
       </div>
-      <p className="text-[11px] leading-snug text-slate-400">
+      <p className="text-[11px] leading-snug text-content-tertiary">
         Reserves this spot in the order. Delete it and add the real item once you know what's going here.
       </p>
     </div>
