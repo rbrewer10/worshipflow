@@ -45,7 +45,7 @@ function ZonePanel(): JSX.Element {
       <ZoneLiveGrid />
 
       {/* Save the 4 zones' current pins as a one-click preset, recalled from the Live tab */}
-      <div className="rounded-lg border border-border bg-panel-raised p-2.5">
+      <div className="rounded-lg border border-border bg-panel p-2.5">
         {showLookForm ? (
           <div className="flex items-center gap-1.5">
             <input
@@ -77,7 +77,7 @@ function ZonePanel(): JSX.Element {
       </div>
 
       {/* Pi network addresses */}
-      <div className="rounded-lg border border-border bg-panel-raised p-2.5">
+      <div className="rounded-lg border border-border bg-panel p-2.5">
         <div className="mb-1.5 text-[11px] font-semibold text-content-secondary">Pi Display URLs</div>
         <div className="space-y-1">
           {ZONE_IDS.map((zoneId) => (

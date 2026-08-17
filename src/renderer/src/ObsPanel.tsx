@@ -207,7 +207,7 @@ function ObsPanel(): JSX.Element {
               <span className="h-2 w-2 rounded-[2px] bg-white" /> Stop Stream
             </button>
           ) : (
-            <button onClick={() => { if (window.confirm('Go live to the internet now? This starts the public stream.')) window.wf.obsStartStream() }} disabled={!status.connected} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600/20 px-2 py-2 text-xs font-bold text-red-700 hover:bg-red-600/30 disabled:opacity-40">
+            <button onClick={() => { if (window.confirm('Go live to the internet now? This starts the public stream.')) window.wf.obsStartStream() }} disabled={!status.connected} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600/20 px-2 py-2 text-xs font-bold text-red-400 hover:bg-red-600/30 disabled:opacity-40">
               <span className="h-2 w-2 rounded-full bg-current" /> Start Stream
             </button>
           )}
@@ -216,7 +216,7 @@ function ObsPanel(): JSX.Element {
               <span className="h-2 w-2 rounded-[2px] bg-white" /> Stop Record
             </button>
           ) : (
-            <button onClick={() => window.wf.obsStartRecord()} disabled={!status.connected} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600/20 px-2 py-2 text-xs font-bold text-amber-700 hover:bg-amber-600/30 disabled:opacity-40">
+            <button onClick={() => window.wf.obsStartRecord()} disabled={!status.connected} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600/20 px-2 py-2 text-xs font-bold text-amber-400 hover:bg-amber-600/30 disabled:opacity-40">
               <span className="h-2 w-2 rounded-full bg-current" /> Start Record
             </button>
           )}
@@ -224,13 +224,13 @@ function ObsPanel(): JSX.Element {
         {(status.streaming || status.recording) && (
           <div className="flex flex-wrap gap-3 text-[11px] font-semibold">
             {status.streaming && (
-              <span className="inline-flex items-center gap-1.5 text-red-600">
+              <span className="inline-flex items-center gap-1.5 text-red-400">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" /> LIVE
-                <span className="font-mono tabular-nums text-red-700">{elapsed(status.streamStartedAt, now)}</span>
+                <span className="font-mono tabular-nums text-red-400">{elapsed(status.streamStartedAt, now)}</span>
               </span>
             )}
             {status.recording && (
-              <span className="inline-flex items-center gap-1.5 text-amber-700">
+              <span className="inline-flex items-center gap-1.5 text-amber-400">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" /> REC
                 <span className="font-mono tabular-nums">{elapsed(status.recordStartedAt, now)}</span>
               </span>

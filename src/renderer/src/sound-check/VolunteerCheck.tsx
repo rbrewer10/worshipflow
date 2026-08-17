@@ -252,7 +252,7 @@ function SetupView({
           &ldquo;this is how our room should sound&rdquo; yardstick.
         </p>
         <p className="mt-2 inline-flex items-center gap-2 text-[12.5px] font-semibold text-amber-400">
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] uppercase tracking-wide">
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] uppercase tracking-wide text-amber-800">
             Coming soon
           </span>
           Reference-mix capture isn&rsquo;t available yet — the live audio feed isn&rsquo;t connected.

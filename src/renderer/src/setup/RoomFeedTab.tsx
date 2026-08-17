@@ -6,9 +6,9 @@ import type { SenderState } from '../livecall/RoomFeedSender'
 
 const STATE_LABEL: Record<SenderState, { label: string; className: string }> = {
   idle: { label: 'Standby', className: 'bg-panel-raised text-content-secondary ring-border' },
-  starting: { label: 'Starting…', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  live: { label: 'Live', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  error: { label: 'Error', className: 'bg-red-50 text-red-700 ring-red-200' },
+  starting: { label: 'Starting…', className: 'bg-amber-500/10 text-amber-400 ring-amber-500/30' },
+  live: { label: 'Live', className: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30' },
+  error: { label: 'Error', className: 'bg-red-500/10 text-red-400 ring-red-500/30' },
 }
 
 // Setup destination for the return feed: a camera and the mixer's audio,
@@ -131,7 +131,7 @@ function RoomFeedTab(): JSX.Element {
             )}
           </div>
 
-          {error && <p className="mb-3 text-[11px] text-red-600">{error}</p>}
+          {error && <p className="mb-3 text-[11px] text-red-400">{error}</p>}
 
           <div className="flex gap-2">
             <button
@@ -161,12 +161,12 @@ function RoomFeedTab(): JSX.Element {
               <p>Scan this on the tablet, then Share &rarr; Add to Home Screen.</p>
               <p className="break-all font-mono text-[10px] text-content-tertiary">{feedUrl}</p>
               {feedUrlIsSecure ? (
-                <p className="rounded bg-emerald-50 p-2 text-emerald-800 ring-1 ring-emerald-200">
+                <p className="rounded bg-emerald-500/10 p-2 text-emerald-400 ring-1 ring-emerald-500/30">
                   Tailscale address detected — the same one already set up for Live Call.
                   No additional setup needed.
                 </p>
               ) : (
-                <p className="rounded bg-amber-50 p-2 text-amber-800 ring-1 ring-amber-200">
+                <p className="rounded bg-amber-500/10 p-2 text-amber-400 ring-1 ring-amber-500/30">
                   <b>Tailscale not detected.</b> Set it up the same way you did for Live
                   Call — install Tailscale on this computer and the tablet, run{' '}
                   <code className="font-mono">tailscale serve --bg {tabletPort}</code>, and
