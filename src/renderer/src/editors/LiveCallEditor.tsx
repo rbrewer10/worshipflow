@@ -5,10 +5,10 @@ import { useLiveCall } from '../livecall/useLiveCall'
 import type { CallState } from '../livecall/LiveCallRelay'
 
 const STATE_STYLE: Record<CallState, { label: string; className: string }> = {
-  idle: { label: 'Standby', className: 'bg-slate-100 text-slate-500 ring-slate-200' },
-  ringing: { label: 'Incoming call', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  live: { label: 'Live', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  reconnecting: { label: 'Reconnecting', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  idle: { label: 'Standby', className: 'bg-panel-raised text-content-secondary ring-border' },
+  ringing: { label: 'Incoming call', className: 'bg-amber-500/10 text-amber-400 ring-amber-500/30' },
+  live: { label: 'Live', className: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30' },
+  reconnecting: { label: 'Reconnecting', className: 'bg-amber-500/10 text-amber-400 ring-amber-500/30' },
 }
 
 /**
@@ -44,7 +44,7 @@ export default function LiveCallEditor(): JSX.Element {
           <Video size={12} />
           {pill.label}
         </span>
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-content-secondary">
           <Monitor size={12} />
           {viewerCount === 1 ? '1 screen connected' : `${viewerCount} screens connected`}
         </span>
@@ -60,30 +60,30 @@ export default function LiveCallEditor(): JSX.Element {
           style={{ objectFit: 'contain' }}
         />
         {state === 'idle' && (
-          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-slate-400">
+          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-content-tertiary">
             Waiting for a call
           </div>
         )}
       </div>
 
-      <div className="min-h-[14px] font-mono text-[10px] text-slate-400">{telemetry}</div>
+      <div className="min-h-[14px] font-mono text-[10px] text-content-tertiary">{telemetry}</div>
 
       <div className="flex items-center gap-2">
         <button
           onClick={accept}
           disabled={state !== 'ringing'}
-          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-panel-raised disabled:text-content-tertiary"
         >
           <Phone size={13} /> Accept
         </button>
         <button
           onClick={decline}
           disabled={state === 'idle'}
-          className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-semibold text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+          className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-semibold text-content-secondary ring-1 ring-border transition-colors hover:bg-panel-raised disabled:cursor-not-allowed disabled:text-content-tertiary"
         >
           <PhoneOff size={13} /> End
         </button>
-        <label className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+        <label className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-content-secondary">
           <input
             type="checkbox"
             checked={autoAccept}
@@ -93,23 +93,23 @@ export default function LiveCallEditor(): JSX.Element {
         </label>
       </div>
 
-      <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+      <div className="rounded-lg bg-panel-raised p-3 ring-1 ring-border">
         <div className="section-header mb-2 flex items-center gap-1.5">
           <QrCode size={12} /> Set up the phone
         </div>
         <div className="flex items-start gap-3">
           {qr && <img src={qr} alt="QR code linking to the Live Call phone page" className="h-[120px] w-[120px] rounded bg-white p-1" />}
-          <div className="space-y-1.5 text-[11px] leading-snug text-slate-500">
+          <div className="space-y-1.5 text-[11px] leading-snug text-content-secondary">
             <p>Scan this on the phone, then Share &rarr; Add to Home Screen.</p>
-            <p className="break-all font-mono text-[10px] text-slate-400">{phoneUrl}</p>
+            <p className="break-all font-mono text-[10px] text-content-tertiary">{phoneUrl}</p>
             {phoneUrlIsSecure ? (
-              <p className="rounded bg-emerald-50 p-2 text-emerald-800 ring-1 ring-emerald-200">
+              <p className="rounded bg-emerald-500/10 p-2 text-emerald-400 ring-1 ring-emerald-500/30">
                 Tailscale address detected. It only serves this page while{' '}
                 <code className="font-mono">tailscale serve --bg {tabletPort}</code> is running on
                 this computer — that survives reboots once set.
               </p>
             ) : (
-              <p className="rounded bg-amber-50 p-2 text-amber-800 ring-1 ring-amber-200">
+              <p className="rounded bg-amber-500/10 p-2 text-amber-400 ring-1 ring-amber-500/30">
                 <b>Tailscale not detected, so this http:// address cannot use the camera.</b>{' '}
                 Phones only allow camera access over https. Install Tailscale on this computer and
                 on his phone, run{' '}
