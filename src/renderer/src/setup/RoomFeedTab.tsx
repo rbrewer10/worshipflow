@@ -5,7 +5,7 @@ import { useRoomFeed } from '../livecall/useRoomFeed'
 import type { SenderState } from '../livecall/RoomFeedSender'
 
 const STATE_LABEL: Record<SenderState, { label: string; className: string }> = {
-  idle: { label: 'Standby', className: 'bg-slate-100 text-slate-500 ring-slate-200' },
+  idle: { label: 'Standby', className: 'bg-panel-raised text-content-secondary ring-border' },
   starting: { label: 'Starting…', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
   live: { label: 'Live', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
   error: { label: 'Error', className: 'bg-red-50 text-red-700 ring-red-200' },
@@ -51,10 +51,10 @@ function RoomFeedTab(): JSX.Element {
     <div className="min-h-0 flex-1 overflow-auto p-6">
       <div className="mx-auto max-w-3xl space-y-5">
         <div>
-          <h1 className="mb-1 flex items-center gap-2 text-lg font-semibold text-slate-900">
-            <Camera size={18} className="text-slate-500" /> Room feed
+          <h1 className="mb-1 flex items-center gap-2 text-lg font-semibold text-content-primary">
+            <Camera size={18} className="text-content-secondary" /> Room feed
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-content-secondary">
             Sends a camera and the mixer&apos;s audio to a tablet in front of a remote
             preacher, so he can see and hear the room. Independent of Live Call — start
             and stop this whenever you want, whether or not his call is live.
@@ -62,8 +62,8 @@ function RoomFeedTab(): JSX.Element {
         </div>
 
         {!hasLabels && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <p className="mb-3 text-sm text-slate-600">
+          <div className="rounded-xl border border-border bg-panel p-5">
+            <p className="mb-3 text-sm text-content-secondary">
               Grant camera and microphone access once so the pickers below can show real
               device names.
             </p>
@@ -73,12 +73,12 @@ function RoomFeedTab(): JSX.Element {
           </div>
         )}
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="rounded-xl border border-border bg-panel p-5">
           <div className="mb-3 flex items-center gap-3">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${pill.className}`}>
               {pill.label}
             </span>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-content-secondary">
               <Monitor size={12} />
               {viewerCount === 1 ? '1 tablet connected' : `${viewerCount} tablets connected`}
             </span>
@@ -86,12 +86,12 @@ function RoomFeedTab(): JSX.Element {
 
           <div className="mb-3 grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Camera</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-content-secondary">Camera</span>
               <select
                 value={cameraId}
                 onChange={(e) => setCameraId(e.target.value)}
                 disabled={state !== 'idle'}
-                className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
               >
                 {cameras.length === 0 && <option value="">No camera found</option>}
                 {cameras.map((c) => (
@@ -100,12 +100,12 @@ function RoomFeedTab(): JSX.Element {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Audio input</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-content-secondary">Audio input</span>
               <select
                 value={audioId}
                 onChange={(e) => setAudioId(e.target.value)}
                 disabled={state !== 'idle'}
-                className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
               >
                 {microphones.length === 0 && <option value="">No audio input found</option>}
                 {microphones.map((m) => (
@@ -125,7 +125,7 @@ function RoomFeedTab(): JSX.Element {
               style={{ objectFit: 'contain' }}
             />
             {state === 'idle' && (
-              <div className="absolute inset-0 flex items-center justify-center text-[11px] text-slate-400">
+              <div className="absolute inset-0 flex items-center justify-center text-[11px] text-content-tertiary">
                 Not started
               </div>
             )}
@@ -151,15 +151,15 @@ function RoomFeedTab(): JSX.Element {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="rounded-xl border border-border bg-panel p-5">
           <div className="section-header mb-2 flex items-center gap-1.5">
             <QrCode size={12} /> Set up the tablet
           </div>
           <div className="flex items-start gap-3">
-            {qr && <img src={qr} alt="QR code linking to the room feed viewer page" className="h-[120px] w-[120px] rounded bg-slate-50 p-1" />}
-            <div className="space-y-1.5 text-[11px] leading-snug text-slate-500">
+            {qr && <img src={qr} alt="QR code linking to the room feed viewer page" className="h-[120px] w-[120px] rounded bg-panel-raised p-1" />}
+            <div className="space-y-1.5 text-[11px] leading-snug text-content-secondary">
               <p>Scan this on the tablet, then Share &rarr; Add to Home Screen.</p>
-              <p className="break-all font-mono text-[10px] text-slate-400">{feedUrl}</p>
+              <p className="break-all font-mono text-[10px] text-content-tertiary">{feedUrl}</p>
               {feedUrlIsSecure ? (
                 <p className="rounded bg-emerald-50 p-2 text-emerald-800 ring-1 ring-emerald-200">
                   Tailscale address detected — the same one already set up for Live Call.
