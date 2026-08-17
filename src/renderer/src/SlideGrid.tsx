@@ -57,7 +57,7 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
   const liveIndex = live?.index ?? -1
 
   if (!activeService) {
-    return <div className="flex h-full min-w-0 flex-1 items-center justify-center text-sm text-slate-500">No service loaded — pick one in the Services tab.</div>
+    return <div className="flex h-full min-w-0 flex-1 items-center justify-center text-sm text-content-secondary">No service loaded — pick one in the Services tab.</div>
   }
 
   const items = activeService.items.filter((it) => it.track === track).filter(canGoLive)
@@ -65,7 +65,7 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
   return (
     <div className="h-full min-h-0 min-w-0 flex-1 space-y-3 overflow-auto p-3">
       {items.length === 0 && (
-        <p className="py-8 text-center text-sm text-slate-500">
+        <p className="py-8 text-center text-sm text-content-secondary">
           {track === 'main' ? 'This service has no go-live items yet.' : 'No second-track items yet — add some in Build Service.'}
         </p>
       )}
@@ -77,8 +77,8 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
         const bgFile = itemThumbBackground(it, songBg)
         return (
           <div key={it.id} ref={isLiveItem ? liveRowRef : null} className="card-lg">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-900">
-              <Icon size={13} className="shrink-0 text-slate-600" />
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-content-primary">
+              <Icon size={13} className="shrink-0 text-content-secondary" />
               <span className="truncate">{it.title}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -99,7 +99,7 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
                     onClick={handleClick}
                     aria-label={`Play slide ${idx + 1} of ${its.length}`}
                     className={`overflow-hidden rounded-md transition-shadow min-h-10 cursor-pointer group relative ${
-                      isLiveSlide ? 'ring-2 ring-blue-500' : isPending ? 'ring-2 ring-amber-500/70' : 'ring-1 ring-slate-200 hover:ring-blue-400/50'
+                      isLiveSlide ? 'ring-2 ring-blue-500' : isPending ? 'ring-2 ring-amber-500/70' : 'ring-1 ring-border hover:ring-blue-400/50'
                     }`}
                     title={isPending ? 'Tap again to confirm' : `Click to play slide ${idx + 1}`}
                   >
@@ -113,7 +113,7 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
                         <Play size={20} className="text-white" fill="currentColor" />
                       </div>
                     )}
-                    <div className="bg-[#e9ecf1] px-1.5 py-0.5 text-left text-[9px] text-slate-500">{idx + 1}</div>
+                    <div className="bg-app px-1.5 py-0.5 text-left text-[9px] text-content-secondary">{idx + 1}</div>
                   </button>
                 )
               })}
