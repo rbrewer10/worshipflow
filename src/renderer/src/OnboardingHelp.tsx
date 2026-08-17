@@ -17,15 +17,15 @@ interface OnboardingHelpProps {
 // operator is exactly the wrong place to skip that.
 function OnboardingHelp({ onClose, onGoToVolunteer }: OnboardingHelpProps): JSX.Element {
   return (
-    <Modal onClose={onClose} label="Quick start" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+    <Modal onClose={onClose} label="Quick start" className="w-full max-w-md rounded-2xl bg-panel p-5 shadow-xl">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-slate-900">Quick start</h2>
-        <button onClick={onClose} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+        <h2 className="text-base font-semibold text-content-primary">Quick start</h2>
+        <button onClick={onClose} className="rounded p-1 text-content-tertiary hover:bg-panel-raised hover:text-content-secondary">
           <X size={16} />
         </button>
       </div>
 
-      <div className="space-y-3 text-sm text-slate-700">
+      <div className="space-y-3 text-sm text-content-secondary">
         <p>
           Every screen shows one of three things: <strong>Lyrics</strong> (whatever slide is live —
           a song, sermon point, or announcement), <strong>Logo</strong> (the church logo, for
@@ -40,7 +40,7 @@ function OnboardingHelp({ onClose, onGoToVolunteer }: OnboardingHelpProps): JSX.
       </div>
 
       <div className="mt-4 flex justify-end gap-2">
-        <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100">
+        <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-content-secondary hover:bg-panel-raised">
           Close
         </button>
         <button
