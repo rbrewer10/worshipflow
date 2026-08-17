@@ -82,7 +82,7 @@ function DiagnosticsTab(): JSX.Element {
           <h2 className="mb-2 font-semibold text-content-primary">Displays</h2>
           <div className="text-sm text-content-secondary">
             <b className="text-content-primary">{info?.displays.length ?? '…'}</b> display(s) ·{' '}
-            <span className={info && info.outputs > 0 ? 'text-blue-400' : 'text-amber-700'}>
+            <span className={info && info.outputs > 0 ? 'text-blue-400' : 'text-amber-400'}>
               {info?.outputs ?? 0} live
             </span>
           </div>
