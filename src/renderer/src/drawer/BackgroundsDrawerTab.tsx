@@ -106,7 +106,7 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
             onClick={() => setSelectedFolder('ALL')}
             className={[
               'rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all',
-              selectedFolder === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+              selectedFolder === 'ALL' ? 'bg-blue-600 text-white' : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
             ].join(' ')}
           >
             All
@@ -115,7 +115,7 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
             onClick={() => setSelectedFolder(null)}
             className={[
               'rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all',
-              selectedFolder === null ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+              selectedFolder === null ? 'bg-blue-600 text-white' : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
             ].join(' ')}
           >
             Uncategorized
@@ -126,7 +126,7 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
               onClick={() => setSelectedFolder(f)}
               className={[
                 'rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all',
-                selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
               ].join(' ')}
             >
               {f}
@@ -136,16 +136,16 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
       )}
       <div className="grid grid-cols-6 gap-2">
         {backgrounds.length === 0 ? (
-          <p className="col-span-6 text-xs text-slate-400">No backgrounds yet — add some in Build Service.</p>
+          <p className="col-span-6 text-xs text-content-tertiary">No backgrounds yet — add some in Build Service.</p>
         ) : folderScoped.length === 0 ? (
-          <p className="col-span-6 text-xs text-slate-400">Nothing in this folder yet.</p>
+          <p className="col-span-6 text-xs text-content-tertiary">Nothing in this folder yet.</p>
         ) : (
           folderScoped.map((bg) => (
             <button
               key={bg.path}
               onClick={() => void pick(bg.path)}
               disabled={busy}
-              className="overflow-hidden rounded border border-slate-200 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="overflow-hidden rounded border border-border hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ aspectRatio: '16/9' }}
               title={bg.filename}
             >
