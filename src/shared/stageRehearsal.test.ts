@@ -13,10 +13,10 @@ describe('zoneTrackFor', () => {
     expect(zoneTrackFor(4, armed, 'main')).toBe('second')
     expect(zoneTrackFor(4, armed, 'second')).toBe('second')
   })
-  it('armed: zones 1-3 are untouched, keep their assigned track', () => {
+  it('armed: zones 1-3 are forced onto Main even if assigned Second', () => {
     expect(zoneTrackFor(1, armed, 'main')).toBe('main')
-    expect(zoneTrackFor(2, armed, 'main')).toBe('main')
-    expect(zoneTrackFor(3, armed, 'main')).toBe('main')
+    expect(zoneTrackFor(2, armed, 'second')).toBe('main') // the actual bug this closes
+    expect(zoneTrackFor(3, armed, 'second')).toBe('main')
   })
 })
 
