@@ -19,82 +19,20 @@ body,
    ════════════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --wf-primary: #2563eb;
-  --wf-primary-dark: #1d4ed8;
-  --wf-secondary: #0891b2;
-  --wf-secondary-dark: #0e7490;
-  --wf-accent: #f59e0b;
-  --wf-accent-light: #fbbf24;
-  --wf-bg-primary: #ffffff;
-  --wf-bg-secondary: #f8fafc;
-  --wf-bg-tertiary: #e2e8f0;
-  --wf-text-primary: #0f172a;
-  --wf-text-secondary: #475569;
-  --wf-border: rgba(0, 0, 0, 0.1);
-  --wf-glass-bg: rgba(255, 255, 255, 0.95);
-  --wf-success: #059669;
-  --wf-warning: #d97706;
-  --wf-error: #dc2626;
-}
-
-/* Minimalist Professional - Clean LIGHT steel-blue (high contrast for older eyes) */
-html[data-theme="minimalist"] {
-  --wf-primary: #1d4ed8;
-  --wf-primary-dark: #1e3a8a;
-  --wf-secondary: #0369a1;
-  --wf-secondary-dark: #075985;
-  --wf-accent: #0284c7;
-  --wf-accent-light: #0ea5e9;
-  --wf-bg-primary: #dbe3ee;
-  --wf-bg-secondary: #eaf0f7;
-  --wf-bg-tertiary: #cdd8e6;
-  --wf-text-primary: #0f172a;
-  --wf-text-secondary: #334155;
-  --wf-border: rgba(30, 58, 138, 0.22);
-  --wf-glass-bg: rgba(255, 255, 255, 0.95);
-  --wf-success: #047857;
-  --wf-warning: #b45309;
-  --wf-error: #b91c1c;
-}
-
-/* Vibrant Creative - Bold & Energetic */
-html[data-theme="vibrant"] {
-  --wf-primary: #dc2626;
-  --wf-primary-dark: #991b1b;
-  --wf-secondary: #ea580c;
-  --wf-secondary-dark: #c2410c;
-  --wf-accent: #fbbf24;
-  --wf-accent-light: #fcd34d;
-  --wf-bg-primary: #1f1f1f;
-  --wf-bg-secondary: #2d2d2d;
-  --wf-bg-tertiary: #3f3f3f;
-  --wf-text-primary: #fafafa;
-  --wf-text-secondary: #d4d4d4;
-  --wf-border: rgba(220, 38, 38, 0.25);
-  --wf-glass-bg: rgba(31, 31, 31, 0.9);
-  --wf-success: #10b981;
-  --wf-warning: #fbbf24;
+  --wf-primary: #3b82f6;
+  --wf-primary-dark: #2563eb;
+  --wf-bg-app: #0b0f1a;
+  --wf-bg-panel: #131a29;
+  --wf-bg-panel-raised: #1c2536;
+  --wf-text-primary: #efe7d8;
+  --wf-text-secondary: #a89e8c;
+  --wf-border: #212a3d;
+  --wf-border-strong: #2f3b52;
+  --wf-live: #10b981;
+  --wf-gold: #c9a466;
+  --wf-warning: #f59e0b;
   --wf-error: #ef4444;
-}
-
-/* Dark Premium - Cool & Professional */
-html[data-theme="dark-premium"] {
-  --wf-primary: #06b6d4;
-  --wf-primary-dark: #0891b2;
-  --wf-secondary: #3b82f6;
-  --wf-secondary-dark: #2563eb;
-  --wf-accent: #14b8a6;
-  --wf-accent-light: #2dd4bf;
-  --wf-bg-primary: #1a1a2e;
-  --wf-bg-secondary: #16213e;
-  --wf-bg-tertiary: #0f3460;
-  --wf-text-primary: #ecf0f1;
-  --wf-text-secondary: #bdc3c7;
-  --wf-border: rgba(6, 182, 212, 0.2);
-  --wf-glass-bg: rgba(26, 26, 46, 0.9);
-  --wf-success: #10b981;
-  --wf-warning: #fbbf24;
-  --wf-error: #ef4444;
+  --wf-stage-rehearsal: #8b5cf6;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════
