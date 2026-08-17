@@ -2,11 +2,34 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Lay the foundation for WorshipFlow's dark-theme visual redesign — reskin the existing shared CSS component-class system to the new near-black/emerald palette (instant win across the 28 files that already use it), add Tailwind config tokens for later per-screen migration, and set up the motion/utility infrastructure (Framer Motion, a `cn()` classnames helper) the rest of the redesign will build on. This stage changes no screen's structure or behavior — only the shared styling layer underneath it.
+**Goal:** Lay the foundation for WorshipFlow's dark-theme visual redesign — reskin the existing shared CSS component-class system to the new navy/graphite-and-blue palette (instant win across the files that already use it), add Tailwind config tokens for later per-screen migration, and set up the motion/utility infrastructure (Framer Motion, a `cn()` classnames helper) the rest of the redesign will build on. This stage changes no screen's structure or behavior — only the shared styling layer underneath it.
 
-**Architecture:** WorshipFlow already has a centralized `@layer components` block in `src/renderer/src/assets/main.css` (`.btn`, `.btn-primary`, `.card`, `.surface`, `.badge`, etc., all using hardcoded light-theme hex values) that 28 `.tsx` files already reference via plain `className="btn-primary"` strings. Reskinning that one file's color values is the single highest-leverage change in the whole redesign — every consuming file gets the new look with zero changes to its own code. Separately, `tailwind.config.js` gets semantic color tokens (`bg-app`, `bg-panel`, `text-content-primary`, etc.) for use directly in JSX className strings during later per-screen migration stages (raw `bg-white`/`bg-slate-100` usage that doesn't go through the shared classes). A new `cn()` helper (clsx + tailwind-merge) and a `motion.ts` preset module (Framer Motion) round out the infrastructure later stages will need.
+**Palette update (2026-08-17):** this plan originally specified a single achromatic near-black background and a single emerald accent shared by every primary/selection/focus interaction (matching the design spec's original, pre-amendment decision). The spec's 2026-08-16 amendment changed that: navy-tinted backgrounds (not achromatic), warm ivory text (not cool gray), **Snow Hill blue** for selection/focus/general primary actions, **champagne gold** as a rare premium accent, and **emerald narrowed to ready/on-air/live state only** — a real status color on par with amber (Rehearsal)/violet (Stage Rehearsal)/red (danger), not the app-wide accent anymore. The amendment left exact hex values for implementation to pick; those were chosen below, previewed to Ryan as a small mockup (navy panel + ivory text + blue "Go live" button + emerald "Live" badge + a gold accent detail), and confirmed before writing this plan's task bodies. Every hex value in Tasks 2/4/5/6/7/8/9 reflects that confirmed palette, not the original spec draft's values.
+
+**Architecture:** WorshipFlow already has a centralized `@layer components` block in `src/renderer/src/assets/main.css` (`.btn`, `.btn-primary`, `.card`, `.surface`, `.badge`, etc., all using hardcoded light-theme hex values) that files across the renderer already reference via plain `className="btn-primary"` strings. Reskinning that one file's color values is the single highest-leverage change in the whole redesign — every consuming file gets the new look with zero changes to its own code. Separately, `tailwind.config.js` gets semantic color tokens (`bg-app`, `bg-panel`, `text-content-primary`, etc.) for use directly in JSX className strings during later per-screen migration stages (raw `bg-white`/`bg-slate-100` usage that doesn't go through the shared classes). A new `cn()` helper (clsx + tailwind-merge) and a `motion.ts` preset module (Framer Motion) round out the infrastructure later stages will need.
 
 **Tech Stack:** React, Tailwind CSS v3, Framer Motion (new), clsx + tailwind-merge (new), Vitest.
+
+---
+
+## Confirmed palette
+
+| Role | Value(s) | Used for |
+|---|---|---|
+| `bg-app` | `#0b0f1a` | Window/app background |
+| `bg-panel` | `#131a29` | Cards, panels, sidebars |
+| `bg-panel-raised` | `#1c2536` | Hover states, nested panels, modals |
+| `border` | `#212a3d` | Default dividers/outlines |
+| `border-strong` | `#2f3b52` | Emphasized borders, hover borders |
+| `text-primary` | `#efe7d8` | Main content/labels (warm ivory) |
+| `text-secondary` | `#a89e8c` | Secondary labels, metadata |
+| `text-tertiary` | `#6f6858` | Disabled/placeholder |
+| **Snow Hill blue** (selection, focus, general primary actions) | `#93c5fd` / `#60a5fa` / `#3b82f6` / `#2563eb` (Tailwind `blue-300/400/500/600`) | Primary buttons, focus rings, selected/active state |
+| **Champagne gold** (premium accents only, sparingly) | `#d9bd85` / `#c9a466` / `#a8823f` | Rare highlight details — not a general UI color |
+| **Emerald** (ready/on-air/live state only) | `#34d399` / `#10b981` / `#059669` (Tailwind `emerald-400/500/600`) | Live/on-air/ready indicators — a status color, not the app accent |
+| Rehearsal Mode | `#f59e0b` / `#fbbf24` (amber) | Unchanged from original spec |
+| Stage Rehearsal | `#8b5cf6` (violet) | Unchanged — matches existing `text-violet-700` convention |
+| Danger/destructive | `#dc2626` / `#ef4444` / `#fca5a5` (red) | Unchanged from original spec |
 
 ---
 
@@ -52,7 +75,7 @@ In `package.json`, in the `"dependencies"` block (currently starts at line 23), 
   },
 ```
 
-(Keep the list alphabetically sorted, matching the existing convention.)
+(Keep the list alphabetically sorted, matching the existing convention. If any of these three exact version ranges no longer resolve, use the closest current major-compatible version instead — the versions here are a good-faith pin, not load-bearing.)
 
 - [ ] **Step 2: Install**
 
@@ -84,17 +107,22 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        app: '#0a0d10',
-        panel: '#12171b',
-        'panel-raised': '#1a2126',
+        app: '#0b0f1a',
+        panel: '#131a29',
+        'panel-raised': '#1c2536',
         border: {
-          DEFAULT: '#1c2226',
-          strong: '#2a3238',
+          DEFAULT: '#212a3d',
+          strong: '#2f3b52',
         },
         content: {
-          primary: '#e8ebed',
-          secondary: '#8a939c',
-          tertiary: '#5a6570',
+          primary: '#efe7d8',
+          secondary: '#a89e8c',
+          tertiary: '#6f6858',
+        },
+        gold: {
+          DEFAULT: '#c9a466',
+          light: '#d9bd85',
+          dark: '#a8823f',
         },
         status: {
           rehearsal: '#f59e0b',
@@ -107,7 +135,7 @@ module.exports = {
 }
 ```
 
-This generates utilities used in later per-screen migration stages: `bg-app`, `bg-panel`, `bg-panel-raised`, `border-border`/`border-border-strong` (Tailwind's standard naming when a color is itself named `border` — the same convention shadcn/ui uses), `text-content-primary`/`-secondary`/`-tertiary`, `bg-status-rehearsal`/`text-status-rehearsal`, `bg-status-stage-rehearsal`/`text-status-stage-rehearsal`. The primary accent and danger colors intentionally use Tailwind's built-in `emerald-*` and `red-*` scales directly rather than new custom tokens — no need to reinvent shades that already exist.
+This generates utilities used in later per-screen migration stages: `bg-app`, `bg-panel`, `bg-panel-raised`, `border-border`/`border-border-strong` (Tailwind's standard naming when a color is itself named `border` — the same convention shadcn/ui uses), `text-content-primary`/`-secondary`/`-tertiary`, `bg-gold`/`text-gold`/`bg-gold-light`/`bg-gold-dark`, `bg-status-rehearsal`/`text-status-rehearsal`, `bg-status-stage-rehearsal`/`text-status-stage-rehearsal`. Snow Hill blue (primary/selection/focus), the live/ready/on-air emerald, and danger red intentionally use Tailwind's built-in `blue-*`/`emerald-*`/`red-*` scales directly rather than new custom tokens — no need to reinvent shades that already exist, and it keeps hover/active/disabled variants free.
 
 - [ ] **Step 2: Verify Tailwind still builds**
 
@@ -205,21 +233,24 @@ Replace lines 21-98 (the `:root` block through the end of the `dark-premium` blo
 
 ```css
 :root {
-  --wf-primary: #10b981;
-  --wf-primary-dark: #059669;
-  --wf-bg-app: #0a0d10;
-  --wf-bg-panel: #12171b;
-  --wf-bg-panel-raised: #1a2126;
-  --wf-text-primary: #e8ebed;
-  --wf-text-secondary: #8a939c;
-  --wf-border: #1c2226;
-  --wf-border-strong: #2a3238;
-  --wf-success: #10b981;
+  --wf-primary: #3b82f6;
+  --wf-primary-dark: #2563eb;
+  --wf-bg-app: #0b0f1a;
+  --wf-bg-panel: #131a29;
+  --wf-bg-panel-raised: #1c2536;
+  --wf-text-primary: #efe7d8;
+  --wf-text-secondary: #a89e8c;
+  --wf-border: #212a3d;
+  --wf-border-strong: #2f3b52;
+  --wf-live: #10b981;
+  --wf-gold: #c9a466;
   --wf-warning: #f59e0b;
   --wf-error: #ef4444;
   --wf-stage-rehearsal: #8b5cf6;
 }
 ```
+
+(`--wf-primary` is now Snow Hill blue, not emerald — it's consumed by general "primary interactive element" usages like the scrollbar thumb hover in Task 9. `--wf-success` is renamed `--wf-live` since emerald's role narrowed specifically to live/on-air/ready state, not generic "success.")
 
 - [ ] **Step 2: Commit**
 
@@ -256,14 +287,14 @@ Replace with:
 
 ```css
 body {
-  background-color: #0a0d10;
-  color: #e8ebed;
+  background-color: #0b0f1a;
+  color: #efe7d8;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Flat fallback surface (operator chrome should not animate). */
 .wf-fallback {
-  background: #0a0d10;
+  background: #0b0f1a;
 }
 
 /* Respect the OS-level reduced-motion preference everywhere at once,
@@ -301,48 +332,48 @@ Find the block starting `/* Base button: white surface, dark text (light theme) 
   /* Base button: dark panel surface */
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all;
-    border: 1px solid #2a3238;
-    background-color: #12171b;
-    color: #e8ebed;
+    border: 1px solid #2f3b52;
+    background-color: #131a29;
+    color: #efe7d8;
   }
 
   .btn:hover {
-    background-color: #1a2126;
-    border-color: #3a444d;
+    background-color: #1c2536;
+    border-color: #3a4a68;
   }
 
   .btn:active {
-    background-color: #0a0d10;
+    background-color: #0b0f1a;
   }
 
-  /* Primary: Emerald (Live/Active/Go) */
+  /* Primary: Snow Hill blue (general primary actions, not live state) */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all;
-    background-color: #10b981;
-    border: 1px solid #34d399;
-    color: #0a0d10;
+    background-color: #3b82f6;
+    border: 1px solid #60a5fa;
+    color: #0b0f1a;
   }
 
   .btn-primary:hover {
-    background-color: #34d399;
-    border-color: #6ee7b7;
+    background-color: #60a5fa;
+    border-color: #93c5fd;
   }
 
   .btn-primary:active {
-    background-color: #059669;
+    background-color: #2563eb;
   }
 
-  /* Secondary: elevated neutral (supporting actions — one accent rule: emerald only) */
+  /* Secondary: elevated neutral (supporting actions) */
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all;
-    background-color: #1a2126;
-    border: 1px solid #2a3238;
-    color: #e8ebed;
+    background-color: #1c2536;
+    border: 1px solid #2f3b52;
+    color: #efe7d8;
   }
 
   .btn-secondary:hover {
-    background-color: #232b31;
-    border-color: #3a444d;
+    background-color: #232e42;
+    border-color: #3a4a68;
   }
 
   /* Danger: Red (Delete/Destructive) */
@@ -357,7 +388,7 @@ Find the block starting `/* Base button: white surface, dark text (light theme) 
     border-color: #fca5a5;
   }
 
-  /* Warning: Amber (Stage messages, timers) */
+  /* Warning: Amber (Stage messages, timers, Rehearsal Mode) */
   .btn-warning {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer transition-all text-black;
     background-color: #f59e0b;
@@ -372,27 +403,27 @@ Find the block starting `/* Base button: white surface, dark text (light theme) 
   /* Icon button: compact, minimal */
   .btn-icon {
     @apply w-10 h-10 rounded-lg flex items-center justify-center font-semibold cursor-pointer transition-all;
-    background-color: #12171b;
-    border: 1px solid #2a3238;
-    color: #8a939c;
+    background-color: #131a29;
+    border: 1px solid #212a3d;
+    color: #a89e8c;
   }
 
   .btn-icon:hover {
-    background-color: #1a2126;
-    border-color: #3a444d;
-    color: #e8ebed;
+    background-color: #1c2536;
+    border-color: #2f3b52;
+    color: #efe7d8;
   }
 
   /* Pill: compact, rounded full */
   .btn-pill {
     @apply inline-flex items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-medium cursor-pointer transition-all;
-    background-color: #1a2126;
-    border: 1px solid #2a3238;
-    color: #8a939c;
+    background-color: #1c2536;
+    border: 1px solid #2f3b52;
+    color: #a89e8c;
   }
 
   .btn-pill:hover {
-    background-color: #232b31;
+    background-color: #232e42;
   }
 }
 ```
@@ -420,49 +451,50 @@ Replace the block (from `/* Base card: white panel on light page */` through the
   /* Base card: dark panel */
   .card {
     @apply rounded-lg border p-3 transition-all;
-    background-color: #12171b;
-    border-color: #1c2226;
+    background-color: #131a29;
+    border-color: #212a3d;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 
   .card:hover {
-    background-color: #1a2126;
-    border-color: #2a3238;
+    background-color: #1c2536;
+    border-color: #2f3b52;
   }
 
   /* Card with more padding */
   .card-lg {
     @apply rounded-lg border p-4 transition-all;
-    background-color: #12171b;
-    border-color: #1c2226;
+    background-color: #131a29;
+    border-color: #212a3d;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 
-  /* Interactive card (clickable) */
+  /* Interactive card (clickable) — hover border uses Snow Hill blue,
+     a selection affordance, not the live-state emerald */
   .card-interactive {
     @apply rounded-lg border p-3 cursor-pointer transition-all;
-    background-color: #12171b;
-    border-color: #1c2226;
+    background-color: #131a29;
+    border-color: #212a3d;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 
   .card-interactive:hover {
-    background-color: #1a2126;
-    border-color: #10b981;
+    background-color: #1c2536;
+    border-color: #3b82f6;
   }
 
-  /* Active/selected card */
+  /* Active/selected card — selection state, Snow Hill blue */
   .card-active {
     @apply rounded-lg border p-3 transition-all;
-    background-color: rgba(16, 185, 129, 0.12);
-    border-color: #10b981;
+    background-color: rgba(59, 130, 246, 0.12);
+    border-color: #3b82f6;
   }
 
   /* Surface: panel background for sections */
   .surface {
     @apply rounded-lg border p-3;
-    background-color: #12171b;
-    border-color: #1c2226;
+    background-color: #131a29;
+    border-color: #212a3d;
   }
 }
 ```
@@ -489,30 +521,36 @@ Replace the block with:
 @layer components {
   input, textarea, select {
     @apply rounded-lg border px-3 py-2 text-sm font-medium transition-all;
-    background-color: #12171b;
-    border-color: #2a3238;
-    color: #e8ebed;
+    background-color: #131a29;
+    border-color: #2f3b52;
+    color: #efe7d8;
   }
 
   input::placeholder, textarea::placeholder {
-    color: #5a6570;
+    color: #6f6858;
   }
 
+  /* Focus ring: Snow Hill blue — the spec explicitly names focus rings as
+     blue's role, not emerald's */
   input:focus, textarea:focus, select:focus {
     outline: none;
-    background-color: #12171b;
-    border-color: #10b981;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+    background-color: #131a29;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
   }
 
   option {
-    background-color: #12171b;
-    color: #e8ebed;
+    background-color: #131a29;
+    color: #efe7d8;
   }
 
-  /* Input with validation */
+  /* Input with validation — .valid stays blue (matches the focus-ring
+     treatment rather than mixing in the now live-only emerald); .error
+     stays red, unchanged. Neither class is applied anywhere in the app
+     today (confirmed via grep) — this is infrastructure for whenever a
+     later stage adds real field-level validation UI. */
   input.valid {
-    border-color: #10b981;
+    border-color: #3b82f6;
   }
 
   input.error {
@@ -541,30 +579,32 @@ Replace the block with:
 
 ```css
 @layer components {
-  /* Section header: small, caps, emerald accent */
+  /* Section header: small, caps, neutral by default */
   .section-header {
     @apply text-xs font-semibold uppercase tracking-widest mb-2;
-    color: #8a939c;
+    color: #a89e8c;
     letter-spacing: 0.1em;
   }
 
+  /* Active/selected section header — Snow Hill blue (selection state) */
   .section-header.active {
-    color: #34d399;
+    color: #60a5fa;
   }
 
   /* Title: large, prominent */
   .section-title {
     @apply text-lg font-bold mb-2;
-    color: #e8ebed;
+    color: #efe7d8;
   }
 
   /* Subtitle: secondary text */
   .section-subtitle {
     @apply text-sm font-medium;
-    color: #8a939c;
+    color: #a89e8c;
   }
 
-  /* Badge: small status indicator */
+  /* Badge: small status indicator — emerald reads as "good/ready", the
+     same family as the live-state color, not a generic UI accent */
   .badge {
     @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
     background-color: rgba(16, 185, 129, 0.15);
@@ -693,16 +733,17 @@ Expected: no errors.
 
 - [ ] **Step 3: Run the full test suite**
 
-Run: `npm run test -- --run`
-Expected: all existing tests still pass (391 as of this writing, plus the 4 new `cn()` tests from Task 3 = 395), 0 failures. This is a pure CSS/config change — no test should have been broken by it.
+Run: `npm test`
+Expected: all existing tests still pass (406 as of this writing, plus the 4 new `cn()` tests from Task 3 = 410), 0 failures. This is a pure CSS/config change — no test should have been broken by it.
 
 - [ ] **Step 4: Build and launch the app**
 
 Run: `npm run dist` (or `npm run pack:dir` for a faster unpacked build), then launch it.
 
 Confirm in the running app:
-- The app background is near-black, not light, on every screen (this alone proves the `body` rule from Task 5 took effect app-wide).
+- The app background is dark navy, not light, on every screen (this alone proves the `body` rule from Task 5 took effect app-wide).
 - Any button, card, or badge on screen (e.g. the Home screen's action cards, the Live tab's Black/Logo/Live buttons, any "Rehearsing"/status badge) renders with the new dark colors and is still clearly readable — not just "dark" but legible, with visible contrast between text and background.
+- A primary button (e.g. anywhere `.btn-primary` renders) is Snow Hill blue, not emerald — this is the one behavior change from the original (pre-amendment) draft of this plan that's easy to miss if skimming the diff.
 - Hover a few buttons/cards — the hover-state color changes (e.g. `.btn:hover`, `.card:hover`) are visible and not jarring.
 - Nothing is broken or unreadable (this stage should look like "the same app, recolored," not have any layout shifts — this stage doesn't touch structure, only color).
 
