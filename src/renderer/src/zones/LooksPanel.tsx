@@ -42,7 +42,7 @@ function LooksPanel(): JSX.Element {
             <div key={look.id} className="group flex items-center gap-1">
               <button
                 onClick={() => applyLook(look.id)}
-                className="min-w-0 flex-1 truncate rounded-lg border border-border bg-panel px-2 py-1.5 text-left text-xs font-medium text-content-primary hover:border-blue-400 hover:bg-blue-500/10"
+                className="min-w-0 flex-1 truncate rounded-lg border border-border bg-panel-raised px-2 py-1.5 text-left text-xs font-medium text-content-primary hover:border-blue-400 hover:bg-blue-500/10"
               >
                 {look.name}
               </button>
