@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ZoneId, ZoneState } from '../../../shared/types'
+import type { AppInfo, ZoneId, ZoneState } from '../../../shared/types'
 import ZoneStatusBox from './ZoneStatusBox'
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
@@ -14,6 +14,7 @@ const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 // Setup-only action. See the 2026-08-01 design spec.
 function LiveZoneStatus(): JSX.Element {
   const [zoneStates, setZoneStates] = useState<Record<ZoneId, ZoneState> | null>(null)
+  const [zonesConnected, setZonesConnected] = useState<ZoneId[]>([])
 
   const refreshStates = useCallback((): void => { void window.wf.zoneGetStates().then(setZoneStates) }, [])
 
@@ -26,13 +27,22 @@ function LiveZoneStatus(): JSX.Element {
     return off
   }, [refreshStates])
 
+  // Connectivity isn't part of the wf:state push (that's content, not transport) —
+  // poll wf:getInfo the same way TopBar/HomeView already do for the same field.
+  useEffect(() => {
+    const load = (): void => { window.wf.getInfo().then((i: AppInfo) => setZonesConnected(i.zonesConnected)) }
+    load()
+    const t = setInterval(load, 2000)
+    return () => clearInterval(t)
+  }, [])
+
   return (
     <div className="p-2">
       <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Zones</div>
       <div className="grid grid-cols-2 gap-2">
         {ZONE_IDS.map((zoneId) => (
           <div key={zoneId} className="rounded-xl border-2 border-slate-200 bg-white p-2">
-            <ZoneStatusBox zoneId={zoneId} zoneState={zoneStates?.[zoneId]} />
+            <ZoneStatusBox zoneId={zoneId} zoneState={zoneStates?.[zoneId]} connected={zonesConnected.includes(zoneId)} />
           </div>
         ))}
       </div>

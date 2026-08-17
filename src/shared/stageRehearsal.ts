@@ -35,9 +35,14 @@ export function clampSongIndex(index: number, queueLength: number): number {
 
 // Zone 4 follows Second while armed, regardless of the service's persisted
 // zone_track_assignment — a temporary, session-only override, not a change
-// to the service's saved config, so disarming needs no cleanup.
+// to the service's saved config, so disarming needs no cleanup. Zones 1-3
+// are forced onto Main for the same reason: an operator's real
+// zone_track_assignment might legitimately point one of them at Second (e.g.
+// a split-screen video), and if it does, rehearsal must not let the
+// rehearsal song bleed onto that real congregation screen.
 export function zoneTrackFor(zoneId: ZoneId, state: StageRehearsalState, assigned: TrackId): TrackId {
-  return state.active && zoneId === 4 ? 'second' : assigned
+  if (!state.active) return assigned
+  return zoneId === 4 ? 'second' : 'main'
 }
 
 // Guards the exact bug that got the old Main/Second UI pulled from the Live
