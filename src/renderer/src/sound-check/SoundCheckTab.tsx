@@ -194,7 +194,7 @@ function SoundCheckTab(): JSX.Element {
               title={r.hint}
               className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
                 role === r.id
-                  ? 'bg-blue-500/15 font-semibold text-blue-400'
+                  ? 'bg-blue-500/15 font-semibold text-blue-400 ring-1 ring-inset ring-blue-500/40'
                   : 'font-medium text-content-secondary hover:bg-border-strong hover:text-content-primary'
               }`}
             >
@@ -225,7 +225,7 @@ function SoundCheckTab(): JSX.Element {
               className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
                 mode === m
                   ? 'bg-border-strong font-semibold text-content-primary'
-                  : 'font-medium text-content-secondary hover:bg-border-strong hover:text-content-primary'
+                  : 'font-medium text-content-secondary hover:text-content-primary'
               }`}
             >
               {m === 'setup' ? 'Setup' : 'Live'}
@@ -300,8 +300,8 @@ function ConnectionErrorState({
 }): JSX.Element {
   return (
     <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 px-4 text-center">
-      <div className="max-w-[440px] rounded-2xl border border-red-300 bg-red-50 px-6 py-5">
-        <p className="mb-1 text-sm font-semibold text-red-700">Couldn&rsquo;t connect to the mixer</p>
+      <div className="max-w-[440px] rounded-2xl border border-red-500/30 bg-red-500/10 px-6 py-5">
+        <p className="mb-1 text-sm font-semibold text-red-400">Couldn&rsquo;t connect to the mixer</p>
         <p className="m-0 text-[13px] leading-relaxed text-content-secondary">
           Check that it&rsquo;s powered on and on the same network.
         </p>

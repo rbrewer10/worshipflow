@@ -71,7 +71,7 @@ export function EngineerPinPrompt({
             Unlock
           </button>
         </form>
-        {error && <p className="mt-2 text-[12px] font-medium text-red-600">{error}</p>}
+        {error && <p className="mt-2 text-[12px] font-medium text-red-400">{error}</p>}
       </div>
     </div>
   )
@@ -181,7 +181,7 @@ export function ManagePasscodePanel({
           Remove passcode (unlocks Engineer for everyone)
         </button>
       )}
-      {error && <p className="mt-2 text-[12px] font-medium text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-[12px] font-medium text-red-400">{error}</p>}
     </div>
   )
 }
