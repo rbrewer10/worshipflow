@@ -35,9 +35,9 @@ export function EngineerPinPrompt({
 
   return (
     <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 px-4 text-center">
-      <div className="w-full max-w-[360px] rounded-2xl border border-slate-200 bg-[#f4f6f9] px-6 py-6">
-        <p className="mb-1 text-[13px] font-semibold text-slate-900">Engineer view is locked</p>
-        <p className="m-0 mb-4 text-[12px] leading-relaxed text-slate-500">
+      <div className="w-full max-w-[360px] rounded-2xl border border-border bg-panel px-6 py-6">
+        <p className="mb-1 text-[13px] font-semibold text-content-primary">Engineer view is locked</p>
+        <p className="m-0 mb-4 text-[12px] leading-relaxed text-content-secondary">
           Enter the passcode to open the mixer dashboard.
         </p>
         <form
@@ -62,7 +62,7 @@ export function EngineerPinPrompt({
               setEntry(e.target.value)
               if (error) setError(null)
             }}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-sm tracking-widest text-slate-900 placeholder:tracking-normal placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-center text-sm tracking-widest text-content-primary placeholder:tracking-normal placeholder:text-content-tertiary focus:border-blue-500 focus:outline-none"
           />
           <button
             type="submit"
@@ -130,15 +130,15 @@ export function ManagePasscodePanel({
   }
 
   return (
-    <div className="w-full max-w-[360px] rounded-xl border border-slate-200 bg-white p-3">
+    <div className="w-full max-w-[360px] rounded-xl border border-border bg-panel p-3">
       <div className="mb-2 flex items-center">
-        <p className="m-0 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+        <p className="m-0 text-[11px] font-semibold uppercase tracking-widest text-content-secondary">
           {hasPin ? 'Change passcode' : 'Set passcode'}
         </p>
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto rounded px-1.5 text-[13px] leading-none text-slate-500 hover:text-slate-900"
+          className="ml-auto rounded px-1.5 text-[13px] leading-none text-content-secondary hover:text-content-primary"
           aria-label="Close passcode settings"
         >
           ×
@@ -161,7 +161,7 @@ export function ManagePasscodePanel({
             setValue(e.target.value)
             if (error) setError(null)
           }}
-          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] tracking-widest text-slate-900 placeholder:tracking-normal placeholder:text-slate-400 focus:border-blue-500 focus:outline-none disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-lg border border-border bg-panel-raised px-3 py-1.5 text-[13px] tracking-widest text-content-primary placeholder:tracking-normal placeholder:text-content-tertiary focus:border-blue-500 focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"
@@ -176,7 +176,7 @@ export function ManagePasscodePanel({
           type="button"
           onClick={() => void remove()}
           disabled={busy}
-          className="mt-2 text-[12px] font-medium text-red-600 hover:text-red-700 disabled:opacity-60"
+          className="mt-2 text-[12px] font-medium text-red-400 hover:text-red-300 disabled:opacity-60"
         >
           Remove passcode (unlocks Engineer for everyone)
         </button>
