@@ -36,15 +36,15 @@ function ServiceRail(): JSX.Element {
   }
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-[#f4f6f9]">
-      <div className="border-b border-slate-200 px-3 py-3">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-panel">
+      <div className="border-b border-border px-3 py-3">
         {activeService ? (
           <>
-            <div className="text-sm text-slate-500">{activeService.service_date ?? 'Service'}</div>
-            <div className="truncate text-base font-medium text-slate-900">{activeService.name}</div>
+            <div className="text-sm text-content-secondary">{activeService.service_date ?? 'Service'}</div>
+            <div className="truncate text-base font-medium text-content-primary">{activeService.name}</div>
           </>
         ) : (
-          <div className="text-base text-slate-500">No service loaded</div>
+          <div className="text-base text-content-secondary">No service loaded</div>
         )}
       </div>
       <div className="min-h-0 flex-1 space-y-0.5 overflow-auto p-2">
@@ -54,7 +54,7 @@ function ServiceRail(): JSX.Element {
           // per-track ordinal and tapping one would incorrectly go live on Main.
           const mainItems = activeService?.items.filter((it) => it.track === 'main') ?? []
           return mainItems.length === 0 ? (
-            <p className="px-2 py-4 text-center text-sm text-slate-400">No items — pick a service in the Services tab.</p>
+            <p className="px-2 py-4 text-center text-sm text-content-tertiary">No items — pick a service in the Services tab.</p>
           ) : (
             mainItems.map((it) => (
               <button
@@ -66,7 +66,7 @@ function ServiceRail(): JSX.Element {
                     ? 'bg-blue-600/15 ring-1 ring-blue-500/50'
                     : pendingKey === String(it.id)
                     ? 'bg-amber-500/20 ring-2 ring-amber-500/60'
-                    : 'hover:bg-slate-100'
+                    : 'hover:bg-panel-raised'
                 }`}
               >
                 {pendingKey === String(it.id) && (
@@ -75,9 +75,9 @@ function ServiceRail(): JSX.Element {
                 <div className="w-10 shrink-0">
                   <SlideThumb label="" itemStyle={it.style} serviceTheme={activeService?.theme ?? null} serviceColors={activeService?.themeColors ?? null} bgFile={itemThumbBackground(it, songBg)} />
                 </div>
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{it.title}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-content-primary">{it.title}</span>
                 {pendingKey === String(it.id)
-                  ? <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-amber-700"><Hourglass size={11} /> tap to cancel</span>
+                  ? <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-amber-400"><Hourglass size={11} /> tap to cancel</span>
                   : liveId === it.id
                   ? <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                   : null
@@ -87,10 +87,10 @@ function ServiceRail(): JSX.Element {
           )
         })()}
       </div>
-      <div className="border-t border-slate-200">
+      <div className="border-t border-border">
         <LiveZoneStatus />
       </div>
-      <div className="border-t border-slate-200">
+      <div className="border-t border-border">
         <LooksPanel />
       </div>
     </aside>
