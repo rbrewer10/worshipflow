@@ -239,8 +239,8 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
     <div className="flex flex-col gap-3">
 
       {/* Search by tags */}
-      <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-600">Filter by mood</p>
+      <div className="rounded-lg border border-border bg-panel p-2.5">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-content-secondary">Filter by mood</p>
         <div className="flex flex-wrap gap-1.5">
           {['worship', 'prayer', 'energetic', 'peaceful', 'joyful', 'dark', 'bright', 'nature', 'modern', 'seasonal'].map((tag) => (
             <button
@@ -254,7 +254,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 'rounded-full px-2 py-1 text-[10px] font-semibold transition-all',
                 searchTags.includes(tag)
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                  : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
               ].join(' ')}
             >
               {tag}
@@ -264,7 +264,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
         {searchTags.length > 0 && (
           <button
             onClick={() => setSearchTags([])}
-            className="mt-2 text-[10px] text-slate-500 hover:text-slate-700"
+            className="mt-2 text-[10px] text-content-secondary hover:text-content-primary"
           >
             Clear filters
           </button>
@@ -277,7 +277,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
           onClick={() => setSelectedFolder('ALL')}
           className={[
             'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all',
-            selectedFolder === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+            selectedFolder === 'ALL' ? 'bg-blue-600 text-white' : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
           ].join(' ')}
         >
           All
@@ -289,7 +289,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
           onDrop={onFolderDrop(null)}
           className={[
             'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all',
-            selectedFolder === null ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+            selectedFolder === null ? 'bg-blue-600 text-white' : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
             dragOverFolder === null ? 'ring-2 ring-blue-400 ring-offset-1' : '',
           ].join(' ')}
         >
@@ -311,9 +311,9 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                   if (e.key === 'Escape') { setRenamingFolder(null); setRenameValue('') }
                 }}
                 placeholder="Folder name"
-                className="w-28 rounded-full border border-slate-300 px-2.5 py-1 text-[11px] outline-none focus:border-blue-500"
+                className="w-28 rounded-full border border-border px-2.5 py-1 text-[11px] outline-none focus:border-blue-500"
               />
-              <button onClick={() => handleRenameFolder(f)} className="text-[11px] font-semibold text-blue-700">Save</button>
+              <button onClick={() => handleRenameFolder(f)} className="text-[11px] font-semibold text-blue-400">Save</button>
             </div>
           ) : (
             <div key={f} className="group relative">
@@ -324,7 +324,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 onDrop={onFolderDrop(f)}
                 className={[
                   'rounded-full px-2.5 py-1 pr-9 text-[11px] font-semibold transition-all',
-                  selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                  selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
                   dragOverFolder === f ? 'ring-2 ring-blue-400 ring-offset-1' : '',
                 ].join(' ')}
               >
@@ -359,14 +359,14 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
               onChange={(e) => setNewFolderName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateFolder(); if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName('') } }}
               placeholder="Folder name"
-              className="w-28 rounded-full border border-slate-300 px-2.5 py-1 text-[11px] outline-none focus:border-blue-500"
+              className="w-28 rounded-full border border-border px-2.5 py-1 text-[11px] outline-none focus:border-blue-500"
             />
-            <button onClick={handleCreateFolder} className="text-[11px] font-semibold text-blue-700">Add</button>
+            <button onClick={handleCreateFolder} className="text-[11px] font-semibold text-blue-400">Add</button>
           </div>
         ) : (
           <button
             onClick={() => setCreatingFolder(true)}
-            className="rounded-full border border-dashed border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:border-slate-400 hover:text-slate-700"
+            className="rounded-full border border-dashed border-border px-2.5 py-1 text-[11px] font-semibold text-content-secondary hover:border-border-strong hover:text-content-primary"
           >
             + New folder
           </button>
@@ -386,18 +386,18 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
           className={[
             'flex flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-7 text-center transition-all',
             dragging
-              ? 'border-blue-400 bg-blue-500/10 text-blue-700'
-              : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700',
+              ? 'border-blue-400 bg-blue-500/10 text-blue-400'
+              : 'border-border text-content-secondary hover:border-border-strong hover:bg-panel-raised hover:text-content-primary',
           ].join(' ')}
         >
           <Upload size={20} />
           <span className="text-xs font-medium">Drop image or video here</span>
-          <span className="text-[10px] text-slate-500">or click to browse</span>
+          <span className="text-[10px] text-content-secondary">or click to browse</span>
         </button>
         <button
           onClick={() => window.wf.bgOpenFolder()}
           title="Open the backgrounds folder — drop in as many images as you want, then come back here"
-          className="flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-4 text-slate-600 transition-all hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700"
+          className="flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border px-4 text-content-secondary transition-all hover:border-border-strong hover:bg-panel-raised hover:text-content-primary"
         >
           <FolderOpen size={20} />
           <span className="text-[10px] font-medium">Open folder</span>
@@ -407,7 +407,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
       {/* How many are actually loaded, plus a manual re-scan. The count is here
           so "did it pick up everything I just added?" is answerable at a glance
           rather than by counting thumbnails. */}
-      <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500">
+      <div className="mb-2 flex items-center justify-between text-[11px] text-content-secondary">
         <span>
           {uploads.length} background{uploads.length === 1 ? '' : 's'}
           {searchTags.length > 0 && ` · ${filteredUploads.length} matching`}
@@ -415,7 +415,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
         <button
           onClick={() => void loadUploads()}
           title="Re-scan the backgrounds folder"
-          className="inline-flex items-center gap-1 font-medium text-blue-700 hover:underline"
+          className="inline-flex items-center gap-1 font-medium text-blue-400 hover:underline"
         >
           <RefreshCw size={11} /> Refresh
         </button>
@@ -423,9 +423,9 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
 
       {/* Thumbnails grid */}
       {uploads.length === 0 ? (
-        <p className="py-8 text-center text-xs text-slate-400">No uploads yet</p>
+        <p className="py-8 text-center text-xs text-content-tertiary">No uploads yet</p>
       ) : filteredUploads.length === 0 ? (
-        <p className="py-8 text-center text-xs text-slate-400">No backgrounds match the selected mood</p>
+        <p className="py-8 text-center text-xs text-content-tertiary">No backgrounds match the selected mood</p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           {filteredUploads.map((u) => {
@@ -445,8 +445,8 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 className={[
                   'group relative cursor-pointer overflow-hidden rounded-lg transition-all duration-150',
                   active
-                    ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-[#f4f6f9]'
-                    : 'ring-1 ring-slate-200 hover:ring-slate-300 hover:scale-[1.02]',
+                    ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-panel'
+                    : 'ring-1 ring-border hover:ring-border-strong hover:scale-[1.02]',
                 ].join(' ')}
                 style={{ aspectRatio: '16/9' }}
               >
@@ -541,8 +541,8 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
 
       {/* Tag editing modal */}
       {editingPath && (
-        <Modal onClose={() => { setEditingPath(null); setEditingTags('') }} labelledBy="edit-tags-title" className="w-full max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-4 shadow-2xl">
-            <h3 id="edit-tags-title" className="mb-3 text-sm font-bold text-slate-900">Edit Tags</h3>
+        <Modal onClose={() => { setEditingPath(null); setEditingTags('') }} labelledBy="edit-tags-title" className="w-full max-w-sm rounded-xl border border-border bg-panel p-4 shadow-2xl">
+            <h3 id="edit-tags-title" className="mb-3 text-sm font-bold text-content-primary">Edit Tags</h3>
             <div className="mb-3 flex flex-wrap gap-2">
               {['worship', 'prayer', 'energetic', 'peaceful', 'joyful', 'dark', 'bright', 'nature', 'modern', 'seasonal', 'other'].map((tag) => (
                 <button
@@ -559,7 +559,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                     'rounded-lg px-2 py-1 text-xs font-semibold transition-all',
                     editingTags.split(',').map((t) => t.trim()).includes(tag)
                       ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+                      : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
                   ].join(' ')}
                 >
                   {tag}
@@ -570,7 +570,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
               value={editingTags}
               onChange={(e) => setEditingTags(e.target.value)}
               placeholder="Tags separated by commas"
-              className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 resize-none"
+              className="w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:border-blue-500 resize-none"
               rows={3}
             />
             <div className="mt-4 flex gap-2">
@@ -588,7 +588,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                   setEditingPath(null)
                   setEditingTags('')
                 }}
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                className="flex-1 rounded-lg border border-border bg-panel px-3 py-2 text-sm font-semibold text-content-secondary hover:bg-panel-raised"
               >
                 Cancel
               </button>
