@@ -157,7 +157,7 @@ function AppShell(): JSX.Element {
   return (
     <ServiceProvider>
       <NotifyToasts />
-      <div className="flex h-screen flex-col overflow-hidden bg-[#e9ecf1] text-slate-900">
+      <div className="flex h-screen flex-col overflow-hidden bg-app text-content-primary">
         <TopBar view={view} setView={setView} />
         <div className="flex min-h-0 flex-1 flex-col">
           {view === 'home' ? (
