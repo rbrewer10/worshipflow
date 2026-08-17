@@ -24,7 +24,8 @@
 | `ring-slate-200` (ring-based borders) | `ring-border` |
 | `text-slate-900` | `text-content-primary` |
 | `text-slate-500`, `text-slate-600`, `text-slate-700` | `text-content-secondary` (or `text-content-primary` where the current shade is clearly the more prominent/high-contrast one in context — noted per-task below) |
-| `text-slate-400` | `text-content-tertiary` |
+| `text-slate-400` on a decorative/icon-only element (search icon, delete-X icon, chevron) | `text-content-tertiary` |
+| `text-slate-400` on real word/sentence content (empty-state messages, mode labels, helper captions) | `text-content-secondary` — `text-content-tertiary` (#6f6858 on `#131a29`/`bg-panel`) computes to ~3.1:1, below WCAG AA's 4.5:1 for normal text; reserve the tertiary tier for icon glyphs and disabled/placeholder inputs (its original design intent per the Foundation stage's token table), not for anything a screen reader would read as content. Caught mid-Task-1 by code review on ServiceRail's "No items" message — corrected here and in every other task below before they were implemented, not left to repeat. |
 | `hover:bg-slate-100`, `hover:bg-slate-200` | `hover:bg-panel-raised` |
 | Solid pastel badges/boxes (`bg-red-50 text-red-700`, `bg-violet-50 text-violet-800`, `bg-red-100 text-red-700`) | translucent-chip pattern: `bg-{color}-500/10` (or `/20` for a slightly stronger fill) `text-{color}-400`, e.g. `bg-red-500/10 text-red-400` |
 | Bare text-only `text-blue-600` (not sitting on a solid blue fill) | `text-blue-400` |
@@ -112,7 +113,7 @@ function ServiceRail(): JSX.Element {
           // per-track ordinal and tapping one would incorrectly go live on Main.
           const mainItems = activeService?.items.filter((it) => it.track === 'main') ?? []
           return mainItems.length === 0 ? (
-            <p className="px-2 py-4 text-center text-sm text-content-tertiary">No items — pick a service in the Services tab.</p>
+            <p className="px-2 py-4 text-center text-sm text-content-secondary">No items — pick a service in the Services tab.</p>
           ) : (
             mainItems.map((it) => (
               <button
@@ -269,7 +270,7 @@ function ZoneStatusBox({ zoneId, zoneState, connected = true }: ZoneStatusBoxPro
             {ZONE_NAMES[zoneId]}
           </span>
           {connected && (
-            <span className="shrink-0 text-[10px] font-semibold text-content-tertiary">{MODE_LABELS[zoneState?.mode ?? 'off']}</span>
+            <span className="shrink-0 text-[10px] font-semibold text-content-secondary">{MODE_LABELS[zoneState?.mode ?? 'off']}</span>
           )}
         </div>
         {/* On its own line rather than competing with the name for the same
@@ -879,7 +880,7 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
               {s.title}
             </button>
           ))}
-          {searchResults.length === 0 && <p className="px-3 py-2 text-xs text-content-tertiary">No songs match.</p>}
+          {searchResults.length === 0 && <p className="px-3 py-2 text-xs text-content-secondary">No songs match.</p>}
         </div>
       )}
     </aside>
@@ -1140,7 +1141,7 @@ export default function ZonePinPicker({
             </button>
             {showAdvanced && (
               <div className="px-2 pb-1">
-                <div className="mb-1 text-[10px] text-content-tertiary">Which track this screen follows</div>
+                <div className="mb-1 text-[10px] text-content-secondary">Which track this screen follows</div>
                 <ZoneTrackToggle
                   serviceId={serviceId}
                   zoneId={zoneId}
