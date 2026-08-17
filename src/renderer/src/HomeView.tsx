@@ -79,16 +79,16 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-auto bg-[#e9ecf1] p-6">
+    <div className="h-full overflow-auto bg-app p-6">
       <div className="mb-5 flex items-center gap-3">
         <BrandMark size={40} className="flex-shrink-0 rounded-[9px] shadow-sm" />
         <h1 className="flex items-baseline gap-1.5">
-          <span className="text-2xl font-extrabold tracking-tight text-slate-900">WorshipFlow</span>
-          <span className="text-base font-bold tracking-wide text-blue-600">PRO</span>
+          <span className="text-2xl font-extrabold tracking-tight text-content-primary">WorshipFlow</span>
+          <span className="text-base font-bold tracking-wide text-blue-400">PRO</span>
         </h1>
       </div>
-      <div className="mb-1 text-xl font-semibold text-slate-900">{greeting()}</div>
-      <div className="mb-3 text-sm text-slate-500">
+      <div className="mb-1 text-xl font-semibold text-content-primary">{greeting()}</div>
+      <div className="mb-3 text-sm text-content-secondary">
         {needsAttention ? 'A few things to check before you go live' : 'Ready when you are'}
       </div>
 
@@ -98,10 +98,10 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
             key={i}
             className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium ${
               c.level === 'warn'
-                ? 'border-amber-500/30 bg-amber-500/[0.08] text-amber-800'
+                ? 'border-amber-500/30 bg-amber-500/[0.08] text-amber-400'
                 : c.level === 'ok'
-                ? 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-800'
-                : 'border-slate-200 bg-white text-slate-500'
+                ? 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400'
+                : 'border-border bg-panel text-content-secondary'
             }`}
           >
             {c.level === 'warn' ? <TriangleAlert size={13} className="shrink-0" /> : c.level === 'ok' ? <Check size={13} className="shrink-0" /> : null}
@@ -114,12 +114,12 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
         onClick={() => setView('live')}
         className="mb-4 flex w-full items-center gap-4 rounded-xl border border-blue-500/30 bg-blue-500/[0.10] px-5 py-4 text-left transition-colors hover:bg-blue-500/[0.16]"
       >
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600">
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
           <Play size={22} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-base font-semibold text-slate-900">Go live</div>
-          <div className="truncate text-sm text-slate-600">
+          <div className="text-base font-semibold text-content-primary">Go live</div>
+          <div className="truncate text-sm text-content-secondary">
             {activeService
               ? `${activeService.name} — ${activeService.items.length} item${activeService.items.length !== 1 ? 's' : ''} loaded`
               : 'Open live control'}
@@ -130,14 +130,10 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
 
       <div className="grid grid-cols-3 gap-3">
         {CARDS.map((card) => (
-          <button
-            key={card.label}
-            onClick={() => handle(card)}
-            className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
-          >
-            <card.Icon size={20} className="mb-2.5 text-slate-500" />
-            <div className="text-sm font-medium text-slate-900">{card.label}</div>
-            <div className="text-xs text-slate-500">{card.sub}</div>
+          <button key={card.label} onClick={() => handle(card)} className="card-interactive flex flex-col text-left">
+            <card.Icon size={20} className="mb-2.5 text-content-secondary" />
+            <div className="text-sm font-medium text-content-primary">{card.label}</div>
+            <div className="text-xs text-content-secondary">{card.sub}</div>
           </button>
         ))}
       </div>
