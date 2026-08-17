@@ -144,11 +144,11 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
           is simply no longer a way to route a screen onto the empty one. */}
 
       {multiSelected.size > 0 && (
-        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5">
-          <span className="text-xs font-semibold text-indigo-800">{multiSelected.size} selected</span>
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-3 py-1.5">
+          <span className="text-xs font-semibold text-indigo-300">{multiSelected.size} selected</span>
           <div className="flex items-center gap-2">
             <button onClick={batchDelete} className="text-xs font-semibold text-red-600 hover:underline">Delete</button>
-            <button onClick={() => setMultiSelected(new Set())} className="text-xs font-medium text-indigo-600 hover:underline">Clear</button>
+            <button onClick={() => setMultiSelected(new Set())} className="text-xs font-medium text-indigo-400 hover:underline">Clear</button>
           </div>
         </div>
       )}
@@ -156,9 +156,9 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
       <div className="min-h-0 flex-1 overflow-auto pr-1">
         {items.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <ListMusic size={28} className="mb-3 text-slate-400" />
-            <p className="text-sm text-slate-500">{track === 'main' ? 'Your service is empty' : 'No second-track items yet'}</p>
-            <p className="mt-1 text-xs text-slate-400">Click &quot;Add item&quot; below to get started</p>
+            <ListMusic size={28} className="mb-3 text-content-tertiary" />
+            <p className="text-sm text-content-secondary">{track === 'main' ? 'Your service is empty' : 'No second-track items yet'}</p>
+            <p className="mt-1 text-xs text-content-tertiary">Click &quot;Add item&quot; below to get started</p>
           </div>
         )}
         {items.map((it, i) => {
@@ -172,8 +172,8 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
           const ring = selectedId === it.id
             ? 'border-blue-500/30 bg-blue-500/[0.07] ring-1 ring-blue-500/30'
             : isMultiSelected
-            ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-400'
-            : 'border-slate-200 bg-white hover:bg-slate-100'
+            ? 'border-indigo-400 bg-indigo-500/10 ring-1 ring-indigo-400'
+            : 'border-border bg-panel hover:bg-panel-raised'
 
           // Section headers are a compact colored divider, not a content row —
           // no type-line, no preview, no Play button, just the label and delete.
@@ -194,7 +194,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                 className={`group mb-1.5 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${ring} ${dragId === it.id ? 'opacity-40' : ''}`}
                 style={selectedId !== it.id && !isMultiSelected ? { borderColor: color + '55', background: color + '14' } : undefined}
               >
-                <GripVertical size={13} className="shrink-0 text-slate-400 group-hover:text-slate-600" />
+                <GripVertical size={13} className="shrink-0 text-content-tertiary group-hover:text-content-secondary" />
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
                 <span className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-wide" style={{ color }}>
                   {it.title || 'Section'}
@@ -202,8 +202,8 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                 {/* onClick here only keeps the row's own onClick from firing when duplicating/deleting — not a user-facing interaction itself. */}
                 {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
                 <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => onDuplicate(it)} className="text-slate-400 opacity-0 hover:text-blue-700 group-hover:opacity-100" title="Duplicate"><Copy size={13} /></button>
-                  <button onClick={() => onDelete(it)} className="text-slate-400 opacity-0 hover:text-red-600 group-hover:opacity-100" title="Delete"><X size={14} /></button>
+                  <button onClick={() => onDuplicate(it)} className="text-content-tertiary opacity-0 hover:text-blue-400 group-hover:opacity-100" title="Duplicate"><Copy size={13} /></button>
+                  <button onClick={() => onDelete(it)} className="text-content-tertiary opacity-0 hover:text-red-400 group-hover:opacity-100" title="Delete"><X size={14} /></button>
                 </div>
               </div>
             )
@@ -222,20 +222,20 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
               onClick={(e) => handleRowClick(it, i, e)}
               onKeyDown={(e) => handleRowKeyDown(it, e)}
               className={`group mb-1.5 flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
-                it.type === 'placeholder' && selectedId !== it.id && !isMultiSelected ? 'border-dashed border-amber-300 bg-amber-50/40' : ring
+                it.type === 'placeholder' && selectedId !== it.id && !isMultiSelected ? 'border-dashed border-amber-500/40 bg-amber-500/10' : ring
               } ${dragId === it.id ? 'opacity-40' : ''}`}
             >
               <div className="flex w-5 flex-shrink-0 flex-col items-center">
-                <GripVertical size={13} className="text-slate-400 group-hover:text-slate-600" />
+                <GripVertical size={13} className="text-content-tertiary group-hover:text-content-secondary" />
               </div>
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-panel-raised text-content-secondary">
                 <Icon size={15} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-slate-900">{it.title || it.type}</div>
-                <div className="flex items-center gap-1.5 truncate text-xs text-slate-600">
+                <div className="truncate text-sm font-medium text-content-primary">{it.title || it.type}</div>
+                <div className="flex items-center gap-1.5 truncate text-xs text-content-secondary">
                   {it.type === 'placeholder' && (
-                    <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">TBD</span>
+                    <span className="shrink-0 rounded bg-amber-500/20 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-300">TBD</span>
                   )}
                   <span className="truncate">{it.type} · #{i + 1}{preview ? ` · ${preview}` : ''}</span>
                   {sceneConfig && !nonLive && (() => {
@@ -243,7 +243,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                     const matched = matchScene(routing, it.type, sceneConfig)
                     const name = matched === 'custom' ? 'Custom' : sceneConfig.scenes.find((s) => s.id === matched)?.name
                     return (
-                      <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-slate-400">
+                      <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-content-tertiary">
                         <ZoneStripBadge routing={routing} title={name} />
                       </span>
                     )
@@ -254,7 +254,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
               {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
               <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 {liveItemId === it.id ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                     LIVE
                   </span>
@@ -263,18 +263,18 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                     {!nonLive && (
                       <button
                         onClick={() => onGoLive(it)}
-                        className="text-slate-400 opacity-0 hover:text-blue-700 group-hover:opacity-100"
+                        className="text-content-tertiary opacity-0 hover:text-blue-400 group-hover:opacity-100"
                         title="Go live"
                       ><Play size={14} /></button>
                     )}
                     <button
                       onClick={() => onDuplicate(it)}
-                      className="text-slate-400 opacity-0 hover:text-blue-700 group-hover:opacity-100"
+                      className="text-content-tertiary opacity-0 hover:text-blue-400 group-hover:opacity-100"
                       title="Duplicate"
                     ><Copy size={13} /></button>
                     <button
                       onClick={() => onDelete(it)}
-                      className="text-slate-400 opacity-0 hover:text-red-600 group-hover:opacity-100"
+                      className="text-content-tertiary opacity-0 hover:text-red-400 group-hover:opacity-100"
                       title="Delete"
                     ><X size={14} /></button>
                   </>
@@ -286,20 +286,20 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
       </div>
 
       {showAdd ? (
-        <div className="mt-2 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mt-2 rounded-xl border border-border bg-panel p-4">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-900">What do you want to add?</span>
-            <button onClick={() => setShowAdd(false)} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+            <span className="text-sm font-semibold text-content-primary">What do you want to add?</span>
+            <button onClick={() => setShowAdd(false)} className="inline-flex items-center gap-1 text-xs text-content-secondary hover:text-content-primary">
               <X size={12} /> Close
             </button>
           </div>
           <div className="mb-3">
-            <label htmlFor="deck-add-song" className="mb-1.5 block text-xs font-semibold text-slate-600">Song from library</label>
+            <label htmlFor="deck-add-song" className="mb-1.5 block text-xs font-semibold text-content-secondary">Song from library</label>
             <select
               id="deck-add-song"
               value=""
               onChange={(e) => { if (e.target.value) { onAddSong(Number(e.target.value)); setShowAdd(false) } }}
-              className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none hover:bg-slate-200"
+              className="w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm text-content-primary outline-none hover:bg-border-strong"
             >
               <option value="">Choose a song…</option>
               {songs.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
@@ -307,25 +307,25 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
           </div>
           {announcements.length > 0 && (
             <div className="mb-3">
-              <label htmlFor="deck-add-announcement" className="mb-1.5 block text-xs font-semibold text-slate-600">Announcement from library</label>
+              <label htmlFor="deck-add-announcement" className="mb-1.5 block text-xs font-semibold text-content-secondary">Announcement from library</label>
               <select
                 id="deck-add-announcement"
                 value=""
                 onChange={(e) => { if (e.target.value) { onAddAnnouncement(Number(e.target.value)); setShowAdd(false) } }}
-                className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none hover:bg-slate-200"
+                className="w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm text-content-primary outline-none hover:bg-border-strong"
               >
                 <option value="">Choose an announcement…</option>
                 {announcements.map((a) => <option key={a.id} value={a.id}>{a.title}{a.expired ? ' (expired)' : ''}</option>)}
               </select>
             </div>
           )}
-          <div className="mb-1.5 text-xs font-semibold text-slate-600">Or add another item type</div>
+          <div className="mb-1.5 text-xs font-semibold text-content-secondary">Or add another item type</div>
           <div className="grid grid-cols-3 gap-2">
             {ADD_TYPES.map((a) => (
               <button
                 key={a.type}
                 onClick={() => { onAdd(a.type); setShowAdd(false) }}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-center text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-panel px-3 py-2.5 text-center text-xs font-semibold text-content-secondary transition-colors hover:bg-panel-raised hover:text-content-primary"
               >
                 <a.Icon size={13} />
                 {a.label}
@@ -336,7 +336,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
       ) : (
         <button
           onClick={() => setShowAdd(true)}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-blue-500/50 hover:text-blue-700"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm font-semibold text-content-secondary transition-colors hover:border-blue-500/50 hover:text-blue-400"
         >
           <Plus size={15} /> Add item
         </button>
