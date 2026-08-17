@@ -26,8 +26,8 @@ function ZoneTrackToggle({ serviceId, zoneId, assignment, onChanged, onPersisted
         <button
           key={tb}
           onClick={() => setZoneTrack(tb)}
-          className={`rounded px-2 py-0.5 text-[10px] font-semibold ring-1 ring-slate-200 transition-colors ${
-            assignment[zoneId] === tb ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'
+          className={`rounded px-2 py-0.5 text-[10px] font-semibold ring-1 ring-border transition-colors ${
+            assignment[zoneId] === tb ? 'bg-blue-600 text-white' : 'text-content-secondary hover:bg-panel'
           }`}
         >
           {tb === 'main' ? 'Main' : 'Second'}

@@ -19,11 +19,11 @@ function Row({ checked, label, muted, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-slate-100 ${
-        muted ? 'text-[11px] text-slate-500' : 'text-xs text-slate-700'
+      className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-panel ${
+        muted ? 'text-[11px] text-content-secondary' : 'text-xs text-content-primary'
       }`}
     >
-      <span className="w-3 shrink-0">{checked && <Check size={12} className="text-blue-600" />}</span>
+      <span className="w-3 shrink-0">{checked && <Check size={12} className="text-blue-400" />}</span>
       <span className="truncate">{label}</span>
     </button>
   )
@@ -80,7 +80,7 @@ export default function ZonePinPicker({
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div className="fixed inset-0 z-20" onClick={onClose} />
       <div
-        className={`absolute z-30 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg ${
+        className={`absolute z-30 w-64 rounded-xl border border-border bg-panel-raised p-1.5 shadow-lg ${
           placement === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
         } ${align === 'right' ? 'right-0' : 'left-0'}`}
       >
@@ -96,14 +96,14 @@ export default function ZonePinPicker({
           <>
             <button
               onClick={() => setShowOthers((v) => !v)}
-              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-100"
+              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-content-primary hover:bg-panel"
             >
-              <span className="w-3 shrink-0">{heldId != null && heldId !== liveHoldable?.id && <Check size={12} className="text-blue-600" />}</span>
+              <span className="w-3 shrink-0">{heldId != null && heldId !== liveHoldable?.id && <Check size={12} className="text-blue-400" />}</span>
               <span className="flex-1 truncate">Hold another item…</span>
-              {showOthers ? <ChevronUp size={12} className="text-slate-400" /> : <ChevronDown size={12} className="text-slate-400" />}
+              {showOthers ? <ChevronUp size={12} className="text-content-tertiary" /> : <ChevronDown size={12} className="text-content-tertiary" />}
             </button>
             {showOthers && (
-              <div className="max-h-40 overflow-auto border-l border-slate-200 pl-1.5">
+              <div className="max-h-40 overflow-auto border-l border-border pl-1.5">
                 {holdable.map((it) => (
                   <Row
                     key={it.id}
@@ -117,7 +117,7 @@ export default function ZonePinPicker({
           </>
         )}
 
-        <div className="my-1 border-t border-slate-200" />
+        <div className="my-1 border-t border-border" />
 
         <Row checked={pin?.kind === 'mode' && pin.mode === 'logo'} label="Logo" onClick={() => onPick({ kind: 'mode', mode: 'logo' })} />
         <Row checked={pin?.kind === 'mode' && pin.mode === 'black'} label="Black" onClick={() => onPick({ kind: 'mode', mode: 'black' })} />
@@ -127,17 +127,17 @@ export default function ZonePinPicker({
 
         {serviceId != null && (
           <>
-            <div className="my-1 border-t border-slate-200" />
+            <div className="my-1 border-t border-border" />
             <button
               onClick={() => setShowAdvanced((v) => !v)}
-              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] text-slate-500 hover:bg-slate-100"
+              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] text-content-secondary hover:bg-panel"
             >
               <span className="flex-1">Advanced</span>
               {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
             {showAdvanced && (
               <div className="px-2 pb-1">
-                <div className="mb-1 text-[10px] text-slate-400">Which track this screen follows</div>
+                <div className="mb-1 text-[10px] text-content-tertiary">Which track this screen follows</div>
                 <ZoneTrackToggle
                   serviceId={serviceId}
                   zoneId={zoneId}
