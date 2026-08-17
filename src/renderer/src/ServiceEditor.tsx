@@ -228,7 +228,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   }
 
   if (service == null) {
-    return <div className="flex h-full items-center justify-center text-sm text-slate-500">Loading…</div>
+    return <div className="flex h-full items-center justify-center text-sm text-content-secondary">Loading…</div>
   }
 
   return (
@@ -236,7 +236,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <h2 className="truncate text-lg font-semibold text-slate-900">{service.name}</h2>
+          <h2 className="truncate text-lg font-semibold text-content-primary">{service.name}</h2>
           {/* Which Sunday this is for. Drives the scheduled-announcements list
               and the printed order's date line — both of which used to be
               unreachable for hand-built services, since only the church-app
@@ -250,7 +250,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
               void window.wf.serviceSetDate(serviceId, e.target.value || null).then(() => reload())
             }}
             title="The date this service is for"
-            className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+            className="shrink-0 rounded-lg border border-border bg-panel px-2 py-1 text-xs text-content-secondary"
           />
         </div>
         {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
@@ -304,7 +304,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
               onChanged={reload}
             />
           ) : (
-            <div className="text-sm text-slate-500">Select an item to preview &amp; style it</div>
+            <div className="text-sm text-content-secondary">Select an item to preview &amp; style it</div>
           )}
         </div>
 
@@ -324,19 +324,19 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
 
       {/* Confirm delete item(s) modal */}
       {confirmDeleteItems && (
-        <Modal onClose={() => setConfirmDeleteItems(null)} labelledBy="delete-items-title" className="max-w-sm rounded-xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl">
-            <h3 id="delete-items-title" className="mb-2 text-lg font-semibold text-slate-900">{confirmDeleteItems.length === 1 ? 'Delete Item?' : `Delete ${confirmDeleteItems.length} Items?`}</h3>
-            <p className="mb-4 text-sm text-slate-600">
+        <Modal onClose={() => setConfirmDeleteItems(null)} labelledBy="delete-items-title" className="max-w-sm rounded-xl border border-border bg-panel p-5 text-content-primary shadow-2xl">
+            <h3 id="delete-items-title" className="mb-2 text-lg font-semibold text-content-primary">{confirmDeleteItems.length === 1 ? 'Delete Item?' : `Delete ${confirmDeleteItems.length} Items?`}</h3>
+            <p className="mb-4 text-sm text-content-secondary">
               {confirmDeleteItems.length === 1 ? (
                 <>Are you sure you want to delete{' '}
-                <span className="font-semibold text-slate-900">{confirmDeleteItems[0].title}</span>? This cannot be undone.</>
+                <span className="font-semibold text-content-primary">{confirmDeleteItems[0].title}</span>? This cannot be undone.</>
               ) : (
                 <>Are you sure you want to delete these {confirmDeleteItems.length} items? This cannot be undone.</>
               )}
             </p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDeleteItems(null)}
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                className="flex-1 rounded-lg border border-border bg-panel px-4 py-2 text-sm font-semibold text-content-secondary hover:bg-panel-raised">
                 Cancel
               </button>
               <button onClick={confirmDelete}
