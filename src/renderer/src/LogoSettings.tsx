@@ -102,7 +102,7 @@ function LogoSettings(): JSX.Element {
               <h2 className="font-semibold text-content-primary">Church Logo</h2>
               <div className="text-xs text-content-secondary mt-0.5">Displayed on logo screens between songs</div>
             </div>
-            {saved && <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600"><Check size={13} /> Saved</span>}
+            {saved && <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-400"><Check size={13} /> Saved</span>}
           </div>
 
           {/* Logo preview */}
@@ -245,7 +245,7 @@ function LogoSettings(): JSX.Element {
         </div>
 
         <div className="rounded-xl border border-border bg-panel-raised p-4">
-          <p className="text-xs text-content-tertiary leading-relaxed">
+          <p className="text-xs text-content-secondary leading-relaxed">
             <strong className="text-content-secondary">How it works:</strong> Zones 1 &amp; 2 (back-left and back-right screens) show your logo and background whenever the system is between songs or in logo mode.
             If no background is set, a gentle animated gradient plays automatically.
             Video files loop continuously; images use a slow Ken Burns zoom.
