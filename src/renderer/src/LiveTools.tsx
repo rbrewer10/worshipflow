@@ -47,7 +47,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       <div className="flex gap-2">
         <button
           onClick={() => window.wf.sendIntent(track, 'black')}
-          className="flex-1 btn bg-black text-white border-white/20"
+          className="flex-1 btn bg-black text-white border-white/40"
         >
           <MonitorOff size={14} /> Black
         </button>
@@ -66,7 +66,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       </div>
 
       {/* Keyboard shortcut strip */}
-      <div className="flex justify-around rounded-lg border border-border bg-panel-raised/70 px-2 py-1.5 text-[10px] text-content-secondary">
+      <div className="flex justify-around rounded-lg border border-border bg-panel-raised px-2 py-1.5 text-[10px] text-content-secondary">
         <span><span className="font-bold text-content-primary">Space</span> Next</span>
         <span><span className="font-bold text-content-primary">←→</span> Prev/Next</span>
         <span><span className="font-bold text-content-primary">B</span> Black</span>
@@ -120,7 +120,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
 
       {/* Status strip: hymn timer + verse */}
       {(hmsElapsedSecs > 0 || live?.verseNumber != null) && (
-        <div className="flex gap-2 rounded-lg border border-border bg-panel-raised/70 px-3 py-1.5 text-xs text-content-secondary">
+        <div className="flex gap-2 rounded-lg border border-border bg-panel-raised px-3 py-1.5 text-xs text-content-secondary">
           {hmsElapsedSecs > 0 && <span className="inline-flex items-center gap-1 tabular-nums"><Timer size={12} /> {Math.floor(hmsElapsedSecs / 60)}:{String(hmsElapsedSecs % 60).padStart(2, '0')}</span>}
           {live?.verseNumber != null && <span>· Verse {live.verseNumber}</span>}
         </div>
