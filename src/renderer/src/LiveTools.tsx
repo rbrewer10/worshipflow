@@ -42,12 +42,12 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
   const clearStageMessage = (): void => { setStageMsg(''); window.wf.liveSetStageMessage(track, null) }
 
   return (
-    <aside className="flex w-96 shrink-0 flex-col gap-4 overflow-auto border-l border-slate-200 bg-[#f4f6f9] p-4">
+    <aside className="flex w-96 shrink-0 flex-col gap-4 overflow-auto border-l border-border bg-panel p-4">
       {/* Emergency controls */}
       <div className="flex gap-2">
         <button
           onClick={() => window.wf.sendIntent(track, 'black')}
-          className="flex-1 btn bg-black text-white border-white/20"
+          className="flex-1 btn bg-black text-white border-white/40"
         >
           <MonitorOff size={14} /> Black
         </button>
@@ -66,15 +66,15 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       </div>
 
       {/* Keyboard shortcut strip */}
-      <div className="flex justify-around rounded-lg border border-slate-200 bg-slate-100/70 px-2 py-1.5 text-[10px] text-slate-500">
-        <span><span className="font-bold text-slate-600">Space</span> Next</span>
-        <span><span className="font-bold text-slate-600">←→</span> Prev/Next</span>
-        <span><span className="font-bold text-slate-600">B</span> Black</span>
-        <span><span className="font-bold text-slate-600">L</span> Logo</span>
+      <div className="flex justify-around rounded-lg border border-border bg-panel-raised px-2 py-1.5 text-[10px] text-content-secondary">
+        <span><span className="font-bold text-content-primary">Space</span> Next</span>
+        <span><span className="font-bold text-content-primary">←→</span> Prev/Next</span>
+        <span><span className="font-bold text-content-primary">B</span> Black</span>
+        <span><span className="font-bold text-content-primary">L</span> Logo</span>
       </div>
 
       {/* Divider */}
-      <div className="border-t border-slate-200" />
+      <div className="border-t border-border" />
 
       {/* Presenter notes + timer */}
       <PresenterPanel liveState={live} liveItem={liveItem} />
@@ -90,7 +90,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       />
 
       {/* Divider */}
-      <div className="border-t border-slate-200" />
+      <div className="border-t border-border" />
 
       {/* Text size + Auto-advance */}
       <TimingPanel
@@ -116,11 +116,11 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       />
 
       {/* Divider */}
-      <div className="border-t border-slate-200" />
+      <div className="border-t border-border" />
 
       {/* Status strip: hymn timer + verse */}
       {(hmsElapsedSecs > 0 || live?.verseNumber != null) && (
-        <div className="flex gap-2 rounded-lg border border-slate-200 bg-slate-100/70 px-3 py-1.5 text-xs text-slate-600">
+        <div className="flex gap-2 rounded-lg border border-border bg-panel-raised px-3 py-1.5 text-xs text-content-secondary">
           {hmsElapsedSecs > 0 && <span className="inline-flex items-center gap-1 tabular-nums"><Timer size={12} /> {Math.floor(hmsElapsedSecs / 60)}:{String(hmsElapsedSecs % 60).padStart(2, '0')}</span>}
           {live?.verseNumber != null && <span>· Verse {live.verseNumber}</span>}
         </div>

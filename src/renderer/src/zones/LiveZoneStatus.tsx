@@ -38,10 +38,10 @@ function LiveZoneStatus(): JSX.Element {
 
   return (
     <div className="p-2">
-      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Zones</div>
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-content-secondary">Zones</div>
       <div className="grid grid-cols-2 gap-2">
         {ZONE_IDS.map((zoneId) => (
-          <div key={zoneId} className="rounded-xl border-2 border-slate-200 bg-white p-2">
+          <div key={zoneId} className="rounded-xl border-2 border-border bg-panel p-2">
             <ZoneStatusBox zoneId={zoneId} zoneState={zoneStates?.[zoneId]} connected={zonesConnected.includes(zoneId)} />
           </div>
         ))}

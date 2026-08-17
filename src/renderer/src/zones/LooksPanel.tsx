@@ -30,19 +30,19 @@ function LooksPanel(): JSX.Element {
       <button
         onClick={safetyReset}
         title="Force all 4 zones to the logo — screens only, doesn't touch audio"
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20"
       >
         <ShieldAlert size={13} /> Safety Reset
       </button>
 
       {looks.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Looks</div>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-content-secondary">Looks</div>
           {looks.map((look) => (
             <div key={look.id} className="group flex items-center gap-1">
               <button
                 onClick={() => applyLook(look.id)}
-                className="min-w-0 flex-1 truncate rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left text-xs font-medium text-slate-700 hover:border-blue-400 hover:bg-blue-50"
+                className="min-w-0 flex-1 truncate rounded-lg border border-border bg-panel-raised px-2 py-1.5 text-left text-xs font-medium text-content-primary hover:border-blue-400 hover:bg-blue-500/10"
               >
                 {look.name}
               </button>
@@ -50,7 +50,7 @@ function LooksPanel(): JSX.Element {
                 onClick={() => deleteLook(look.id)}
                 title={`Delete "${look.name}"`}
                 aria-label={`Delete "${look.name}"`}
-                className="hidden shrink-0 rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 group-hover:block"
+                className="hidden shrink-0 rounded p-1 text-content-tertiary hover:bg-panel-raised hover:text-content-primary group-hover:block"
               >
                 <X size={12} />
               </button>

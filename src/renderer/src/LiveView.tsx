@@ -31,7 +31,7 @@ function LiveView(): JSX.Element {
         <SlideGrid track="main" />
         <LiveTools track="main" />
       </div>
-      <div className="flex min-h-0 border-l border-slate-300">
+      <div className="flex min-h-0 border-l border-border">
         {stageRehearsalActive && <SlideGrid track="second" />}
         <StageRehearsalTools onActiveChange={setStageRehearsalActive} />
       </div>
