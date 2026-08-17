@@ -290,7 +290,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
           className={[
             'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all',
             selectedFolder === null ? 'bg-blue-600 text-white' : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
-            dragOverFolder === null ? 'ring-2 ring-blue-400 ring-offset-1' : '',
+            dragOverFolder === null ? 'ring-2 ring-blue-400 ring-offset-1 ring-offset-panel' : '',
           ].join(' ')}
         >
           Uncategorized
@@ -325,7 +325,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
                 className={[
                   'rounded-full px-2.5 py-1 pr-9 text-[11px] font-semibold transition-all',
                   selectedFolder === f ? 'bg-blue-600 text-white' : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
-                  dragOverFolder === f ? 'ring-2 ring-blue-400 ring-offset-1' : '',
+                  dragOverFolder === f ? 'ring-2 ring-blue-400 ring-offset-1 ring-offset-panel' : '',
                 ].join(' ')}
               >
                 {f}
