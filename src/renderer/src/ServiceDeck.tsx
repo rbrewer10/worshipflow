@@ -191,7 +191,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                 onDrop={() => onDrop(it.id)}
                 onClick={(e) => handleRowClick(it, i, e)}
                 onKeyDown={(e) => handleRowKeyDown(it, e)}
-                className={`group mb-1.5 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${ring} ${dragId === it.id ? 'opacity-40' : ''}`}
+                className={`group mb-1.5 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${ring} ${dragId === it.id ? 'opacity-40 ring-2 ring-white/30' : ''}`}
                 style={selectedId !== it.id && !isMultiSelected ? { borderColor: color + '55', background: color + '14' } : undefined}
               >
                 <GripVertical size={13} className="shrink-0 text-content-tertiary group-hover:text-content-secondary" />
@@ -223,7 +223,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
               onKeyDown={(e) => handleRowKeyDown(it, e)}
               className={`group mb-1.5 flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                 it.type === 'placeholder' && selectedId !== it.id && !isMultiSelected ? 'border-dashed border-amber-500/40 bg-amber-500/10' : ring
-              } ${dragId === it.id ? 'opacity-40' : ''}`}
+              } ${dragId === it.id ? 'opacity-40 ring-2 ring-white/30' : ''}`}
             >
               <div className="flex w-5 flex-shrink-0 flex-col items-center">
                 <GripVertical size={13} className="text-content-tertiary group-hover:text-content-secondary" />
