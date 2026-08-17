@@ -288,7 +288,7 @@ function ObsPanel(): JSX.Element {
                   className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
                     status.currentScene === sc
                       ? 'bg-blue-600 text-white'
-                      : 'bg-panel-raised text-content-secondary hover:bg-border-strong'
+                      : 'bg-panel text-content-secondary hover:bg-border-strong'
                   }`}
                 >
                   {sc}
@@ -316,7 +316,7 @@ function ObsPanel(): JSX.Element {
                     <select
                       value={sceneMap[ctx]}
                       onChange={(e) => setCtxScene(ctx, e.target.value)}
-                      className="min-w-0 flex-1 rounded border border-border bg-panel-raised px-2 py-1 text-xs text-content-primary"
+                      className="min-w-0 flex-1 rounded border border-border bg-panel px-2 py-1 text-xs text-content-primary"
                     >
                       <option value="">— pick scene —</option>
                       {status.scenes.map((sc) => <option key={sc} value={sc}>{sc}</option>)}
