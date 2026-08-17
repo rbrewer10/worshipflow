@@ -37,17 +37,17 @@ export const TextEditor = memo(function TextEditor({
       </div>
 
       {/* ── Text Style ── */}
-      <div className="space-y-3 border-t border-slate-200 pt-3 mt-2">
+      <div className="space-y-3 border-t border-border pt-3 mt-2">
         <div className="flex items-center justify-between">
           <span className="section-header">Text Style</span>
-          <span className="text-xs text-slate-500">Appearance</span>
+          <span className="text-xs text-content-secondary">Appearance</span>
         </div>
 
         {/* Font size */}
         <div>
-          <label htmlFor="font-size-slider" className="mb-1.5 flex items-center justify-between text-[11px] text-slate-600">
+          <label htmlFor="font-size-slider" className="mb-1.5 flex items-center justify-between text-[11px] text-content-secondary">
             <span>Font size</span>
-            <span className="font-mono text-slate-900">{fontScale} vw</span>
+            <span className="font-mono text-content-primary">{fontScale} vw</span>
           </label>
           <input id="font-size-slider" type="range" min={3} max={14} step={0.5}
             value={fontScale}
@@ -58,7 +58,7 @@ export const TextEditor = memo(function TextEditor({
 
         {/* Text alignment */}
         <div>
-          <span className="mb-2 block text-[11px] text-slate-600">Text alignment</span>
+          <span className="mb-2 block text-[11px] text-content-secondary">Text alignment</span>
           <div className="flex gap-1.5">
             {(['left', 'center', 'right'] as const).map((align) => (
               <button key={align} onClick={() => onTextAlignChange(align)}

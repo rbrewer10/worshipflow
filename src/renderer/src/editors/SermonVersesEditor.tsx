@@ -41,7 +41,7 @@ export function SermonVersesEditor({
       </div>
 
       {verses.length === 0 && (
-        <p className="text-[11px] leading-snug text-slate-400">
+        <p className="text-[11px] leading-snug text-content-tertiary">
           No verses yet — his pulpit tablet will just show the title card until you add some.
         </p>
       )}

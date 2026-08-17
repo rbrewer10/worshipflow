@@ -18,9 +18,9 @@ export const ScriptureEditor = memo(function ScriptureEditor({
     <div className="space-y-3">
       <ScriptureRefField reference={reference} onReferenceChange={onReferenceChange} />
       <div>
-        <label htmlFor="scripture-font-size" className="mb-1.5 flex items-center justify-between text-[11px] text-slate-600">
+        <label htmlFor="scripture-font-size" className="mb-1.5 flex items-center justify-between text-[11px] text-content-secondary">
           <span>Font size</span>
-          <span className="font-mono text-slate-900">{fontScale} vw</span>
+          <span className="font-mono text-content-primary">{fontScale} vw</span>
         </label>
         <input id="scripture-font-size" type="range" min={3} max={14} step={0.5}
           value={fontScale}

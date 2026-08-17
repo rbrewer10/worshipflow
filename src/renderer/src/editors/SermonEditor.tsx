@@ -37,7 +37,7 @@ export const SermonEditor = memo(function SermonEditor({
           onChange={(e) => onPassageChange(e.target.value)}
           aria-label="Sermon passage" />
       </div>
-      <p className="text-[11px] leading-snug text-slate-400">
+      <p className="text-[11px] leading-snug text-content-tertiary">
         When live, the screen shows the logo. This marks where the sermon starts for recording chapters.
       </p>
     </div>

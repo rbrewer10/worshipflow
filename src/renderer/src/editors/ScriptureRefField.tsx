@@ -48,22 +48,22 @@ export default function ScriptureRefField({ reference, onReferenceChange }: {
         placeholder="John 3:16-18; Romans 8:1"
         onChange={(e) => onReferenceChange(e.target.value)}
         aria-label="Scripture reference — separate several passages with a semicolon or a new line"
-        className="w-full resize-y rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900"
+        className="w-full resize-y rounded-lg border border-border bg-panel px-2 py-1.5 text-sm text-content-primary"
       />
-      <p className="mt-1 text-[11px] text-slate-500">
+      <p className="mt-1 text-[11px] text-content-secondary">
         Separate passages with <span className="font-mono">;</span> or a new line to read several in a row.
       </p>
 
       {checks.length > 0 && (
         <div className="mt-2 space-y-1" role="status" aria-live="polite">
           {found.length > 0 && (
-            <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
-              <Check size={12} className="shrink-0 text-blue-700" />
+            <p className="flex items-center gap-1.5 text-[11px] text-content-secondary">
+              <Check size={12} className="shrink-0 text-blue-400" />
               {found.length} passage{found.length === 1 ? '' : 's'} · {totalVerses} verse{totalVerses === 1 ? '' : 's'}
             </p>
           )}
           {missing.map((c) => (
-            <p key={c.reference} className="flex items-center gap-1.5 text-[11px] text-amber-700">
+            <p key={c.reference} className="flex items-center gap-1.5 text-[11px] text-amber-400">
               <AlertTriangle size={12} className="shrink-0" />
               Couldn&apos;t find &ldquo;{c.reference}&rdquo;
             </p>
