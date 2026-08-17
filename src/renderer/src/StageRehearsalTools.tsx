@@ -109,7 +109,7 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
       </div>
 
       {live?.songTitle && (
-        <div className="rounded-lg border border-border bg-panel px-3 py-2">
+        <div className="rounded-lg border border-border bg-panel-raised px-3 py-2">
           <p className="text-sm font-semibold text-content-primary">{live.songTitle}</p>
           <p className="text-[11px] text-content-secondary">
             Song {state.songIndex + 1} of {state.songQueue.length}
