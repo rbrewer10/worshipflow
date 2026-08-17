@@ -22,10 +22,10 @@ function ObsConnectTab(): JSX.Element {
   }, [])
 
   return (
-    <div className="h-full overflow-auto bg-gray-50 p-6">
+    <div className="h-full overflow-auto p-6">
       <div className="mb-6">
-        <div className="text-xl font-semibold text-gray-900">OBS Connect</div>
-        <div className="mt-1 text-sm text-gray-400">
+        <div className="text-xl font-semibold text-content-primary">OBS Connect</div>
+        <div className="mt-1 text-sm text-content-secondary">
           Set up streaming/recording and the network addresses your Pi displays and tablet remote need — do this once before the service.
         </div>
       </div>
@@ -33,31 +33,31 @@ function ObsConnectTab(): JSX.Element {
       <div className="mx-auto max-w-2xl space-y-5">
         <ObsPanel />
 
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-2 font-semibold text-gray-900">
+        <div className="rounded-xl border border-border bg-panel p-5">
+          <div className="mb-3 flex items-center gap-2 font-semibold text-content-primary">
             <Cpu size={15} /> Pi Display URLs
           </div>
           <div className="space-y-1.5">
             {ZONE_IDS.map((zoneId) => (
-              <div key={zoneId} className="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
-                <span className="text-xs text-gray-500">Zone {zoneId} — {ZONE_NAMES[zoneId]}</span>
-                <span className="font-mono text-xs text-blue-700">
+              <div key={zoneId} className="flex items-center justify-between rounded-lg bg-panel-raised border border-border px-3 py-2">
+                <span className="text-xs text-content-secondary">Zone {zoneId} — {ZONE_NAMES[zoneId]}</span>
+                <span className="font-mono text-xs text-blue-400">
                   http://{serverIp}:{tabletPort ?? '...'}/zone/{zoneId}
                 </span>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-xs text-gray-400">Point each Raspberry Pi's kiosk browser at its own URL above.</p>
+          <p className="mt-2 text-xs text-content-tertiary">Point each Raspberry Pi's kiosk browser at its own URL above.</p>
         </div>
 
-        <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-5">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-gray-900">
+        <div className="rounded-xl border border-blue-500/25 bg-blue-500/5 p-5">
+          <div className="mb-2 flex items-center gap-2 font-semibold text-content-primary">
             <Tablet size={15} /> Tablet Remote
           </div>
-          <div className="break-all rounded-lg bg-white border border-gray-200 px-3 py-2 text-center font-mono text-xs text-blue-700">
+          <div className="break-all rounded-lg bg-panel border border-border px-3 py-2 text-center font-mono text-xs text-blue-400">
             {tabletUrl || 'Starting server…'}
           </div>
-          <p className="mt-2 text-xs text-gray-400">Open on an iPad/phone as a wireless stage monitor + remote.</p>
+          <p className="mt-2 text-xs text-content-secondary">Open on an iPad/phone as a wireless stage monitor + remote.</p>
         </div>
       </div>
     </div>

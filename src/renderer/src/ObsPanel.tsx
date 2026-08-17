@@ -131,14 +131,14 @@ function ObsPanel(): JSX.Element {
     setSceneMap((cur) => ({ ...cur, [ctx]: scene }))
 
   const statusPill = status.connected
-    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-blue-700"><span className="h-2 w-2 rounded-full bg-blue-500" /> Connected</span>
+    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-blue-400"><span className="h-2 w-2 rounded-full bg-blue-500" /> Connected</span>
     : status.reconnecting
     ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-amber-700"><RefreshCw size={10} className="animate-spin" /> Reconnecting…</span>
-    : <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-slate-500"><span className="h-2 w-2 rounded-full bg-slate-400" /> Not connected</span>
+    : <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-content-secondary"><span className="h-2 w-2 rounded-full bg-slate-400" /> Not connected</span>
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
-      <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+    <section className="rounded-xl border border-border bg-panel p-3">
+      <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-content-secondary">
         <Video size={13} /> OBS Studio
         <span className="ml-auto">{statusPill}</span>
       </h2>
@@ -146,10 +146,10 @@ function ObsPanel(): JSX.Element {
       <div className="space-y-3">
         {/* Connection — compact once connected, full form otherwise */}
         {status.connected && !editingConn ? (
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-panel px-3 py-2">
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-slate-700">OBS connected</div>
-              <div className="truncate font-mono text-[11px] text-slate-500">{host || 'localhost'}:{port || '4455'}</div>
+              <div className="text-xs font-semibold text-content-primary">OBS connected</div>
+              <div className="truncate font-mono text-[11px] text-content-secondary">{host || 'localhost'}:{port || '4455'}</div>
             </div>
             <div className="flex shrink-0 gap-1.5">
               <button onClick={() => setEditingConn(true)} className="btn-pill text-[11px]">Edit</button>
@@ -157,11 +157,11 @@ function ObsPanel(): JSX.Element {
             </div>
           </div>
         ) : (
-          <div className="rounded-lg border border-slate-200 bg-slate-100 p-2">
+          <div className="rounded-lg border border-border bg-panel-raised p-2">
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-700">Connection</span>
+              <span className="text-xs font-semibold text-content-primary">Connection</span>
               {status.connected && (
-                <button onClick={() => setEditingConn(false)} className="text-[11px] text-slate-500 hover:text-slate-700">Cancel</button>
+                <button onClick={() => setEditingConn(false)} className="text-[11px] text-content-secondary hover:text-content-primary">Cancel</button>
               )}
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -169,20 +169,20 @@ function ObsPanel(): JSX.Element {
                 value={host}
                 onChange={(e) => setHost(e.target.value)}
                 placeholder="localhost"
-                className="w-28 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                className="w-28 rounded border border-border bg-panel-raised px-2 py-1 text-xs text-content-primary"
               />
               <input
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
                 placeholder="4455"
-                className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                className="w-16 rounded border border-border bg-panel-raised px-2 py-1 text-xs text-content-primary"
               />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="password"
-                className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                className="min-w-0 flex-1 rounded border border-border bg-panel-raised px-2 py-1 text-xs text-content-primary"
               />
               <button onClick={connect} disabled={connecting} className="rounded bg-blue-600/80 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
                 {connecting ? 'Connecting…' : status.connected ? 'Reconnect' : 'Connect'}
@@ -194,7 +194,7 @@ function ObsPanel(): JSX.Element {
             {status.reconnecting && !status.connected && (
               <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-amber-700"><RefreshCw size={11} className="animate-spin" /> Trying to reach OBS… it will connect automatically once OBS is running.</div>
             )}
-            <div className="mt-1.5 text-[10px] text-slate-500">
+            <div className="mt-1.5 text-[10px] text-content-secondary">
               Enable in OBS: Tools → WebSocket Server Settings (OBS 28+). WorshipFlow reconnects automatically next time.
             </div>
           </div>
@@ -239,48 +239,48 @@ function ObsPanel(): JSX.Element {
         )}
 
         {/* Auto-record + recordings history */}
-        <div className="rounded-lg border border-slate-200 bg-white p-2">
+        <div className="rounded-lg border border-border bg-panel p-2">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={autoRecord} onChange={toggleAutoRecord} className="h-4 w-4" />
-            <span className="text-xs font-semibold text-slate-700">Auto-record services</span>
+            <span className="text-xs font-semibold text-content-primary">Auto-record services</span>
           </label>
-          <div className="mt-1 text-[10px] text-slate-500">
+          <div className="mt-1 text-[10px] text-content-secondary">
             Recording is written to OBS&rsquo;s configured record folder — point that at your NAS.
           </div>
 
-          <div className="mt-3 border-t border-slate-200 pt-2">
-            <h3 className="mb-1 text-xs font-semibold text-slate-700">Video assembly</h3>
+          <div className="mt-3 border-t border-border pt-2">
+            <h3 className="mb-1 text-xs font-semibold text-content-primary">Video assembly</h3>
             {(['introPath', 'outroPath', 'outputFolder'] as const).map((key) => (
               <div key={key} className="mb-1 flex items-center gap-2 text-[11px]">
-                <span className="w-14 shrink-0 text-slate-500">
+                <span className="w-14 shrink-0 text-content-secondary">
                   {key === 'introPath' ? 'Intro' : key === 'outroPath' ? 'Outro' : 'Output'}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-slate-600" title={asm[key] ?? ''}>{asm[key] ?? <em className="text-slate-400">none</em>}</span>
-                <button onClick={() => void pickAsm(key)} className="shrink-0 text-blue-700 hover:underline">Choose</button>
-                {asm[key] && <button onClick={() => void clearAsm(key)} className="shrink-0 text-slate-400 hover:underline">Clear</button>}
+                <span className="min-w-0 flex-1 truncate text-content-secondary" title={asm[key] ?? ''}>{asm[key] ?? <em className="text-content-tertiary">none</em>}</span>
+                <button onClick={() => void pickAsm(key)} className="shrink-0 text-blue-400 hover:underline">Choose</button>
+                {asm[key] && <button onClick={() => void clearAsm(key)} className="shrink-0 text-content-tertiary hover:underline">Clear</button>}
               </div>
             ))}
-            <p className="text-[10px] text-slate-500">Intro/outro are optional bumper videos. Output defaults to each recording&rsquo;s own folder.</p>
+            <p className="text-[10px] text-content-secondary">Intro/outro are optional bumper videos. Output defaults to each recording&rsquo;s own folder.</p>
             <div className="mt-1 flex items-center gap-2 text-[11px]">
-              <span className="w-14 shrink-0 text-slate-500">Claude key</span>
+              <span className="w-14 shrink-0 text-content-secondary">Claude key</span>
               <input type="password" value={anthropicKey} placeholder="sk-ant-…"
                 onChange={(e) => setAnthropicKey(e.target.value)}
                 onBlur={() => void window.wf.setAnthropicKey(anthropicKey)}
-                className="min-w-0 flex-1 rounded border border-slate-300 px-1 text-slate-700" />
+                className="min-w-0 flex-1 rounded border border-border px-1 text-content-primary" />
             </div>
-            <p className="text-[10px] text-slate-500">AI content also needs your Replicate key (set elsewhere).</p>
+            <p className="text-[10px] text-content-secondary">AI content also needs your Replicate key (set elsewhere).</p>
           </div>
 
-          <div className="mt-2 mb-1 text-xs font-semibold text-slate-700">Recent recordings</div>
+          <div className="mt-2 mb-1 text-xs font-semibold text-content-primary">Recent recordings</div>
           <RecordingsPanel />
         </div>
 
         {/* Scenes */}
         {status.connected && (
-          <div className="rounded-lg border border-slate-200 bg-white p-2">
-            <div className="mb-1.5 text-xs font-semibold text-slate-700">Scenes</div>
+          <div className="rounded-lg border border-border bg-panel p-2">
+            <div className="mb-1.5 text-xs font-semibold text-content-primary">Scenes</div>
             <div className="flex flex-wrap gap-1.5">
-              {status.scenes.length === 0 && <span className="text-xs text-slate-400">No scenes found.</span>}
+              {status.scenes.length === 0 && <span className="text-xs text-content-tertiary">No scenes found.</span>}
               {status.scenes.map((sc) => (
                 <button
                   key={sc}
@@ -288,7 +288,7 @@ function ObsPanel(): JSX.Element {
                   className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
                     status.currentScene === sc
                       ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      : 'bg-panel-raised text-content-secondary hover:bg-border-strong'
                   }`}
                 >
                   {sc}
@@ -299,10 +299,10 @@ function ObsPanel(): JSX.Element {
         )}
 
         {/* Auto-switch */}
-        <div className="rounded-lg border border-slate-200 bg-white p-2">
+        <div className="rounded-lg border border-border bg-panel p-2">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={autoSwitch} onChange={(e) => setAutoSwitch(e.target.checked)} className="h-4 w-4" />
-            <span className="text-xs font-semibold text-slate-700">Auto-switch scenes with the service</span>
+            <span className="text-xs font-semibold text-content-primary">Auto-switch scenes with the service</span>
           </label>
           {autoSwitch && (
             <div className="mt-2 space-y-1.5">
@@ -310,13 +310,13 @@ function ObsPanel(): JSX.Element {
                 const { Icon, label } = SCENE_LABELS[ctx]
                 return (
                   <div key={ctx} className="flex items-center gap-2">
-                    <span className="inline-flex w-40 shrink-0 items-center gap-1.5 text-[11px] text-slate-600">
+                    <span className="inline-flex w-40 shrink-0 items-center gap-1.5 text-[11px] text-content-secondary">
                       <Icon size={12} /> {label}
                     </span>
                     <select
                       value={sceneMap[ctx]}
                       onChange={(e) => setCtxScene(ctx, e.target.value)}
-                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                      className="min-w-0 flex-1 rounded border border-border bg-panel-raised px-2 py-1 text-xs text-content-primary"
                     >
                       <option value="">— pick scene —</option>
                       {status.scenes.map((sc) => <option key={sc} value={sc}>{sc}</option>)}
@@ -325,7 +325,7 @@ function ObsPanel(): JSX.Element {
                 )
               })}
               {!status.connected && (
-                <div className="text-[10px] text-slate-500">Connect to OBS to choose scenes.</div>
+                <div className="text-[10px] text-content-secondary">Connect to OBS to choose scenes.</div>
               )}
             </div>
           )}
@@ -333,9 +333,9 @@ function ObsPanel(): JSX.Element {
 
         {/* Overlay URL */}
         <div className="rounded-lg border border-blue-500/25 bg-blue-500/5 p-2">
-          <div className="mb-1 text-xs font-semibold text-slate-700">Lyrics overlay (Browser Source)</div>
+          <div className="mb-1 text-xs font-semibold text-content-primary">Lyrics overlay (Browser Source)</div>
           <div className="flex gap-1.5">
-            <div className="flex-1 rounded bg-white px-2 py-1.5 text-center font-mono text-[11px] text-blue-700 break-all">
+            <div className="flex-1 rounded bg-panel-raised px-2 py-1.5 text-center font-mono text-[11px] text-blue-400 break-all">
               {obsUrl || '…'}
             </div>
             <button
@@ -344,13 +344,13 @@ function ObsPanel(): JSX.Element {
               className={`inline-flex shrink-0 items-center gap-1 rounded px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-40 ${
                 copied
                   ? 'bg-blue-600 text-white'
-                  : 'bg-blue-500/20 text-blue-700 hover:bg-blue-500/30'
+                  : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
               }`}
             >
               {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
             </button>
           </div>
-          <div className="mt-1 text-[10px] text-slate-500">
+          <div className="mt-1 text-[10px] text-content-secondary">
             In OBS add a Browser Source with this URL (transparent background) for live lyrics on stream.
           </div>
         </div>
