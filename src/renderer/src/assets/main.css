@@ -15,9 +15,17 @@ body,
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════
-   THEME SYSTEM — 4 Complete Professional Themes
+   THEME SYSTEM — dark navy/graphite, single palette (dark-only, no theme switcher)
    ════════════════════════════════════════════════════════════════════════════════ */
 
+/* --wf-primary is Snow Hill blue (general primary actions/selection/focus),
+   not the old emerald "primary" — emerald narrowed to --wf-live (ready/
+   on-air/live status only, alongside --wf-warning/--wf-stage-rehearsal/
+   --wf-error as one of several real state colors, not the app-wide accent).
+   --wf-live has no consumer yet in this shared-class layer (badge/badge-
+   success below still hardcode the emerald literal directly) — it exists
+   so a later per-screen stage has a named token to reach for instead of
+   re-guessing the hex. */
 :root {
   --wf-primary: #3b82f6;
   --wf-primary-dark: #2563eb;
