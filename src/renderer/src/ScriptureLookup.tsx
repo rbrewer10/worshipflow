@@ -63,7 +63,7 @@ function ScriptureLookup(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col p-4 text-slate-900">
+    <div className="flex h-full min-h-0 flex-col p-4 text-content-primary">
       <h1 className="sr-only">Scripture Lookup</h1>
       <div className="mb-3 flex gap-2">
         <input
@@ -71,7 +71,7 @@ function ScriptureLookup(): JSX.Element {
           onChange={(e) => setRef(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && lookup()}
           placeholder='Type a reference — e.g. "John 3:16", "Psalm 23", "Romans 8:28-30"'
-          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-blue-500"
+          className="min-w-0 flex-1 rounded-lg border border-border bg-panel-raised px-4 py-2.5 text-sm text-content-primary placeholder:text-content-secondary outline-none focus:border-blue-500"
         />
         <button
           onClick={() => lookup()}
@@ -87,26 +87,26 @@ function ScriptureLookup(): JSX.Element {
           <button
             key={q}
             onClick={() => lookup(q)}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
+            className="rounded-full border border-border bg-panel px-3 py-1 text-xs text-content-secondary hover:bg-panel-raised"
           >
             {q}
           </button>
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-[#f4f6f9] p-5">
+      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-panel p-5">
         {!result && (
-          <p className="py-10 text-center text-sm text-slate-500">
+          <p className="py-10 text-center text-sm text-content-secondary">
             Look up any passage in the King James Version.
           </p>
         )}
         {result && !result.ok && (
-          <p className="py-10 text-center text-sm text-amber-700">{result.error}</p>
+          <p className="py-10 text-center text-sm text-amber-400">{result.error}</p>
         )}
         {result && result.ok && (
           <>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold text-slate-900">{result.reference}</h2>
+              <h2 className="text-lg font-semibold text-content-primary">{result.reference}</h2>
               {/* This screen could look a passage up but not put it anywhere,
                   so finding a verse and using it were two unconnected jobs.
                   Adding appends to the loaded service; sending skips the
@@ -124,13 +124,13 @@ function ScriptureLookup(): JSX.Element {
             </div>
             <div className="space-y-2 leading-relaxed">
               {result.verses!.map((v) => (
-                <p key={v.n} className="text-slate-900">
-                  <sup className="mr-1 font-mono text-xs text-blue-700">{v.n}</sup>
+                <p key={v.n} className="text-content-primary">
+                  <sup className="mr-1 font-mono text-xs text-blue-400">{v.n}</sup>
                   {v.text}
                 </p>
               ))}
             </div>
-            <p className="mt-5 text-xs text-slate-500">
+            <p className="mt-5 text-xs text-content-secondary">
               {result.verses!.length} verse{result.verses!.length === 1 ? '' : 's'} · King James Version
             </p>
           </>

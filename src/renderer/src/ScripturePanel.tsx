@@ -29,7 +29,7 @@ export const ScripturePanel = memo(function ScripturePanel({
             className={`flex-1 btn text-xs ${bibleTranslation === t ? 'bg-blue-600 border-blue-500 text-white' : ''}`}>{label}</button>
         ))}
       </div>
-      <div className="mt-1 text-[10px] text-slate-500">KJV offline · WEB & BBE need internet</div>
+      <div className="mt-1 text-[10px] text-content-secondary">KJV offline · WEB & BBE need internet</div>
     </section>
   )
 })
