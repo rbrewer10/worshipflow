@@ -219,7 +219,7 @@ function draftFromRule(rule: AutomationRule): RuleDraft {
   }
 }
 
-// Field styling shared across the form's inputs/selects — matches the panel's light
+// Field styling shared across the form's inputs/selects — matches the panel's dark
 // palette. Extracted so the several controls stay visually consistent.
 const FIELD_CLASS =
   'w-full rounded-[5px] border border-border bg-panel px-2 py-1 text-[11.5px] text-content-primary outline-none focus:border-blue-500'
@@ -656,7 +656,7 @@ function MeterRow({
         aria-pressed={c.isMuted}
         className={`rounded-[4px] px-1.5 py-[3px] text-[9px] font-extrabold uppercase tracking-widest disabled:opacity-50 ${
           c.isMuted
-            ? 'bg-red-500/[0.14] text-red-700 shadow-[inset_0_0_0_1px_rgba(220,38,38,.35)]'
+            ? 'bg-red-500/[0.14] text-red-400 shadow-[inset_0_0_0_1px_rgba(220,38,38,.35)]'
             : 'bg-panel-raised text-content-secondary hover:text-content-primary'
         }`}
       >
