@@ -74,7 +74,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     // this, a background/lyrics save reflects on the real live output (which
     // reads the song record directly) but the zone preview tiles here — which
     // render off selectedSongFull — kept showing what was there before the edit.
-    const item = s.items.find((it) => it.id === selectedId)
+    const item = s?.items.find((it) => it.id === selectedId)
     if (item && item.type === 'song' && item.ref_id != null) {
       void window.wf.songGet(item.ref_id).then(setSelectedSongFull)
     }
