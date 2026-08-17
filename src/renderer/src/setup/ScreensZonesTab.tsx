@@ -6,8 +6,8 @@ function ScreensZonesTab(): JSX.Element {
   return (
     <div className="min-h-0 flex-1 overflow-auto p-6">
       <div className="mx-auto max-w-3xl">
-        <h1 className="mb-1 text-lg font-semibold text-slate-900">Screens &amp; zones</h1>
-        <p className="mb-5 text-sm text-slate-500">
+        <h1 className="mb-1 text-lg font-semibold text-content-primary">Screens &amp; zones</h1>
+        <p className="mb-5 text-sm text-content-secondary">
           What each screen in the room shows, and the address to open on each Pi.
         </p>
         <ZonePanel />
