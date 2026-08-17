@@ -107,7 +107,7 @@ export const ItemEditor = memo(function ItemEditor({
   }, [onClose])
 
   return (
-    <div className="card-lg flex w-80 shrink-0 flex-col gap-3 overflow-auto text-slate-900 animate-[fade-in_0.15s_ease-out]">
+    <div className="card-lg flex w-80 shrink-0 flex-col gap-3 overflow-auto text-content-primary animate-[fade-in_0.15s_ease-out]">
       <div className="flex items-center justify-between">
         <h3 className="section-title capitalize">{item.type}</h3>
         <div className="flex items-center gap-2">
@@ -237,7 +237,7 @@ export const ItemEditor = memo(function ItemEditor({
       {/* ── Background & Color — headers/placeholders never render on screen,
           and a live call has no background to pick: the video IS the screen. ── */}
       {!NON_LIVE_TYPES.includes(item.type) && item.type !== 'livecall' && (
-        <div className="border-t border-slate-200 pt-3">
+        <div className="border-t border-border pt-3">
           <ItemBackgroundPanel
             item={item}
             songFull={songFull}
