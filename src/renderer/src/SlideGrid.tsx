@@ -99,7 +99,7 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
                     onClick={handleClick}
                     aria-label={`Play slide ${idx + 1} of ${its.length}`}
                     className={`overflow-hidden rounded-md transition-shadow min-h-10 cursor-pointer group relative ${
-                      isLiveSlide ? 'ring-2 ring-blue-500' : isPending ? 'ring-2 ring-amber-500/70' : 'ring-1 ring-border hover:ring-blue-400/50'
+                      isLiveSlide ? 'ring-2 ring-blue-500' : isPending ? 'ring-2 ring-amber-500/70' : 'ring-1 ring-white/10 hover:ring-blue-400/50'
                     }`}
                     title={isPending ? 'Tap again to confirm' : `Click to play slide ${idx + 1}`}
                   >
