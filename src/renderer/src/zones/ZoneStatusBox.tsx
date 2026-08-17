@@ -22,12 +22,21 @@ function ZoneStatusBox({ zoneId, zoneState, connected = true }: ZoneStatusBoxPro
   return (
     <>
       <div className="mb-1.5 flex items-center justify-between gap-1">
-        <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500">{ZONE_NAMES[zoneId]}</span>
+        {/* min-w-0 is required for truncate to work inside a flex row — without
+            it the flex item won't shrink below its content's intrinsic width,
+            so a wide sibling (the "Offline" badge) pushes this to 0 instead of
+            the name itself giving way and eliding with an ellipsis. */}
+        <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500" title={ZONE_NAMES[zoneId]}>
+          {ZONE_NAMES[zoneId]}
+        </span>
         {connected ? (
           <span className="shrink-0 text-[10px] font-semibold text-slate-400">{MODE_LABELS[zoneState?.mode ?? 'off']}</span>
         ) : (
-          <span className="flex shrink-0 items-center gap-1 rounded bg-red-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Not connected
+          <span
+            className="flex shrink-0 items-center gap-1 rounded bg-red-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-700"
+            title="Not connected"
+          >
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" /> Offline
           </span>
         )}
       </div>
