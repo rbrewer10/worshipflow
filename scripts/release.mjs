@@ -20,21 +20,22 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const [, , versionArg, ...rest] = process.argv
 const dryRun = rest.includes('--dry-run')
 
-// On Windows, npm (and any other npm-shimmed command) is a .cmd wrapper
-// batch file, not a directly executable binary — execFileSync can't spawn it
-// without going through a shell. git/gh ship as real .exe files and don't
-// need this.
-function resolveCmd(cmd) {
-  return process.platform === 'win32' && cmd === 'npm' ? 'npm.cmd' : cmd
+// On Windows, npm is a .cmd batch wrapper, not a directly executable binary —
+// execFileSync can't spawn a .cmd file at all without shell:true (git/gh ship
+// as real .exe files and don't need this). With shell:true, Node handles
+// argument escaping for the array form itself, so this is still safe against
+// spaces/quotes in args (e.g. a version string) without manual quoting here.
+function needsShell(cmd) {
+  return process.platform === 'win32' && cmd === 'npm'
 }
 
 function run(cmd, args, opts = {}) {
   console.log(`$ ${cmd} ${args.join(' ')}`)
-  return execFileSync(resolveCmd(cmd), args, { cwd: root, stdio: 'inherit', ...opts })
+  return execFileSync(cmd, args, { cwd: root, stdio: 'inherit', shell: needsShell(cmd), ...opts })
 }
 
 function runCapture(cmd, args) {
-  return execFileSync(resolveCmd(cmd), args, { cwd: root, encoding: 'utf8' }).trim()
+  return execFileSync(cmd, args, { cwd: root, encoding: 'utf8', shell: needsShell(cmd) }).trim()
 }
 
 function fail(msg) {
