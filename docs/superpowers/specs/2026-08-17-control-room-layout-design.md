@@ -70,7 +70,7 @@ Volunteer mode's launch button is unchanged. `AppShell.tsx`'s view-switching log
 
 **Bottom — Outputs strip + Scene Selector** — 4 tiles, one per physical zone, using their real existing names (Back Left, Back Right, Lyrics TVs, Stage Monitors — no relabeling, confirmed with Ryan). Each tile reuses `ZoneStatusBox` (already built with a `connected` prop from the Setup-stage work) laid out horizontally instead of the vertical stack it's used in today. Below the outputs, the same Scene Selector bar as Build Service (§2) — here it overrides the *live* item's routing rather than the item being edited, same underlying mechanism.
 
-**Safety Reset** — the existing "clear everything" emergency control (already present somewhere in `LiveTools`/`StageRehearsalTools` per the codebase's prior safety work) relocates into this right-hand panel as the one deliberately loud, red, always-visible control — not buried in a menu.
+**Safety Reset** — the existing "clear everything" emergency control (`safetyReset()`, currently rendered inside `LooksPanel.tsx`) relocates into this right-hand panel as the one deliberately loud, red, always-visible control — not buried inside the Looks panel.
 
 ### Service Control mode mapping (the one new, small data-model piece)
 
