@@ -86,7 +86,7 @@ function NavMenu<T extends string>({ label, items, activeId, onSelect }: {
         className={`flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
           containsActive
             ? 'bg-blue-600 font-medium text-white'
-            : 'font-normal text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
+            : 'font-normal text-content-secondary hover:bg-panel-raised hover:text-content-primary'
         }`}
       >
         {label}
@@ -99,7 +99,7 @@ function NavMenu<T extends string>({ label, items, activeId, onSelect }: {
           aria-label={label}
           tabIndex={-1}
           onKeyDown={onMenuKeyDown}
-          className="absolute left-0 top-full z-50 mt-1 min-w-[13rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute left-0 top-full z-50 mt-1 min-w-[13rem] rounded-lg border border-border bg-panel-raised py-1 shadow-lg"
         >
           {items.map((item, i) => (
             <button
@@ -109,10 +109,10 @@ function NavMenu<T extends string>({ label, items, activeId, onSelect }: {
               onClick={() => choose(item.id)}
               onMouseEnter={() => dispatch({ type: 'highlight', index: i })}
               className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
-                item.id === activeId ? 'font-medium text-blue-700' : 'text-slate-700'
-              } ${state.highlighted === i ? 'bg-slate-100' : 'hover:bg-slate-100'}`}
+                item.id === activeId ? 'font-medium text-blue-400' : 'text-content-primary'
+              } ${state.highlighted === i ? 'bg-panel' : 'hover:bg-panel'}`}
             >
-              <item.Icon size={15} className="flex-shrink-0 text-slate-500" />
+              <item.Icon size={15} className="flex-shrink-0 text-content-secondary" />
               {item.label}
             </button>
           ))}
