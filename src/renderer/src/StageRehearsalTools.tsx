@@ -70,15 +70,15 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
 
   if (!state.active) {
     return (
-      <aside className="flex w-96 shrink-0 flex-col gap-3 overflow-auto border-l border-slate-200 bg-[#f4f6f9] p-4">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+      <aside className="flex w-96 shrink-0 flex-col gap-3 overflow-auto border-l border-border bg-panel p-4">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-content-secondary">
           <Mic2 size={14} /> Stage Rehearsal
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-content-secondary">
           Steps through this service's songs, in order, on the Stage Monitor only — Zones 1-3 automatically loop
           through the service's announcements the whole time.
         </p>
-        {startError && <p className="text-xs font-medium text-red-600">{startError}</p>}
+        {startError && <p className="text-xs font-medium text-red-400">{startError}</p>}
         <button
           onClick={start}
           disabled={starting}
@@ -94,9 +94,9 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
   const atEnd = state.songIndex >= state.songQueue.length - 1
 
   return (
-    <aside className="flex w-96 shrink-0 flex-col gap-3 overflow-auto border-l border-slate-200 bg-[#f4f6f9] p-4">
+    <aside className="flex w-96 shrink-0 flex-col gap-3 overflow-auto border-l border-border bg-panel p-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-violet-700">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-violet-400">
           <Mic2 size={14} /> Rehearsing
         </div>
         <button onClick={stop} className="btn bg-slate-800 text-white">
@@ -104,14 +104,14 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
         </button>
       </div>
 
-      <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-800">
+      <div className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-400">
         Stage Monitor shows the song below. Zones 1-3 are looping the service's announcements.
       </div>
 
       {live?.songTitle && (
-        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-          <p className="text-sm font-semibold text-slate-900">{live.songTitle}</p>
-          <p className="text-[11px] text-slate-500">
+        <div className="rounded-lg border border-border bg-panel px-3 py-2">
+          <p className="text-sm font-semibold text-content-primary">{live.songTitle}</p>
+          <p className="text-[11px] text-content-secondary">
             Song {state.songIndex + 1} of {state.songQueue.length}
             {live.total > 0 && ` · Slide ${live.index + 1} of ${live.total}`}
           </p>
@@ -152,9 +152,9 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
         </button>
       </div>
 
-      <div className="border-t border-slate-200" />
+      <div className="border-t border-border" />
 
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Service order</p>
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-content-secondary">Service order</p>
       <div className="flex flex-col gap-1">
         {state.songQueue.map((id, i) => (
           <button
@@ -162,7 +162,7 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
             onClick={() => void goToSong(i)}
             className={[
               'rounded-lg px-3 py-2 text-left text-sm',
-              i === state.songIndex ? 'bg-violet-600 text-white' : 'text-slate-700 hover:bg-slate-200',
+              i === state.songIndex ? 'bg-violet-600 text-white' : 'text-content-primary hover:bg-panel-raised',
             ].join(' ')}
           >
             {i + 1}. {titleFor(id)}
@@ -170,18 +170,18 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
         ))}
       </div>
 
-      <div className="border-t border-slate-200" />
+      <div className="border-t border-border" />
 
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-content-secondary">
         Warm up on something else
       </p>
       <div className="relative">
-        <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-content-tertiary" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search any song…"
-          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-blue-500"
+          className="w-full rounded-lg border border-border bg-panel py-2 pl-8 pr-3 text-sm outline-none focus:border-blue-500"
         />
       </div>
       {search.trim() && (
@@ -190,12 +190,12 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
             <button
               key={s.id}
               onClick={() => pickSong(s.id)}
-              className="rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-200"
+              className="rounded-lg px-3 py-2 text-left text-sm text-content-primary hover:bg-panel-raised"
             >
               {s.title}
             </button>
           ))}
-          {searchResults.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">No songs match.</p>}
+          {searchResults.length === 0 && <p className="px-3 py-2 text-xs text-content-secondary">No songs match.</p>}
         </div>
       )}
     </aside>
