@@ -1023,7 +1023,7 @@ function Row({ checked, label, muted, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-panel-raised ${
+      className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-panel ${
         muted ? 'text-[11px] text-content-secondary' : 'text-xs text-content-primary'
       }`}
     >
@@ -1100,7 +1100,7 @@ export default function ZonePinPicker({
           <>
             <button
               onClick={() => setShowOthers((v) => !v)}
-              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-content-primary hover:bg-panel-raised"
+              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-content-primary hover:bg-panel"
             >
               <span className="w-3 shrink-0">{heldId != null && heldId !== liveHoldable?.id && <Check size={12} className="text-blue-400" />}</span>
               <span className="flex-1 truncate">Hold another item…</span>
@@ -1134,7 +1134,7 @@ export default function ZonePinPicker({
             <div className="my-1 border-t border-border" />
             <button
               onClick={() => setShowAdvanced((v) => !v)}
-              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] text-content-secondary hover:bg-panel-raised"
+              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] text-content-secondary hover:bg-panel"
             >
               <span className="flex-1">Advanced</span>
               {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -1191,7 +1191,7 @@ function ZoneTrackToggle({ serviceId, zoneId, assignment, onChanged, onPersisted
           key={tb}
           onClick={() => setZoneTrack(tb)}
           className={`rounded px-2 py-0.5 text-[10px] font-semibold ring-1 ring-border transition-colors ${
-            assignment[zoneId] === tb ? 'bg-blue-600 text-white' : 'text-content-secondary hover:bg-panel-raised'
+            assignment[zoneId] === tb ? 'bg-blue-600 text-white' : 'text-content-secondary hover:bg-panel'
           }`}
         >
           {tb === 'main' ? 'Main' : 'Second'}
