@@ -58,6 +58,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
   const [now, setNow] = useState(() => Date.now())
   const [rehearsal, setRehearsal] = useState(false)
   const [updateReady, setUpdateReady] = useState(false)
+  const [stageRehearsalActive, setStageRehearsalActive] = useState(false)
   useEffect(() => {
     const load = (): void => {
       window.wf.getInfo().then((i: AppInfo) => {
@@ -72,7 +73,9 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
     const off = window.wf.obsOnStatus(setObs)
     window.wf.getRehearsalMode().then(setRehearsal)
     const offUpdate = window.wf.onUpdateReady(() => setUpdateReady(true))
-    return () => { clearInterval(t); off(); offUpdate() }
+    window.wf.getStageRehearsal().then((s) => setStageRehearsalActive(s.active))
+    const offStageRehearsal = window.wf.onState((s) => setStageRehearsalActive(s.stageRehearsal.active))
+    return () => { clearInterval(t); off(); offUpdate(); offStageRehearsal() }
   }, [])
 
   const toggleRehearsal = (): void => {
@@ -149,6 +152,19 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
         >
           {rehearsal ? 'Rehearsing' : 'Rehearsal'}
         </button>
+
+        {stageRehearsalActive && (
+          <button
+            onClick={() => setView('live')}
+            title="Stage Rehearsal is armed — Zone 4 is looping the rehearsal song, Zones 1-3 are looping announcements. Click to go manage it."
+            className="flex items-center gap-1.5 rounded-lg bg-violet-500/10 px-3 py-1.5 ring-1 ring-violet-500/30 hover:bg-violet-500/20"
+          >
+            <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-violet-500" />
+            <span className="text-xs font-bold uppercase tracking-wide text-violet-700">
+              Stage Rehearsal active
+            </span>
+          </button>
+        )}
 
         {rehearsal ? (
           <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 ring-1 ring-amber-500/30" title="Rehearsal mode is armed — real outputs are showing nothing, regardless of what's happening here">
