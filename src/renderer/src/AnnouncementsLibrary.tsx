@@ -72,20 +72,20 @@ function AnnouncementsLibrary(): JSX.Element {
   return (
     <>
       {confirmDelete && (
-        <Modal onClose={() => setConfirmDelete(null)} labelledBy="delete-announcement-title" className="max-w-sm rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg">
-            <h3 id="delete-announcement-title" className="mb-2 text-lg font-semibold text-slate-900">Delete announcement?</h3>
-            <p className="mb-4 text-sm text-slate-600">
-              Delete <span className="font-semibold text-slate-900">{confirmDelete.title}</span>? This cannot be undone.
+        <Modal onClose={() => setConfirmDelete(null)} labelledBy="delete-announcement-title" className="max-w-sm rounded-xl border border-border bg-panel p-5 shadow-lg">
+            <h3 id="delete-announcement-title" className="mb-2 text-lg font-semibold text-content-primary">Delete announcement?</h3>
+            <p className="mb-4 text-sm text-content-secondary">
+              Delete <span className="font-semibold text-content-primary">{confirmDelete.title}</span>? This cannot be undone.
             </p>
             <div className="flex gap-2">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold hover:bg-slate-200">Cancel</button>
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-lg border border-border bg-panel-raised px-4 py-2 text-sm font-semibold hover:bg-border-strong">Cancel</button>
               <button onClick={confirmRemove} className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500">Delete</button>
             </div>
         </Modal>
       )}
-      <div className="flex h-full min-h-0 gap-4 p-4 text-slate-900">
+      <div className="flex h-full min-h-0 gap-4 p-4 text-content-primary">
         <h1 className="sr-only">Announcements</h1>
-        <div className="flex w-96 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
+        <div className="flex w-96 flex-col rounded-xl border border-border bg-panel p-3">
           {namingNew ? (
             <form
               onSubmit={(e) => { e.preventDefault(); void createAnnouncement() }}
@@ -102,10 +102,10 @@ function AnnouncementsLibrary(): JSX.Element {
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Escape') { setNamingNew(false); setNewTitle('') } }}
                 placeholder="Announcement title…"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-lg border border-border bg-panel px-3 py-2 text-sm outline-none focus:border-blue-500"
               />
               {duplicateTitle && (
-                <p className="text-[11px] text-amber-700">
+                <p className="text-[11px] text-amber-400">
                   “{duplicateTitle}” is already in your library — this will create a separate copy.
                 </p>
               )}
@@ -113,7 +113,7 @@ function AnnouncementsLibrary(): JSX.Element {
                 <button
                   type="button"
                   onClick={() => { setNamingNew(false); setNewTitle('') }}
-                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  className="flex-1 rounded-lg border border-border bg-panel px-3 py-1.5 text-xs font-semibold text-content-secondary hover:bg-panel-raised"
                 >
                   Cancel
                 </button>
@@ -138,40 +138,40 @@ function AnnouncementsLibrary(): JSX.Element {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search announcements…"
-            className="mb-3 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none focus:border-blue-500"
+            className="mb-3 w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm outline-none focus:border-blue-500"
           />
           <div className="min-h-0 flex-1 space-y-1 overflow-auto">
             {items.length === 0 && (
-              <p className="px-1 py-6 text-center text-sm text-slate-500">{search ? 'No matches.' : 'No announcements yet — add your first one'}</p>
+              <p className="px-1 py-6 text-center text-sm text-content-secondary">{search ? 'No matches.' : 'No announcements yet — add your first one'}</p>
             )}
             {items.map((it) => (
               <div
                 key={it.id}
-                className={`group flex items-center gap-2 rounded-lg px-3 py-2 ${editorId === it.id ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'hover:bg-slate-100'} ${it.expired ? 'opacity-50' : ''}`}
+                className={`group flex items-center gap-2 rounded-lg px-3 py-2 ${editorId === it.id ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'hover:bg-panel-raised'} ${it.expired ? 'opacity-50' : ''}`}
               >
-                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-panel-raised text-content-secondary">
                   {it.display === 'ticker' ? <ScrollText size={14} /> : <Type size={14} />}
                 </div>
                 <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditorId(it.id)}>
                   <div className="truncate text-sm font-medium">{it.title}</div>
-                  <div className="truncate text-xs text-slate-500">
+                  <div className="truncate text-xs text-content-secondary">
                     {it.frequency === 'once' ? 'One time' : 'Recurring'}{it.expired ? ' · expired' : it.active ? '' : ' · paused'}
                   </div>
                 </button>
-                <button onClick={() => setConfirmDelete({ id: it.id, title: it.title })} className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-red-500/20 hover:text-red-600 group-hover:opacity-100">Del</button>
+                <button onClick={() => setConfirmDelete({ id: it.id, title: it.title })} className="shrink-0 rounded px-2 py-1 text-xs text-content-secondary opacity-0 hover:bg-red-500/20 hover:text-red-400 group-hover:opacity-100">Del</button>
               </div>
             ))}
           </div>
-          <div className="mt-2 border-t border-slate-200 pt-2 text-xs text-slate-500">{items.length} announcement{items.length === 1 ? '' : 's'}</div>
+          <div className="mt-2 border-t border-border pt-2 text-xs text-content-secondary">{items.length} announcement{items.length === 1 ? '' : 's'}</div>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-4">
+        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-border bg-panel p-4">
           {editorId != null ? (
             <AnnouncementEditor key={editorId} id={editorId} onSaved={() => refresh()} />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
               <Megaphone size={40} className="opacity-20" />
-              <p className="text-sm text-slate-500">Select an announcement to edit, or add a new one</p>
+              <p className="text-sm text-content-secondary">Select an announcement to edit, or add a new one</p>
             </div>
           )}
         </div>
