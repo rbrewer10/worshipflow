@@ -236,30 +236,36 @@ button:disabled {
 @layer components {
   input, textarea, select {
     @apply rounded-lg border px-3 py-2 text-sm font-medium transition-all;
-    background-color: #ffffff;
-    border-color: #cdd5df;
-    color: #16202e;
+    background-color: #131a29;
+    border-color: #2f3b52;
+    color: #efe7d8;
   }
 
   input::placeholder, textarea::placeholder {
-    color: #94a3b8;
+    color: #6f6858;
   }
 
+  /* Focus ring: Snow Hill blue — the spec explicitly names focus rings as
+     blue's role, not emerald's */
   input:focus, textarea:focus, select:focus {
     outline: none;
-    background-color: #ffffff;
-    border-color: #10b981;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    background-color: #131a29;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
   }
 
   option {
-    background-color: #ffffff;
-    color: #16202e;
+    background-color: #131a29;
+    color: #efe7d8;
   }
 
-  /* Input with validation */
+  /* Input with validation — .valid stays blue (matches the focus-ring
+     treatment rather than mixing in the now live-only emerald); .error
+     stays red, unchanged. Neither class is applied anywhere in the app
+     today (confirmed via grep) — this is infrastructure for whenever a
+     later stage adds real field-level validation UI. */
   input.valid {
-    border-color: #10b981;
+    border-color: #3b82f6;
   }
 
   input.error {
