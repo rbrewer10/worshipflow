@@ -133,7 +133,7 @@ function ObsPanel(): JSX.Element {
   const statusPill = status.connected
     ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-blue-400"><span className="h-2 w-2 rounded-full bg-blue-500" /> Connected</span>
     : status.reconnecting
-    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-amber-700"><RefreshCw size={10} className="animate-spin" /> Reconnecting…</span>
+    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-amber-400"><RefreshCw size={10} className="animate-spin" /> Reconnecting…</span>
     : <span className="inline-flex items-center gap-1 text-[10px] font-semibold normal-case text-content-secondary"><span className="h-2 w-2 rounded-full bg-slate-400" /> Not connected</span>
 
   return (
@@ -146,7 +146,7 @@ function ObsPanel(): JSX.Element {
       <div className="space-y-3">
         {/* Connection — compact once connected, full form otherwise */}
         {status.connected && !editingConn ? (
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-panel px-3 py-2">
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-panel-raised px-3 py-2">
             <div className="min-w-0">
               <div className="text-xs font-semibold text-content-primary">OBS connected</div>
               <div className="truncate font-mono text-[11px] text-content-secondary">{host || 'localhost'}:{port || '4455'}</div>
@@ -169,30 +169,30 @@ function ObsPanel(): JSX.Element {
                 value={host}
                 onChange={(e) => setHost(e.target.value)}
                 placeholder="localhost"
-                className="w-28 rounded border border-border bg-panel-raised px-2 py-1 text-xs text-content-primary"
+                className="w-28 rounded border border-border px-2 py-1 text-xs text-content-primary"
               />
               <input
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
                 placeholder="4455"
-                className="w-16 rounded border border-border bg-panel-raised px-2 py-1 text-xs text-content-primary"
+                className="w-16 rounded border border-border px-2 py-1 text-xs text-content-primary"
               />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="password"
-                className="min-w-0 flex-1 rounded border border-border bg-panel-raised px-2 py-1 text-xs text-content-primary"
+                className="min-w-0 flex-1 rounded border border-border px-2 py-1 text-xs text-content-primary"
               />
               <button onClick={connect} disabled={connecting} className="rounded bg-blue-600/80 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
                 {connecting ? 'Connecting…' : status.connected ? 'Reconnect' : 'Connect'}
               </button>
             </div>
             {status.error && !status.connected && !status.reconnecting && (
-              <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-red-600"><TriangleAlert size={11} /> {status.error}</div>
+              <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-red-400"><TriangleAlert size={11} /> {status.error}</div>
             )}
             {status.reconnecting && !status.connected && (
-              <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-amber-700"><RefreshCw size={11} className="animate-spin" /> Trying to reach OBS… it will connect automatically once OBS is running.</div>
+              <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-amber-400"><RefreshCw size={11} className="animate-spin" /> Trying to reach OBS… it will connect automatically once OBS is running.</div>
             )}
             <div className="mt-1.5 text-[10px] text-content-secondary">
               Enable in OBS: Tools → WebSocket Server Settings (OBS 28+). WorshipFlow reconnects automatically next time.
@@ -239,7 +239,7 @@ function ObsPanel(): JSX.Element {
         )}
 
         {/* Auto-record + recordings history */}
-        <div className="rounded-lg border border-border bg-panel p-2">
+        <div className="rounded-lg border border-border bg-panel-raised p-2">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={autoRecord} onChange={toggleAutoRecord} className="h-4 w-4" />
             <span className="text-xs font-semibold text-content-primary">Auto-record services</span>
@@ -277,7 +277,7 @@ function ObsPanel(): JSX.Element {
 
         {/* Scenes */}
         {status.connected && (
-          <div className="rounded-lg border border-border bg-panel p-2">
+          <div className="rounded-lg border border-border bg-panel-raised p-2">
             <div className="mb-1.5 text-xs font-semibold text-content-primary">Scenes</div>
             <div className="flex flex-wrap gap-1.5">
               {status.scenes.length === 0 && <span className="text-xs text-content-tertiary">No scenes found.</span>}
@@ -299,7 +299,7 @@ function ObsPanel(): JSX.Element {
         )}
 
         {/* Auto-switch */}
-        <div className="rounded-lg border border-border bg-panel p-2">
+        <div className="rounded-lg border border-border bg-panel-raised p-2">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={autoSwitch} onChange={(e) => setAutoSwitch(e.target.checked)} className="h-4 w-4" />
             <span className="text-xs font-semibold text-content-primary">Auto-switch scenes with the service</span>

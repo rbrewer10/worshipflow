@@ -34,7 +34,7 @@ function TabletRemoteTab(): JSX.Element {
 
           <div className="mb-1 mt-4 text-xs font-semibold uppercase tracking-wide text-content-secondary">Unlock PIN</div>
           <div className="flex items-center gap-3">
-            <span className="rounded-lg bg-panel-raised ring-1 ring-border-strong px-3 py-1.5 font-mono text-lg tracking-[0.3em] text-[#d9bd85]">
+            <span className="rounded-lg bg-panel-raised ring-1 ring-border-strong px-3 py-1.5 font-mono text-lg tracking-[0.3em] text-gold-light">
               {tabletPin || '······'}
             </span>
             <button onClick={regenerate} className="btn text-xs">New PIN</button>
