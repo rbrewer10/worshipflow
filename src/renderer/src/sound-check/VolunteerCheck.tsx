@@ -76,7 +76,7 @@ function SetupRow({
   children: React.ReactNode
 }): JSX.Element {
   const badge: Record<RowState, string> = {
-    done: 'border border-green-500/40 bg-green-500/15 text-green-700',
+    done: 'border border-green-500/40 bg-green-500/15 text-green-400',
     cur: 'bg-blue-600 text-white',
     todo: 'border border-border bg-panel-raised text-content-secondary'
   }
@@ -244,14 +244,14 @@ function SetupView({
             />
           ))}
         </div>
-        {classifyError && <p className="mt-2 text-[12.5px] text-red-600">{classifyError}</p>}
+        {classifyError && <p className="mt-2 text-[12.5px] text-red-400">{classifyError}</p>}
       </SetupRow>
       <SetupRow state={recorded ? 'done' : 'todo'} n={3} title="Record a reference mix">
         <p className="m-0 text-[13.5px] leading-normal text-content-secondary">
           When the band sounds great, press record and let it listen for a few minutes. That becomes the
           &ldquo;this is how our room should sound&rdquo; yardstick.
         </p>
-        <p className="mt-2 inline-flex items-center gap-2 text-[12.5px] font-semibold text-amber-700">
+        <p className="mt-2 inline-flex items-center gap-2 text-[12.5px] font-semibold text-amber-400">
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] uppercase tracking-wide">
             Coming soon
           </span>
@@ -262,18 +262,18 @@ function SetupView({
           disabled
           title="Reference-mix capture isn't available yet"
           onClick={handleRecordReference}
-          className="mt-3 inline-flex items-center gap-2.5 rounded-xl border border-blue-500 bg-blue-500/10 px-5 py-3 text-[14.5px] font-bold text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-3 inline-flex items-center gap-2.5 rounded-xl border border-blue-500 bg-blue-500/10 px-5 py-3 text-[14.5px] font-bold text-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span className="h-[11px] w-[11px] rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,.5)]" />
           {recording ? 'Recording reference mix…' : recorded ? 'Recorded — record again' : 'Record Reference Mix'}
         </button>
         {recorded && !recording && (
-          <p className="mt-2 text-[12.5px] text-green-700">
+          <p className="mt-2 text-[12.5px] text-green-400">
             Reference mix saved ({recorded.durationSeconds}s). Live audio capture isn&rsquo;t wired up yet, so this
             was built from an empty buffer for now — the flow is real, the audio feed is coming in a later task.
           </p>
         )}
-        {recordError && <p className="mt-2 text-[12.5px] text-red-600">{recordError}</p>}
+        {recordError && <p className="mt-2 text-[12.5px] text-red-400">{recordError}</p>}
       </SetupRow>
       <SetupRow state="todo" n={4} title="Choose what happens automatically">
         <p className="m-0 text-[13.5px] leading-normal text-content-secondary">
