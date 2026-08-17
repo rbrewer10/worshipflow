@@ -30,7 +30,7 @@ function DuplicateSongsPanel({ onEdit, onDelete }: { onEdit: (id: number) => voi
     <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06]">
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-amber-800"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-amber-400"
       >
         <AlertTriangle size={13} className="shrink-0" />
         <span className="flex-1">{groups.length} duplicate title{groups.length === 1 ? '' : 's'} in your library ({total} songs)</span>
@@ -42,9 +42,9 @@ function DuplicateSongsPanel({ onEdit, onDelete }: { onEdit: (id: number) => voi
             <div key={g.normalizedTitle}>
               {g.songs.map((s) => (
                 <div key={s.id} className="flex items-center justify-between gap-2 py-0.5 text-xs">
-                  <span className="min-w-0 flex-1 truncate text-slate-700">{s.title}</span>
-                  <button onClick={() => onEdit(s.id)} className="shrink-0 text-slate-500 hover:text-slate-900">Edit</button>
-                  <button onClick={() => onDelete(s.id)} className="shrink-0 text-red-600 hover:text-red-700">Delete</button>
+                  <span className="min-w-0 flex-1 truncate text-content-secondary">{s.title}</span>
+                  <button onClick={() => onEdit(s.id)} className="shrink-0 text-content-secondary hover:text-content-primary">Edit</button>
+                  <button onClick={() => onDelete(s.id)} className="shrink-0 text-red-400 hover:text-red-300">Delete</button>
                 </div>
               ))}
             </div>
@@ -158,15 +158,15 @@ function SongLibrary(): JSX.Element {
     <>
       {/* Confirmation Dialog */}
       {confirmDelete && (
-        <Modal onClose={() => setConfirmDelete(null)} labelledBy="delete-song-title" className="rounded-xl border border-slate-200 bg-[#f4f6f9] p-5 shadow-lg max-w-sm">
-            <h3 id="delete-song-title" className="mb-2 text-lg font-semibold text-slate-900">Delete Song?</h3>
-            <p className="mb-4 text-sm text-slate-600">
-              Are you sure you want to delete <span className="font-semibold text-slate-900">{confirmDelete.title}</span>? This cannot be undone.
+        <Modal onClose={() => setConfirmDelete(null)} labelledBy="delete-song-title" className="rounded-xl border border-border bg-panel p-5 shadow-lg max-w-sm">
+            <h3 id="delete-song-title" className="mb-2 text-lg font-semibold text-content-primary">Delete Song?</h3>
+            <p className="mb-4 text-sm text-content-secondary">
+              Are you sure you want to delete <span className="font-semibold text-content-primary">{confirmDelete.title}</span>? This cannot be undone.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold hover:bg-slate-200"
+                className="flex-1 rounded-lg border border-border bg-panel-raised px-4 py-2 text-sm font-semibold hover:bg-border-strong"
               >
                 Cancel
               </button>
@@ -179,10 +179,10 @@ function SongLibrary(): JSX.Element {
             </div>
         </Modal>
       )}
-      <div className="flex h-full min-h-0 gap-4 p-4 text-slate-900">
+      <div className="flex h-full min-h-0 gap-4 p-4 text-content-primary">
       <h1 className="sr-only">Song Library</h1>
       {/* Library list */}
-      <div className="flex w-96 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
+      <div className="flex w-96 flex-col rounded-xl border border-border bg-panel p-3">
         <CcliPanel />
         <DuplicateSongsPanel onEdit={setEditorId} onDelete={remove} />
         <PptxImport onImported={() => refresh()} />
@@ -195,7 +195,7 @@ function SongLibrary(): JSX.Element {
                   'In the Snow Hill Church app: Planning → "Sync songs from WorshipFlow" → choose this file.'
               )
           }}
-          className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-panel px-3 py-2 text-sm font-semibold text-content-secondary hover:bg-panel-raised"
           title="Export your song titles as a file to load into the church planning app"
         >
           <FileDown size={15} /> Export song list (for church app)
@@ -215,10 +215,10 @@ function SongLibrary(): JSX.Element {
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Escape') { setNamingNew(false); setNewTitle('') } }}
               placeholder="Song title…"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-border bg-panel px-3 py-2 text-sm outline-none focus:border-blue-500"
             />
             {duplicateTitle && (
-              <p className="text-[11px] text-amber-700">
+              <p className="text-[11px] text-amber-400">
                 “{duplicateTitle}” is already in your library — this will create a separate copy.
               </p>
             )}
@@ -226,7 +226,7 @@ function SongLibrary(): JSX.Element {
               <button
                 type="button"
                 onClick={() => { setNamingNew(false); setNewTitle('') }}
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                className="flex-1 rounded-lg border border-border bg-panel px-3 py-1.5 text-xs font-semibold text-content-secondary hover:bg-panel-raised"
               >
                 Cancel
               </button>
@@ -251,11 +251,11 @@ function SongLibrary(): JSX.Element {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search songs by title, author, or lyrics…"
-          className="mb-3 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none focus:border-blue-500"
+          className="mb-3 w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm outline-none focus:border-blue-500"
         />
         <div className="min-h-0 flex-1 space-y-1 overflow-auto">
           {songs.length === 0 && (
-            <p className="px-1 py-6 text-center text-sm text-slate-500">
+            <p className="px-1 py-6 text-center text-sm text-content-secondary">
               {search ? 'No matches.' : 'No songs yet — add your first one'}
             </p>
           )}
@@ -263,18 +263,18 @@ function SongLibrary(): JSX.Element {
             <div
               key={s.id}
               className={`group flex items-center gap-2 rounded-lg px-3 py-2 ${
-                editorId === s.id ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'hover:bg-slate-100'
+                editorId === s.id ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'hover:bg-panel-raised'
               }`}
             >
               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditorId(s.id)}>
                 <div className="text-sm font-medium">{s.title}</div>
-                {s.author && <div className="text-xs text-slate-600">{s.author}</div>}
+                {s.author && <div className="text-xs text-content-secondary">{s.author}</div>}
               </button>
               {s.background ? (
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => pickBg(s.id)}
-                    className="inline-flex max-w-[80px] items-center justify-center gap-1.5 truncate rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                    className="inline-flex max-w-[80px] items-center justify-center gap-1.5 truncate rounded-md bg-panel-raised px-2 py-0.5 text-xs font-medium text-content-secondary hover:bg-border-strong"
                     title={s.background}
                   >
                     {/\.(mp4|webm|mov|m4v)$/i.test(s.background) ? <Film size={13} /> : <ImageIcon size={13} />}
@@ -282,7 +282,7 @@ function SongLibrary(): JSX.Element {
                   </button>
                   <button
                     onClick={() => clearBg(s.id)}
-                    className="inline-flex items-center justify-center rounded px-1 text-slate-500 hover:text-red-600"
+                    className="inline-flex items-center justify-center rounded px-1 text-content-secondary hover:text-red-400"
                     title="Remove background"
                   >
                     <X size={13} />
@@ -291,7 +291,7 @@ function SongLibrary(): JSX.Element {
               ) : (
                 <button
                   onClick={() => pickBg(s.id)}
-                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-700"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-dashed border-border px-2 py-0.5 text-xs text-content-secondary hover:border-border-strong hover:text-content-primary"
                   title="Add background video or image"
                 >
                   <Plus size={13} /> bg
@@ -299,26 +299,26 @@ function SongLibrary(): JSX.Element {
               )}
               <button
                 onClick={() => setEditorId(s.id)}
-                className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-slate-200 hover:text-slate-900 group-hover:opacity-100"
+                className="shrink-0 rounded px-2 py-1 text-xs text-content-secondary opacity-0 hover:bg-panel-raised hover:text-content-primary group-hover:opacity-100"
               >
                 Edit
               </button>
               <button
                 onClick={() => remove(s.id)}
-                className="shrink-0 rounded px-2 py-1 text-xs text-slate-500 opacity-0 hover:bg-red-500/20 hover:text-red-600 group-hover:opacity-100"
+                className="shrink-0 rounded px-2 py-1 text-xs text-content-secondary opacity-0 hover:bg-red-500/20 hover:text-red-400 group-hover:opacity-100"
               >
                 Del
               </button>
             </div>
           ))}
         </div>
-        <div className="mt-2 border-t border-slate-200 pt-2 text-xs text-slate-500">
+        <div className="mt-2 border-t border-border pt-2 text-xs text-content-secondary">
           {songs.length} song{songs.length === 1 ? '' : 's'} in library
         </div>
       </div>
 
       {/* WYSIWYG editor or welcome state */}
-      <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-4">
+      <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-border bg-panel p-4">
         {editorId != null ? (
           <SongEditor
             key={editorId}
@@ -328,7 +328,7 @@ function SongLibrary(): JSX.Element {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <Music size={40} className="opacity-20" />
-            <p className="text-sm text-slate-500">Select a song from the list to open the slide editor</p>
+            <p className="text-sm text-content-secondary">Select a song from the list to open the slide editor</p>
           </div>
         )}
       </div>
