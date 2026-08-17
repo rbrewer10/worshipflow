@@ -278,52 +278,54 @@ button:disabled {
    ════════════════════════════════════════════════════════════════════════════════ */
 
 @layer components {
-  /* Section header: small, caps, emerald accent */
+  /* Section header: small, caps, neutral by default */
   .section-header {
     @apply text-xs font-semibold uppercase tracking-widest mb-2;
-    color: #64748b;
+    color: #a89e8c;
     letter-spacing: 0.1em;
   }
 
+  /* Active/selected section header — Snow Hill blue (selection state) */
   .section-header.active {
-    color: #047857;
+    color: #60a5fa;
   }
 
   /* Title: large, prominent */
   .section-title {
     @apply text-lg font-bold mb-2;
-    color: #16202e;
+    color: #efe7d8;
   }
 
   /* Subtitle: secondary text */
   .section-subtitle {
     @apply text-sm font-medium;
-    color: #64748b;
+    color: #a89e8c;
   }
 
-  /* Badge: small status indicator */
+  /* Badge: small status indicator — emerald reads as "good/ready", the
+     same family as the live-state color, not a generic UI accent */
   .badge {
     @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
     background-color: rgba(16, 185, 129, 0.15);
-    color: #047857;
+    color: #34d399;
   }
 
   .badge-success {
     @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
     background-color: rgba(16, 185, 129, 0.15);
-    color: #047857;
+    color: #34d399;
   }
 
   .badge-warning {
     @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
     background-color: rgba(245, 158, 11, 0.18);
-    color: #b45309;
+    color: #fbbf24;
   }
 
   .badge-danger {
     @apply inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold;
     background-color: rgba(239, 68, 68, 0.15);
-    color: #b91c1c;
+    color: #f87171;
   }
 }
 
@@ -467,14 +469,14 @@ button:disabled {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--wf-bg-secondary);
+  background: var(--wf-bg-panel);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--wf-primary);
+  background: var(--wf-border-strong);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--wf-secondary);
+  background: var(--wf-primary);
 }
