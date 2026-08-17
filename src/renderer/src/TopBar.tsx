@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User, Monitor, Palette, Tablet, Stethoscope, Camera } from 'lucide-react'
+import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User, Monitor, Palette, Tablet, Stethoscope, Camera, HelpCircle } from 'lucide-react'
 import type { AppInfo, ObsStatus, ZoneId } from '../../shared/types'
 import { ZONE_IDS, ZONE_NAMES } from '../../shared/types'
 import type { View } from './AppShell'
 import BrandMark from './BrandMark'
 import NavMenu from './NavMenu'
 import type { NavMenuItem } from './NavMenu'
+import OnboardingHelp from './OnboardingHelp'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
@@ -59,6 +60,15 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
   const [rehearsal, setRehearsal] = useState(false)
   const [updateReady, setUpdateReady] = useState(false)
   const [stageRehearsalActive, setStageRehearsalActive] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  useEffect(() => {
+    window.wf.settingGet('has_seen_onboarding').then((v) => {
+      if (v !== '1') {
+        setHelpOpen(true)
+        void window.wf.settingSet('has_seen_onboarding', '1')
+      }
+    })
+  }, [])
   useEffect(() => {
     const load = (): void => {
       window.wf.getInfo().then((i: AppInfo) => {
@@ -230,7 +240,20 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
           <User size={15} className="flex-shrink-0" />
           Volunteer mode
         </button>
+        <button
+          onClick={() => setHelpOpen(true)}
+          title="Quick start help"
+          className="ml-1.5 flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100"
+        >
+          <HelpCircle size={15} />
+        </button>
       </div>
+      {helpOpen && (
+        <OnboardingHelp
+          onClose={() => setHelpOpen(false)}
+          onGoToVolunteer={() => { setView('volunteer'); setHelpOpen(false) }}
+        />
+      )}
     </header>
   )
 }
