@@ -89,6 +89,7 @@ function NavMenu<T extends string>({ label, items, activeId, onSelect, iconOnly,
         aria-haspopup="menu"
         aria-expanded={state.open}
         aria-label={label}
+        title={label}
         className={
           iconOnly
             ? `flex flex-shrink-0 items-center justify-center rounded-lg p-2 transition-colors ${
