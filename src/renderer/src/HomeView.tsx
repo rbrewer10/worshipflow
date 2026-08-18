@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 import { Play, LayoutGrid, MonitorSpeaker, ListMusic, Music, BookOpen, User, Check, TriangleAlert } from 'lucide-react'
 import type { View } from './AppShell'
-import type { AppInfo, ObsStatus, ZoneId } from '../../shared/types'
-import { ZONE_IDS, ZONE_NAMES } from '../../shared/types'
 import { useService } from './ServiceContext'
+import { usePreflightChecks } from './usePreflightChecks'
 import BrandMark from './BrandMark'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
@@ -25,52 +23,9 @@ function greeting(): string {
   return 'Good evening'
 }
 
-// A row's status. 'ok' and 'warn' are opinions ("this probably needs
-// attention before Sunday"); 'info' is neutral — not every church streams
-// every service, so no OBS connection isn't itself a problem.
-type PreflightLevel = 'ok' | 'warn' | 'info'
-
 function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
   const { activeService } = useService()
-  const [outputs, setOutputs] = useState(0)
-  const [zonesConnected, setZonesConnected] = useState<ZoneId[]>([])
-  const [rehearsal, setRehearsal] = useState(false)
-  const [obs, setObs] = useState<ObsStatus | null>(null)
-
-  // Startup preflight: the app used to say "Ready when you are" unconditionally,
-  // with no way to tell whether outputs are actually connected, rehearsal mode
-  // was left armed, or a service is even loaded. This surfaces that state
-  // up front instead of leaving the operator to discover it live.
-  useEffect(() => {
-    const load = (): void => {
-      window.wf.getInfo().then((i: AppInfo) => { setOutputs(i.outputs); setZonesConnected(i.zonesConnected) })
-      window.wf.getRehearsalMode().then(setRehearsal)
-    }
-    load()
-    const t = setInterval(load, 2000)
-    window.wf.obsGetStatus().then(setObs)
-    const off = window.wf.obsOnStatus(setObs)
-    return () => { clearInterval(t); off() }
-  }, [])
-
-  const screenCount = outputs + zonesConnected.length
-  const missingZoneNames = ZONE_IDS.filter((id) => !zonesConnected.includes(id)).map((id) => ZONE_NAMES[id])
-
-  const checks: { level: PreflightLevel; label: string }[] = [
-    rehearsal
-      ? { level: 'warn', label: 'Rehearsal mode is armed — real outputs are showing nothing' }
-      : { level: 'ok', label: 'Rehearsal mode off' },
-    screenCount === 0
-      ? { level: 'warn', label: 'No screens connected yet' }
-      : missingZoneNames.length > 0
-      ? { level: 'warn', label: `${screenCount} screen${screenCount !== 1 ? 's' : ''} connected — ${missingZoneNames.join(', ')} not connected` }
-      : { level: 'ok', label: `${screenCount} screen${screenCount !== 1 ? 's' : ''} connected` },
-    activeService
-      ? { level: 'ok', label: `"${activeService.name}" loaded` }
-      : { level: 'warn', label: 'No service loaded yet' },
-    { level: obs?.connected ? 'ok' : 'info', label: obs?.connected ? 'OBS connected' : 'OBS not connected' }
-  ]
-  const needsAttention = checks.some((c) => c.level === 'warn')
+  const { checks, needsAttention } = usePreflightChecks()
 
   const handle = (card: typeof CARDS[0]): void => {
     if (card.view) setView(card.view)
