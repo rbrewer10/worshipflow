@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Image as ImageIcon, FileUp, FolderOpen, Layers, Trash2, ExternalLink, Save, Printer } from 'lucide-react'
+import { Plus, Image as ImageIcon, FileUp, FolderOpen, Trash2, ExternalLink, Save, Printer } from 'lucide-react'
 import type { ServiceItem } from '../../shared/types'
 import ServiceEditor from './ServiceEditor'
 import { useService } from './ServiceContext'
@@ -11,7 +11,6 @@ function ServiceBuilder(): JSX.Element {
   const [newName, setNewName] = useState('')
   const [importing, setImporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null)
-  const [showTemplates, setShowTemplates] = useState(false)
 
   const open = (id: number): void => { selectService(id) }
 
@@ -135,8 +134,8 @@ function ServiceBuilder(): JSX.Element {
       {confirmDelete && (
         <Modal onClose={() => setConfirmDelete(null)} labelledBy="delete-service-title" className="card-lg max-w-sm">
             <h3 id="delete-service-title" className="section-title">Delete Service?</h3>
-            <p className="mb-4 text-sm text-slate-600">
-              Are you sure you want to delete <span className="font-semibold text-slate-900">{confirmDelete.name}</span>? This cannot be undone.
+            <p className="mb-4 text-sm text-content-secondary">
+              Are you sure you want to delete <span className="font-semibold text-content-primary">{confirmDelete.name}</span>? This cannot be undone.
             </p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(null)}
@@ -153,10 +152,10 @@ function ServiceBuilder(): JSX.Element {
         </Modal>
       )}
 
-      <div className="flex h-full min-h-0 gap-4 bg-[#e9ecf1] p-4">
+      <div className="flex h-full min-h-0 gap-4 p-4">
         <h1 className="sr-only">Build Service</h1>
         {/* Services list */}
-        <div className="flex w-72 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9] p-3">
+        <div className="flex w-72 flex-col overflow-y-auto rounded-xl border border-border bg-panel p-3">
           <div className="mb-3 flex gap-2">
             <label htmlFor="new-service-name" className="sr-only">New service name</label>
             <input id="new-service-name" value={newName} onChange={(e) => setNewName(e.target.value)}
@@ -192,16 +191,10 @@ function ServiceBuilder(): JSX.Element {
               title="Import a .wfplan exported from the Snow Hill Church planning app — songs match your library by title">
               <FileUp size={13} /> Import plan from church app
             </button>
-            <button onClick={() => setShowTemplates(true)}
-              aria-label="Manage service templates"
-              className="w-full btn text-xs"
-              title="Save, load, or manage service templates for quick setup">
-              <Layers size={13} /> Service Templates
-            </button>
-            {importing && <p className="text-center text-[11px] text-slate-600" role="status" aria-live="polite">Importing…</p>}
+            {importing && <p className="text-center text-[11px] text-content-secondary" role="status" aria-live="polite">Importing…</p>}
           </div>
-          <div className="min-h-0 flex-1 space-y-1 overflow-auto">
-            {services.length === 0 && <p className="px-1 py-6 text-center text-sm text-slate-500">No saved services yet.</p>}
+          <div className="space-y-1">
+            {services.length === 0 && <p className="px-1 py-6 text-center text-sm text-content-secondary">No saved services yet.</p>}
             {services.map((s) => (
               <div key={s.id} onClick={() => open(s.id)}
                 role="button"
@@ -211,8 +204,8 @@ function ServiceBuilder(): JSX.Element {
                 aria-pressed={openId === s.id}
                 className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 transition-colors min-h-10 ${
                   openId === s.id
-                    ? 'bg-blue-500/10 ring-1 ring-blue-500/30 text-slate-900'
-                    : 'text-slate-700 hover:bg-slate-100'
+                    ? 'bg-blue-500/10 ring-1 ring-blue-500/30 text-content-primary'
+                    : 'text-content-secondary hover:bg-panel-raised'
                 }`}>
                 <span className="truncate text-sm font-medium">{s.name}</span>
                 <button onClick={(e) => { e.stopPropagation(); del(s.id) }}
@@ -223,12 +216,20 @@ function ServiceBuilder(): JSX.Element {
               </div>
             ))}
           </div>
+
+          <div className="mt-3 border-t border-border pt-3">
+            <TemplatesPanel
+              currentService={service}
+              onLoadTemplate={loadTemplateIntoService}
+              inline
+            />
+          </div>
         </div>
 
         {/* Open service */}
-        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-slate-200 bg-[#f4f6f9]">
+        <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-border bg-panel">
           {openId == null ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
+            <div className="flex flex-1 items-center justify-center text-sm text-content-secondary">
               Select a service, or create one to start building your order of worship.
             </div>
           ) : (
@@ -255,14 +256,6 @@ function ServiceBuilder(): JSX.Element {
           )}
         </div>
       </div>
-
-      {showTemplates && (
-        <TemplatesPanel
-          currentService={service}
-          onLoadTemplate={loadTemplateIntoService}
-          onClose={() => setShowTemplates(false)}
-        />
-      )}
     </>
   )
 }
