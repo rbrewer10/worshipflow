@@ -225,7 +225,7 @@ describe('computePreflightChecks', () => {
 })
 ```
 
-Run: `npm run test:web -- usePreflightChecks` (or `npm test` for the full suite). Expected: all pass.
+Run: `npm test -- usePreflightChecks` (or `npm test` for the full suite — there is no separate `test:web`/`test:node` split in this repo, just a single `vitest run`). Expected: all pass.
 
 - [ ] **Step 4: Typecheck and commit**
 
@@ -349,7 +349,7 @@ describe('formatDurationEstimate', () => {
 })
 ```
 
-Run: `npm run test:node -- serviceDuration` (this is a `src/shared` pure module, runs under the node test project — check `vitest.config` / existing `src/shared/*.test.ts` files for the exact invocation pattern already used elsewhere in this repo, e.g. `zoneScenes.test.ts` if it exists, and match it).
+Run: `npm test -- serviceDuration` (there is no separate `test:web`/`test:node` split in this repo, just a single `vitest run` — confirmed against `package.json`).
 
 - [ ] **Step 3: Typecheck and commit**
 
