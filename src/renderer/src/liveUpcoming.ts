@@ -30,7 +30,8 @@ export function resolveUpcoming(
     // yet (or genuinely has none) — one empty-text slot rather than skipping
     // the item entirely, so the flat sequence's indices still line up with
     // what SlideGrid/the live engine consider "slide 0" of that item.
-    const slides = slidesByItemId[it.id] ?? ['']
+    const rawSlides = slidesByItemId[it.id]
+    const slides = rawSlides && rawSlides.length > 0 ? rawSlides : ['']
     slides.forEach((text, slideIndex) => {
       flat.push({ itemId: it.id, itemTitle: it.title, slideIndex, text })
     })

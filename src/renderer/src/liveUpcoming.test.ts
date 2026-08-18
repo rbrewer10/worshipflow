@@ -74,4 +74,16 @@ describe('resolveUpcoming', () => {
     expect(next).toBeNull()
     expect(afterNext).toBeNull()
   })
+
+  it('falls back to one empty slot for an item with a genuinely-empty (not missing) slides array', () => {
+    const withEmptySlides = [
+      item({ id: 1, title: 'Empty Sermon', type: 'sermon' }),
+      item({ id: 2, title: 'Next Song', type: 'song', ref_id: 1 }),
+    ]
+    // id 1 maps to an explicit [] (not absent from the object) — simulates a
+    // sermon with no content or a deleted announcement reference.
+    const slidesWithEmpty = { 1: [], 2: ['Song slide'] }
+    const { next } = resolveUpcoming(withEmptySlides, 'main', slidesWithEmpty, 1, 0)
+    expect(next).toEqual({ itemId: 2, itemTitle: 'Next Song', slideIndex: 0, text: 'Song slide' })
+  })
 })
