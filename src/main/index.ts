@@ -15,6 +15,8 @@ import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
+import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
+import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseReferenceList, formatReferenceList, subReference } from '../shared/scriptureRefs'
 import { reflowSlideTexts } from '../shared/reflowText'
@@ -3113,6 +3115,14 @@ ipcMain.handle('wf:scenes:set', (_e, config: SceneConfig) => {
   if (!validateSceneConfig(config)) throw new Error('Invalid scene configuration')
   setSetting('zone_scenes', JSON.stringify(config))
   broadcast() // typeDefaults may have changed → zones with default routing re-resolve
+})
+
+// --- Service Control mode mapping (Live Control's Sermon/Worship/Invitation
+// Mode shortcuts — which of the church's own scene presets each one applies) ---
+ipcMain.handle('wf:service-control-modes:get', () => parseServiceControlModeMapping(getSetting('service_control_mode_mapping')))
+ipcMain.handle('wf:service-control-modes:set', (_e, mapping: ServiceControlModeMapping) => {
+  if (!validateServiceControlModeMapping(mapping)) throw new Error('Invalid service control mode mapping')
+  setSetting('service_control_mode_mapping', JSON.stringify(mapping))
 })
 
 ipcMain.handle('wf:app:getTabletPort', async (): Promise<number> => {

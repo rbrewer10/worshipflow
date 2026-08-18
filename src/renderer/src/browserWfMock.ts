@@ -29,6 +29,8 @@ import type {
 } from '../../shared/types'
 import { parseReferenceList } from '../../shared/scriptureRefs'
 import { starterConfig } from '../../shared/zoneScenes'
+import { DEFAULT_MODE_MAPPING } from '../../shared/serviceControlModes'
+import type { ServiceControlModeMapping } from '../../shared/serviceControlModes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../../main/types/sound-check-types'
 import type { ZoneSlide } from '../../shared/zoneSlides'
 import type { ZonePin, ZonePins } from '../../shared/zonePins'
@@ -508,6 +510,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     zoneTrackAssignmentSet: noop,
     scenesGet: async () => starterConfig(),
     scenesSet: noop,
+    serviceControlModesGet: async (): Promise<ServiceControlModeMapping> => ({ ...DEFAULT_MODE_MAPPING }),
+    serviceControlModesSet: noop,
     getTabletPort: async (): Promise<number> => 3691,
     livecallConfig: async (): Promise<LivecallConfig> => ({
       url: 'ws://127.0.0.1:3691/livecall',

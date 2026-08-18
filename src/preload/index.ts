@@ -30,6 +30,7 @@ import type {
   LivecallConfig
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
+import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import type { ZoneSlide } from '../shared/zoneSlides'
@@ -376,6 +377,8 @@ const wf = {
     ipcRenderer.invoke('wf:service:zoneTrackAssignment:set', serviceId, assignment),
   scenesGet: (): Promise<SceneConfig> => ipcRenderer.invoke('wf:scenes:get'),
   scenesSet: (config: SceneConfig): Promise<void> => ipcRenderer.invoke('wf:scenes:set', config),
+  serviceControlModesGet: (): Promise<ServiceControlModeMapping> => ipcRenderer.invoke('wf:service-control-modes:get'),
+  serviceControlModesSet: (mapping: ServiceControlModeMapping): Promise<void> => ipcRenderer.invoke('wf:service-control-modes:set', mapping),
   getTabletPort: (): Promise<number> =>
     ipcRenderer.invoke('wf:app:getTabletPort'),
   livecallConfig: (): Promise<LivecallConfig> =>
