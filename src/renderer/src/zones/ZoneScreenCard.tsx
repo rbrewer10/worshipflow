@@ -16,7 +16,7 @@ function toAssetUrl(p: string): string {
 // equivalent ('off', 'stage') renders read-only — the Advanced grid remains the
 // way to change those.
 export default function ZoneScreenCard({
-  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, slideText, deckSlot, showSafeArea, onRoleChange, onSlideDrop
+  zoneId, mode, item, serviceTheme, serviceColors, songFull, logoPath, offTrack, offTrackLabel, slideText, deckSlot, showSafeArea, compact, onRoleChange, onSlideDrop
 }: {
   zoneId: ZoneId
   mode: ZoneMode
@@ -29,6 +29,7 @@ export default function ZoneScreenCard({
   offTrackLabel?: string
   slideText?: string
   showSafeArea?: boolean
+  compact?: boolean
   // See ServiceSlidePreview: what THIS SCREEN holds on THIS deck slide, which
   // can differ from the item's own type.
   deckSlot?: { kind: 'text' | 'scripture' | 'sermon'; text?: string; reference?: string }
@@ -106,13 +107,13 @@ export default function ZoneScreenCard({
       tabIndex={editable ? 0 : undefined}
       onKeyDown={(e) => { if (editable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); cycle() } }}
       title={editable ? `${ZONE_NAMES[zoneId]} — click to cycle, or drop a role here` : ZONE_NAMES[zoneId]}
-      className={`rounded-xl border-2 p-2 transition-colors ${
-        dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-slate-200 bg-white'
-      } ${editable ? 'cursor-pointer hover:border-slate-300' : 'cursor-default'} ${offTrack ? 'opacity-50' : ''}`}
+      className={`rounded-xl border-2 ${compact ? 'p-1.5' : 'p-2'} transition-colors ${
+        dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-border bg-panel'
+      } ${editable ? 'cursor-pointer hover:border-border-strong' : 'cursor-default'} ${offTrack ? 'opacity-50' : ''}`}
     >
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{ZONE_NAMES[zoneId]}</span>
-        <span className="text-[10px] font-semibold text-slate-400">{offTrack ? offTrackLabel : role ? ROLE_LABEL[role] : mode}</span>
+      <div className={`${compact ? 'mb-1' : 'mb-1.5'} flex items-center justify-between`}>
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-content-secondary">{ZONE_NAMES[zoneId]}</span>
+        <span className="text-[10px] font-semibold text-content-tertiary">{offTrack ? offTrackLabel : role ? ROLE_LABEL[role] : mode}</span>
       </div>
       {body()}
     </div>

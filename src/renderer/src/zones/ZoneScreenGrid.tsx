@@ -18,7 +18,7 @@ const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 // 2x2 grid of live previews, and the raw-mode Advanced escape hatch. Writes the
 // same per-item zone_routing the scene chips always have, through the existing
 // zoneSetRouting IPC — no new persistence.
-export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceColors, songFull, slides, trackAssignment, onChanged }: {
+export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceColors, songFull, slides, trackAssignment, compact, onChanged }: {
   item: ServiceItem
   serviceId: number
   serviceTheme: string | null
@@ -26,6 +26,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
   songFull: SongFull | null
   slides: string[]
   trackAssignment: ZoneTrackAssignment
+  compact?: boolean
   onChanged: () => void
 }): JSX.Element {
   const [config, setConfig] = useState<SceneConfig | null>(null)
@@ -116,7 +117,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
   }
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-3">
+    <div className={`flex w-full ${compact ? 'max-w-full' : 'max-w-3xl'} flex-col gap-3`}>
       {deck ? (
         // A deck governs what every screen shows directly, slide by slide —
         // the preset row and role palette configure the OTHER (non-deck) path
@@ -136,14 +137,16 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
         />
       ) : (
         <>
-          <ScenePresetRow
-            config={config}
-            itemType={item.type}
-            routing={routing}
-            matched={matched}
-            isDefault={isDefault}
-            onPick={pickScene}
-          />
+          {!compact && (
+            <ScenePresetRow
+              config={config}
+              itemType={item.type}
+              routing={routing}
+              matched={matched}
+              isDefault={isDefault}
+              onPick={pickScene}
+            />
+          )}
 
           <div className="flex items-center justify-between gap-2">
             <ZoneRolePalette />
@@ -171,7 +174,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
               assigned to the other track will never actually show this item's
               content, no matter what role gets set here. Dim and lock those cards
               instead of rendering something that would never appear there. */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid grid-cols-2 ${compact ? 'gap-1.5' : 'gap-3'}`}>
             {ZONE_IDS.map((zoneId) => {
               const offTrack = trackAssignment[zoneId] !== item.track
               return (
@@ -188,6 +191,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
                   offTrackLabel={trackAssignment[zoneId] === 'main' ? 'Follows Main' : 'Follows Second'}
                   slideText={slides[selectedSlide]}
                   showSafeArea={showSafeArea}
+                  compact={compact}
                   onRoleChange={(role) => setRole(zoneId, role)}
                 />
               )
