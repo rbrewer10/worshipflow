@@ -155,7 +155,7 @@ function ServiceBuilder(): JSX.Element {
       <div className="flex h-full min-h-0 gap-4 p-4">
         <h1 className="sr-only">Build Service</h1>
         {/* Services list */}
-        <div className="flex w-72 flex-col overflow-y-auto rounded-xl border border-border bg-panel p-3">
+        <div className="flex w-72 flex-col rounded-xl border border-border bg-panel p-3">
           <div className="mb-3 flex gap-2">
             <label htmlFor="new-service-name" className="sr-only">New service name</label>
             <input id="new-service-name" value={newName} onChange={(e) => setNewName(e.target.value)}
@@ -193,7 +193,7 @@ function ServiceBuilder(): JSX.Element {
             </button>
             {importing && <p className="text-center text-[11px] text-content-secondary" role="status" aria-live="polite">Importing…</p>}
           </div>
-          <div className="space-y-1">
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
             {services.length === 0 && <p className="px-1 py-6 text-center text-sm text-content-secondary">No saved services yet.</p>}
             {services.map((s) => (
               <div key={s.id} onClick={() => open(s.id)}
@@ -215,14 +215,14 @@ function ServiceBuilder(): JSX.Element {
                 </button>
               </div>
             ))}
-          </div>
 
-          <div className="mt-3 border-t border-border pt-3">
-            <TemplatesPanel
-              currentService={service}
-              onLoadTemplate={loadTemplateIntoService}
-              inline
-            />
+            <div className="mt-3 border-t border-border pt-3">
+              <TemplatesPanel
+                currentService={service}
+                onLoadTemplate={loadTemplateIntoService}
+                inline
+              />
+            </div>
           </div>
         </div>
 

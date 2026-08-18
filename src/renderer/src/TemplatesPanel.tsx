@@ -217,7 +217,7 @@ export function TemplatesPanel({
     </>
   )
 
-  if (inline) return <div>{body}</div>
+  if (inline) return <div className="rounded-lg bg-panel-raised p-3">{body}</div>
 
   if (!onClose) throw new Error('TemplatesPanel: onClose is required when inline is not set')
 
