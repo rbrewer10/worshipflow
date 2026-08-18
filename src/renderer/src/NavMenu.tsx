@@ -16,11 +16,16 @@ export interface NavMenuItem<T extends string> {
 // setup) live in here rather than as flat tabs, so the bar stays readable —
 // see the 2026-08-01 spec. Live-critical controls are never put behind one of
 // these: a dropdown costs a click, and mid-service that matters.
-function NavMenu<T extends string>({ label, items, activeId, onSelect }: {
+function NavMenu<T extends string>({ label, items, activeId, onSelect, iconOnly, Icon }: {
   label: string
   items: NavMenuItem<T>[]
   activeId: T | null
   onSelect: (id: T) => void
+  // When set, the trigger renders as an icon-only button (Icon required in
+  // this mode) instead of a text+chevron button — used for the gear-icon
+  // Settings entry point, which shouldn't take up nav-bar text space.
+  iconOnly?: boolean
+  Icon?: IconType
 }): JSX.Element {
   const [state, dispatch] = useReducer(
     (s: NavMenuState, a: NavMenuAction) => navMenuReducer(s, a, items.length),
@@ -83,14 +88,27 @@ function NavMenu<T extends string>({ label, items, activeId, onSelect }: {
         onKeyDown={onTriggerKeyDown}
         aria-haspopup="menu"
         aria-expanded={state.open}
-        className={`flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-          containsActive
-            ? 'bg-blue-600 font-medium text-white'
-            : 'font-normal text-content-secondary hover:bg-panel-raised hover:text-content-primary'
-        }`}
+        aria-label={label}
+        className={
+          iconOnly
+            ? `flex flex-shrink-0 items-center justify-center rounded-lg p-2 transition-colors ${
+                containsActive
+                  ? 'bg-blue-600 text-white'
+                  : 'border border-border bg-panel text-content-secondary hover:bg-panel-raised hover:text-content-primary'
+              }`
+            : `flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                containsActive
+                  ? 'bg-blue-600 font-medium text-white'
+                  : 'font-normal text-content-secondary hover:bg-panel-raised hover:text-content-primary'
+              }`
+        }
       >
-        {label}
-        <ChevronDown size={14} className="flex-shrink-0" />
+        {iconOnly && Icon ? <Icon size={16} className="flex-shrink-0" /> : (
+          <>
+            {label}
+            <ChevronDown size={14} className="flex-shrink-0" />
+          </>
+        )}
       </button>
 
       {state.open && (

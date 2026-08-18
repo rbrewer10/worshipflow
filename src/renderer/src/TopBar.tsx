@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User, Monitor, Palette, Tablet, Stethoscope, Camera, HelpCircle } from 'lucide-react'
+import { Home, Play, ListMusic, Music, Megaphone, BookOpen, Video, Image as ImageIcon, User, Monitor, Palette, Tablet, Stethoscope, Camera, HelpCircle, Settings } from 'lucide-react'
 import type { AppInfo, ObsStatus, ZoneId } from '../../shared/types'
 import { ZONE_IDS, ZONE_NAMES } from '../../shared/types'
 import type { View } from './AppShell'
@@ -29,7 +29,7 @@ function elapsed(startedAt: number | null, now: number): string {
 // dock went app-wide — it has, so this is that phase, not a reversal.
 const PRIMARY_ITEMS: { id: View; Icon: IconType; label: string }[] = [
   { id: 'home', Icon: Home, label: 'Home' },
-  { id: 'live', Icon: Play, label: 'Live' },
+  { id: 'live', Icon: Play, label: 'Live Control' },
   { id: 'service', Icon: ListMusic, label: 'Build service' }
 ]
 
@@ -149,8 +149,8 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
             {label}
           </button>
         ))}
-        <NavMenu label="Library" items={LIBRARY_ITEMS} activeId={view} onSelect={setView} />
-        <NavMenu label="Setup" items={SETUP_ITEMS} activeId={view} onSelect={setView} />
+        <NavMenu label="Media/Library" items={LIBRARY_ITEMS} activeId={view} onSelect={setView} />
+        <NavMenu label="Settings" items={SETUP_ITEMS} activeId={view} onSelect={setView} iconOnly Icon={Settings} />
       </nav>
 
       <div className="flex flex-shrink-0 items-center gap-2">
