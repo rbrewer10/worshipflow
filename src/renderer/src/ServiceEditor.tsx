@@ -315,7 +315,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
 
           {/* Right: consolidated inspector — compact zone preview + item editor */}
           {selectedItem && (
-            <div className="flex w-80 shrink-0 flex-col gap-3 overflow-auto">
+            <div className="flex w-80 shrink-0 flex-col gap-3 overflow-auto rounded-xl border border-border bg-panel-raised p-3">
               <ZoneScreenGrid
                 item={selectedItem}
                 serviceId={service.id}
@@ -339,7 +339,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
             </div>
           )}
           {!selectedItem && (
-            <div className="flex w-80 shrink-0 items-center justify-center text-sm text-content-secondary">
+            <div className="flex w-80 shrink-0 items-center justify-center rounded-xl border border-border bg-panel-raised p-3 text-sm text-content-secondary">
               Select an item to preview &amp; style it
             </div>
           )}
