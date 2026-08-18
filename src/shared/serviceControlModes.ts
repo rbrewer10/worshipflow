@@ -35,12 +35,12 @@ export function validateServiceControlModeMapping(x: unknown): x is ServiceContr
 // Never throws; anything unusable yields the default mapping — same
 // defensive philosophy as zoneScenes.ts's parseSceneConfig.
 export function parseServiceControlModeMapping(json: string | null): ServiceControlModeMapping {
-  if (!json) return DEFAULT_MODE_MAPPING
+  if (!json) return { ...DEFAULT_MODE_MAPPING }
   try {
     const parsed = JSON.parse(json)
-    return validateServiceControlModeMapping(parsed) ? parsed : DEFAULT_MODE_MAPPING
+    return validateServiceControlModeMapping(parsed) ? parsed : { ...DEFAULT_MODE_MAPPING }
   } catch {
-    return DEFAULT_MODE_MAPPING
+    return { ...DEFAULT_MODE_MAPPING }
   }
 }
 
