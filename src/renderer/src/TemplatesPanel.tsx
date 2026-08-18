@@ -162,7 +162,7 @@ export function TemplatesPanel({
                     setSaveName('')
                     setSaveDesc('')
                   }}
-                  className="flex-1 rounded-lg border border-border bg-panel px-4 py-2 text-sm font-semibold text-content-secondary hover:bg-panel-raised"
+                  className="flex-1 rounded-lg border border-border bg-panel px-4 py-2 text-sm font-semibold text-content-secondary hover:bg-border-strong"
                 >
                   Cancel
                 </button>
@@ -184,14 +184,14 @@ export function TemplatesPanel({
             {templates.map((template) => (
               <div
                 key={template.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-panel p-3 hover:bg-panel-raised"
+                className="flex items-center justify-between rounded-lg border border-border bg-panel p-3 hover:bg-border-strong"
               >
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-content-primary truncate">{template.name}</p>
                   {template.description && (
                     <p className="text-xs text-content-secondary truncate">{template.description}</p>
                   )}
-                  <p className="text-xs text-content-tertiary mt-1">{template.items.length} items</p>
+                  <p className="text-xs text-content-secondary mt-1">{template.items.length} items</p>
                 </div>
                 <div className="flex gap-2 ml-3">
                   <button
