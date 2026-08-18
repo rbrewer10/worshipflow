@@ -44,7 +44,7 @@ export function PresenterPanel({ liveState, liveItem }: PresenterPanelProps): JS
         <p className="text-sm text-content-secondary">No item loaded</p>
       ) : hasNotes ? (
         <div className="space-y-2">
-          <div className="surface max-h-48 overflow-y-auto">
+          <div className="rounded-lg border border-border bg-panel-raised p-3 max-h-48 overflow-y-auto">
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-secondary">
               {liveItem?.notes}
             </p>
@@ -57,7 +57,7 @@ export function PresenterPanel({ liveState, liveItem }: PresenterPanelProps): JS
         <div className="surface text-center">
           <p className="text-sm text-content-secondary">
             No notes for this item.{' '}
-            <span className="block text-xs text-content-tertiary mt-1">
+            <span className="block text-xs text-content-secondary mt-1">
               Add notes in the service editor to display them here.
             </span>
           </p>

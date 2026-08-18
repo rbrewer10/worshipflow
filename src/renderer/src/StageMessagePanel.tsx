@@ -71,7 +71,7 @@ export const StageMessagePanel = memo(function StageMessagePanel({
 
       {!editingPresets ? (
         <div className="mt-2 flex flex-wrap gap-2">
-          {presets.length === 0 && <span className="text-xs text-content-tertiary">No quick messages — tap Edit to add some.</span>}
+          {presets.length === 0 && <span className="text-xs text-content-secondary">No quick messages — tap Edit to add some.</span>}
           {presets.map((p, i) => (
             <button key={i} onClick={() => onInputChange(p)} className="btn-pill text-xs hover:bg-amber-500/30">{p}</button>
           ))}
