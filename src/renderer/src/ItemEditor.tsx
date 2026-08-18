@@ -107,7 +107,7 @@ export const ItemEditor = memo(function ItemEditor({
   }, [onClose])
 
   return (
-    <div className="card-lg flex w-80 shrink-0 flex-col gap-3 overflow-auto text-content-primary animate-[fade-in_0.15s_ease-out]">
+    <div className="card-lg flex flex-col gap-3 overflow-auto text-content-primary animate-[fade-in_0.15s_ease-out]">
       <div className="flex items-center justify-between">
         <h3 className="section-title capitalize">{item.type}</h3>
         <div className="flex items-center gap-2">

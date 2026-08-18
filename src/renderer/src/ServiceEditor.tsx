@@ -2,15 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../../shared/types'
 import type { ZoneTrackAssignment } from '../../shared/zoneTrack'
+import type { SceneConfig } from '../../shared/zoneScenes'
+import { effectiveRouting, matchScene, expandScene } from '../../shared/zoneScenes'
 import ThemePicker from './ThemePicker'
 import ServiceDeck from './ServiceDeck'
 import CardEditPanel from './CardEditPanel'
 import ZoneScreenGrid from './zones/ZoneScreenGrid'
+import ScenePresetRow from './ScenePresetRow'
 import { sendItemLive } from './liveActions'
 import ScheduledAnnouncements from './ScheduledAnnouncements'
 import Modal from './Modal'
 import QuickSearchOverlay from './QuickSearchOverlay'
 import { useOptionalService } from './ServiceContext'
+import { usePreflightChecks } from './usePreflightChecks'
+import { estimateServiceDuration, formatDurationEstimate } from '../../shared/serviceDuration'
 import { notifyLocalAction } from './NotifyToasts'
 
 function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
@@ -32,6 +37,9 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const [itemSlides, setItemSlides] = useState<Record<number, string[]>>({})
   const [trackAssignment, setTrackAssignment] = useState<ZoneTrackAssignment>(DEFAULT_ZONE_TRACK)
   const [showQuickSearch, setShowQuickSearch] = useState(false)
+  const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
+
+  const { needsAttention } = usePreflightChecks()
 
   // Ctrl/Cmd+F opens the cross-type quick search from anywhere in Build
   // Service — matches ProPresenter's global search shortcut.
@@ -120,6 +128,8 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   useEffect(() => {
     void window.wf.zoneTrackAssignmentGet(serviceId).then(setTrackAssignment)
   }, [serviceId])
+
+  useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [])
 
   // Slide text depends only on each item's type/payload/ref, never on its zone
   // routing — so key the fetch on those. Without this, every zone-card click
@@ -227,6 +237,8 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     if (id != null) setSelectedId(id)
   }
 
+  const duration = service ? estimateServiceDuration(service.items) : null
+
   if (service == null) {
     return <div className="flex h-full items-center justify-center text-sm text-content-secondary">Loading…</div>
   }
@@ -252,6 +264,16 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
             title="The date this service is for"
             className="shrink-0 rounded-lg border border-border bg-panel px-2 py-1 text-xs text-content-secondary"
           />
+          {duration && duration.knownItemCount > 0 && (
+            <span className="shrink-0 text-xs text-content-secondary" title={`${duration.knownItemCount} of ${duration.totalItemCount} items have a known duration`}>
+              {formatDurationEstimate(duration.totalSeconds)}
+            </span>
+          )}
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+            needsAttention ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'
+          }`}>
+            {needsAttention ? 'Needs attention' : 'Ready to plan'}
+          </span>
         </div>
         {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
       </div>
@@ -260,65 +282,86 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
       <ThemePicker serviceId={serviceId} themeId={service.theme} colors={service.themeColors} onChange={reload} />
 
       {/* Body */}
-      <div className="flex min-h-0 flex-1 gap-3">
-        {/* Left: item deck */}
-        <div className="flex w-80 shrink-0 flex-col min-h-0">
-          <ScheduledAnnouncements
-            serviceDate={service.service_date}
-            addedRefIds={new Set(service.items.filter((it) => it.type === 'announcement' && it.ref_id != null).map((it) => it.ref_id as number))}
-            onAdd={addAnnouncement}
-          />
-          <ServiceDeck
-            service={service}
-            track={track}
-            onTrackChange={setTrack}
-            trackAssignment={trackAssignment}
-            onTrackAssignmentChange={setTrackAssignment}
-            songs={songs}
-            announcements={announcements}
-            liveItemId={live?.main.liveServiceItemId ?? null}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onAdd={addCard}
-            onAddSong={addSong}
-            onAddAnnouncement={addAnnouncement}
-            onGoLive={(it) => sendItemLive(it, it.track)}
-            onDelete={delItem}
-            onDuplicate={duplicateItem}
-            onBatchDelete={batchDeleteItems}
-            onReordered={reload}
-          />
-        </div>
-
-        {/* Center: the four zone screens for the selected item */}
-        <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto p-2">
-          {selectedItem ? (
-            <ZoneScreenGrid
-              item={selectedItem}
-              serviceId={service.id}
-              serviceTheme={service.theme}
-              serviceColors={service.themeColors}
-              songFull={selectedSongFull}
-              slides={itemSlides[selectedItem.id] ?? []}
-              trackAssignment={trackAssignment}
-              onChanged={reload}
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex min-h-0 flex-1 gap-3">
+          {/* Center: run of show (moved from the left column) */}
+          <div className="flex min-w-0 flex-1 flex-col min-h-0">
+            <ScheduledAnnouncements
+              serviceDate={service.service_date}
+              addedRefIds={new Set(service.items.filter((it) => it.type === 'announcement' && it.ref_id != null).map((it) => it.ref_id as number))}
+              onAdd={addAnnouncement}
             />
-          ) : (
-            <div className="text-sm text-content-secondary">Select an item to preview &amp; style it</div>
+            <ServiceDeck
+              service={service}
+              track={track}
+              onTrackChange={setTrack}
+              trackAssignment={trackAssignment}
+              onTrackAssignmentChange={setTrackAssignment}
+              songs={songs}
+              announcements={announcements}
+              liveItemId={live?.main.liveServiceItemId ?? null}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onAdd={addCard}
+              onAddSong={addSong}
+              onAddAnnouncement={addAnnouncement}
+              onGoLive={(it) => sendItemLive(it, it.track)}
+              onDelete={delItem}
+              onDuplicate={duplicateItem}
+              onBatchDelete={batchDeleteItems}
+              onReordered={reload}
+            />
+          </div>
+
+          {/* Right: consolidated inspector — compact zone preview + item editor */}
+          {selectedItem && (
+            <div className="flex w-80 shrink-0 flex-col gap-3 overflow-auto">
+              <ZoneScreenGrid
+                item={selectedItem}
+                serviceId={service.id}
+                serviceTheme={service.theme}
+                serviceColors={service.themeColors}
+                songFull={selectedSongFull}
+                slides={itemSlides[selectedItem.id] ?? []}
+                trackAssignment={trackAssignment}
+                onChanged={reload}
+                compact
+              />
+              <CardEditPanel
+                item={selectedItem}
+                serviceTheme={service.theme}
+                serviceColors={service.themeColors}
+                showPreview={false}
+                onClose={() => setSelectedId(null)}
+                onChanged={reload}
+                onDelete={delItem}
+              />
+            </div>
+          )}
+          {!selectedItem && (
+            <div className="flex w-80 shrink-0 items-center justify-center text-sm text-content-secondary">
+              Select an item to preview &amp; style it
+            </div>
           )}
         </div>
 
-        {/* Right: edit controls */}
-        {selectedItem && (
-          <CardEditPanel
-            item={selectedItem}
-            serviceTheme={service.theme}
-            serviceColors={service.themeColors}
-            showPreview={false}
-            onClose={() => setSelectedId(null)}
-            onChanged={reload}
-            onDelete={delItem}
-          />
+        {/* Bottom: persistent Scene Selector bar */}
+        {selectedItem && sceneConfig && (
+          <div className="shrink-0 rounded-xl border border-border bg-panel-raised p-3">
+            <div className="section-header mb-2">Scene Selector</div>
+            <ScenePresetRow
+              config={sceneConfig}
+              itemType={selectedItem.type}
+              routing={effectiveRouting(selectedItem, sceneConfig)}
+              matched={matchScene(effectiveRouting(selectedItem, sceneConfig), selectedItem.type, sceneConfig)}
+              isDefault={selectedItem.zoneRouting == null}
+              onPick={(sceneId) => {
+                const scene = sceneConfig.scenes.find((s) => s.id === sceneId)
+                if (!scene) return
+                void window.wf.zoneSetRouting(selectedItem.id, expandScene(scene, selectedItem.type)).then(() => reload())
+              }}
+            />
+          </div>
         )}
       </div>
 

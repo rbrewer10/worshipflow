@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AppInfo, ObsStatus, ZoneId } from '../../shared/types'
 import { ZONE_IDS, ZONE_NAMES } from '../../shared/types'
-import { useService } from './ServiceContext'
+import { useOptionalService } from './ServiceContext'
 
 // A row's status. 'ok' and 'warn' are opinions ("this probably needs
 // attention before Sunday"); 'info' is neutral — not every church streams
@@ -46,7 +46,11 @@ export function computePreflightChecks(input: {
 // pill, added in a later task) so the two can never disagree about what
 // "ready" means.
 export function usePreflightChecks(): PreflightResult {
-  const { activeService } = useService()
+  // useOptionalService (not useService): ServiceEditor also renders in the
+  // standalone pop-out service window (App.tsx's #/service route), which has
+  // no ServiceProvider ancestor. useService() would throw there and crash
+  // that window the moment this hook is called from it.
+  const activeService = useOptionalService()?.activeService ?? null
   const [outputs, setOutputs] = useState(0)
   const [zonesConnected, setZonesConnected] = useState<ZoneId[]>([])
   const [rehearsal, setRehearsal] = useState(false)
