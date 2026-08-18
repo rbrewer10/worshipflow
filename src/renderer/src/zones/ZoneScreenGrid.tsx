@@ -150,7 +150,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowSafeArea((v) => !v)}
-                className={`shrink-0 text-[10px] font-semibold ${showSafeArea ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`shrink-0 text-[10px] font-semibold ${showSafeArea ? 'text-blue-400' : 'text-content-tertiary hover:text-content-secondary'}`}
                 title="Show a guide for the margin most screens actually respect"
               >
                 Safe area {showSafeArea ? 'on' : 'off'}
@@ -159,7 +159,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
                 <button
                   onClick={() => { void buildSlides() }}
                   disabled={buildingSlides}
-                  className="shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-700 disabled:text-slate-400"
+                  className="shrink-0 text-[10px] font-semibold text-blue-400 hover:text-blue-300 disabled:text-content-tertiary"
                 >
                   {buildingSlides ? 'Building…' : 'Build slides'}
                 </button>
@@ -203,17 +203,17 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
       <div>
         <button
           onClick={() => setShowAdvanced((v) => !v)}
-          className="text-[10px] font-semibold text-slate-400 hover:text-slate-600"
+          className="text-[10px] font-semibold text-content-tertiary hover:text-content-secondary"
         >
           Advanced {showAdvanced ? '▴' : '▾'}
         </button>
         {showAdvanced && (
-          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-100/70 p-2.5">
+          <div className="mt-2 rounded-lg border border-border bg-panel-raised p-2.5">
             <ZoneRoutingGrid routing={routing} onChange={save} />
             {!isDefault && (
               <button
                 onClick={() => { void window.wf.zoneSetRouting(item.id, null).then(onChanged) }}
-                className="mt-2 text-[10px] font-semibold text-slate-400 hover:text-slate-600"
+                className="mt-2 text-[10px] font-semibold text-content-tertiary hover:text-content-secondary"
               >
                 Reset to default for this type
               </button>

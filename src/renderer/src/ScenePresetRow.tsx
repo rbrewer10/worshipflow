@@ -25,7 +25,7 @@ export default function ScenePresetRow({ config, itemType, routing, matched, isD
             key={s.id}
             onClick={() => onPick(s.id)}
             className={`flex flex-col items-start gap-1 rounded-lg border-2 px-2 py-1.5 text-[11px] font-semibold transition-colors ${
-              active ? 'border-blue-500 bg-blue-500/10 text-blue-800' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+              active ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-border bg-panel text-content-secondary hover:border-border-strong'
             }`}
           >
             <ZoneStripBadge routing={expandScene(s, itemType)} title={s.name} />
@@ -34,7 +34,7 @@ export default function ScenePresetRow({ config, itemType, routing, matched, isD
         )
       })}
       {matched === 'custom' && (
-        <span className="flex flex-col items-start gap-1 rounded-lg border-2 border-slate-300 bg-slate-100 px-2 py-1.5 text-[11px] font-semibold text-slate-600">
+        <span className="flex flex-col items-start gap-1 rounded-lg border-2 border-border-strong bg-panel-raised px-2 py-1.5 text-[11px] font-semibold text-content-secondary">
           <ZoneStripBadge routing={routing} />
           <span className="inline-flex items-center gap-1"><Wrench size={10} /> Custom</span>
         </span>
