@@ -77,8 +77,10 @@ function ServiceRail(): JSX.Element {
         )}
         <button
           onClick={() => setShowSearch(true)}
+          disabled={!activeService}
+          title={activeService ? undefined : 'Load a service first'}
           aria-label="Quick search: add a song, announcement, or scripture"
-          className="btn-pill shrink-0 text-xs"
+          className="btn-pill shrink-0 text-xs disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Search size={13} /> Add
         </button>
