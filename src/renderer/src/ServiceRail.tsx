@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react'
-import { Hourglass } from 'lucide-react'
-import type { LiveState, ServiceItem } from '../../shared/types'
+import { Hourglass, Search } from 'lucide-react'
+import type { LiveState, ServiceItem, SongSummary, AnnouncementSummary } from '../../shared/types'
 import { useService } from './ServiceContext'
 import SlideThumb from './SlideThumb'
-import LiveZoneStatus from './zones/LiveZoneStatus'
-import LooksPanel from './zones/LooksPanel'
+import QuickSearchOverlay from './QuickSearchOverlay'
 import { sendItemLive, itemThumbBackground, usePendingConfirm } from './liveActions'
 
-// Persistent left rail: the loaded service's items + the pinned zone status.
+// Persistent left rail: just the loaded service's run-of-show — the only way
+// to jump to an arbitrary item live. Zone status + Looks live in the right
+// panel now; this rail stays focused on "what's in the service, what's live."
 function ServiceRail(): JSX.Element {
-  const { activeService } = useService()
+  const { activeService, reloadActiveService } = useService()
   const [live, setLive] = useState<LiveState | null>(null)
   const { pendingKey, trigger, cancel } = usePendingConfirm()
   const [songBg, setSongBg] = useState<Record<number, string | null>>({})
+  const [songs, setSongs] = useState<SongSummary[]>([])
+  const [announcements, setAnnouncements] = useState<AnnouncementSummary[]>([])
+  const [showSearch, setShowSearch] = useState(false)
   useEffect(() => {
     const off = window.wf.onState((s) => setLive(s.main))
     window.wf.getState('main').then(setLive)
@@ -29,28 +33,70 @@ function ServiceRail(): JSX.Element {
     })
   }, [activeService?.id, activeService?.items.length])
 
+  useEffect(() => { window.wf.songsList().then(setSongs) }, [])
+  useEffect(() => { window.wf.announcementsList().then(setAnnouncements) }, [])
+
   const liveId = live?.liveServiceItemId ?? null
 
   const handleItemClick = (it: ServiceItem): void => {
     trigger(String(it.id), () => { sendItemLive(it, 'main') })
   }
 
+  // From quick search — added straight onto Live Control's run-of-show
+  // (always the main track here). No "selected item" concept to move focus
+  // to, unlike Build Service: the operator finds the new item in the list.
+  const addSongFromSearch = async (songId: number): Promise<void> => {
+    if (!activeService) return
+    await window.wf.serviceAddItem(activeService.id, { type: 'song', ref_id: songId, track: 'main' })
+    reloadActiveService()
+    setShowSearch(false)
+  }
+  const addAnnouncementFromSearch = async (announcementId: number): Promise<void> => {
+    if (!activeService) return
+    await window.wf.serviceAddItem(activeService.id, { type: 'announcement', ref_id: announcementId, track: 'main' })
+    reloadActiveService()
+    setShowSearch(false)
+  }
+  const addScriptureFromSearch = async (reference: string): Promise<void> => {
+    if (!activeService) return
+    await window.wf.serviceAddItem(activeService.id, { type: 'scripture', payload: { reference }, track: 'main' })
+    reloadActiveService()
+    setShowSearch(false)
+  }
+
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-panel">
-      <div className="border-b border-border px-3 py-3">
+      <div className="flex items-start justify-between gap-2 border-b border-border px-3 py-3">
         {activeService ? (
-          <>
+          <div className="min-w-0">
             <div className="text-sm text-content-secondary">{activeService.service_date ?? 'Service'}</div>
             <div className="truncate text-base font-medium text-content-primary">{activeService.name}</div>
-          </>
+          </div>
         ) : (
           <div className="text-base text-content-secondary">No service loaded</div>
         )}
+        <button
+          onClick={() => setShowSearch(true)}
+          aria-label="Quick search: add a song, announcement, or scripture"
+          className="btn-pill shrink-0 text-xs"
+        >
+          <Search size={13} /> Add
+        </button>
       </div>
+      {showSearch && (
+        <QuickSearchOverlay
+          songs={songs}
+          announcements={announcements}
+          onAddSong={addSongFromSearch}
+          onAddAnnouncement={addAnnouncementFromSearch}
+          onAddScripture={addScriptureFromSearch}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
       <div className="min-h-0 flex-1 space-y-0.5 overflow-auto p-2">
         {(() => {
-          // This rail is Main-only (same scope as the zone status it's pinned
-          // above) — without this filter, Second-track items would interleave by
+          // This rail is Main-only — Live Control's run-of-show is main-track
+          // only; without this filter, Second-track items would interleave by
           // per-track ordinal and tapping one would incorrectly go live on Main.
           const mainItems = activeService?.items.filter((it) => it.track === 'main') ?? []
           return mainItems.length === 0 ? (
@@ -86,12 +132,6 @@ function ServiceRail(): JSX.Element {
             ))
           )
         })()}
-      </div>
-      <div className="border-t border-border">
-        <LiveZoneStatus />
-      </div>
-      <div className="border-t border-border">
-        <LooksPanel />
       </div>
     </aside>
   )
