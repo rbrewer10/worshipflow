@@ -7,6 +7,7 @@ import { expandScene } from '../../../shared/zoneScenes'
 import type { ServiceControlMode, ServiceControlModeMapping } from '../../../shared/serviceControlModes'
 import { DEFAULT_MODE_MAPPING, resolveModeScene } from '../../../shared/serviceControlModes'
 import { useService } from '../ServiceContext'
+import { notifyLocal } from '../NotifyToasts'
 
 const MODE_LABEL: Record<ServiceControlMode, string> = {
   sermon: 'Sermon Mode',
@@ -55,7 +56,10 @@ function ServiceControlsDrawer({ track, liveItemId }: { track: TrackId; liveItem
 
   const startTimer = (): void => {
     const secs = parseFloat(timerSecs)
-    if (isNaN(secs) || secs <= 0) return
+    if (isNaN(secs) || secs <= 0 || secs > 3600) {
+      notifyLocal('Timer must be between 1 and 3600 seconds', 'warn')
+      return
+    }
     void window.wf.liveLoadCountdown(track, secs, null, undefined)
   }
 
@@ -109,7 +113,7 @@ function ServiceControlsDrawer({ track, liveItemId }: { track: TrackId; liveItem
           {/* Livestream Check — read-only */}
           <div className="flex items-center justify-between rounded-lg border border-border bg-panel-raised px-3 py-2 text-xs">
             <span className="inline-flex items-center gap-1.5 text-content-secondary"><Radio size={13} /> Livestream</span>
-            <span className={`font-semibold ${obs?.connected ? 'text-emerald-400' : 'text-content-tertiary'}`}>
+            <span className={`font-semibold ${obs?.connected ? 'text-emerald-400' : 'text-content-secondary'}`}>
               {obs?.connected ? 'OBS connected' : 'OBS not connected'}
             </span>
           </div>
