@@ -213,7 +213,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
             {!isDefault && (
               <button
                 onClick={() => { void window.wf.zoneSetRouting(item.id, null).then(onChanged) }}
-                className="mt-2 text-[10px] font-semibold text-content-tertiary hover:text-content-secondary"
+                className="mt-2 text-[10px] font-semibold text-content-secondary hover:text-content-primary"
               >
                 Reset to default for this type
               </button>

@@ -30,11 +30,11 @@ export default function ZoneRoutingGrid({ routing, onChange }: {
     <div className="grid grid-cols-2 gap-1.5">
       {ZONE_IDS.map((zoneId) => (
         <div key={zoneId} className="flex items-center gap-1.5">
-          <span className="w-6 text-[10px] font-bold text-slate-400" title={ZONE_NAMES[zoneId]}>Z{zoneId}</span>
+          <span className="w-6 text-[10px] font-bold text-content-tertiary" title={ZONE_NAMES[zoneId]}>Z{zoneId}</span>
           <select
             value={routing[zoneId]}
             onChange={(e) => onChange({ ...routing, [zoneId]: e.target.value as ZoneState['mode'] })}
-            className="flex-1 rounded border border-slate-200 bg-slate-100 py-0.5 text-[11px] text-slate-700 outline-none focus:border-blue-500/50"
+            className="flex-1 rounded border border-border bg-panel py-0.5 text-[11px] text-content-secondary outline-none focus:border-blue-500/50"
           >
             {modeOptionsFor(zoneId).map((m) => (
               <option key={m} value={m}>{MODE_LABELS[m]}</option>
