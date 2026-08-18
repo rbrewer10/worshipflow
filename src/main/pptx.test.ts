@@ -72,6 +72,30 @@ describe('parsePptx', () => {
     expect(result.slides).toEqual(['First', 'Second', 'Tenth'])
   })
 
+  it('drops PowerPoint\'s auto-inserted photo-attribution caption, keeping real lyrics', async () => {
+    const buffer = await buildPptx([
+      [
+        'Amazing grace, how sweet the sound',
+        'This Photo by Unknown Author is licensed under CC BY-NC-ND',
+        'That saved a wretch like me',
+        'This Photo by Unknown Author is licensed under CC BY-ND'
+      ]
+    ])
+    const result = await parsePptx('song.pptx', buffer)
+    expect(result.slides).toEqual([
+      'Amazing grace, how sweet the sound\nThat saved a wretch like me'
+    ])
+  })
+
+  it('drops the attribution caption case-insensitively and leaves a slide with nothing else empty', async () => {
+    const buffer = await buildPptx([
+      ['this photo by jane doe is licensed under cc by-sa'],
+      ['Real lyrics survive']
+    ])
+    const result = await parsePptx('song.pptx', buffer)
+    expect(result.slides).toEqual(['Real lyrics survive'])
+  })
+
   it('skips slides with no extractable text', async () => {
     const buffer = await buildPptx([['Real lyrics here'], []])
     const result = await parsePptx('song.pptx', buffer)

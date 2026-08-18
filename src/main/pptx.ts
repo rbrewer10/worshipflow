@@ -17,6 +17,16 @@ function decodeEntities(s: string): string {
     .replace(/&amp;/g, '&') // last, so we don't double-decode
 }
 
+// PowerPoint auto-inserts its own caption text box — "This Photo by <author>
+// is licensed under <license>" — onto a slide whenever "Insert Online
+// Pictures" was used, as a sibling text box independent of whatever the
+// slide's actual content says. slideText() has no way to tell that box apart
+// from a real lyric/content paragraph, so without this filter a song
+// imported from a PPTX that used that feature gets this caption pulled in as
+// if it were a lyric line (see the 2026-08-18 report: "When We All Get to
+// Heaven" showing this text live instead of its lyrics).
+const PHOTO_ATTRIBUTION = /^this photo by .+ is licensed under .+$/i
+
 // Pull the text out of one slide's XML, preserving paragraph + in-line breaks.
 function slideText(xml: string): string {
   const lines: string[] = []
@@ -34,6 +44,7 @@ function slideText(xml: string): string {
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n[ \t]+/g, '\n')
       .trim()
+    if (PHOTO_ATTRIBUTION.test(s)) continue
     lines.push(s)
   }
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
