@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { MonitorOff, Image as ImageIcon, Play, Timer } from 'lucide-react'
+import { MonitorOff, Image as ImageIcon, Play, ShieldAlert, Timer } from 'lucide-react'
 import type { LiveState, TrackId } from '../../shared/types'
 import { useService } from './ServiceContext'
 import { PresenterPanel } from './PresenterPanel'
 import { StageMessagePanel } from './StageMessagePanel'
 import { TimingPanel } from './TimingPanel'
 import { notifyLocal } from './NotifyToasts'
+import LiveZoneStatus from './zones/LiveZoneStatus'
+import LooksPanel from './zones/LooksPanel'
+import ServiceControlsDrawer from './live/ServiceControlsDrawer'
 
 // The Live tab's right-hand control panel for the Main track. Deliberately holds
 // only what an operator reaches for *during* a service: the panic row, presenter
@@ -125,6 +128,23 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
           {live?.verseNumber != null && <span>· Verse {live.verseNumber}</span>}
         </div>
       )}
+
+      {/* Safety Reset — deliberately loud, always visible; force all 4 zones
+          to the logo without touching audio. Relocated from LooksPanel. */}
+      <button
+        onClick={() => void window.wf.zoneSafetyReset()}
+        title="Force all 4 zones to the logo — screens only, doesn't touch audio"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20"
+      >
+        <ShieldAlert size={13} /> Safety Reset
+      </button>
+
+      {/* Zone status + saved Looks */}
+      <LiveZoneStatus />
+      <LooksPanel />
+
+      {/* Sermon/Worship/Invitation Mode, Livestream Check, Quick Cues, Timer */}
+      <ServiceControlsDrawer track={track} liveItemId={live?.liveServiceItemId ?? null} />
 
     </aside>
   )

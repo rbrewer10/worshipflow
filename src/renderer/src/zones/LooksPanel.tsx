@@ -1,9 +1,10 @@
 // src/renderer/src/zones/LooksPanel.tsx
-// Saved zone-pin presets ("Looks") + the safety-reset button — both live here
-// on the Live tab since they're meant for in-the-moment use, unlike pinning
-// itself, which stays a Setup-only action (see ZoneLiveGrid.tsx / ZonePanel.tsx).
+// Saved zone-pin presets ("Looks") — lives here on the Live tab since it's
+// meant for in-the-moment use, unlike pinning itself, which stays a Setup-only
+// action (see ZoneLiveGrid.tsx / ZonePanel.tsx). Safety Reset relocated to
+// LiveTools.tsx — more prominent, always visible, not tucked in this panel.
 import { useCallback, useEffect, useState } from 'react'
-import { ShieldAlert, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { Look } from '../../../shared/zoneLooks'
 
 function LooksPanel(): JSX.Element {
@@ -21,20 +22,8 @@ function LooksPanel(): JSX.Element {
     void window.wf.looksDelete(lookId).then(refresh)
   }
 
-  const safetyReset = (): void => {
-    void window.wf.zoneSafetyReset()
-  }
-
   return (
     <div className="space-y-2 p-2">
-      <button
-        onClick={safetyReset}
-        title="Force all 4 zones to the logo — screens only, doesn't touch audio"
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20"
-      >
-        <ShieldAlert size={13} /> Safety Reset
-      </button>
-
       {looks.length > 0 && (
         <div className="space-y-1">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-content-secondary">Looks</div>
