@@ -71,13 +71,13 @@ export const StageMessagePanel = memo(function StageMessagePanel({
 
       {!editingPresets ? (
         <div className="mt-2 flex flex-wrap gap-2">
-          {presets.length === 0 && <span className="text-xs text-slate-400">No quick messages — tap Edit to add some.</span>}
+          {presets.length === 0 && <span className="text-xs text-content-tertiary">No quick messages — tap Edit to add some.</span>}
           {presets.map((p, i) => (
             <button key={i} onClick={() => onInputChange(p)} className="btn-pill text-xs hover:bg-amber-500/30">{p}</button>
           ))}
         </div>
       ) : (
-        <div className="mt-2 space-y-2 p-2 rounded-lg bg-white border border-slate-200">
+        <div className="mt-2 space-y-2 p-2 rounded-lg bg-panel-raised border border-border">
           {presets.map((p, i) => (
             <div key={i} className="flex gap-2">
               <input type="text" value={p} onChange={(e) => editPreset(i, e.target.value)} className="flex-1" />

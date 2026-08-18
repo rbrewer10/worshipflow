@@ -34,30 +34,30 @@ export function PresenterPanel({ liveState, liveItem }: PresenterPanelProps): JS
       <div className="mb-2 flex items-center justify-between">
         <h3 className="section-header">Presenter Notes</h3>
         {showNotes && (
-          <div className="text-sm font-mono font-bold text-blue-700 tabular-nums">
+          <div className="text-sm font-mono font-bold text-blue-400 tabular-nums">
             {formatTime(elapsed)}
           </div>
         )}
       </div>
 
       {!showNotes ? (
-        <p className="text-sm text-slate-500">No item loaded</p>
+        <p className="text-sm text-content-secondary">No item loaded</p>
       ) : hasNotes ? (
         <div className="space-y-2">
           <div className="surface max-h-48 overflow-y-auto">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-secondary">
               {liveItem?.notes}
             </p>
           </div>
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-content-secondary">
             {liveItem?.type} · {liveItem?.title}
           </div>
         </div>
       ) : (
         <div className="surface text-center">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-content-secondary">
             No notes for this item.{' '}
-            <span className="block text-xs text-slate-400 mt-1">
+            <span className="block text-xs text-content-tertiary mt-1">
               Add notes in the service editor to display them here.
             </span>
           </p>

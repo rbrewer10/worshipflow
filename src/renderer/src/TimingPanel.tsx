@@ -37,14 +37,14 @@ export const TimingPanel = memo(function TimingPanel({
         <h2 className="section-header">Text size</h2>
         <div className="flex items-center gap-2">
           <button onClick={onFontScaleDecrease} className="btn">A −</button>
-          <span className="text-xs text-slate-500 tabular-nums">{fontScale.toFixed(1)}vw</span>
+          <span className="text-xs text-content-secondary tabular-nums">{fontScale.toFixed(1)}vw</span>
           <button onClick={onFontScaleIncrease} className="btn">A +</button>
           <button onClick={onFontScaleSave} className="ml-auto btn-pill" title="Save size to current song"><Save size={11} /> Save</button>
         </div>
       </section>
 
       {/* Divider */}
-      <div className="border-t border-slate-200" />
+      <div className="border-t border-border" />
 
       {/* Auto-advance */}
       <section className="surface">
@@ -58,7 +58,7 @@ export const TimingPanel = memo(function TimingPanel({
           )}
         </div>
         {autoAdvanceRunning && (
-          <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-panel-raised">
             <div
               className="h-full rounded-full bg-blue-500 transition-none"
               style={{ width: `${Math.min(100, ((liveState?.autoAdvanceMs ?? 0) / (parseFloat(autoAdvanceSecs) * 1000)) * 100)}%` }}
@@ -72,7 +72,7 @@ export const TimingPanel = memo(function TimingPanel({
         </div>
         <label className="mt-2 flex cursor-pointer items-center gap-2">
           <input type="checkbox" checked={autoAdvanceLoop} onChange={(e) => onAutoAdvanceLoopToggle(e.target.checked)} className="h-3.5 w-3.5" />
-          <span className="inline-flex items-center gap-1 text-[11px] text-slate-600"><Repeat size={11} /> Loop back to start at the end</span>
+          <span className="inline-flex items-center gap-1 text-[11px] text-content-secondary"><Repeat size={11} /> Loop back to start at the end</span>
         </label>
       </section>
     </>
