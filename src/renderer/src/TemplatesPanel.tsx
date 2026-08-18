@@ -22,11 +22,13 @@ interface ServiceFull {
 export function TemplatesPanel({
   currentService,
   onLoadTemplate,
-  onClose
+  onClose,
+  inline
 }: {
   currentService: ServiceFull | null
   onLoadTemplate: (items: any[], theme: string | null, themeColors: any | null) => Promise<void>
-  onClose: () => void
+  onClose?: () => void
+  inline?: boolean
 }): JSX.Element {
   const [templates, setTemplates] = useState<ServiceTemplate[]>([])
   const [loading, setLoading] = useState(false)
@@ -55,7 +57,7 @@ export function TemplatesPanel({
     try {
       setLoading(true)
       await onLoadTemplate(template.items, template.theme, template.themeColors)
-      onClose()
+      if (!inline) onClose?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -99,117 +101,129 @@ export function TemplatesPanel({
     }
   }
 
-  return (
-    <Modal onClose={onClose} labelledBy="templates-panel-title" className="w-full max-w-2xl rounded-xl border border-slate-200 bg-[#f4f6f9] p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="templates-panel-title" className="text-xl font-bold text-slate-900">Service Templates</h2>
+  const body = (
+    <>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 id="templates-panel-title" className="text-xl font-bold text-content-primary">Service Templates</h2>
+        {!inline && onClose && (
           <button
             onClick={onClose}
-            className="inline-flex items-center justify-center text-slate-600 hover:text-slate-900"
+            className="inline-flex items-center justify-center text-content-secondary hover:text-content-primary"
             aria-label="Close"
           >
             <X size={18} />
           </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          {error}
         </div>
+      )}
 
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">
-            {error}
-          </div>
-        )}
-
-        {/* Save Current Service as Template */}
-        {currentService && (
-          <div className="mb-6 rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-            {!showSaveForm ? (
-              <button
-                onClick={() => setShowSaveForm(true)}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-              >
-                <Save size={15} /> Save Current Service as Template
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Template name (e.g. Sunday Worship 60min)"
-                  value={saveName}
-                  onChange={(e) => setSaveName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus:border-blue-500"
-                />
-                <textarea
-                  placeholder="Description (optional)"
-                  value={saveDesc}
-                  onChange={(e) => setSaveDesc(e.target.value)}
-                  rows={2}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus:border-blue-500"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSaveTemplate}
-                    disabled={!saveName.trim() || loading}
-                    className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSaveForm(false)
-                      setSaveName('')
-                      setSaveDesc('')
-                    }}
-                    className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Templates List */}
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">Available Templates</h3>
-          {loading && templates.length === 0 ? (
-            <p className="text-center text-sm text-slate-600">Loading templates…</p>
-          ) : templates.length === 0 ? (
-            <p className="text-center text-sm text-slate-600">No templates saved yet.</p>
+      {/* Save Current Service as Template */}
+      {currentService && (
+        <div className="mb-6 rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+          {!showSaveForm ? (
+            <button
+              onClick={() => setShowSaveForm(true)}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+            >
+              <Save size={15} /> Save Current Service as Template
+            </button>
           ) : (
-            <div className="space-y-2">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-100 p-3 hover:bg-slate-200"
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Template name (e.g. Sunday Worship 60min)"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                className="w-full rounded-lg border border-border bg-panel px-3 py-2 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:border-blue-500"
+              />
+              <textarea
+                placeholder="Description (optional)"
+                value={saveDesc}
+                onChange={(e) => setSaveDesc(e.target.value)}
+                rows={2}
+                className="w-full rounded-lg border border-border bg-panel px-3 py-2 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:border-blue-500"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveTemplate}
+                  disabled={!saveName.trim() || loading}
+                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-900 truncate">{template.name}</p>
-                    {template.description && (
-                      <p className="text-xs text-slate-600 truncate">{template.description}</p>
-                    )}
-                    <p className="text-xs text-slate-500 mt-1">{template.items.length} items</p>
-                  </div>
-                  <div className="flex gap-2 ml-3">
-                    <button
-                      onClick={() => handleLoadTemplate(template)}
-                      disabled={loading}
-                      className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-                    >
-                      Load
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTemplate(template.id)}
-                      disabled={loading}
-                      className="rounded-lg bg-red-600/20 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-600/30 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSaveForm(false)
+                    setSaveName('')
+                    setSaveDesc('')
+                  }}
+                  className="flex-1 rounded-lg border border-border bg-panel px-4 py-2 text-sm font-semibold text-content-secondary hover:bg-panel-raised"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>
+      )}
+
+      {/* Templates List */}
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-content-secondary">Available Templates</h3>
+        {loading && templates.length === 0 ? (
+          <p className="text-center text-sm text-content-secondary">Loading templates…</p>
+        ) : templates.length === 0 ? (
+          <p className="text-center text-sm text-content-secondary">No templates saved yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {templates.map((template) => (
+              <div
+                key={template.id}
+                className="flex items-center justify-between rounded-lg border border-border bg-panel p-3 hover:bg-panel-raised"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-content-primary truncate">{template.name}</p>
+                  {template.description && (
+                    <p className="text-xs text-content-secondary truncate">{template.description}</p>
+                  )}
+                  <p className="text-xs text-content-tertiary mt-1">{template.items.length} items</p>
+                </div>
+                <div className="flex gap-2 ml-3">
+                  <button
+                    onClick={() => handleLoadTemplate(template)}
+                    disabled={loading}
+                    className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+                  >
+                    Load
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTemplate(template.id)}
+                    disabled={loading}
+                    className="rounded-lg bg-red-600/20 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-600/30 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  )
+
+  if (inline) return <div>{body}</div>
+
+  if (!onClose) throw new Error('TemplatesPanel: onClose is required when inline is not set')
+
+  return (
+    <Modal onClose={onClose} labelledBy="templates-panel-title" className="w-full max-w-2xl rounded-xl border border-border bg-panel-raised p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
+      {body}
     </Modal>
   )
 }
