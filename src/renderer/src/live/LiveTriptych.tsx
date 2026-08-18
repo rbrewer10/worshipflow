@@ -47,20 +47,33 @@ function LiveTriptych({ track }: { track: TrackId }): JSX.Element {
 
   const advance = (): void => { void window.wf.sendIntent(track, 'next') }
 
-  const progressPct = live && live.total > 0 ? ((live.index + 1) / live.total) * 100 : 0
+  const progressPct = live && live.total > 0 ? Math.min(100, ((live.index + 1) / live.total) * 100) : 0
+
+  // Black/Logo cutaways deliberately leave the last song/line/index/total
+  // untouched in main (see processIntent's black/logo branches), so the
+  // CURRENT panel must branch on mode rather than trusting those fields —
+  // otherwise it shows stale lyric content while the screen is actually
+  // black or on the logo.
+  const isBlack = live?.mode === 'black'
+  const isLogo = live?.mode === 'logo'
+  const showLiveContent = !isBlack && !isLogo
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col gap-3 overflow-auto p-3">
       {/* CURRENT — large, dominant */}
       <div className="card-lg flex min-h-0 flex-[3] flex-col justify-center gap-3 p-6">
         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-content-secondary">
-          <span>{live?.songTitle || 'Current'}</span>
-          {live && live.total > 0 && <span className="tabular-nums">Slide {live.index + 1} of {live.total}</span>}
+          <span>{showLiveContent ? (live?.songTitle || 'Current') : 'Current'}</span>
+          {showLiveContent && live && live.total > 0 && <span className="tabular-nums">Slide {live.index + 1} of {live.total}</span>}
         </div>
         <p className="whitespace-pre-line text-center text-3xl font-semibold leading-snug text-content-primary">
-          {live?.line || <span className="italic text-content-tertiary">Nothing live</span>}
+          {isBlack
+            ? <span className="italic text-content-tertiary">Screen is black</span>
+            : isLogo
+              ? <span className="italic text-content-tertiary">Logo screen</span>
+              : (live?.line || <span className="italic text-content-tertiary">Nothing live</span>)}
         </p>
-        {live && live.total > 0 && (
+        {showLiveContent && live && live.total > 0 && (
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-panel-raised">
             <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${progressPct}%` }} />
           </div>
