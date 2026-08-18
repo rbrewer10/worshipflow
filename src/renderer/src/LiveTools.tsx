@@ -27,6 +27,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
 
   useEffect(() => {
     const off = window.wf.onState((s) => setLive(track === 'main' ? s.main : s.second))
+    window.wf.getState(track).then(setLive)
     return off
   }, [track])
   useEffect(() => { if (!live?.stageMessage) setStageMsg('') }, [live?.stageMessage])
