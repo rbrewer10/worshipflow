@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ServiceItem, ThemeColors, SongFull, ZoneId, ZoneRouting } from '../../../shared/types'
 import { NON_LIVE_TYPES } from '../../../shared/types'
 import type { SceneConfig, ZoneRole } from '../../../shared/zoneScenes'
@@ -18,7 +19,7 @@ const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 // 2x2 grid of live previews, and the raw-mode Advanced escape hatch. Writes the
 // same per-item zone_routing the scene chips always have, through the existing
 // zoneSetRouting IPC — no new persistence.
-export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceColors, songFull, slides, trackAssignment, compact, onChanged }: {
+export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceColors, songFull, slides, trackAssignment, compact, onChanged, zoneCardsPortalTarget }: {
   item: ServiceItem
   serviceId: number
   serviceTheme: string | null
@@ -28,6 +29,16 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
   trackAssignment: ZoneTrackAssignment
   compact?: boolean
   onChanged: () => void
+  // When set, the 2x2 zone-preview cards render into this DOM node (via a
+  // portal) instead of inline here — everything else (preset row, role
+  // palette, slide filmstrip, Advanced routing grid) stays exactly where it
+  // is. Lets Build Service's cramped 320px right column keep just the
+  // controls while the previews themselves live in a full-width bottom
+  // strip, mirroring Live Control's OutputsStrip. Deck-mode items have no
+  // cards to portal (ZoneDeckComposer shows its own per-zone previews
+  // inline) — the target simply stays empty then, which collapses to zero
+  // height on its own.
+  zoneCardsPortalTarget?: HTMLElement | null
 }): JSX.Element {
   const [config, setConfig] = useState<SceneConfig | null>(null)
   const [logoPath, setLogoPath] = useState<string | null>(null)
@@ -116,6 +127,36 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
     save({ ...routing, [zoneId]: modeForRole(role, item.type) })
   }
 
+  // An item only ever reaches zones tuned to its own track — a zone assigned
+  // to the other track will never actually show this item's content, no
+  // matter what role gets set here. Dim and lock those cards instead of
+  // rendering something that would never appear there.
+  const zoneCards = (
+    <div className={`grid ${zoneCardsPortalTarget ? 'grid-cols-4' : 'grid-cols-2'} ${compact ? 'gap-1.5' : 'gap-3'}`}>
+      {ZONE_IDS.map((zoneId) => {
+        const offTrack = trackAssignment[zoneId] !== item.track
+        return (
+          <ZoneScreenCard
+            key={zoneId}
+            zoneId={zoneId}
+            mode={routing[zoneId]}
+            item={item}
+            serviceTheme={serviceTheme}
+            serviceColors={serviceColors}
+            songFull={songFull}
+            logoPath={logoPath}
+            offTrack={offTrack}
+            offTrackLabel={trackAssignment[zoneId] === 'main' ? 'Follows Main' : 'Follows Second'}
+            slideText={slides[selectedSlide]}
+            showSafeArea={showSafeArea}
+            compact={compact}
+            onRoleChange={(role) => setRole(zoneId, role)}
+          />
+        )
+      })}
+    </div>
+  )
+
   return (
     <div className={`flex w-full ${compact ? 'max-w-full' : 'max-w-3xl'} flex-col gap-3`}>
       {deck ? (
@@ -170,33 +211,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
             </div>
           </div>
 
-          {/* An item only ever reaches zones tuned to its own track — a zone
-              assigned to the other track will never actually show this item's
-              content, no matter what role gets set here. Dim and lock those cards
-              instead of rendering something that would never appear there. */}
-          <div className={`grid grid-cols-2 ${compact ? 'gap-1.5' : 'gap-3'}`}>
-            {ZONE_IDS.map((zoneId) => {
-              const offTrack = trackAssignment[zoneId] !== item.track
-              return (
-                <ZoneScreenCard
-                  key={zoneId}
-                  zoneId={zoneId}
-                  mode={routing[zoneId]}
-                  item={item}
-                  serviceTheme={serviceTheme}
-                  serviceColors={serviceColors}
-                  songFull={songFull}
-                  logoPath={logoPath}
-                  offTrack={offTrack}
-                  offTrackLabel={trackAssignment[zoneId] === 'main' ? 'Follows Main' : 'Follows Second'}
-                  slideText={slides[selectedSlide]}
-                  showSafeArea={showSafeArea}
-                  compact={compact}
-                  onRoleChange={(role) => setRole(zoneId, role)}
-                />
-              )
-            })}
-          </div>
+          {zoneCardsPortalTarget ? createPortal(zoneCards, zoneCardsPortalTarget) : zoneCards}
         </>
       )}
 

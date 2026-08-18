@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Trash2, X } from 'lucide-react'
 import type { ItemStyle, ServiceItem, SongFull, ThemeColors } from '../../shared/types'
 import { NON_LIVE_TYPES } from '../../shared/types'
@@ -106,6 +106,19 @@ export const ItemEditor = memo(function ItemEditor({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
+  // Headers/placeholders never render on screen, and a live call has no
+  // background to pick (the video IS the screen) — those types get no
+  // Background tab at all, just the plain content editor.
+  const hasBackgroundTab = !NON_LIVE_TYPES.includes(item.type) && item.type !== 'livecall'
+  const [activeTab, setActiveTab] = useState<'content' | 'background'>('content')
+  // Reaching Background used to mean scrolling past the whole content editor
+  // first — with tabs instead, switching items should land back on Content
+  // rather than silently staying on a Background tab that may not even apply
+  // to the newly-selected item.
+  useEffect(() => { setActiveTab('content') }, [item.id])
+  const showContent = !hasBackgroundTab || activeTab === 'content'
+  const showBackground = hasBackgroundTab && activeTab === 'background'
+
   return (
     <div className="card-lg flex flex-col gap-3 overflow-auto text-content-primary animate-[fade-in_0.15s_ease-out]">
       <div className="flex items-center justify-between">
@@ -121,8 +134,31 @@ export const ItemEditor = memo(function ItemEditor({
         <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} />
       )}
 
+      {/* Content / Background tabs — Background used to be reachable only by
+          scrolling past the whole content editor below it, which for a song's
+          long lyrics list meant scrolling well past a screen's worth just to
+          reach the picker. */}
+      {hasBackgroundTab && (
+        <div className="flex rounded-lg bg-panel p-0.5">
+          {(['content', 'background'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={[
+                'flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-all',
+                activeTab === tab
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-content-secondary hover:text-content-primary',
+              ].join(' ')}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Type-specific editors */}
-      {item.type === 'song' && (
+      {showContent && item.type === 'song' && (
         <CardSongEditor
           songFull={songFull}
           lyrics={lyrics}
@@ -144,7 +180,7 @@ export const ItemEditor = memo(function ItemEditor({
         />
       )}
 
-      {item.type === 'scripture' && (
+      {showContent && item.type === 'scripture' && (
         <ScriptureEditor
           reference={(payload.reference as string) ?? ''}
           fontScale={(payload.fontScale as number) ?? 6}
@@ -153,7 +189,7 @@ export const ItemEditor = memo(function ItemEditor({
         />
       )}
 
-      {item.type === 'text' && (
+      {showContent && item.type === 'text' && (
         <TextEditor
           title={(payload.title as string) ?? ''}
           body={(payload.body as string) ?? ''}
@@ -166,28 +202,28 @@ export const ItemEditor = memo(function ItemEditor({
         />
       )}
 
-      {item.type === 'image' && (
+      {showContent && item.type === 'image' && (
         <ImageEditor
           imagePath={(payload.path as string) ?? '—'}
           onPathChange={(path) => savePayload({ ...payload, path })}
         />
       )}
 
-      {(item.type === 'countdown' || item.type === 'welcome') && (
+      {showContent && (item.type === 'countdown' || item.type === 'welcome') && (
         <CountdownEditor
           seconds={(payload.seconds as number) ?? 300}
           onSecondsChange={(secs) => savePayload({ ...payload, seconds: secs })}
         />
       )}
 
-      {item.type === 'ticker' && (
+      {showContent && item.type === 'ticker' && (
         <TickerEditor
           text={(payload.text as string) ?? ''}
           onTextChange={(text) => savePayload({ ...payload, text })}
         />
       )}
 
-      {item.type === 'sermon' && (
+      {showContent && item.type === 'sermon' && (
         <>
           <SermonEditor
             title={(payload.title as string) ?? ''}
@@ -204,7 +240,7 @@ export const ItemEditor = memo(function ItemEditor({
         </>
       )}
 
-      {item.type === 'announcement' && (
+      {showContent && item.type === 'announcement' && (
         <AnnouncementItemEditor
           refId={item.ref_id}
           refIds={(payload.refIds as number[] | undefined) ?? []}
@@ -234,10 +270,8 @@ export const ItemEditor = memo(function ItemEditor({
           whether it's connected, which LiveCallEditor shows directly. */}
       {item.type === 'livecall' && <LiveCallEditor />}
 
-      {/* ── Background & Color — headers/placeholders never render on screen,
-          and a live call has no background to pick: the video IS the screen. ── */}
-      {!NON_LIVE_TYPES.includes(item.type) && item.type !== 'livecall' && (
-        <div className="border-t border-border pt-3">
+      {showBackground && (
+        <div>
           <ItemBackgroundPanel
             item={item}
             songFull={songFull}

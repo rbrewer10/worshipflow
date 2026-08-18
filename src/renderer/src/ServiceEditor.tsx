@@ -38,6 +38,15 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   const [trackAssignment, setTrackAssignment] = useState<ZoneTrackAssignment>(DEFAULT_ZONE_TRACK)
   const [showQuickSearch, setShowQuickSearch] = useState(false)
   const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
+  // Portal target for ZoneScreenGrid's zone-preview cards — see the bottom
+  // strip below. A ref callback (not useRef) because we need the actual DOM
+  // node to trigger a re-render once it exists, so the portal has somewhere
+  // to render into on the very first paint.
+  const [zoneCardsAnchor, setZoneCardsAnchor] = useState<HTMLDivElement | null>(null)
+  // Collapsed by default — the Scene Selector is a less-frequent action than
+  // picking an item to preview, and left open it crowded the bottom strip.
+  // Matches the "Advanced ▾" disclosure idiom ZoneScreenGrid already uses.
+  const [showSceneSelector, setShowSceneSelector] = useState(false)
 
   const { needsAttention } = usePreflightChecks()
 
@@ -325,6 +334,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
                 slides={itemSlides[selectedItem.id] ?? []}
                 trackAssignment={trackAssignment}
                 onChanged={reload}
+                zoneCardsPortalTarget={zoneCardsAnchor}
                 compact
               />
               <CardEditPanel
@@ -345,22 +355,39 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
           )}
         </div>
 
-        {/* Bottom: persistent Scene Selector bar */}
-        {selectedItem && sceneConfig && (
-          <div className="shrink-0 rounded-xl border border-border bg-panel-raised p-3">
-            <div className="section-header mb-2">Scene Selector</div>
-            <ScenePresetRow
-              config={sceneConfig}
-              itemType={selectedItem.type}
-              routing={effectiveRouting(selectedItem, sceneConfig)}
-              matched={matchScene(effectiveRouting(selectedItem, sceneConfig), selectedItem.type, sceneConfig)}
-              isDefault={selectedItem.zoneRouting == null}
-              onPick={(sceneId) => {
-                const scene = sceneConfig.scenes.find((s) => s.id === sceneId)
-                if (!scene) return
-                void window.wf.zoneSetRouting(selectedItem.id, expandScene(scene, selectedItem.type)).then(() => reload())
-              }}
-            />
+        {/* Bottom: zone-preview cards (portaled in from ZoneScreenGrid above)
+            + persistent Scene Selector bar — mirrors Live Control's
+            OutputsStrip-then-ScenePresetRow bottom bar, so the narrow right
+            column only has to hold controls, not previews. */}
+        {selectedItem && (
+          <div className="flex shrink-0 flex-col gap-3 rounded-xl border border-border bg-panel-raised p-3">
+            <div ref={setZoneCardsAnchor} />
+            {sceneConfig && (
+              <div>
+                <button
+                  onClick={() => setShowSceneSelector((v) => !v)}
+                  className="text-[10px] font-semibold uppercase tracking-widest text-content-tertiary hover:text-content-secondary"
+                >
+                  Scene Selector {showSceneSelector ? '▴' : '▾'}
+                </button>
+                {showSceneSelector && (
+                  <div className="mt-2">
+                    <ScenePresetRow
+                      config={sceneConfig}
+                      itemType={selectedItem.type}
+                      routing={effectiveRouting(selectedItem, sceneConfig)}
+                      matched={matchScene(effectiveRouting(selectedItem, sceneConfig), selectedItem.type, sceneConfig)}
+                      isDefault={selectedItem.zoneRouting == null}
+                      onPick={(sceneId) => {
+                        const scene = sceneConfig.scenes.find((s) => s.id === sceneId)
+                        if (!scene) return
+                        void window.wf.zoneSetRouting(selectedItem.id, expandScene(scene, selectedItem.type)).then(() => reload())
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
