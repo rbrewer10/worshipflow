@@ -56,20 +56,23 @@ function LiveView(): JSX.Element {
         {/* Bottom: outputs + scene selector */}
         <div className="flex flex-col gap-2 border-t border-border p-3">
           <OutputsStrip />
-          {liveItem && sceneConfig && (
-            <ScenePresetRow
-              config={sceneConfig}
-              itemType={liveItem.type}
-              routing={effectiveRouting(liveItem, sceneConfig)}
-              matched={matchScene(effectiveRouting(liveItem, sceneConfig), liveItem.type, sceneConfig)}
-              isDefault={liveItem.zoneRouting == null}
-              onPick={(sceneId) => {
-                const scene = sceneConfig.scenes.find((s) => s.id === sceneId)
-                if (!scene) return
-                void window.wf.zoneSetRouting(liveItem.id, expandScene(scene, liveItem.type))
-              }}
-            />
-          )}
+          {liveItem && sceneConfig && (() => {
+            const routing = effectiveRouting(liveItem, sceneConfig)
+            return (
+              <ScenePresetRow
+                config={sceneConfig}
+                itemType={liveItem.type}
+                routing={routing}
+                matched={matchScene(routing, liveItem.type, sceneConfig)}
+                isDefault={liveItem.zoneRouting == null}
+                onPick={(sceneId) => {
+                  const scene = sceneConfig.scenes.find((s) => s.id === sceneId)
+                  if (!scene) return
+                  void window.wf.zoneSetRouting(liveItem.id, expandScene(scene, liveItem.type))
+                }}
+              />
+            )
+          })()}
         </div>
       </div>
       <div className="flex min-h-0 border-l border-border">
