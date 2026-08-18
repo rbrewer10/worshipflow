@@ -113,7 +113,7 @@ export default function ZoneScreenCard({
     >
       <div className={`${compact ? 'mb-1' : 'mb-1.5'} flex items-center justify-between`}>
         <span className="text-[10px] font-semibold uppercase tracking-wide text-content-secondary">{ZONE_NAMES[zoneId]}</span>
-        <span className="text-[10px] font-semibold text-content-tertiary">{offTrack ? offTrackLabel : role ? ROLE_LABEL[role] : mode}</span>
+        <span className="text-[10px] font-semibold text-content-secondary">{offTrack ? offTrackLabel : role ? ROLE_LABEL[role] : mode}</span>
       </div>
       {body()}
     </div>
