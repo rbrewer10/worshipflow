@@ -17,15 +17,18 @@ jobs:
           cache: npm
 
       - run: npm ci
-
-      # npm's install-scripts gate has been silently skipping electron's own
-      # postinstall (the step that downloads the actual Electron binary) on
-      # this runner since 2026-08-17, leaving node_modules/electron without a
-      # binary and failing every test that touches electron-store (db.test.ts,
-      # recovery.test.ts) with "Electron failed to install correctly" even
-      # though npm ci itself reports success. Running its installer directly
-      # bypasses whatever gated it during npm ci.
-      - run: node node_modules/electron/install.js
+        env:
+          # electron/install.js's very first line is `if
+          # (process.env.ELECTRON_SKIP_BINARY_DOWNLOAD) process.exit(0)` --
+          # this runner has that set (probably a windows-latest image default
+          # as of 2026-08-17), so electron's postinstall has been silently
+          # doing nothing on every push since, leaving node_modules/electron
+          # without a binary and failing every test that touches
+          # electron-store (db.test.ts, recovery.test.ts) with "Electron
+          # failed to install correctly" -- even though npm ci itself reports
+          # success. Clearing it (empty string is falsy in JS) lets the real
+          # postinstall run.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: ''
 
       - run: npm run typecheck
 
