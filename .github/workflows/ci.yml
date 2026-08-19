@@ -51,6 +51,14 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: ''
 
+      # TEMPORARY: the first debug step proved @electron/get itself resolves
+      # a valid, correctly-sized cached zip in ~300ms (cache hit against a
+      # pre-warmed runner-image cache) -- so the network/cache layer is fine.
+      # This step checks what `npm rebuild electron` actually left on disk
+      # afterwards, and re-runs install.js directly with full @electron/get
+      # debug logging to see where extraction/path.txt goes missing.
+      - run: node scripts/debug-electron-post-rebuild.cjs
+
       - run: npm run typecheck
 
       - run: npm test
