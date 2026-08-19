@@ -20,16 +20,40 @@ asarUnpack:
 
 # Everything under out/ (the electron-vite build) plus production node_modules is included
 # by default; these exclusions keep source, tooling, and the unused serialport binding out.
+#
+# This list is exclusion-only (no positive allowlist), so it silently falls behind whenever
+# a new top-level file/folder shows up in the project — that's exactly how v0.14.2 shipped a
+# 412MB installer containing tests/, test-results/ (Playwright artifacts), every config file,
+# and even a stray installer .exe that happened to be sitting in the project root. Re-check
+# this list against `ls` at the project root whenever the built installer's size looks off.
 files:
+  - '!.claude/**'
+  - '!.full-review/**'
+  - '!.superpowers/**'
+  - '!.worktrees/**'
+  - '!.worshipflow-dev/**'
+  - '!.github/**'
   - '!src/**'
   - '!scripts/**'
   - '!docs/**'
+  - '!tests/**'
+  - '!test-results/**'
+  - '!playwright-report/**'
+  - '!build/**'
   - '!electron.vite.config.*'
   - '!tsconfig*.json'
   - '!**/*.tsbuildinfo'
   - '!*.md'
+  - '!*.exe'
   - '!launch-worshipflow.vbs'
   - '!gen-bg.html'
+  - '!test-import.js'
+  - '!playwright.config.ts'
+  - '!postcss.config.js'
+  - '!tailwind.config.js'
+  - '!vitest.config.ts'
+  - '!eslint.config.mjs'
+  - '!package-lock.json'
   - '!**/node_modules/@serialport/**'
   - '!**/node_modules/serialport/**'
 
