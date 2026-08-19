@@ -16,19 +16,28 @@ jobs:
           node-version: 26
           cache: npm
 
-      # This runner's npm (bundled with Node 26) warns "N packages have
-      # install scripts not yet covered by allowScripts" and silently skips
-      # them -- including electron's own postinstall, the step that
-      # downloads the actual Electron binary. That's left node_modules/
-      # electron without a binary since 2026-08-17, failing every test that
-      # touches electron-store (db.test.ts, recovery.test.ts) with "Electron
-      # failed to install correctly" even though npm ci itself reports
-      # success. package.json's new top-level allowScripts covers the
-      # flagged packages; `npm rebuild electron` re-runs its postinstall
-      # explicitly as a fallback in case that alone isn't enough.
+      # Two separate things on this runner have been blocking electron's
+      # postinstall (the step that downloads the actual Electron binary)
+      # since 2026-08-17, failing every test that touches electron-store
+      # (db.test.ts, recovery.test.ts) with "Electron failed to install
+      # correctly" even though npm ci itself reports success:
+      #   1. npm warns "N packages have install scripts not yet covered by
+      #      allowScripts" and skips them outright -- fixed by package.json's
+      #      top-level allowScripts allowlist.
+      #   2. This runner also sets ELECTRON_SKIP_BINARY_DOWNLOAD, which is
+      #      install.js's own very first check (`if (...) process.exit(0)`)
+      #      -- fixed by clearing it below (empty string is falsy in JS).
+      # Both are needed together: with only #1 fixed, npm actually invokes
+      # install.js, which then immediately no-ops on #2 -- same silent
+      # "success", no binary. `npm rebuild electron` re-runs the postinstall
+      # explicitly as a fallback in case the allowlist alone isn't enough.
       - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: ''
 
       - run: npm rebuild electron
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: ''
 
       - run: npm run typecheck
 
