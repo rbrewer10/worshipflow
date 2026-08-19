@@ -38,6 +38,15 @@ jobs:
           # doesn't (empty string is falsy in JS).
           ELECTRON_SKIP_BINARY_DOWNLOAD: ''
 
+      # TEMPORARY: live instrumentation to get a definitive root cause for
+      # the electron-install CI failure. Calls @electron/get directly with
+      # full logging (see scripts/debug-electron-download.cjs) instead of
+      # relying on install.js's silent success/failure. Remove once we have
+      # an answer.
+      - run: node scripts/debug-electron-download.cjs
+        env:
+          DEBUG: '@electron/get*'
+
       - run: npm rebuild electron
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: ''
