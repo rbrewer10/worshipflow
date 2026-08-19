@@ -37,7 +37,6 @@ function LiveTriptych({ track }: { track: TrackId }): JSX.Element {
   const items = activeService?.items ?? []
   const { next, afterNext } = useMemo(
     () => resolveUpcoming(items, track, slides, live?.liveServiceItemId ?? null, live?.index ?? 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [items, track, slides, live?.liveServiceItemId, live?.index]
   )
 
@@ -59,9 +58,9 @@ function LiveTriptych({ track }: { track: TrackId }): JSX.Element {
   const showLiveContent = !isBlack && !isLogo
 
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col gap-3 overflow-auto p-3">
+    <div className="wf-live-triptych grid h-full min-w-0 flex-1 grid-cols-[minmax(0,1.55fr)_minmax(190px,0.85fr)] grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden p-3">
       {/* CURRENT — large, dominant */}
-      <div className="card-lg flex min-h-0 flex-[3] flex-col justify-center gap-3 p-6">
+      <div className="wf-live-current card-lg row-span-2 flex min-h-0 flex-col justify-center gap-3 overflow-hidden p-6">
         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-content-secondary">
           <span>{showLiveContent ? (live?.songTitle || 'Current') : 'Current'}</span>
           {showLiveContent && live && live.total > 0 && <span className="tabular-nums">Slide {live.index + 1} of {live.total}</span>}
@@ -87,19 +86,19 @@ function LiveTriptych({ track }: { track: TrackId }): JSX.Element {
         onClick={advance}
         disabled={!next}
         title={next ? 'Click to advance' : 'End of service'}
-        className="card-lg flex min-h-0 flex-[2] flex-col justify-center gap-1.5 p-4 text-left transition-colors hover:bg-panel-raised disabled:cursor-default disabled:hover:bg-transparent"
+        className="wf-live-next card-lg flex min-h-0 flex-col justify-center gap-1.5 overflow-hidden p-4 text-left transition-colors hover:bg-panel-raised disabled:cursor-default disabled:hover:bg-transparent"
       >
         <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-widest text-content-secondary">
           <span className="inline-flex items-center gap-1"><ChevronRight size={13} /> Next</span>
           {next && next.itemTitle && <span className="truncate text-content-tertiary">{next.itemTitle}</span>}
         </div>
-        <p className="whitespace-pre-line text-xl font-medium text-content-primary">
+        <p className="line-clamp-4 whitespace-pre-line text-xl font-medium text-content-primary">
           {next?.text || <span className="italic text-content-tertiary">End of service</span>}
         </p>
       </button>
 
       {/* AFTER NEXT — small, thumbnail-only preview */}
-      <div className="card-lg flex min-h-0 flex-1 items-center gap-2 p-3">
+      <div className="wf-live-after card-lg flex min-h-0 items-center gap-2 overflow-hidden p-3">
         <span className="shrink-0 text-[10px] font-semibold uppercase tracking-widest text-content-tertiary">After next</span>
         <p className="min-w-0 flex-1 truncate text-sm text-content-secondary">
           {afterNext?.text || <span className="italic text-content-tertiary">—</span>}

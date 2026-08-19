@@ -27,7 +27,7 @@ const QUICK_CUES = ['Applause', 'Amen', 'Bible', 'Thank You']
 
 function ServiceControlsDrawer({ track, liveItemId }: { track: TrackId; liveItemId: number | null }): JSX.Element {
   const { activeService } = useService()
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
   const [modeMapping, setModeMapping] = useState<ServiceControlModeMapping>(DEFAULT_MODE_MAPPING)
   const [obs, setObs] = useState<ObsStatus | null>(null)

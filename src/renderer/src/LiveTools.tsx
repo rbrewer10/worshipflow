@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { MonitorOff, Image as ImageIcon, Play, ShieldAlert, Timer } from 'lucide-react'
 import type { LiveState, TrackId } from '../../shared/types'
 import { useService } from './ServiceContext'
@@ -9,6 +10,27 @@ import { notifyLocal } from './NotifyToasts'
 import LiveZoneStatus from './zones/LiveZoneStatus'
 import LooksPanel from './zones/LooksPanel'
 import ServiceControlsDrawer from './live/ServiceControlsDrawer'
+
+function LiveToolsSection({ title, description, children }: { title: string; description: string; children: ReactNode }): JSX.Element {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-panel-raised">
+      <button
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-panel"
+      >
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold text-content-primary">{title}</span>
+          <span className="mt-0.5 block truncate text-[11px] text-content-tertiary">{description}</span>
+        </span>
+        {open ? <ChevronUp size={14} className="shrink-0 text-content-tertiary" /> : <ChevronDown size={14} className="shrink-0 text-content-tertiary" />}
+      </button>
+      {open && <div className="space-y-3 border-t border-border p-2">{children}</div>}
+    </section>
+  )
+}
 
 // The Live tab's right-hand control panel for the Main track. Deliberately holds
 // only what an operator reaches for *during* a service: the panic row, presenter
@@ -46,7 +68,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
   const clearStageMessage = (): void => { setStageMsg(''); window.wf.liveSetStageMessage(track, null) }
 
   return (
-    <aside className="flex w-96 shrink-0 flex-col gap-4 overflow-auto border-l border-border bg-panel p-4">
+    <aside className="wf-live-tools flex w-96 shrink-0 flex-col gap-4 overflow-auto border-l border-border bg-panel p-4">
       {/* Emergency controls */}
       <div className="flex gap-2">
         <button
@@ -140,9 +162,12 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
         <ShieldAlert size={13} /> Safety Reset
       </button>
 
-      {/* Zone status + saved Looks */}
-      <LiveZoneStatus />
-      <LooksPanel />
+      {/* Lower-frequency output and routing controls stay available without
+          pushing the operator's primary controls below the fold. */}
+      <LiveToolsSection title="Outputs & looks" description="Zone status and saved screen presets">
+        <LiveZoneStatus />
+        <LooksPanel />
+      </LiveToolsSection>
 
       {/* Sermon/Worship/Invitation Mode, Livestream Check, Quick Cues, Timer */}
       <ServiceControlsDrawer track={track} liveItemId={live?.liveServiceItemId ?? null} />
