@@ -18,6 +18,15 @@ jobs:
 
       - run: npm ci
 
+      # npm's install-scripts gate has been silently skipping electron's own
+      # postinstall (the step that downloads the actual Electron binary) on
+      # this runner since 2026-08-17, leaving node_modules/electron without a
+      # binary and failing every test that touches electron-store (db.test.ts,
+      # recovery.test.ts) with "Electron failed to install correctly" even
+      # though npm ci itself reports success. Running its installer directly
+      # bypasses whatever gated it during npm ci.
+      - run: node node_modules/electron/install.js
+
       - run: npm run typecheck
 
       - run: npm test
