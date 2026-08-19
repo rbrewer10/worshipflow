@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react'
-import { Trash2, X } from 'lucide-react'
+import { Palette, Trash2, X } from 'lucide-react'
 import type { ItemStyle, ServiceItem, SongFull, ThemeColors } from '../../shared/types'
 import { NON_LIVE_TYPES } from '../../shared/types'
 import type { SermonVerse } from '../../shared/sermonVerses'
@@ -120,41 +120,49 @@ export const ItemEditor = memo(function ItemEditor({
   const showBackground = hasBackgroundTab && activeTab === 'background'
 
   return (
-    <div className="card-lg flex flex-col gap-3 overflow-auto text-content-primary animate-[fade-in_0.15s_ease-out]">
-      <div className="flex items-center justify-between">
-        <h3 className="section-title capitalize">{item.type}</h3>
-        <div className="flex items-center gap-2">
-          <SaveStatusBadge status={saveStatus} error={saveError} onRetry={onRetrySave} />
-          <button onClick={onClose} aria-label="Close item editor" className="btn-pill text-xs"><X size={12} /> Close</button>
+    <div className="card-lg flex flex-col gap-3 text-content-primary animate-[fade-in_0.15s_ease-out]">
+      <div className="sticky top-0 z-20 -mx-1 -mt-1 flex flex-col gap-3 border-b border-border bg-panel-raised/95 px-1 pb-2 pt-1 backdrop-blur">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-400">Editing {item.type}</div>
+            <h3 className="truncate text-base font-semibold text-content-primary">{item.title || 'Untitled item'}</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <SaveStatusBadge status={saveStatus} error={saveError} onRetry={onRetrySave} />
+            <button onClick={onClose} aria-label="Close item editor" className="btn-pill text-xs"><X size={12} /> Close</button>
+          </div>
         </div>
-      </div>
-
-      {/* Live slide preview — headers/placeholders never go live, nothing to preview */}
-      {showPreview !== false && !NON_LIVE_TYPES.includes(item.type) && (
-        <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} />
-      )}
 
       {/* Content / Background tabs — Background used to be reachable only by
           scrolling past the whole content editor below it, which for a song's
           long lyrics list meant scrolling well past a screen's worth just to
           reach the picker. */}
-      {hasBackgroundTab && (
-        <div className="flex rounded-lg bg-panel p-0.5">
-          {(['content', 'background'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={[
-                'flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-all',
-                activeTab === tab
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'text-content-secondary hover:text-content-primary',
-              ].join(' ')}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+        {hasBackgroundTab && (
+          <div className="flex rounded-lg bg-panel p-0.5" role="tablist" aria-label="Item editing sections">
+            {(['content', 'background'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                role="tab"
+                aria-selected={activeTab === tab}
+                aria-label={tab === 'background' ? 'Open backgrounds and style' : 'Open item content'}
+                className={[
+                  'flex-1 rounded-md py-1.5 text-xs font-semibold transition-all',
+                  activeTab === tab
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-content-secondary hover:text-content-primary',
+                ].join(' ')}
+              >
+                  {tab === 'background' ? <><Palette size={12} /> Backgrounds</> : 'Content'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Live slide preview — headers/placeholders never go live, nothing to preview */}
+      {showPreview !== false && !NON_LIVE_TYPES.includes(item.type) && (
+        <ServiceSlidePreview item={item} serviceTheme={serviceTheme} serviceColors={serviceColors} songFull={songFull} />
       )}
 
       {/* Type-specific editors */}
@@ -289,7 +297,7 @@ export const ItemEditor = memo(function ItemEditor({
 
       {/* Notes */}
       <div>
-        <label htmlFor="item-notes" className="section-header block mb-2">Notes</label>
+        <label htmlFor="item-notes" className="section-header block mb-2">Operator notes</label>
         <textarea id="item-notes" value={notes} onChange={(e) => onNotesChange(e.target.value)} onBlur={onSaveNotes} rows={2}
           placeholder="Notes for operator / pastor…"
           aria-label="Notes for operator and pastor" />
