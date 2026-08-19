@@ -13,71 +13,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
+          # Pinned below 24.16.0 -- see 2026-08-19 root-cause note below.
           node-version: 24.15
-          # TEMPORARY test: Node 22 hit a different, unrelated problem here
-          # (its older bundled npm rejects this repo's lockfile: "Missing
-          # esbuild@0.28.2 from lock file"). Trying a Node 24 patch just
-          # below the 24.16.0 regression threshold instead, to stay closer
-          # to the npm version the lockfile was generated with while still
-          # avoiding the extract-zip-breaking stream change.
-          # No npm cache. Diagnostics on 2026-08-19 showed node_modules/
-          # electron/dist containing only LICENSES.chromium.html with
-          # path.txt missing, and install.js exiting clean in well under a
-          # second -- a corrupted/truncated cached download being silently
-          # reused instead of a real fetch. GitHub Actions runners are fresh
-          # VMs each run, so the npm cache this restores is the only thing
-          # that could carry that corruption across every push since
-          # 2026-08-17. Slower installs, but a real binary every time.
 
-      # This runner also warns "N packages have install scripts not yet
-      # covered by allowScripts" and skips them outright (including
-      # electron's postinstall) unless package.json opts them in -- see its
-      # top-level allowScripts. `npm rebuild electron` re-runs the
-      # postinstall explicitly as a fallback in case the allowlist alone
-      # isn't enough.
       - run: npm ci
-        env:
-          # Cheap belt-and-suspenders alongside removing the npm cache above:
-          # install.js's very first line is `if (process.env.
-          # ELECTRON_SKIP_BINARY_DOWNLOAD) process.exit(0)`. Never confirmed
-          # this runner sets it by default, but clearing costs nothing if it
-          # doesn't (empty string is falsy in JS).
-          ELECTRON_SKIP_BINARY_DOWNLOAD: ''
-          # ROOT CAUSE (confirmed via live instrumentation 2026-08-19): the
-          # windows-latest runner image ships with a pre-seeded, valid
-          # electron-v33.4.11-win32-x64.zip already sitting in @electron/get's
-          # cache dir (%LOCALAPPDATA%\electron\Cache). @electron/get's cache
-          # lookup is an existence + checksum check only -- it never verifies
-          # the file actually extracts cleanly. That pre-baked cache entry
-          # passes checksum validation but extract-zip only ever pulls
-          # LICENSES.chromium.html out of it and never writes path.txt, so
-          # every install "succeeds" with a broken, unusable electron/dist.
-          # `force_no_cache` makes install.js pass `force: true` to
-          # downloadArtifact(), which skips the cache lookup entirely and
-          # fetches a real zip from GitHub Releases into a fresh temp file.
-          force_no_cache: 'true'
-
-      # TEMPORARY: live instrumentation to get a definitive root cause for
-      # the electron-install CI failure. Calls @electron/get directly with
-      # full logging (see scripts/debug-electron-download.cjs) instead of
-      # relying on install.js's silent success/failure. Remove once we have
-      # an answer.
-      - run: node scripts/debug-electron-download.cjs
-        env:
-          DEBUG: '@electron/get*'
-
-      - run: npm rebuild electron
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: ''
-          force_no_cache: 'true'
-
-      # TEMPORARY: the first debug step proved @electron/get itself resolves
-      # a valid, correctly-sized cached zip in ~300ms (cache hit against a
-      # pre-warmed runner-image cache) -- so the network/cache layer is fine.
-      # This step checks what `npm rebuild electron` actually left on disk
-      # afterwards, and re-runs install.js directly with full @electron/get
-      # debug logging to see where extraction/path.txt goes missing.
-      - run: node scripts/debug-electron-post-rebuild.cjs
 
       - run: npm run typecheck
 
