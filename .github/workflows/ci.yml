@@ -16,19 +16,19 @@ jobs:
           node-version: 26
           cache: npm
 
+      # This runner's npm (bundled with Node 26) warns "N packages have
+      # install scripts not yet covered by allowScripts" and silently skips
+      # them -- including electron's own postinstall, the step that
+      # downloads the actual Electron binary. That's left node_modules/
+      # electron without a binary since 2026-08-17, failing every test that
+      # touches electron-store (db.test.ts, recovery.test.ts) with "Electron
+      # failed to install correctly" even though npm ci itself reports
+      # success. package.json's new top-level allowScripts covers the
+      # flagged packages; `npm rebuild electron` re-runs its postinstall
+      # explicitly as a fallback in case that alone isn't enough.
       - run: npm ci
-        env:
-          # electron/install.js's very first line is `if
-          # (process.env.ELECTRON_SKIP_BINARY_DOWNLOAD) process.exit(0)` --
-          # this runner has that set (probably a windows-latest image default
-          # as of 2026-08-17), so electron's postinstall has been silently
-          # doing nothing on every push since, leaving node_modules/electron
-          # without a binary and failing every test that touches
-          # electron-store (db.test.ts, recovery.test.ts) with "Electron
-          # failed to install correctly" -- even though npm ci itself reports
-          # success. Clearing it (empty string is falsy in JS) lets the real
-          # postinstall run.
-          ELECTRON_SKIP_BINARY_DOWNLOAD: ''
+
+      - run: npm rebuild electron
 
       - run: npm run typecheck
 
