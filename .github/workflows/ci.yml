@@ -39,6 +39,20 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: ''
 
+      # Temporary diagnostic -- two "fixes" in a row still left electron
+      # uninstalled with zero visible error, so get real answers instead of
+      # guessing a third time: is the env var actually cleared in-process,
+      # does dist/ exist, and what does install.js's own promise actually do
+      # when run in total isolation with nothing swallowing its output.
+      - run: |
+          node -e "console.log('ELECTRON_SKIP_BINARY_DOWNLOAD =', JSON.stringify(process.env.ELECTRON_SKIP_BINARY_DOWNLOAD))"
+          node -e "const fs=require('fs'); console.log('dist exists:', fs.existsSync('node_modules/electron/dist')); try { console.log('dist contents:', fs.readdirSync('node_modules/electron/dist')) } catch (e) { console.log('readdir failed:', e.message) }"
+          node -e "const fs=require('fs'); try { console.log('path.txt:', fs.readFileSync('node_modules/electron/path.txt', 'utf8')) } catch (e) { console.log('path.txt missing:', e.message) }"
+          node node_modules/electron/install.js
+          echo "install.js exit code: $LASTEXITCODE"
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: ''
+
       - run: npm run typecheck
 
       - run: npm test
