@@ -155,12 +155,24 @@ const PRELOAD = join(__dirname, '../preload/index.js')
 const startTime = Date.now()
 
 // The product is branded "WorshipFlow Pro" (package.json productName + window titles),
-// but the Electron userData folder MUST stay "worshipflow" — that's where the existing
-// songs/services database, settings, and media already live. Electron derives userData
-// from the app name, so without pinning it here the rename would silently repoint to a
-// fresh "WorshipFlow Pro" folder and orphan all existing data. Runs at module load,
-// before whenReady and before any getPath('userData') use.
-app.setPath('userData', join(app.getPath('appData'), 'worshipflow'))
+// but the packaged Electron userData folder MUST stay "worshipflow" — that's where the
+// existing songs/services database, settings, and media already live. Development uses
+// a workspace-local folder so it can run in restricted environments without touching or
+// locking the production profile. Runs at module load, before whenReady and before any
+// getPath('userData') use.
+const userDataPath = app.isPackaged
+  ? join(app.getPath('appData'), 'worshipflow')
+  : join(process.cwd(), '.worshipflow-dev')
+app.setPath('userData', userDataPath)
+// Some development containers do not expose a usable GPU process. Keep the
+// packaged app on normal hardware acceleration, but let local development
+// render through software so the operator window can still open for UI review.
+if (!app.isPackaged) {
+  app.disableHardwareAcceleration()
+  app.commandLine.appendSwitch('disable-gpu')
+  app.commandLine.appendSwitch('disable-gpu-compositing')
+  app.commandLine.appendSwitch('in-process-gpu')
+}
 
 // Windows taskbar identity + icon. setAppUserModelId gives the app a stable identity so
 // Windows groups/pins it as "WorshipFlow Pro" rather than a generic Electron entry. The
@@ -2310,7 +2322,7 @@ function createOperator(): void {
     // the idle-status state, more once OBS on-air badges are showing) — keep
     // the default and the floor comfortably above that.
     minWidth: 1300,
-    show: false,
+    show: !app.isPackaged,
     title: 'WorshipFlow Pro — Operator',
     icon: APP_ICON,
     backgroundColor: '#0b0f17',

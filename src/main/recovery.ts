@@ -24,11 +24,21 @@ export interface RecoverySnapshot {
   pins?: ZonePins
 }
 
-const recoveryStore = new Store<{ lastState: RecoverySnapshot | null }>({ name: 'recovery' })
+type RecoveryStore = Store<{ lastState: RecoverySnapshot | null }>
+let recoveryStore: RecoveryStore | null = null
+
+// Keep construction lazy so importing the pure recovery helpers does not
+// require an Electron user-data directory. The live app still uses the same
+// electron-store file, but only creates it when recovery is actually read or
+// written.
+function getRecoveryStore(): RecoveryStore {
+  recoveryStore ??= new Store<{ lastState: RecoverySnapshot | null }>({ name: 'recovery' })
+  return recoveryStore
+}
 
 export function readRecovery(): RecoverySnapshot | null {
   try {
-    return recoveryStore.get('lastState') ?? null
+    return getRecoveryStore().get('lastState') ?? null
   } catch {
     return null
   }
@@ -36,7 +46,7 @@ export function readRecovery(): RecoverySnapshot | null {
 
 export function writeRecovery(snap: RecoverySnapshot): void {
   try {
-    recoveryStore.set('lastState', snap)
+    getRecoveryStore().set('lastState', snap)
   } catch {
     // Never let autosave crash the live engine.
   }

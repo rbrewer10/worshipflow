@@ -2,11 +2,13 @@ node_modules
 dist
 dist-installer
 out
+WorshipFlow-Pro-*.exe
 .DS_Store
 *.log
 # Local media / data (not source)
 /media
 /data
+/.worshipflow-dev
 # Demo/sample media — kept local, not committed (large binaries)
 src/renderer/public/assets/*.mp4
 *.sqlite
