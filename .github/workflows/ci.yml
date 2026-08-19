@@ -13,7 +13,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 26
+          node-version: 22
+          # TEMPORARY test: local repro (2026-08-19) shows extract-zip/yauzl
+          # silently stalls extracting electron's zip on this machine's
+          # Node 26.3.0 too, independent of CI or caching -- matches a known
+          # Node stream destroy() regression (nodejs/node#63487, extract-
+          # zip#154) affecting Node >=24.16.0 and >=26.1.0. Trying a Node 22
+          # LTS runner to confirm that's the actual fix before committing to
+          # it.
           # No npm cache. Diagnostics on 2026-08-19 showed node_modules/
           # electron/dist containing only LICENSES.chromium.html with
           # path.txt missing, and install.js exiting clean in well under a
