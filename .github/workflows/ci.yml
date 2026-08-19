@@ -37,6 +37,19 @@ jobs:
           # this runner sets it by default, but clearing costs nothing if it
           # doesn't (empty string is falsy in JS).
           ELECTRON_SKIP_BINARY_DOWNLOAD: ''
+          # ROOT CAUSE (confirmed via live instrumentation 2026-08-19): the
+          # windows-latest runner image ships with a pre-seeded, valid
+          # electron-v33.4.11-win32-x64.zip already sitting in @electron/get's
+          # cache dir (%LOCALAPPDATA%\electron\Cache). @electron/get's cache
+          # lookup is an existence + checksum check only -- it never verifies
+          # the file actually extracts cleanly. That pre-baked cache entry
+          # passes checksum validation but extract-zip only ever pulls
+          # LICENSES.chromium.html out of it and never writes path.txt, so
+          # every install "succeeds" with a broken, unusable electron/dist.
+          # `force_no_cache` makes install.js pass `force: true` to
+          # downloadArtifact(), which skips the cache lookup entirely and
+          # fetches a real zip from GitHub Releases into a fresh temp file.
+          force_no_cache: 'true'
 
       # TEMPORARY: live instrumentation to get a definitive root cause for
       # the electron-install CI failure. Calls @electron/get directly with
@@ -50,6 +63,7 @@ jobs:
       - run: npm rebuild electron
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: ''
+          force_no_cache: 'true'
 
       # TEMPORARY: the first debug step proved @electron/get itself resolves
       # a valid, correctly-sized cached zip in ~300ms (cache hit against a
