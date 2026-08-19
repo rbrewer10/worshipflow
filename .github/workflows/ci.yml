@@ -13,14 +13,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          # TEMPORARY test: local repro (2026-08-19) shows extract-zip/yauzl
-          # silently stalls extracting electron's zip on this machine's
-          # Node 26.3.0 too, independent of CI or caching -- matches a known
-          # Node stream destroy() regression (nodejs/node#63487, extract-
-          # zip#154) affecting Node >=24.16.0 and >=26.1.0. Trying a Node 22
-          # LTS runner to confirm that's the actual fix before committing to
-          # it.
+          node-version: 24.15
+          # TEMPORARY test: Node 22 hit a different, unrelated problem here
+          # (its older bundled npm rejects this repo's lockfile: "Missing
+          # esbuild@0.28.2 from lock file"). Trying a Node 24 patch just
+          # below the 24.16.0 regression threshold instead, to stay closer
+          # to the npm version the lockfile was generated with while still
+          # avoiding the extract-zip-breaking stream change.
           # No npm cache. Diagnostics on 2026-08-19 showed node_modules/
           # electron/dist containing only LICENSES.chromium.html with
           # path.txt missing, and install.js exiting clean in well under a
