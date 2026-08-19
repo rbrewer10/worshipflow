@@ -14,42 +14,31 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
-          cache: npm
+          # No npm cache. Diagnostics on 2026-08-19 showed node_modules/
+          # electron/dist containing only LICENSES.chromium.html with
+          # path.txt missing, and install.js exiting clean in well under a
+          # second -- a corrupted/truncated cached download being silently
+          # reused instead of a real fetch. GitHub Actions runners are fresh
+          # VMs each run, so the npm cache this restores is the only thing
+          # that could carry that corruption across every push since
+          # 2026-08-17. Slower installs, but a real binary every time.
 
-      # Two separate things on this runner have been blocking electron's
-      # postinstall (the step that downloads the actual Electron binary)
-      # since 2026-08-17, failing every test that touches electron-store
-      # (db.test.ts, recovery.test.ts) with "Electron failed to install
-      # correctly" even though npm ci itself reports success:
-      #   1. npm warns "N packages have install scripts not yet covered by
-      #      allowScripts" and skips them outright -- fixed by package.json's
-      #      top-level allowScripts allowlist.
-      #   2. This runner also sets ELECTRON_SKIP_BINARY_DOWNLOAD, which is
-      #      install.js's own very first check (`if (...) process.exit(0)`)
-      #      -- fixed by clearing it below (empty string is falsy in JS).
-      # Both are needed together: with only #1 fixed, npm actually invokes
-      # install.js, which then immediately no-ops on #2 -- same silent
-      # "success", no binary. `npm rebuild electron` re-runs the postinstall
-      # explicitly as a fallback in case the allowlist alone isn't enough.
+      # This runner also warns "N packages have install scripts not yet
+      # covered by allowScripts" and skips them outright (including
+      # electron's postinstall) unless package.json opts them in -- see its
+      # top-level allowScripts. `npm rebuild electron` re-runs the
+      # postinstall explicitly as a fallback in case the allowlist alone
+      # isn't enough.
       - run: npm ci
         env:
+          # Cheap belt-and-suspenders alongside removing the npm cache above:
+          # install.js's very first line is `if (process.env.
+          # ELECTRON_SKIP_BINARY_DOWNLOAD) process.exit(0)`. Never confirmed
+          # this runner sets it by default, but clearing costs nothing if it
+          # doesn't (empty string is falsy in JS).
           ELECTRON_SKIP_BINARY_DOWNLOAD: ''
 
       - run: npm rebuild electron
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: ''
-
-      # Temporary diagnostic -- two "fixes" in a row still left electron
-      # uninstalled with zero visible error, so get real answers instead of
-      # guessing a third time: is the env var actually cleared in-process,
-      # does dist/ exist, and what does install.js's own promise actually do
-      # when run in total isolation with nothing swallowing its output.
-      - run: |
-          node -e "console.log('ELECTRON_SKIP_BINARY_DOWNLOAD =', JSON.stringify(process.env.ELECTRON_SKIP_BINARY_DOWNLOAD))"
-          node -e "const fs=require('fs'); console.log('dist exists:', fs.existsSync('node_modules/electron/dist')); try { console.log('dist contents:', fs.readdirSync('node_modules/electron/dist')) } catch (e) { console.log('readdir failed:', e.message) }"
-          node -e "const fs=require('fs'); try { console.log('path.txt:', fs.readFileSync('node_modules/electron/path.txt', 'utf8')) } catch (e) { console.log('path.txt missing:', e.message) }"
-          node node_modules/electron/install.js
-          echo "install.js exit code: $LASTEXITCODE"
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: ''
 
