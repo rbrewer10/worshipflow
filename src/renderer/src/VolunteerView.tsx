@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useChurchName } from './useChurchName'
 import {
   BookOpen,
+  CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Church,
@@ -16,7 +18,10 @@ import {
   Square,
   Timer,
   Video,
-  X
+  X,
+  UserRound,
+  UsersRound,
+  AlertTriangle
 } from 'lucide-react'
 import type { Intent, LiveState, ServiceFull, ServiceItem, ServiceSummary } from '../../shared/types'
 
@@ -118,6 +123,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
   const [services, setServices] = useState<ServiceSummary[]>([])
   const [activeServiceId, setActiveServiceId] = useState<number | null>(null)
   const [service, setService] = useState<ServiceFull | null>(null)
+  const [assignmentFilter, setAssignmentFilter] = useState('all')
 
   // Shared across all views via main-process broadcast.
   const liveItemId = live?.liveServiceItemId ?? null
@@ -130,6 +136,31 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
   useEffect(() => { serviceRef.current = service }, [service])
   useEffect(() => { liveItemIdRef.current = liveItemId }, [liveItemId])
 
+  const team = service?.team ?? { people: [], assignments: {} }
+  const roleOptions = [...new Set(team.people.map((person) => person.role))]
+  const isAssignedToFilter = (item: ServiceItem): boolean => {
+    if (assignmentFilter === 'all') return true
+    const assignedIds = team.assignments[String(item.id)] ?? []
+    if (assignmentFilter.startsWith('person:')) return assignedIds.includes(assignmentFilter.slice('person:'.length))
+    if (assignmentFilter.startsWith('role:')) {
+      const role = assignmentFilter.slice('role:'.length)
+      return assignedIds.some((id) => team.people.some((person) => person.id === id && person.role === role))
+    }
+    return true
+  }
+  const visibleItems = service?.items.filter((item) => item.track === 'main' && isAssignedToFilter(item)) ?? []
+  const visibleItemsRef = useRef<ServiceItem[]>([])
+  useEffect(() => { visibleItemsRef.current = visibleItems }, [service, assignmentFilter])
+  const unassignedCount = service?.items.filter((item) => item.track === 'main' && !team.assignments[String(item.id)]?.length && item.type !== 'header' && item.type !== 'placeholder').length ?? 0
+  const assignedMomentCount = service?.items.filter((item) => item.track === 'main' && item.type !== 'header' && item.type !== 'placeholder' && (team.assignments[String(item.id)]?.length ?? 0) > 0).length ?? 0
+
+  const chooseDefaultService = (list: ServiceSummary[], activeId: number | null): number | null => {
+    if (activeId != null && list.some((item) => item.id === activeId)) return activeId
+    const today = new Date().toISOString().slice(0, 10)
+    const upcoming = list.filter((item) => item.service_date && item.service_date >= today).sort((a, b) => (a.service_date ?? '').localeCompare(b.service_date ?? ''))
+    return upcoming[0]?.id ?? list[0]?.id ?? null
+  }
+
   useEffect(() => {
     const off = window.wf.onState((s) => setLive(s.main))
     window.wf.getState('main').then(setLive)
@@ -139,7 +170,8 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
       // Honor the service the operator prepared (the shared active service) rather
       // than blindly defaulting to the first/most-recent one.
       const activeId = await window.wf.getActiveServiceId()
-      const chosen = activeId != null && list.some((s) => s.id === activeId) ? activeId : list[0].id
+      const chosen = chooseDefaultService(list, activeId)
+      if (chosen == null) return
       setActiveServiceId(chosen)
       window.wf.setActiveService(chosen)
       window.wf.serviceGet(chosen).then(setService)
@@ -149,6 +181,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
 
   const pickService = (id: number): void => {
     setActiveServiceId(id)
+    setAssignmentFilter('all')
     window.wf.setActiveService(id)  // keep projector/zones/tablet in sync with the volunteer's choice
     window.wf.serviceGet(id).then(setService)
   }
@@ -163,7 +196,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
       // Volunteer mode is Main-only — filter out Second-track items so
       // auto-advance-to-next-item can't cross tracks or land on an id
       // loadItem's hardcoded 'main' calls can't correctly resolve.
-      const items = serviceRef.current.items.filter((it) => it.track === 'main')
+      const items = visibleItemsRef.current
       const idx = items.findIndex((it) => it.id === liveItemIdRef.current)
       const next = idx >= 0 ? items.slice(idx + 1).find(canGoLive) : undefined
       if (next) { loadItem(next); return }
@@ -212,10 +245,30 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
           className="rounded-lg border border-border bg-panel-raised px-2 py-1.5 text-sm text-content-primary outline-none focus:border-blue-500"
         >
           {services.length === 0 && <option value="">No services</option>}
-          {services.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
+        {services.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}{s.service_date ? ` · ${s.service_date}` : ''}{s.published_at ? ' · Published' : ''}</option>
           ))}
         </select>
+        <div className="mx-1 h-5 w-px bg-border" />
+        {team.people.length > 0 ? (
+          <label className="inline-flex items-center gap-1.5 text-xs text-content-secondary">
+            <UsersRound size={14} className="text-violet-400" />
+            <span className="sr-only">Show assignments for</span>
+            <select value={assignmentFilter} onChange={(e) => setAssignmentFilter(e.target.value)} aria-label="Show assignments for" className="rounded-lg border border-border bg-panel-raised px-2 py-1.5 text-xs text-content-primary outline-none focus:border-blue-500">
+              <option value="all">Everyone</option>
+              <optgroup label="People">
+                {team.people.map((person) => <option key={person.id} value={`person:${person.id}`}>{person.name} · {person.role}</option>)}
+              </optgroup>
+              <optgroup label="Roles">
+                {roleOptions.map((role) => <option key={role} value={`role:${role}`}>{role}</option>)}
+              </optgroup>
+            </select>
+          </label>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-xs font-semibold text-amber-400" title="Add people and assignments in Build Service">
+            <AlertTriangle size={13} /> No team assignments
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-content-secondary">Space / → next · ← prev · B black · L logo</span>
           {onExit && (
@@ -225,6 +278,20 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
           )}
         </div>
       </div>
+
+      {service && (
+        <div className="flex items-center gap-3 border-b border-border bg-panel-raised px-4 py-2">
+          <CalendarDays size={15} className="shrink-0 text-blue-400" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-content-primary">{service.name}</div>
+            <div className="truncate text-[11px] text-content-secondary">{service.service_date ?? 'Date not set'} · {service.published_at ? 'Published handoff' : 'Draft plan'}</div>
+          </div>
+          <div className="hidden items-center gap-1.5 text-[11px] font-semibold text-content-secondary sm:flex">
+            <CheckCircle2 size={13} className={assignedMomentCount > 0 ? 'text-emerald-400' : 'text-content-tertiary'} />
+            {assignedMomentCount} assigned · {unassignedCount} unassigned
+          </div>
+        </div>
+      )}
 
       {/* ── Main: PREV | content | NEXT ── */}
       <div className="flex min-h-0 flex-1 items-stretch">
@@ -283,10 +350,14 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
       </div>
 
       {/* ── Bottom: service item strip (Main-only — see goNext's filter) ── */}
-      {service && service.items.some((it) => it.track === 'main') && (
+      {service && visibleItems.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto border-t border-border bg-panel px-3 py-2">
-          <span className="shrink-0 text-xs text-content-secondary">Jump:</span>
-          {service.items.filter((it) => it.track === 'main').map((item, i) => (
+          <span className="shrink-0 text-xs text-content-secondary">Jump{assignmentFilter !== 'all' ? ' · Assigned' : ''}:</span>
+          {assignmentFilter === 'all' && unassignedCount > 0 && <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-1 text-[10px] font-semibold text-amber-400"><AlertTriangle size={11} /> {unassignedCount} need an owner</span>}
+          {visibleItems.map((item, i) => {
+            const assignedIds = team.assignments[String(item.id)] ?? []
+            const assignedNames = assignedIds.map((id) => team.people.find((person) => person.id === id)?.name).filter(Boolean).join(', ')
+            return (
             <button
               key={item.id}
               onClick={() => canGoLive(item) && loadItem(item)}
@@ -298,6 +369,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
                   ? 'border-border bg-panel-raised text-content-secondary hover:bg-border-strong'
                   : 'cursor-default border-transparent bg-transparent text-content-tertiary'
               }`}
+              title={assignedNames || (item.type === 'header' || item.type === 'placeholder' ? undefined : 'No owner assigned')}
             >
               <span className="font-mono text-[10px] text-content-secondary">{i + 1}</span>
               <span>{ICON[item.type]}</span>
@@ -305,9 +377,14 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
               {liveItemId === item.id && (
                 <span className="text-[9px] font-bold text-blue-400">LIVE</span>
               )}
+              {assignmentFilter === 'all' && item.type !== 'header' && item.type !== 'placeholder' && !assignedIds.length && <span className="text-[9px] font-semibold text-amber-400">OWNER?</span>}
             </button>
-          ))}
+            )
+          })}
         </div>
+      )}
+      {service && service.items.some((it) => it.track === 'main') && visibleItems.length === 0 && (
+        <div className="border-t border-border bg-panel px-3 py-2 text-center text-xs text-amber-400">No service moments are assigned to this volunteer yet.</div>
       )}
     </div>
   )

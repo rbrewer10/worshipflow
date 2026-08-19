@@ -93,6 +93,12 @@ function ScriptureLookup(): JSX.Element {
           </button>
         ))}
       </div>
+      {activeServiceId != null && (
+        <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/[0.06] px-2.5 py-1.5 text-[11px] text-content-secondary">
+          <ListPlus size={12} className="shrink-0 text-blue-400" />
+          <span className="truncate">Looked-up passages can be added directly to the current Sunday service.</span>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-panel p-5">
         {!result && (

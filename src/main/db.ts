@@ -9,6 +9,7 @@ import type {
   SongInput,
   ServiceSummary,
   ServiceItem,
+  ServiceItemType,
   ServiceFull,
   NewServiceItem,
   SongUsage,
@@ -21,7 +22,9 @@ import type {
   AnnouncementInput,
   RecordingRow,
   RecordingMarker,
-  RecordingMarkerInput
+  RecordingMarkerInput,
+  ServiceTeam,
+  ServicePerson
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
 import { splitLyricLines } from '../shared/lyrics'
@@ -82,6 +85,8 @@ CREATE TABLE IF NOT EXISTS service (
   service_date TEXT,
   theme TEXT,
   theme_colors TEXT,
+  published_at INTEGER,
+  team_json TEXT,
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS service_item (
@@ -166,6 +171,8 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE service_item ADD COLUMN notes TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE service ADD COLUMN published_at INTEGER') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE service ADD COLUMN team_json TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN style TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN zone_routing TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN zone_slides TEXT') } catch { /* already exists */ }
@@ -700,7 +707,7 @@ function itemTitle(type: string, refId: number | null, payload: Record<string, u
 }
 
 export function listServices(): ServiceSummary[] {
-  const stmt = db.prepare('SELECT id, name, service_date FROM service ORDER BY created_at DESC')
+  const stmt = db.prepare('SELECT id, name, service_date, published_at FROM service ORDER BY created_at DESC')
   const rows: ServiceSummary[] = []
   while (stmt.step()) rows.push(stmt.getAsObject() as unknown as ServiceSummary)
   stmt.free()
@@ -723,15 +730,48 @@ export function deleteService(id: number): void {
   persist()
 }
 
+export function setServicePublished(id: number, publishedAt: number | null): void {
+  db.run('UPDATE service SET published_at = ? WHERE id = ?', [publishedAt, id])
+  persist()
+}
+
+// Publishing is a handoff point, not a permanent label. Any later change to
+// the order, content, styling, date, or team returns the plan to draft so the
+// home screen and review step cannot imply that the published handoff is still
+// current.
+function markServiceDraft(serviceId: number): void {
+  db.run('UPDATE service SET published_at = NULL WHERE id = ?', [serviceId])
+}
+
+export function getServiceTeam(id: number): ServiceTeam {
+  const rows = db.exec('SELECT team_json FROM service WHERE id = ?', [id])
+  if (!rows[0] || rows[0].values.length === 0) return { people: [], assignments: {} }
+  try {
+    const value = JSON.parse((rows[0].values[0][0] as string | null) ?? '{}') as Partial<ServiceTeam>
+    return {
+      people: Array.isArray(value.people) ? value.people as ServicePerson[] : [],
+      assignments: value.assignments && typeof value.assignments === 'object' ? value.assignments as Record<string, string[]> : {}
+    }
+  } catch {
+    return { people: [], assignments: {} }
+  }
+}
+
+export function setServiceTeam(id: number, team: ServiceTeam): void {
+  db.run('UPDATE service SET team_json = ? WHERE id = ?', [JSON.stringify(team), id])
+  markServiceDraft(id)
+  persist()
+}
+
 export function getService(id: number): ServiceFull | null {
-  const head = db.prepare('SELECT id, name, service_date, theme, theme_colors FROM service WHERE id = ?')
+  const head = db.prepare('SELECT id, name, service_date, theme, theme_colors, published_at, team_json FROM service WHERE id = ?')
   head.bind([id])
   if (!head.step()) {
     head.free()
     return null
   }
   const row = head.getAsObject() as unknown as {
-    id: number; name: string; service_date: string | null; theme: string | null; theme_colors: string | null
+    id: number; name: string; service_date: string | null; theme: string | null; theme_colors: string | null; published_at: number | null; team_json: string | null
   }
   head.free()
   let themeColors: ThemeColors | null = null
@@ -742,12 +782,14 @@ export function getService(id: number): ServiceFull | null {
     themeColors = null
   }
 
-  const svc: ServiceSummary & { theme: string | null; themeColors: ThemeColors | null } = {
+  const svc: ServiceSummary & { theme: string | null; themeColors: ThemeColors | null; team: ServiceTeam } = {
     id: row.id,
     name: row.name,
     service_date: row.service_date ?? null,
     theme: row.theme ?? null,
-    themeColors
+    themeColors,
+    published_at: row.published_at ?? null,
+    team: getServiceTeam(id)
   }
 
   const stmt = db.prepare(
@@ -825,8 +867,18 @@ export function addServiceItem(serviceId: number, item: NewServiceItem): number 
     track
   ])
   const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number
+  markServiceDraft(serviceId)
   persist()
   return id
+}
+
+// Replaces the content of an existing running-order row without changing its
+// ordinal, notes, styling, or zone routing. Review uses this to turn imported
+// placeholders into real content without making the operator rebuild the order.
+export function replaceServiceItem(itemId: number, type: ServiceItemType, refId: number | null, payload: Record<string, unknown>): void {
+  db.run('UPDATE service_item SET type = ?, ref_id = ?, payload_json = ? WHERE id = ?', [type, refId, JSON.stringify(payload), itemId])
+  db.run('UPDATE service SET published_at = NULL WHERE id = (SELECT service_id FROM service_item WHERE id = ?)', [itemId])
+  persist()
 }
 
 // Clones an item — payload, style, zone routing, and any authored zone deck —
@@ -872,11 +924,13 @@ export function duplicateServiceItem(itemId: number): number | null {
     throw e
   }
   const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number
+  markServiceDraft(r.service_id)
   persist()
   return id
 }
 
 export function removeServiceItem(itemId: number): void {
+  db.run('UPDATE service SET published_at = NULL WHERE id = (SELECT service_id FROM service_item WHERE id = ?)', [itemId])
   db.run('DELETE FROM service_item WHERE id = ?', [itemId])
   persist()
 }
@@ -906,11 +960,13 @@ export function moveServiceItem(itemId: number, dir: 'up' | 'down'): void {
 
   db.run('UPDATE service_item SET ordinal = ? WHERE id = ?', [neighbor.ordinal, itemId])
   db.run('UPDATE service_item SET ordinal = ? WHERE id = ?', [ordinal, neighbor.id])
+  markServiceDraft(service_id)
   persist()
 }
 
 export function updateServiceItemNotes(itemId: number, notes: string | null): void {
   db.run('UPDATE service_item SET notes = ? WHERE id = ?', [notes, itemId])
+  db.run('UPDATE service SET published_at = NULL WHERE id = (SELECT service_id FROM service_item WHERE id = ?)', [itemId])
   persist()
 }
 
@@ -919,6 +975,7 @@ export function updateServiceItemNotes(itemId: number, notes: string | null): vo
 // scheduling compares it as a string for the same reason.
 export function setServiceDate(serviceId: number, serviceDate: string | null): void {
   db.run('UPDATE service SET service_date = ? WHERE id = ?', [serviceDate, serviceId])
+  markServiceDraft(serviceId)
   persist()
 }
 
@@ -928,16 +985,19 @@ export function setServiceTheme(serviceId: number, themeId: string | null, color
     colors ? JSON.stringify(colors) : null,
     serviceId
   ])
+  markServiceDraft(serviceId)
   persist()
 }
 
 export function setServiceItemStyle(itemId: number, style: ItemStyle | null): void {
   db.run('UPDATE service_item SET style = ? WHERE id = ?', [style ? JSON.stringify(style) : null, itemId])
+  db.run('UPDATE service SET published_at = NULL WHERE id = (SELECT service_id FROM service_item WHERE id = ?)', [itemId])
   persist()
 }
 
 export function setServiceItemPayload(itemId: number, payload: Record<string, unknown>): void {
   db.run('UPDATE service_item SET payload_json = ? WHERE id = ?', [JSON.stringify(payload ?? {}), itemId])
+  db.run('UPDATE service SET published_at = NULL WHERE id = (SELECT service_id FROM service_item WHERE id = ?)', [itemId])
   persist()
 }
 
@@ -949,6 +1009,7 @@ export function getItemZoneRouting(itemId: number): string | null {
 
 export function setItemZoneRouting(itemId: number, routing: string | null): void {
   db.run('UPDATE service_item SET zone_routing = ? WHERE id = ?', [routing, itemId])
+  db.run('UPDATE service SET published_at = NULL WHERE id = (SELECT service_id FROM service_item WHERE id = ?)', [itemId])
   persist()
 }
 
@@ -960,6 +1021,7 @@ export function getItemZoneSlides(itemId: number): string | null {
 
 export function setItemZoneSlides(itemId: number, slides: string | null): void {
   db.run('UPDATE service_item SET zone_slides = ? WHERE id = ?', [slides, itemId])
+  db.run('UPDATE service SET published_at = NULL WHERE id = (SELECT service_id FROM service_item WHERE id = ?)', [itemId])
   persist()
 }
 
@@ -973,6 +1035,7 @@ export function getZoneTrackAssignment(serviceId: number): string | null {
 
 export function setZoneTrackAssignment(serviceId: number, json: string | null): void {
   db.run('UPDATE service SET zone_track_assignment = ? WHERE id = ?', [json, serviceId])
+  markServiceDraft(serviceId)
   persist()
 }
 
@@ -983,6 +1046,7 @@ export function reorderServiceItems(serviceId: number, track: string, orderedIds
       db.run('UPDATE service_item SET ordinal = ? WHERE id = ? AND service_id = ? AND track = ?', [i, id, serviceId, track])
     })
     db.run('COMMIT')
+    markServiceDraft(serviceId)
     persist()
   } catch (e) {
     db.run('ROLLBACK')

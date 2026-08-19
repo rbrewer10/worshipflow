@@ -1,11 +1,12 @@
 import { memo, useState } from 'react'
-import { Play } from 'lucide-react'
+import { Play, Plus } from 'lucide-react'
 
 interface ScripturePanelProps {
   scriptureRef: string
   bibleTranslation: 'kjv' | 'web' | 'bbe'
   onReferenceChange: (ref: string) => void
   onGoLive: () => void
+  buildMode?: boolean
   onTranslationChange: (t: 'kjv' | 'web' | 'bbe') => void
 }
 
@@ -14,14 +15,15 @@ export const ScripturePanel = memo(function ScripturePanel({
   bibleTranslation,
   onReferenceChange,
   onGoLive,
-  onTranslationChange
+  onTranslationChange,
+  buildMode = false
 }: ScripturePanelProps): JSX.Element {
   return (
     <section className="surface">
       <h2 className="section-header">Quick Scripture</h2>
       <div className="flex gap-2">
         <input type="text" value={scriptureRef} onChange={(e) => onReferenceChange(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onGoLive()} placeholder="John 3:16" />
-        <button onClick={onGoLive} className="btn-primary"><Play size={13} /> Go</button>
+        <button onClick={onGoLive} className="btn-primary">{buildMode ? <Plus size={13} /> : <Play size={13} />} {buildMode ? 'Add' : 'Go'}</button>
       </div>
       <div className="mt-2 flex gap-1">
         {([['kjv', 'KJV'], ['web', 'WEB'], ['bbe', 'BBE']] as const).map(([t, label]) => (

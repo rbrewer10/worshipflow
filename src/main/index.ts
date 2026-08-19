@@ -56,7 +56,11 @@ import {
   createService,
   deleteService,
   getService,
+  setServicePublished,
+  getServiceTeam,
+  setServiceTeam,
   addServiceItem,
+  replaceServiceItem,
   duplicateServiceItem,
   removeServiceItem,
   moveServiceItem,
@@ -2913,8 +2917,14 @@ ipcMain.handle('wf:services:list', () => listServices())
 ipcMain.handle('wf:services:create', (_e, name: string, date?: string) => createService(name, date))
 ipcMain.handle('wf:services:delete', (_e, id: number) => deleteService(id))
 ipcMain.handle('wf:services:get', (_e, id: number) => getService(id))
+ipcMain.handle('wf:service:setPublished', (_e, id: number, publishedAt: number | null) => setServicePublished(id, publishedAt))
+ipcMain.handle('wf:service:getTeam', (_e, id: number) => getServiceTeam(id))
+ipcMain.handle('wf:service:setTeam', (_e, id: number, team: import('../shared/types').ServiceTeam) => setServiceTeam(id, team))
 ipcMain.handle('wf:services:addItem', (_e, serviceId: number, item: NewServiceItem) =>
   addServiceItem(serviceId, item)
+)
+ipcMain.handle('wf:services:replaceItem', (_e, itemId: number, type: import('../shared/types').ServiceItemType, refId: number | null, payload: Record<string, unknown>) =>
+  replaceServiceItem(itemId, type, refId, payload)
 )
 ipcMain.handle('wf:services:removeItem', (_e, itemId: number) => removeServiceItem(itemId))
 ipcMain.handle('wf:services:duplicateItem', (_e, itemId: number) => duplicateServiceItem(itemId))
@@ -3274,7 +3284,7 @@ ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ ca
       return { ...item, song }
     })
   )
-  const bundle = { version: 1, name: svc.name, service_date: svc.service_date, theme: svc.theme, themeColors: svc.themeColors, items: itemsWithSongs }
+  const bundle = { version: 2, name: svc.name, service_date: svc.service_date, published_at: svc.published_at ?? null, team: svc.team, theme: svc.theme, themeColors: svc.themeColors, items: itemsWithSongs }
   const { filePath, canceled } = await dialog.showSaveDialog({
     title: 'Export Service',
     defaultPath: `${svc.name.replace(/[/\\?%*:|"<>]/g, '-')}.wfservice`,
@@ -3297,6 +3307,8 @@ ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serv
     version: number
     name: string
     service_date: string | null
+    published_at?: number | null
+    team?: import('../shared/types').ServiceTeam
     theme: string | null
     themeColors: ThemeColors | null
     items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
@@ -3306,6 +3318,8 @@ ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serv
       version: number
       name: string
       service_date: string | null
+      published_at?: number | null
+      team?: import('../shared/types').ServiceTeam
       theme: string | null
       themeColors: ThemeColors | null
       items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
@@ -3323,6 +3337,8 @@ ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serv
 
   const serviceId = createService(bundle.name, bundle.service_date ?? undefined)
   if (bundle.theme) setServiceTheme(serviceId, bundle.theme, bundle.themeColors ?? null)
+  if (bundle.team) setServiceTeam(serviceId, bundle.team)
+  if (bundle.published_at) setServicePublished(serviceId, bundle.published_at)
   for (const item of bundle.items) {
     let ref_id: number | null = null
     if (item.type === 'song' && item.song) {

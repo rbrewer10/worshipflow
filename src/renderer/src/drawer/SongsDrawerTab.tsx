@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Play } from 'lucide-react'
+import { Play, Plus } from 'lucide-react'
 import type { SongSummary } from '../../../shared/types'
 import { useService } from '../ServiceContext'
 import { addAndGoLive } from './addAndGoLive'
 
-export default function SongsDrawerTab({ onDone }: { onDone: () => void }): JSX.Element {
+export default function SongsDrawerTab({ onDone, isBuildService, focusSearch = true }: { onDone: () => void; isBuildService: boolean; focusSearch?: boolean }): JSX.Element {
   const { activeServiceId, reloadActiveService } = useService()
   const [search, setSearch] = useState('')
   const [songs, setSongs] = useState<SongSummary[]>([])
@@ -18,7 +18,7 @@ export default function SongsDrawerTab({ onDone }: { onDone: () => void }): JSX.
     if (busy) return
     setBusy(true)
     try {
-      const ok = await addAndGoLive(activeServiceId, { type: 'song', ref_id: songId }, reloadActiveService)
+      const ok = await addAndGoLive(activeServiceId, { type: 'song', ref_id: songId }, reloadActiveService, !isBuildService)
       if (ok) onDone()
     } finally {
       setBusy(false)
@@ -32,7 +32,7 @@ export default function SongsDrawerTab({ onDone }: { onDone: () => void }): JSX.
         // a song — autofocusing the search box is the deliberate continuation
         // of that action, not an unexpected focus steal.
         // eslint-disable-next-line jsx-a11y/no-autofocus
-        autoFocus
+        autoFocus={focusSearch}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search songs…"
@@ -51,7 +51,7 @@ export default function SongsDrawerTab({ onDone }: { onDone: () => void }): JSX.
               {s.title}
               {s.author ? <span className="text-content-tertiary"> — {s.author}</span> : null}
             </span>
-            <Play size={13} className="shrink-0 text-blue-400" />
+            {isBuildService ? <Plus size={13} className="shrink-0 text-blue-400" /> : <Play size={13} className="shrink-0 text-blue-400" />}
           </button>
         ))}
       </div>

@@ -9,7 +9,7 @@ import type { StageRehearsalState } from '../../shared/stageRehearsal'
 // operator. Deliberately narrower than the general Main/Second track UI (no
 // scripture, no black/logo) — see docs/superpowers/plans/
 // 2026-08-08-stage-rehearsal.md for why that general UI stays hidden.
-function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: boolean) => void }): JSX.Element {
+function StageRehearsalTools({ onActiveChange, className = '' }: { onActiveChange: (active: boolean) => void; className?: string }): JSX.Element {
   const [state, setState] = useState<StageRehearsalState | null>(null)
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
@@ -70,7 +70,7 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
 
   if (!state.active) {
     return (
-      <aside className="flex w-96 shrink-0 flex-col gap-3 overflow-auto border-l border-border bg-panel p-4">
+      <aside className={`flex min-h-0 min-w-0 flex-1 basis-0 flex-col gap-3 overflow-auto bg-panel p-4 ${className}`}>
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-content-secondary">
           <Mic2 size={14} /> Stage Rehearsal
         </div>
@@ -94,7 +94,7 @@ function StageRehearsalTools({ onActiveChange }: { onActiveChange: (active: bool
   const atEnd = state.songIndex >= state.songQueue.length - 1
 
   return (
-    <aside className="flex w-96 shrink-0 flex-col gap-3 overflow-auto border-l border-border bg-panel p-4">
+    <aside className={`flex min-h-0 min-w-0 flex-1 basis-0 flex-col gap-3 overflow-auto bg-panel p-4 ${className}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-violet-400">
           <Mic2 size={14} /> Rehearsing

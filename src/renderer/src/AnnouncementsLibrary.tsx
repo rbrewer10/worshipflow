@@ -3,9 +3,11 @@ import { Megaphone, Plus, ScrollText, Type } from 'lucide-react'
 import type { AnnouncementSummary } from '../../shared/types'
 import AnnouncementEditor from './AnnouncementEditor'
 import Modal from './Modal'
-import { notifyLocalAction } from './NotifyToasts'
+import { notifyLocal, notifyLocalAction } from './NotifyToasts'
+import { useService } from './ServiceContext'
 
 function AnnouncementsLibrary(): JSX.Element {
+  const { activeServiceId, activeService, reloadActiveService } = useService()
   const [items, setItems] = useState<AnnouncementSummary[]>([])
   const [search, setSearch] = useState('')
   const [editorId, setEditorId] = useState<number | null>(null)
@@ -19,6 +21,7 @@ function AnnouncementsLibrary(): JSX.Element {
   // Full-library titles for duplicate detection, independent of whatever the
   // search box currently shows — see the matching comment in SongLibrary.tsx.
   const [existingTitles, setExistingTitles] = useState<string[]>([])
+  const [addingAnnouncementId, setAddingAnnouncementId] = useState<number | null>(null)
   useEffect(() => {
     if (namingNew) window.wf.announcementsList('').then((list) => setExistingTitles(list.map((a) => a.title)))
   }, [namingNew])
@@ -29,7 +32,6 @@ function AnnouncementsLibrary(): JSX.Element {
   }
   useEffect(() => {
     refresh(search)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
   const confirmRemove = async (): Promise<void> => {
@@ -67,6 +69,18 @@ function AnnouncementsLibrary(): JSX.Element {
     setNewTitle('')
     refresh()
     setEditorId(id)
+  }
+
+  const addToCurrentService = async (item: AnnouncementSummary): Promise<void> => {
+    if (activeServiceId == null || addingAnnouncementId != null) return
+    setAddingAnnouncementId(item.id)
+    try {
+      await window.wf.serviceAddItem(activeServiceId, { type: 'announcement', ref_id: item.id, track: 'main' })
+      reloadActiveService()
+      notifyLocal(`Added “${item.title}” to ${activeService?.name ?? 'the current service'}.`, 'info')
+    } finally {
+      setAddingAnnouncementId(null)
+    }
   }
 
   return (
@@ -140,6 +154,12 @@ function AnnouncementsLibrary(): JSX.Element {
             placeholder="Search announcements…"
             className="mb-3 w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm outline-none focus:border-blue-500"
           />
+          {activeService && (
+            <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/[0.06] px-2.5 py-1.5 text-[11px] text-content-secondary">
+              <Plus size={12} className="shrink-0 text-blue-400" />
+              <span className="truncate">Add announcements directly to <span className="font-semibold text-content-primary">{activeService.name}</span></span>
+            </div>
+          )}
           <div className="min-h-0 flex-1 space-y-1 overflow-auto">
             {items.length === 0 && (
               <p className="px-1 py-6 text-center text-sm text-content-secondary">{search ? 'No matches.' : 'No announcements yet — add your first one'}</p>
@@ -158,6 +178,17 @@ function AnnouncementsLibrary(): JSX.Element {
                     {it.frequency === 'once' ? 'One time' : 'Recurring'}{it.expired ? ' · expired' : it.active ? '' : ' · paused'}
                   </div>
                 </button>
+                {activeServiceId != null && (
+                  <button
+                    onClick={() => { void addToCurrentService(it) }}
+                    disabled={addingAnnouncementId != null}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-400 hover:bg-blue-500/20 disabled:cursor-wait disabled:opacity-50"
+                    title={`Add “${it.title}” to ${activeService?.name ?? 'the current service'}`}
+                    aria-label={`Add ${it.title} to current service`}
+                  >
+                    <Plus size={12} /> {addingAnnouncementId === it.id ? 'Adding…' : 'Add'}
+                  </button>
+                )}
                 <button onClick={() => setConfirmDelete({ id: it.id, title: it.title })} className="shrink-0 rounded px-2 py-1 text-xs text-content-secondary opacity-0 hover:bg-red-500/20 hover:text-red-400 group-hover:opacity-100">Del</button>
               </div>
             ))}

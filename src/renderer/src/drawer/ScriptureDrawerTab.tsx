@@ -3,7 +3,7 @@ import { ScripturePanel } from '../ScripturePanel'
 import { useService } from '../ServiceContext'
 import { addAndGoLive } from './addAndGoLive'
 
-export default function ScriptureDrawerTab({ onDone }: { onDone: () => void }): JSX.Element {
+export default function ScriptureDrawerTab({ onDone, isBuildService }: { onDone: () => void; isBuildService: boolean }): JSX.Element {
   const { activeServiceId, reloadActiveService } = useService()
   const [scriptureRef, setScriptureRef] = useState('')
   const [bibleTranslation, setBibleTranslation] = useState<'kjv' | 'web' | 'bbe'>('kjv')
@@ -18,7 +18,8 @@ export default function ScriptureDrawerTab({ onDone }: { onDone: () => void }): 
       const ok = await addAndGoLive(
         activeServiceId,
         { type: 'scripture', payload: { reference: ref } },
-        reloadActiveService
+        reloadActiveService,
+        !isBuildService
       )
       if (ok) {
         setScriptureRef('')
@@ -35,6 +36,7 @@ export default function ScriptureDrawerTab({ onDone }: { onDone: () => void }): 
       bibleTranslation={bibleTranslation}
       onReferenceChange={setScriptureRef}
       onGoLive={() => void goLive()}
+      buildMode={isBuildService}
       onTranslationChange={(t) => { setBibleTranslation(t); window.wf.featuresSetBibleTranslation(t) }}
     />
   )

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Play } from 'lucide-react'
+import { Play, Plus } from 'lucide-react'
 import type { AnnouncementSummary } from '../../../shared/types'
 import { useService } from '../ServiceContext'
 import { addAndGoLive } from './addAndGoLive'
 
-export default function AnnouncementsDrawerTab({ onDone }: { onDone: () => void }): JSX.Element {
+export default function AnnouncementsDrawerTab({ onDone, isBuildService, focusSearch = true }: { onDone: () => void; isBuildService: boolean; focusSearch?: boolean }): JSX.Element {
   const { activeServiceId, reloadActiveService } = useService()
   const [search, setSearch] = useState('')
   const [items, setItems] = useState<AnnouncementSummary[]>([])
@@ -18,7 +18,7 @@ export default function AnnouncementsDrawerTab({ onDone }: { onDone: () => void 
     if (busy) return
     setBusy(true)
     try {
-      const ok = await addAndGoLive(activeServiceId, { type: 'announcement', ref_id: id }, reloadActiveService)
+      const ok = await addAndGoLive(activeServiceId, { type: 'announcement', ref_id: id }, reloadActiveService, !isBuildService)
       if (ok) onDone()
     } finally {
       setBusy(false)
@@ -32,7 +32,7 @@ export default function AnnouncementsDrawerTab({ onDone }: { onDone: () => void 
         // an announcement — autofocusing the search box is the deliberate
         // continuation of that action, not an unexpected focus steal.
         // eslint-disable-next-line jsx-a11y/no-autofocus
-        autoFocus
+        autoFocus={focusSearch}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search announcements…"
@@ -48,7 +48,7 @@ export default function AnnouncementsDrawerTab({ onDone }: { onDone: () => void 
             className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1.5 text-left text-sm hover:border-blue-400 hover:bg-blue-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="truncate">{a.title}</span>
-            <Play size={13} className="shrink-0 text-blue-400" />
+            {isBuildService ? <Plus size={13} className="shrink-0 text-blue-400" /> : <Play size={13} className="shrink-0 text-blue-400" />}
           </button>
         ))}
       </div>

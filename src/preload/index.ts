@@ -27,7 +27,9 @@ import type {
   AnnouncementInput,
   TrackId,
   ScriptureRefCheck,
-  LivecallConfig
+  LivecallConfig,
+  ServiceTeam,
+  ServiceItemType
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
@@ -84,10 +86,16 @@ const wf = {
     ipcRenderer.invoke('wf:services:create', name, date),
   serviceDelete: (id: number): Promise<void> => ipcRenderer.invoke('wf:services:delete', id),
   serviceGet: (id: number): Promise<ServiceFull | null> => ipcRenderer.invoke('wf:services:get', id),
+  serviceSetPublished: (id: number, publishedAt: number | null): Promise<void> =>
+    ipcRenderer.invoke('wf:service:setPublished', id, publishedAt),
+  serviceGetTeam: (id: number): Promise<ServiceTeam> => ipcRenderer.invoke('wf:service:getTeam', id),
+  serviceSetTeam: (id: number, team: ServiceTeam): Promise<void> => ipcRenderer.invoke('wf:service:setTeam', id, team),
   serviceRefreshActiveItems: (id: number): Promise<void> =>
     ipcRenderer.invoke('wf:services:refreshActiveItems', id),
   serviceAddItem: (serviceId: number, item: NewServiceItem): Promise<number> =>
     ipcRenderer.invoke('wf:services:addItem', serviceId, item),
+  serviceReplaceItem: (itemId: number, type: ServiceItemType, refId: number | null, payload: Record<string, unknown>): Promise<void> =>
+    ipcRenderer.invoke('wf:services:replaceItem', itemId, type, refId, payload),
   serviceRemoveItem: (itemId: number): Promise<void> =>
     ipcRenderer.invoke('wf:services:removeItem', itemId),
   serviceDuplicateItem: (itemId: number): Promise<number | null> =>

@@ -6,8 +6,9 @@ import SongEditor from './editor/SongEditor'
 import PptxImport from './PptxImport'
 import Modal from './Modal'
 import { useAutosave } from './useAutosave'
-import { notifyLocalAction } from './NotifyToasts'
+import { notifyLocal, notifyLocalAction } from './NotifyToasts'
 import { findDuplicateSongTitles } from './songDuplicates'
+import { useService } from './ServiceContext'
 
 // Surfaces titles that are already duplicated in the library (left over from
 // before the New Song draft-gate warned about this going forward) — the
@@ -56,6 +57,7 @@ function DuplicateSongsPanel({ onEdit, onDelete }: { onEdit: (id: number) => voi
 }
 
 function SongLibrary(): JSX.Element {
+  const { activeServiceId, activeService, reloadActiveService } = useService()
   const [songs, setSongs] = useState<SongSummary[]>([])
   const [search, setSearch] = useState('')
   const [editorId, setEditorId] = useState<number | null>(null)
@@ -71,6 +73,7 @@ function SongLibrary(): JSX.Element {
   // audit's "warn about likely duplicates" (the library already had several
   // duplicate "New Song" placeholders from before the draft-gate existed).
   const [existingTitles, setExistingTitles] = useState<string[]>([])
+  const [addingSongId, setAddingSongId] = useState<number | null>(null)
   useEffect(() => {
     if (namingNew) window.wf.songsList('').then((list) => setExistingTitles(list.map((s) => s.title)))
   }, [namingNew])
@@ -82,7 +85,6 @@ function SongLibrary(): JSX.Element {
 
   useEffect(() => {
     refresh(search)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
   const remove = (id: number): void => {
@@ -139,6 +141,18 @@ function SongLibrary(): JSX.Element {
 
   const clearBg = (id: number): void => {
     bgQueue.trigger({ id, path: null })
+  }
+
+  const addToCurrentService = async (song: SongSummary): Promise<void> => {
+    if (activeServiceId == null || addingSongId != null) return
+    setAddingSongId(song.id)
+    try {
+      await window.wf.serviceAddItem(activeServiceId, { type: 'song', ref_id: song.id, track: 'main' })
+      reloadActiveService()
+      notifyLocal(`Added “${song.title}” to ${activeService?.name ?? 'the current service'}.`, 'info')
+    } finally {
+      setAddingSongId(null)
+    }
   }
 
   const createSong = async (): Promise<void> => {
@@ -253,6 +267,12 @@ function SongLibrary(): JSX.Element {
           placeholder="Search songs by title, author, or lyrics…"
           className="mb-3 w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm outline-none focus:border-blue-500"
         />
+        {activeService && (
+          <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/[0.06] px-2.5 py-1.5 text-[11px] text-content-secondary">
+            <Plus size={12} className="shrink-0 text-blue-400" />
+            <span className="truncate">Add songs directly to <span className="font-semibold text-content-primary">{activeService.name}</span></span>
+          </div>
+        )}
         <div className="min-h-0 flex-1 space-y-1 overflow-auto">
           {songs.length === 0 && (
             <p className="px-1 py-6 text-center text-sm text-content-secondary">
@@ -295,6 +315,17 @@ function SongLibrary(): JSX.Element {
                   title="Add background video or image"
                 >
                   <Plus size={13} /> bg
+                </button>
+              )}
+              {activeServiceId != null && (
+                <button
+                  onClick={() => { void addToCurrentService(s) }}
+                  disabled={addingSongId != null}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-400 hover:bg-blue-500/20 disabled:cursor-wait disabled:opacity-50"
+                  title={`Add “${s.title}” to ${activeService?.name ?? 'the current service'}`}
+                  aria-label={`Add ${s.title} to current service`}
+                >
+                  <Plus size={12} /> {addingSongId === s.id ? 'Adding…' : 'Add'}
                 </button>
               )}
               <button

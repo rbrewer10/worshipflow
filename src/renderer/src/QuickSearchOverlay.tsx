@@ -61,9 +61,9 @@ export default function QuickSearchOverlay({
   }
 
   return (
-    <Modal onClose={onClose} align="top" label="Quick search" className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2.5">
-          <Search size={16} className="shrink-0 text-slate-400" />
+    <Modal onClose={onClose} align="top" label="Quick search" className="w-full max-w-lg overflow-hidden rounded-xl border border-border bg-panel shadow-2xl">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+          <Search size={16} className="shrink-0 text-content-tertiary" />
           <input
             ref={inputRef}
             value={query}
@@ -71,13 +71,13 @@ export default function QuickSearchOverlay({
             onKeyDown={onKeyDown}
             placeholder="Search songs, announcements, or type a scripture reference…"
             aria-label="Quick search — songs, announcements, scripture"
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+            className="min-w-0 flex-1 bg-transparent text-sm text-content-primary outline-none placeholder:text-content-tertiary"
           />
-          <button onClick={onClose} aria-label="Close quick search" className="shrink-0 text-slate-400 hover:text-slate-600"><X size={16} /></button>
+          <button onClick={onClose} aria-label="Close quick search" className="shrink-0 text-content-tertiary hover:text-content-primary"><X size={16} /></button>
         </div>
         <div className="max-h-80 overflow-auto py-1.5">
           {results.length === 0 && (
-            <p className="px-3 py-6 text-center text-sm text-slate-400">Type to search your songs and announcements, or a scripture reference like John 3:16.</p>
+            <p className="px-3 py-6 text-center text-sm text-content-tertiary">Type to search your songs and announcements, or a scripture reference like John 3:16.</p>
           )}
           {results.map((r, i) => {
             const Icon = r.kind === 'song' ? Music : r.kind === 'announcement' ? Megaphone : BookOpen
@@ -88,17 +88,17 @@ export default function QuickSearchOverlay({
                 onClick={() => pick(r)}
                 onMouseEnter={() => setHighlighted(i)}
                 className={`flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors ${
-                  highlighted === i ? 'bg-blue-500/10' : 'hover:bg-slate-50'
+                  highlighted === i ? 'bg-blue-500/10' : 'hover:bg-panel-raised'
                 }`}
               >
-                <Icon size={14} className="shrink-0 text-slate-400" />
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-900">{r.label}</span>
-                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{kindLabel}</span>
+                <Icon size={14} className="shrink-0 text-content-tertiary" />
+                <span className="min-w-0 flex-1 truncate text-sm text-content-primary">{r.label}</span>
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-content-tertiary">{kindLabel}</span>
               </button>
             )
           })}
         </div>
-        <div className="border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] text-slate-400">
+        <div className="border-t border-border bg-panel-raised px-3 py-1.5 text-[10px] text-content-tertiary">
           ↑↓ to navigate · Enter to add to the end of this service · Esc to close
         </div>
     </Modal>

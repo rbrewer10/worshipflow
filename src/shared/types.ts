@@ -181,6 +181,21 @@ export interface ServiceSummary {
   id: number
   name: string
   service_date: string | null
+  published_at?: number | null
+}
+
+export type ServicePersonStatus = 'confirmed' | 'pending'
+
+export interface ServicePerson {
+  id: string
+  name: string
+  role: string
+  status: ServicePersonStatus
+}
+
+export interface ServiceTeam {
+  people: ServicePerson[]
+  assignments: Record<string, string[]>
 }
 
 // Per-item theme override; null/absent = use the service theme.
@@ -205,6 +220,7 @@ export interface ServiceItem {
 export interface ServiceFull extends ServiceSummary {
   theme: string | null
   themeColors: ThemeColors | null
+  team: ServiceTeam
   items: ServiceItem[]
 }
 

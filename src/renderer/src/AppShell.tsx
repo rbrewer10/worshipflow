@@ -168,7 +168,7 @@ function AppShell(): JSX.Element {
               <main className="min-h-0 flex-1 overflow-hidden"><LiveView /></main>
             </div>
           ) : view === 'service' ? (
-            <ServiceBuilder />
+            <ServiceBuilder onOpenLive={() => setView('live')} />
           ) : view === 'songs' ? (
             <SongLibrary />
           ) : view === 'announcements' ? (

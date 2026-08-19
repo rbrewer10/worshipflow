@@ -3,9 +3,9 @@ import { sendItemLive } from '../liveActions'
 import { notifyLocal } from '../NotifyToasts'
 
 // Shared by the Songs/Scripture/Announcements drawer tabs: append a new item to
-// the active service, then send it live through the SAME chokepoint the rest of
-// the app uses (sendItemLive) — this is what keeps Phase-1 recording markers and
-// zone routing correct, instead of a separate "quick push" path.
+// the active service, optionally sending it live through the SAME chokepoint
+// the rest of the app uses (sendItemLive). Build Service opts out of the live
+// handoff so planning actions cannot surprise the congregation.
 //
 // serviceRefreshActiveItems must run before sendItemLive: sendItemLive ends by
 // calling liveSetItemId(item.id), and main resolves that id against its own
@@ -15,7 +15,8 @@ import { notifyLocal } from '../NotifyToasts'
 export async function addAndGoLive(
   serviceId: number | null,
   newItem: NewServiceItem,
-  reloadActiveService: () => void
+  reloadActiveService: () => void,
+  goLive = true
 ): Promise<boolean> {
   if (serviceId == null) {
     notifyLocal('Load a service first (Build Service).', 'warn')
@@ -29,6 +30,11 @@ export async function addAndGoLive(
     if (!item) {
       notifyLocal('Could not load the new item.', 'error')
       return false
+    }
+    if (!goLive) {
+      reloadActiveService()
+      notifyLocal('Added to the service.', 'info')
+      return true
     }
     const wentLive = await sendItemLive(item, 'main')
     if (!wentLive) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion, Minus, HelpCircle, Copy, Video } from 'lucide-react'
+import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion, Minus, HelpCircle, Copy, Video, Search } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
 import { NON_LIVE_TYPES } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
@@ -45,7 +45,7 @@ function itemPreview(it: ServiceItem): string {
   return ''
 }
 
-function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAssignmentChange, songs, announcements, liveItemId, selectedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onGoLive, onDelete, onDuplicate, onBatchDelete, onReordered }: {
+function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAssignmentChange, songs, announcements, liveItemId, selectedId, recentlyAddedId, onSelect, onAdd, onAddSong, onAddAnnouncement, onQuickSearch, onGoLive, onDelete, onDuplicate, onBatchDelete, onReordered }: {
   service: ServiceFull
   track: TrackId
   onTrackChange: (track: TrackId) => void
@@ -55,11 +55,13 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
   announcements: AnnouncementSummary[]
   liveItemId: number | null
   selectedId: number | null
+  recentlyAddedId?: number | null
   onSelect: (id: number) => void
   onAdd: (type: ServiceItem['type']) => void
   onAddSong: (songId: number) => void
   onAddAnnouncement: (announcementId: number) => void
-  onGoLive: (item: ServiceItem) => void
+  onQuickSearch: () => void
+  onGoLive?: (item: ServiceItem) => void
   onDelete: (item: ServiceItem) => void
   onDuplicate: (item: ServiceItem) => void
   onBatchDelete: (items: ServiceItem[]) => void
@@ -74,6 +76,11 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
   const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
   useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [service])
   const items = service.items.filter((it) => it.track === track)
+
+  useEffect(() => {
+    if (recentlyAddedId == null) return
+    document.getElementById(`service-item-${recentlyAddedId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [recentlyAddedId])
 
   const onDrop = (targetId: number): void => {
     if (dragId == null) return
@@ -135,7 +142,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="wf-service-deck flex min-h-0 flex-1 flex-col">
       {/* The Main/Second track tabs and the zone-assignment badge used to live
           here. Removed: in the whole production database the second track had
           never held a single item, and its only lasting effect was one service
@@ -153,12 +160,76 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto pr-1">
+      <div className="wf-service-deck-toolbar mb-2 flex shrink-0 items-center justify-between gap-2 rounded-xl border border-border bg-panel-raised px-3 py-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-content-primary">Sunday flow</div>
+          <div className="truncate text-[11px] text-content-tertiary">Drag to reorder · select an item to style it</div>
+        </div>
+        <button
+          onClick={() => setShowAdd((v) => !v)}
+          aria-expanded={showAdd}
+          aria-label="Add item"
+          className={`btn-pill shrink-0 text-xs ${showAdd ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' : ''}`}
+        >
+          <Plus size={13} /> Add content
+        </button>
+        <button onClick={onQuickSearch} className="btn-pill shrink-0 text-xs" title="Search and add a song, announcement, or scripture">
+          <Search size={13} /> Quick add
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="mb-2 shrink-0 rounded-xl border border-blue-500/20 bg-blue-500/[0.04] p-3">
+        <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-widest text-content-secondary">Add to Sunday flow</span>
+            <button onClick={() => setShowAdd(false)} className="text-content-tertiary hover:text-content-primary" aria-label="Close add content"><X size={14} /></button>
+          </div>
+          <p className="mb-2 text-[11px] text-content-tertiary">New content is added to the end of this flow. Drag it to the exact position you want.</p>
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <select
+              id="deck-add-song"
+              value=""
+              onChange={(e) => { if (e.target.value) { onAddSong(Number(e.target.value)); setShowAdd(false) } }}
+              aria-label="Song from library"
+              className="w-full border-border bg-panel-raised px-2.5 py-2 text-xs text-content-primary outline-none hover:bg-border-strong"
+            >
+              <option value="">Add a song…</option>
+              {songs.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+            </select>
+            <select
+              id="deck-add-announcement"
+              value=""
+              onChange={(e) => { if (e.target.value) { onAddAnnouncement(Number(e.target.value)); setShowAdd(false) } }}
+              aria-label="Announcement from library"
+              className="w-full border-border bg-panel-raised px-2.5 py-2 text-xs text-content-primary outline-none hover:bg-border-strong"
+            >
+              <option value="">Add an announcement…</option>
+              {announcements.map((a) => <option key={a.id} value={a.id}>{a.title}{a.expired ? ' (expired)' : ''}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+            {ADD_TYPES.map((a) => (
+              <button
+                key={a.type}
+                onClick={() => { onAdd(a.type); setShowAdd(false) }}
+                className="flex items-center justify-center gap-1 rounded-lg border border-border bg-panel px-2 py-2 text-center text-[11px] font-semibold text-content-secondary transition-colors hover:bg-panel-raised hover:text-content-primary"
+              >
+                <a.Icon size={12} /> {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="wf-service-item-list min-h-0 flex-1 overflow-auto pr-1">
         {items.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <ListMusic size={28} className="mb-3 text-content-tertiary" />
             <p className="text-sm text-content-secondary">{track === 'main' ? 'Your service is empty' : 'No second-track items yet'}</p>
-            <p className="mt-1 text-xs text-content-tertiary">Click &quot;Add item&quot; below to get started</p>
+            <p className="mt-1 max-w-xs text-xs text-content-tertiary">Start with a song, scripture, or service moment.</p>
+            <button onClick={() => setShowAdd(true)} className="btn-primary mt-4 text-xs">
+              <Plus size={13} /> Add your first moment
+            </button>
           </div>
         )}
         {items.map((it, i) => {
@@ -191,7 +262,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                 onDrop={() => onDrop(it.id)}
                 onClick={(e) => handleRowClick(it, i, e)}
                 onKeyDown={(e) => handleRowKeyDown(it, e)}
-                className={`group mb-1.5 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${ring} ${dragId === it.id ? 'opacity-40 ring-2 ring-white/30' : ''}`}
+                className={`wf-service-section-row group mb-1.5 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${ring} ${dragId === it.id ? 'opacity-40 ring-2 ring-white/30' : ''}`}
                 style={selectedId !== it.id && !isMultiSelected ? { borderColor: color + '55', background: color + '14' } : undefined}
               >
                 <GripVertical size={13} className="shrink-0 text-content-tertiary group-hover:text-content-secondary" />
@@ -212,6 +283,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
           return (
             <div
               key={it.id}
+              id={`service-item-${it.id}`}
               role="button"
               tabIndex={0}
               aria-label={`${it.type}: ${it.title || it.type}`}
@@ -221,9 +293,9 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
               onDrop={() => onDrop(it.id)}
               onClick={(e) => handleRowClick(it, i, e)}
               onKeyDown={(e) => handleRowKeyDown(it, e)}
-              className={`group mb-1.5 flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+              className={`wf-service-item-row group mb-1.5 flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                 it.type === 'placeholder' && selectedId !== it.id && !isMultiSelected ? 'border-dashed border-amber-500/40 bg-amber-500/10' : ring
-              } ${dragId === it.id ? 'opacity-40 ring-2 ring-white/30' : ''}`}
+              } ${recentlyAddedId === it.id ? 'border-emerald-400/60 bg-emerald-500/[0.08] ring-1 ring-emerald-400/40' : ''} ${dragId === it.id ? 'opacity-40 ring-2 ring-white/30' : ''}`}
             >
               <div className="flex w-5 flex-shrink-0 flex-col items-center">
                 <GripVertical size={13} className="text-content-tertiary group-hover:text-content-secondary" />
@@ -234,6 +306,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-content-primary">{it.title || it.type}</div>
                 <div className="flex items-center gap-1.5 truncate text-xs text-content-secondary">
+                  {recentlyAddedId === it.id && <span className="shrink-0 rounded bg-emerald-500/20 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-300">New · #{i + 1}</span>}
                   {it.type === 'placeholder' && (
                     <span className="shrink-0 rounded bg-amber-500/20 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-300">TBD</span>
                   )}
@@ -260,7 +333,7 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
                   </span>
                 ) : (
                   <>
-                    {!nonLive && (
+                    {!nonLive && onGoLive && (
                       <button
                         onClick={() => onGoLive(it)}
                         className="text-content-tertiary opacity-0 hover:text-blue-400 group-hover:opacity-100"
@@ -285,62 +358,6 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
         })}
       </div>
 
-      {showAdd ? (
-        <div className="mt-2 rounded-xl border border-border bg-panel p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-semibold text-content-primary">What do you want to add?</span>
-            <button onClick={() => setShowAdd(false)} className="inline-flex items-center gap-1 text-xs text-content-secondary hover:text-content-primary">
-              <X size={12} /> Close
-            </button>
-          </div>
-          <div className="mb-3">
-            <label htmlFor="deck-add-song" className="mb-1.5 block text-xs font-semibold text-content-secondary">Song from library</label>
-            <select
-              id="deck-add-song"
-              value=""
-              onChange={(e) => { if (e.target.value) { onAddSong(Number(e.target.value)); setShowAdd(false) } }}
-              className="w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm text-content-primary outline-none hover:bg-border-strong"
-            >
-              <option value="">Choose a song…</option>
-              {songs.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
-            </select>
-          </div>
-          {announcements.length > 0 && (
-            <div className="mb-3">
-              <label htmlFor="deck-add-announcement" className="mb-1.5 block text-xs font-semibold text-content-secondary">Announcement from library</label>
-              <select
-                id="deck-add-announcement"
-                value=""
-                onChange={(e) => { if (e.target.value) { onAddAnnouncement(Number(e.target.value)); setShowAdd(false) } }}
-                className="w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm text-content-primary outline-none hover:bg-border-strong"
-              >
-                <option value="">Choose an announcement…</option>
-                {announcements.map((a) => <option key={a.id} value={a.id}>{a.title}{a.expired ? ' (expired)' : ''}</option>)}
-              </select>
-            </div>
-          )}
-          <div className="mb-1.5 text-xs font-semibold text-content-secondary">Or add another item type</div>
-          <div className="grid grid-cols-3 gap-2">
-            {ADD_TYPES.map((a) => (
-              <button
-                key={a.type}
-                onClick={() => { onAdd(a.type); setShowAdd(false) }}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-panel px-3 py-2.5 text-center text-xs font-semibold text-content-secondary transition-colors hover:bg-panel-raised hover:text-content-primary"
-              >
-                <a.Icon size={13} />
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowAdd(true)}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm font-semibold text-content-secondary transition-colors hover:border-blue-500/50 hover:text-blue-400"
-        >
-          <Plus size={15} /> Add item
-        </button>
-      )}
     </div>
   )
 }

@@ -25,7 +25,9 @@ import type {
   ZoneRouting,
   ZoneState,
   TrackId,
-  LivecallConfig
+  LivecallConfig,
+  ServiceTeam,
+  ServiceItemType
 } from '../../shared/types'
 import { parseReferenceList } from '../../shared/scriptureRefs'
 import { starterConfig } from '../../shared/zoneScenes'
@@ -121,6 +123,7 @@ const services: ServiceFull[] = [
     service_date: null,
     theme: null,
     themeColors: null,
+    team: { people: [], assignments: {} },
     items: [
       {
         id: 1,
@@ -279,14 +282,23 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     liveLoadAnnouncement: noop,
 
     servicesList: async (): Promise<ServiceSummary[]> =>
-      services.map(({ id, name, service_date }) => ({ id, name, service_date })),
+      services.map(({ id, name, service_date, published_at }) => ({ id, name, service_date, published_at })),
     serviceCreate: async (name: string, date?: string): Promise<number> => {
       const id = nextServiceId++
-      services.push({ id, name, service_date: date ?? null, theme: null, themeColors: null, items: [] })
+      services.push({ id, name, service_date: date ?? null, theme: null, themeColors: null, team: { people: [], assignments: {} }, items: [] })
       return id
     },
     serviceDelete: noop,
     serviceGet: async (id: number): Promise<ServiceFull | null> => clone(services.find((svc) => svc.id === id) ?? null),
+    serviceSetPublished: async (id: number, publishedAt: number | null): Promise<void> => {
+      const service = services.find((svc) => svc.id === id)
+      if (service) service.published_at = publishedAt
+    },
+    serviceGetTeam: async (id: number): Promise<ServiceTeam> => clone(services.find((svc) => svc.id === id)?.team ?? { people: [], assignments: {} }),
+    serviceSetTeam: async (id: number, team: ServiceTeam): Promise<void> => {
+      const service = services.find((svc) => svc.id === id)
+      if (service) service.team = clone(team)
+    },
     serviceRefreshActiveItems: noop,
     serviceAddItem: async (serviceId: number, item: NewServiceItem): Promise<number> => {
       const service = services.find((svc) => svc.id === serviceId)
@@ -305,6 +317,18 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       }
       service?.items.push(nextItem)
       return id
+    },
+    serviceReplaceItem: async (itemId: number, type: ServiceItemType, refId: number | null, payload: Record<string, unknown>): Promise<void> => {
+      for (const service of services) {
+        const item = service.items.find((candidate) => candidate.id === itemId)
+        if (item) {
+          item.type = type
+          item.ref_id = refId
+          item.payload = payload
+          item.title = itemTitle({ type, ref_id: refId, payload })
+          return
+        }
+      }
     },
     serviceRemoveItem: noop,
     serviceDuplicateItem: async (): Promise<number | null> => null,

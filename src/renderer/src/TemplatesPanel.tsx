@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, X } from 'lucide-react'
+import { AlertTriangle, Save, X } from 'lucide-react'
 import Modal from './Modal'
 
 interface ServiceTemplate {
@@ -36,6 +36,7 @@ export function TemplatesPanel({
   const [saveName, setSaveName] = useState('')
   const [saveDesc, setSaveDesc] = useState('')
   const [showSaveForm, setShowSaveForm] = useState(false)
+  const [pendingTemplate, setPendingTemplate] = useState<ServiceTemplate | null>(null)
 
   useEffect(() => {
     loadTemplates()
@@ -53,10 +54,12 @@ export function TemplatesPanel({
     }
   }
 
-  const handleLoadTemplate = async (template: ServiceTemplate): Promise<void> => {
+  const handleLoadTemplate = async (): Promise<void> => {
+    if (!pendingTemplate) return
     try {
       setLoading(true)
-      await onLoadTemplate(template.items, template.theme, template.themeColors)
+      await onLoadTemplate(pendingTemplate.items, pendingTemplate.theme, pendingTemplate.themeColors)
+      setPendingTemplate(null)
       if (!inline) onClose?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -103,6 +106,29 @@ export function TemplatesPanel({
 
   const body = (
     <>
+      {pendingTemplate && (
+        <Modal onClose={() => setPendingTemplate(null)} labelledBy="replace-template-title" className="w-full max-w-md rounded-2xl border border-border bg-panel-raised p-5 text-content-primary shadow-2xl">
+          <div className="mb-4 flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400"><AlertTriangle size={18} /></div>
+            <div>
+              <h3 id="replace-template-title" className="text-lg font-semibold">Replace this service?</h3>
+              <p className="mt-1 text-sm text-content-secondary">Loading <span className="font-semibold text-content-primary">{pendingTemplate.name}</span> will replace the current service order.</p>
+            </div>
+          </div>
+          <div className="mb-4 rounded-xl border border-border bg-panel p-3 text-xs text-content-secondary">
+            <div className="mb-2 flex items-center justify-between font-semibold text-content-primary"><span>What will change</span><span>{pendingTemplate.items.length} template items</span></div>
+            <p className="mb-2">{currentService?.items.length ?? 0} current item{currentService?.items.length === 1 ? '' : 's'} will be removed and replaced with this starting flow.</p>
+            <div className="max-h-28 space-y-1 overflow-y-auto border-t border-border pt-2">
+              {pendingTemplate.items.slice(0, 6).map((item, index) => <div key={`${item.id ?? item.type}-${index}`} className="truncate">{index + 1}. {item.title || item.payload?.label || item.payload?.title || item.type}</div>)}
+              {pendingTemplate.items.length > 6 && <div className="text-content-tertiary">+ {pendingTemplate.items.length - 6} more items</div>}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setPendingTemplate(null)} className="flex-1 btn">Cancel</button>
+            <button onClick={() => { void handleLoadTemplate() }} disabled={loading} className="flex-1 btn-primary disabled:opacity-50">Replace service</button>
+          </div>
+        </Modal>
+      )}
       <div className="mb-4 flex items-center justify-between">
         <h2 id="templates-panel-title" className="text-xl font-bold text-content-primary">Service Templates</h2>
         {!inline && onClose && (
@@ -195,7 +221,7 @@ export function TemplatesPanel({
                 </div>
                 <div className="flex gap-2 ml-3">
                   <button
-                    onClick={() => handleLoadTemplate(template)}
+                    onClick={() => setPendingTemplate(template)}
                     disabled={loading}
                     className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
                   >

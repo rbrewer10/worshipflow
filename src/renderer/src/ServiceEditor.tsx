@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { CalendarDays, ClipboardCheck, Clock3, FileWarning, Keyboard, ListChecks, Mic2, Music2, Users } from 'lucide-react'
 import type { LiveState, ServiceFull, ServiceItem, SongFull, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../../shared/types'
 import type { ZoneTrackAssignment } from '../../shared/zoneTrack'
@@ -9,28 +10,33 @@ import ServiceDeck from './ServiceDeck'
 import CardEditPanel from './CardEditPanel'
 import ZoneScreenGrid from './zones/ZoneScreenGrid'
 import ScenePresetRow from './ScenePresetRow'
-import { sendItemLive } from './liveActions'
 import ScheduledAnnouncements from './ScheduledAnnouncements'
 import Modal from './Modal'
 import QuickSearchOverlay from './QuickSearchOverlay'
 import { useOptionalService } from './ServiceContext'
-import { usePreflightChecks } from './usePreflightChecks'
 import { estimateServiceDuration, formatDurationEstimate } from '../../shared/serviceDuration'
-import { notifyLocalAction } from './NotifyToasts'
+import { notifyLocal, notifyLocalAction } from './NotifyToasts'
+import ServiceReviewPanel from './ServiceReviewPanel'
+import ServiceTeamPanel from './ServiceTeamPanel'
+import StageRehearsalTools from './StageRehearsalTools'
+import { computeServiceReadiness } from './serviceReadiness'
+import ReplaceItemModal, { type Replacement } from './ReplaceItemModal'
 
-function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
+function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive }: {
   serviceId: number
   headerActions?: React.ReactNode
   // Called after every edit that mutates this service, so a shared "active
   // service" cache elsewhere (e.g. Live Control's ServiceContext) can refresh.
   // Optional: the standalone pop-out service window has no such context to sync.
   onServiceChanged?: () => void
+  onOpenLive?: () => void
 }): JSX.Element {
   const [service, setService] = useState<ServiceFull | null>(null)
   const [songs, setSongs] = useState<SongSummary[]>([])
   const [announcements, setAnnouncements] = useState<AnnouncementSummary[]>([])
   const [live, setLive] = useState<{ main: LiveState; second: LiveState | null } | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [recentlyAddedId, setRecentlyAddedId] = useState<number | null>(null)
   const [selectedSongFull, setSelectedSongFull] = useState<SongFull | null>(null)
   const [confirmDeleteItems, setConfirmDeleteItems] = useState<ServiceItem[] | null>(null)
   const [track, setTrack] = useState<TrackId>('main')
@@ -47,8 +53,10 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   // picking an item to preview, and left open it crowded the bottom strip.
   // Matches the "Advanced ▾" disclosure idiom ZoneScreenGrid already uses.
   const [showSceneSelector, setShowSceneSelector] = useState(false)
-
-  const { needsAttention } = usePreflightChecks()
+  const [showReview, setShowReview] = useState(false)
+  const [showTeam, setShowTeam] = useState(false)
+  const [showRehearsal, setShowRehearsal] = useState(false)
+  const [replaceItemId, setReplaceItemId] = useState<number | null>(null)
 
   // Ctrl/Cmd+F opens the cross-type quick search from anywhere in Build
   // Service — matches ProPresenter's global search shortcut.
@@ -71,14 +79,12 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   // which has no ServiceProvider — optionalSvc is null there.
   useEffect(() => {
     optionalSvc?.setSelectedItemId(selectedId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
 
   // Clear the mirrored selection on unmount (e.g. navigating away from Build
   // Service), so a stale id doesn't linger once this screen isn't showing.
   useEffect(() => {
     return () => { optionalSvc?.setSelectedItemId(null) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const reload = async (notify = true): Promise<void> => {
@@ -113,7 +119,6 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     window.wf.announcementsList().then(setAnnouncements)
     setSelectedId(null)
     setTrack('main')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceId])
 
   // Re-fetch this component's own copy of the service whenever something
@@ -125,7 +130,6 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
   useEffect(() => {
     if (skipFirstTick.current) { skipFirstTick.current = false; return }
     if (optionalSvc) reload(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [optionalSvc?.itemsChangedTick])
 
   useEffect(() => {
@@ -168,7 +172,6 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     } else {
       setSelectedSongFull(null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, selectedItem?.ref_id])
 
   const addCard = async (type: ServiceItem['type']): Promise<void> => {
@@ -178,24 +181,28 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
       const id = await window.wf.serviceAddItem(serviceId, { type: 'image', payload: { path: result.filePaths[0] }, track })
       await reload()
       setSelectedId(id)
+      markRecentlyAdded(id)
       return
     }
     const payload: Record<string, unknown> = (type === 'countdown' || type === 'welcome') ? { seconds: 300 } : {}
     const id = await window.wf.serviceAddItem(serviceId, { type, payload, track })
     await reload()
     setSelectedId(id)
+    markRecentlyAdded(id)
   }
 
   const addSong = async (songId: number): Promise<void> => {
     const id = await window.wf.serviceAddItem(serviceId, { type: 'song', ref_id: songId, track })
     await reload()
     setSelectedId(id)
+    markRecentlyAdded(id)
   }
 
   const addAnnouncement = async (announcementId: number): Promise<void> => {
     const id = await window.wf.serviceAddItem(serviceId, { type: 'announcement', ref_id: announcementId, track })
     await reload()
     setSelectedId(id)
+    markRecentlyAdded(id)
   }
 
   // From quick search: create the scripture item with its reference already
@@ -204,6 +211,12 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     const id = await window.wf.serviceAddItem(serviceId, { type: 'scripture', payload: { reference }, track })
     await reload()
     setSelectedId(id)
+    markRecentlyAdded(id)
+  }
+
+  const markRecentlyAdded = (id: number): void => {
+    setRecentlyAddedId(id)
+    window.setTimeout(() => setRecentlyAddedId((current) => current === id ? null : current), 3000)
   }
 
   const delItem = (item: ServiceItem): void => setConfirmDeleteItems([item])
@@ -252,18 +265,63 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
     return <div className="flex h-full items-center justify-center text-sm text-content-secondary">Loading…</div>
   }
 
+  const songCount = service.items.filter((item) => item.type === 'song').length
+  const placeholderCount = service.items.filter((item) => item.type === 'placeholder').length
+  const quickSearchHint = navigator.platform.toLowerCase().includes('mac') ? '⌘F' : 'Ctrl+F'
+  const team = service.team ?? { people: [], assignments: {} }
+  const readiness = computeServiceReadiness(service, songs, team.people)
+  const statusLabel = service.published_at
+    ? 'Published'
+    : readiness.ready
+    ? readiness.warnings.length > 0
+    ? `Ready · ${readiness.warnings.length} recommended`
+    : 'Ready to publish'
+    : `${readiness.blocking.length} to fix`
+  const reviewButtonLabel = service.published_at
+    ? 'Published'
+    : readiness.ready
+    ? 'Review & publish'
+    : 'Review plan'
+
+  const saveTeam = async (nextTeam: typeof team): Promise<void> => {
+    await window.wf.serviceSetTeam(serviceId, nextTeam)
+    await reload()
+  }
+
+  const publish = async (): Promise<void> => {
+    if (!readiness.ready) return
+    await window.wf.serviceSetPublished(serviceId, Date.now())
+    await reload()
+    setShowReview(false)
+    notifyLocal('Service published and ready for Live Control.', 'info')
+  }
+
+  const replaceItem = async (replacement: Replacement): Promise<void> => {
+    if (replaceItemId == null) return
+    await window.wf.serviceReplaceItem(replaceItemId, replacement.type, replacement.refId, replacement.payload)
+    await reload()
+    setSelectedId(replaceItemId)
+    setReplaceItemId(null)
+    notifyLocal('Item replaced in place.', 'info')
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="wf-service-editor flex h-full min-h-0 flex-col gap-2">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="wf-service-editor-header flex items-center justify-between gap-3 px-1">
         <div className="flex min-w-0 items-center gap-3">
-          <h2 className="truncate text-lg font-semibold text-content-primary">{service.name}</h2>
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-400">Sunday service</div>
+            <h2 className="truncate text-lg font-semibold text-content-primary">{service.name}</h2>
+          </div>
           {/* Which Sunday this is for. Drives the scheduled-announcements list
               and the printed order's date line — both of which used to be
               unreachable for hand-built services, since only the church-app
               plan import ever set a date. */}
           <label htmlFor="service-date" className="sr-only">Service date</label>
-          <input
+          <div className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-panel px-2 py-1">
+            <CalendarDays size={13} className="text-content-tertiary" />
+            <input
             id="service-date"
             type="date"
             value={service.service_date ?? ''}
@@ -271,30 +329,42 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
               void window.wf.serviceSetDate(serviceId, e.target.value || null).then(() => reload())
             }}
             title="The date this service is for"
-            className="shrink-0 rounded-lg border border-border bg-panel px-2 py-1 text-xs text-content-secondary"
-          />
-          {duration && duration.knownItemCount > 0 && (
-            <span className="shrink-0 text-xs text-content-secondary" title={`${duration.knownItemCount} of ${duration.totalItemCount} items have a known duration`}>
-              {formatDurationEstimate(duration.totalSeconds)}
-            </span>
-          )}
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
-            needsAttention ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'
-          }`}>
-            {needsAttention ? 'Needs attention' : 'Ready to plan'}
-          </span>
+            className="border-0 bg-transparent px-0 py-0 text-xs text-content-secondary shadow-none focus:border-0 focus:shadow-none"
+            />
+          </div>
         </div>
-        {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
+        <div className="wf-service-editor-actions flex shrink-0 items-center gap-2">
+          <button onClick={() => setShowTeam(true)} className="btn-pill text-xs" title="Manage people and roles for this service"><Users size={13} /> Team{team.people.length > 0 ? ` · ${team.people.length}` : ''}</button>
+          <button onClick={() => setShowRehearsal(true)} className="btn-pill text-xs" title="Step the Stage Monitor through this service's songs for a pre-service rehearsal"><Mic2 size={13} /> Stage Rehearsal</button>
+          <button onClick={() => setShowReview(true)} className={`btn-pill text-xs ${readiness.ready ? 'border-emerald-500/35 text-emerald-400' : 'border-amber-500/35 text-amber-400'}`} title="Review this service before publishing"><ClipboardCheck size={13} /> {reviewButtonLabel}</button>
+          {headerActions && headerActions}
+        </div>
+      </div>
+
+      <div className="wf-service-stats flex shrink-0 items-center gap-2 overflow-x-auto rounded-xl border border-border bg-panel-raised px-3 py-2">
+        <div className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-content-primary"><ListChecks size={14} className="text-blue-400" /> {service.items.length} item{service.items.length === 1 ? '' : 's'}</div>
+        <span className="h-4 w-px shrink-0 bg-border" />
+        <div className="inline-flex shrink-0 items-center gap-1.5 text-xs text-content-secondary"><Music2 size={13} /> {songCount} song{songCount === 1 ? '' : 's'}</div>
+        {duration && duration.knownItemCount > 0 && (
+          <div className="inline-flex shrink-0 items-center gap-1.5 text-xs text-content-secondary" title={`${duration.knownItemCount} of ${duration.totalItemCount} items have a known duration`}><Clock3 size={13} /> {formatDurationEstimate(duration.totalSeconds)}</div>
+        )}
+        {placeholderCount > 0 && <div className="inline-flex shrink-0 items-center gap-1.5 text-xs text-amber-400"><FileWarning size={13} /> {placeholderCount} to fill</div>}
+        <span className={`ml-auto shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+          readiness.ready ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'
+        }`} title={readiness.ready ? 'This service can be published' : `${readiness.blocking.length} blocking issue${readiness.blocking.length === 1 ? '' : 's'} before publishing`}>
+          {statusLabel}
+        </span>
+        <span className="hidden shrink-0 items-center gap-1 text-[11px] text-content-tertiary xl:inline-flex"><Keyboard size={12} /> {quickSearchHint} quick add</span>
       </div>
 
       {/* Theme bar */}
       <ThemePicker serviceId={serviceId} themeId={service.theme} colors={service.themeColors} onChange={reload} />
 
       {/* Body */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="wf-service-editor-body flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex min-h-0 flex-1 gap-3">
           {/* Center: run of show (moved from the left column) */}
-          <div className="flex min-w-0 flex-1 flex-col min-h-0">
+          <div className="wf-service-flow flex min-w-0 flex-1 flex-col min-h-0">
             <ScheduledAnnouncements
               serviceDate={service.service_date}
               addedRefIds={new Set(service.items.filter((it) => it.type === 'announcement' && it.ref_id != null).map((it) => it.ref_id as number))}
@@ -310,11 +380,12 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
               announcements={announcements}
               liveItemId={live?.main.liveServiceItemId ?? null}
               selectedId={selectedId}
+              recentlyAddedId={recentlyAddedId}
               onSelect={setSelectedId}
               onAdd={addCard}
               onAddSong={addSong}
               onAddAnnouncement={addAnnouncement}
-              onGoLive={(it) => sendItemLive(it, it.track)}
+              onQuickSearch={() => setShowQuickSearch(true)}
               onDelete={delItem}
               onDuplicate={duplicateItem}
               onBatchDelete={batchDeleteItems}
@@ -324,7 +395,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
 
           {/* Right: consolidated inspector — compact zone preview + item editor */}
           {selectedItem && (
-            <div className="flex w-80 shrink-0 flex-col gap-3 overflow-auto rounded-xl border border-border bg-panel-raised p-3">
+            <div className="wf-service-inspector flex min-h-0 w-80 shrink-0 flex-col gap-3 overflow-auto overscroll-contain rounded-xl border border-border bg-panel-raised p-3">
               <ZoneScreenGrid
                 item={selectedItem}
                 serviceId={service.id}
@@ -349,7 +420,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
             </div>
           )}
           {!selectedItem && (
-            <div className="flex w-80 shrink-0 items-center justify-center rounded-xl border border-border bg-panel-raised p-3 text-sm text-content-secondary">
+            <div className="wf-service-inspector flex min-h-0 w-80 shrink-0 items-center justify-center rounded-xl border border-border bg-panel-raised p-3 text-sm text-content-secondary">
               Select an item to preview &amp; style it
             </div>
           )}
@@ -360,7 +431,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
             OutputsStrip-then-ScenePresetRow bottom bar, so the narrow right
             column only has to hold controls, not previews. */}
         {selectedItem && (
-          <div className="flex shrink-0 flex-col gap-3 rounded-xl border border-border bg-panel-raised p-3">
+          <div className="wf-service-bottom-strip flex max-h-28 shrink-0 flex-col gap-2 overflow-hidden rounded-xl border border-border bg-panel-raised p-2">
             <div ref={setZoneCardsAnchor} />
             {sceneConfig && (
               <div>
@@ -427,6 +498,19 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged }: {
           onClose={() => setShowQuickSearch(false)}
         />
       )}
+
+      {showReview && <ServiceReviewPanel service={service} readiness={readiness} onSelectItem={(id) => { setSelectedId(id); setShowReview(false) }} onReplaceItem={(id) => { setReplaceItemId(id); setShowReview(false) }} onFixIssue={(issueId) => { if (issueId === 'date') window.setTimeout(() => document.getElementById('service-date')?.focus(), 0); if (issueId === 'team') setShowTeam(true); if (issueId === 'empty') setShowQuickSearch(true) }} onPublish={() => { void publish() }} onOpenLive={() => { setShowReview(false); onOpenLive?.() }} onClose={() => setShowReview(false)} />}
+      {showTeam && <ServiceTeamPanel team={team} selectedItem={selectedItem} onChange={(next) => { void saveTeam(next) }} onClose={() => setShowTeam(false)} />}
+      {showRehearsal && (
+        <Modal onClose={() => setShowRehearsal(false)} labelledBy="stage-rehearsal-title" className="w-full max-w-md rounded-2xl border border-border bg-panel-raised text-content-primary shadow-2xl">
+          <h2 id="stage-rehearsal-title" className="sr-only">Stage Rehearsal</h2>
+          <StageRehearsalTools onActiveChange={() => {}} className="max-h-[80vh] rounded-2xl" />
+        </Modal>
+      )}
+      {replaceItemId != null && (() => {
+        const item = service.items.find((it) => it.id === replaceItemId)
+        return item && <ReplaceItemModal item={item} songs={songs} onReplace={(replacement) => { void replaceItem(replacement) }} onClose={() => setReplaceItemId(null)} />
+      })()}
     </div>
   )
 }
