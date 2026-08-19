@@ -166,8 +166,8 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
 
         {stageRehearsalActive && (
           <button
-            onClick={() => setView('live')}
-            title="Stage Rehearsal is armed — Zone 4 is looping the rehearsal song, Zones 1-3 are looping announcements. Click to go manage it."
+            onClick={() => setView('service')}
+            title="Stage Rehearsal is armed — Zone 4 is looping the rehearsal song, Zones 1-3 are looping announcements. Click to go manage it from Build Service."
             className="flex items-center gap-1.5 rounded-lg bg-violet-500/10 px-3 py-1.5 ring-1 ring-violet-500/30 hover:bg-violet-500/20"
           >
             <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-violet-500" />
