@@ -431,7 +431,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
             OutputsStrip-then-ScenePresetRow bottom bar, so the narrow right
             column only has to hold controls, not previews. */}
         {selectedItem && (
-          <div className="wf-service-bottom-strip flex max-h-28 shrink-0 flex-col gap-2 overflow-hidden rounded-xl border border-border bg-panel-raised p-2">
+          <div className="wf-service-bottom-strip flex shrink-0 flex-col gap-2 rounded-xl border border-border bg-panel-raised p-2">
             <div ref={setZoneCardsAnchor} />
             {sceneConfig && (
               <div>

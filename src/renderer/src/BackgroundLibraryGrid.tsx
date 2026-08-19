@@ -31,7 +31,6 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
 }): JSX.Element {
   const [uploads, setUploads] = useState<BackgroundWithTags[]>([])
   const [dragging, setDragging] = useState(false)
-  const [searchTags, setSearchTags] = useState<string[]>([])
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const [editingTags, setEditingTags] = useState<string>('')
   const dropRef = useRef<HTMLButtonElement>(null)
@@ -114,13 +113,9 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
     }
   }
 
-  const folderScoped = selectedFolder === 'ALL'
+  const filteredUploads = selectedFolder === 'ALL'
     ? uploads
     : uploads.filter((bg) => bg.folder === selectedFolder)
-
-  const filteredUploads = searchTags.length === 0
-    ? folderScoped
-    : folderScoped.filter((bg) => bg.tags?.some((t) => searchTags.includes(t)))
 
   async function handleUploadFile(file: File): Promise<void> {
     const path = (file as File & { path?: string }).path
@@ -237,39 +232,6 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
 
   return (
     <div className="flex flex-col gap-3">
-
-      {/* Search by tags */}
-      <div className="rounded-lg border border-border bg-panel p-2.5">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-content-secondary">Filter by mood</p>
-        <div className="flex flex-wrap gap-1.5">
-          {['worship', 'prayer', 'energetic', 'peaceful', 'joyful', 'dark', 'bright', 'nature', 'modern', 'seasonal'].map((tag) => (
-            <button
-              key={tag}
-              onClick={() =>
-                setSearchTags((cur) =>
-                  cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]
-                )
-              }
-              className={[
-                'rounded-full px-2 py-1 text-[10px] font-semibold transition-all',
-                searchTags.includes(tag)
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-panel-raised text-content-secondary hover:bg-border-strong',
-              ].join(' ')}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-        {searchTags.length > 0 && (
-          <button
-            onClick={() => setSearchTags([])}
-            className="mt-2 text-[10px] text-content-secondary hover:text-content-primary"
-          >
-            Clear filters
-          </button>
-        )}
-      </div>
 
       {/* Folder rail */}
       <div className="flex flex-wrap items-center gap-1.5">
@@ -410,7 +372,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
       <div className="mb-2 flex items-center justify-between text-[11px] text-content-secondary">
         <span>
           {uploads.length} background{uploads.length === 1 ? '' : 's'}
-          {searchTags.length > 0 && ` · ${filteredUploads.length} matching`}
+          {selectedFolder !== 'ALL' && ` · ${filteredUploads.length} shown`}
         </span>
         <button
           onClick={() => void loadUploads()}
@@ -425,7 +387,7 @@ export default function BackgroundLibraryGrid({ activePath, onApply }: {
       {uploads.length === 0 ? (
         <p className="py-8 text-center text-xs text-content-tertiary">No uploads yet</p>
       ) : filteredUploads.length === 0 ? (
-        <p className="py-8 text-center text-xs text-content-tertiary">No backgrounds match the selected mood</p>
+        <p className="py-8 text-center text-xs text-content-tertiary">No backgrounds in this folder</p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           {filteredUploads.map((u) => {

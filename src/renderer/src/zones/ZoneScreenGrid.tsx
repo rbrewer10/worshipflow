@@ -189,7 +189,7 @@ export default function ZoneScreenGrid({ item, serviceId, serviceTheme, serviceC
             />
           )}
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
             <ZoneRolePalette />
             <div className="flex items-center gap-3">
               <button

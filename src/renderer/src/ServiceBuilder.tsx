@@ -273,19 +273,22 @@ function ServiceBuilder({ onOpenLive }: { onOpenLive?: () => void }): JSX.Elemen
               <FolderOpen size={12} /> Import {showImportTools ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
           </div>
-          <div className="mb-3 flex gap-2">
+          <div className="mb-3 flex flex-col gap-2">
             <label htmlFor="new-service-name" className="sr-only">New service name</label>
             <input id="new-service-name" value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && create()}
               placeholder="Sunday service name…"
-              aria-label="Enter a new service name" />
-            <button onClick={openStartSunday} disabled={startingSunday}
-              aria-label="Start a Sunday service"
-              className="btn-secondary shrink-0 px-2 text-[11px] font-bold"
-              title="Start with a Sunday date and optional template">Start Sunday</button>
-            <button onClick={create} disabled={!newName.trim()}
-              aria-label="Create new service"
-              className="btn-primary disabled:opacity-40"><Plus size={15} /></button>
+              aria-label="Enter a new service name"
+              className="w-full" />
+            <div className="flex gap-2">
+              <button onClick={openStartSunday} disabled={startingSunday}
+                aria-label="Start a Sunday service"
+                className="btn-secondary min-w-0 flex-1 px-2 text-[11px] font-bold"
+                title="Start with a Sunday date and optional template">Start Sunday</button>
+              <button onClick={create} disabled={!newName.trim()}
+                aria-label="Create new service"
+                className="btn-primary shrink-0 disabled:opacity-40"><Plus size={15} /></button>
+            </div>
           </div>
           {showImportTools && (
             <div className="mb-3 grid grid-cols-2 gap-1.5 rounded-lg border border-border bg-panel-raised p-1.5">
