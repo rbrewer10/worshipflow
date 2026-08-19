@@ -16,7 +16,7 @@ function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
 }
 
-export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDone: () => void; isBuildService: boolean }): JSX.Element {
+export default function BackgroundsDrawerTab({ onDone, isBuildService, columns = 6 }: { onDone: () => void; isBuildService: boolean; columns?: 3 | 6 }): JSX.Element {
   const { activeService, reloadActiveService, selectedItemId } = useService()
   const [backgrounds, setBackgrounds] = useState<BgEntry[]>([])
   const [live, setLive] = useState<LiveState | null>(null)
@@ -134,11 +134,11 @@ export default function BackgroundsDrawerTab({ onDone, isBuildService }: { onDon
           ))}
         </div>
       )}
-      <div className="grid grid-cols-6 gap-2">
+      <div className={columns === 3 ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-6 gap-2'}>
         {backgrounds.length === 0 ? (
-          <p className="col-span-6 text-xs text-content-tertiary">No backgrounds yet — add some in Build Service.</p>
+          <p className="col-span-full text-xs text-content-tertiary">No backgrounds yet — add some in Build Service.</p>
         ) : folderScoped.length === 0 ? (
-          <p className="col-span-6 text-xs text-content-tertiary">Nothing in this folder yet.</p>
+          <p className="col-span-full text-xs text-content-tertiary">Nothing in this folder yet.</p>
         ) : (
           folderScoped.map((bg) => (
             <button

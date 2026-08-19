@@ -23,7 +23,7 @@ export default function ScheduledAnnouncements({
 
   if (!serviceDate) {
     return (
-      <div className="mb-3 rounded-xl border border-dashed border-slate-300 bg-[#f4f6f9] p-3 text-xs text-slate-500">
+      <div className="mb-2 rounded-xl border border-dashed border-border-strong bg-panel-raised p-2.5 text-xs text-content-tertiary">
         Set a service date to see scheduled announcements.
       </div>
     )
@@ -33,10 +33,10 @@ export default function ScheduledAnnouncements({
   const unadded = items.filter((it) => !addedRefIds.has(it.id))
 
   return (
-    <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+    <div className="mb-2 rounded-xl border border-blue-500/25 bg-blue-500/[0.06] p-2.5">
       <div className="mb-2 flex items-center gap-2">
-        <CalendarClock size={14} className="text-blue-700" />
-        <span className="text-xs font-bold uppercase tracking-widest text-blue-700">Scheduled for {serviceDate}</span>
+        <CalendarClock size={14} className="text-blue-400" />
+        <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Scheduled for {serviceDate}</span>
         {unadded.length > 0 && (
           <button
             onClick={() => unadded.forEach((it) => onAdd(it.id))}
@@ -50,12 +50,12 @@ export default function ScheduledAnnouncements({
         {items.map((it) => {
           const added = addedRefIds.has(it.id)
           return (
-            <div key={it.id} className="flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-sm">
-              <span className="min-w-0 flex-1 truncate text-slate-800">{it.title}</span>
+            <div key={it.id} className="flex items-center gap-2 rounded-lg bg-panel-raised px-3 py-1.5 text-sm">
+              <span className="min-w-0 flex-1 truncate text-content-primary">{it.title}</span>
               {added ? (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600"><Check size={13} /> Added</span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400"><Check size={13} /> Added</span>
               ) : (
-                <button onClick={() => onAdd(it.id)} className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-200">
+                <button onClick={() => onAdd(it.id)} className="inline-flex items-center gap-1 rounded-md bg-blue-500/15 px-2 py-0.5 text-xs font-semibold text-blue-400 hover:bg-blue-500/25">
                   <Plus size={13} /> Add
                 </button>
               )}

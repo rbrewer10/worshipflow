@@ -29,13 +29,13 @@ function ThemePicker({ serviceId, themeId, colors, onChange }: {
   }
 
   return (
-    <div className="mb-3 rounded-lg border border-slate-200 bg-[#f4f6f9] p-2">
+    <div className="mb-2 rounded-lg border border-border bg-panel-raised p-2">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between text-xs font-semibold text-slate-700"
+        className="flex w-full items-center justify-between text-xs font-semibold text-content-secondary"
       >
         <span className="inline-flex items-center gap-1.5"><Palette size={13} /> Theme — {active.name}</span>
-        <span className="text-slate-500">{open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
+        <span className="text-content-tertiary">{open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
       </button>
       {open && (
         <div className="mt-2">
