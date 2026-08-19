@@ -23,7 +23,6 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   const [autoLabelPreview, setAutoLabelPreview] = useState('')
   const [autoLabelAnalyses, setAutoLabelAnalyses] = useState<any[]>([])
   const [showChords, setShowChords] = useState(true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setP(item.payload ?? {}); setNotes(item.notes ?? '')
     if (item.type === 'song' && item.ref_id != null) {

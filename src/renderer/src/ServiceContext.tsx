@@ -50,7 +50,6 @@ export function ServiceProvider({ children }: { children: ReactNode }): JSX.Elem
       setServices(list)
       if (list.length > 0) selectService(list[0].id)
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

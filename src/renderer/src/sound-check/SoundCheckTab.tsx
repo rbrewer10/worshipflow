@@ -147,7 +147,6 @@ function SoundCheckTab(): JSX.Element {
   // Auto-discover on first mount only; retries go through the manual-IP form.
   useEffect(() => {
     connect()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Returns the in-flight promise so callers (e.g. the Engineer fader commit) can await

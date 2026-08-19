@@ -35,7 +35,6 @@ export function useAutosave<T>(save: (value: T) => Promise<void>): {
         onStatusChange: (s, e) => { setStatus(s); setError(e); registerSave(registryId, s) },
         notifyFailure: (message) => notifyLocal(`Save failed: ${message}`, 'error')
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   )
 
