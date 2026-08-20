@@ -749,6 +749,7 @@ function renderState(track: TrackId = 'main'): LiveState {
     total: lines.length,
     songTitle: t.hasLiveContent ? t.song.title : '',
     background: t.hasLiveContent ? (t.song.background ?? null) : null,
+    icon: t.hasLiveContent ? (t.song.icon ?? null) : null,
     bgMotion: t.hasLiveContent ? ((t.song.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null) : null,
     bgFit: t.bgFit,
     liveServiceItemId: t.serviceItemId,
@@ -1659,6 +1660,34 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
   }
 }
 
+// Slide-display announcements get their own load path instead of doLoadText's
+// title/body-become-separate-slides split — the split-layout AnnouncementLayer
+// (Output.tsx) shows title and body together on one card, so there's nothing
+// to page through. Ticker-display announcements are unaffected; they still
+// go through doLoadText (see doLoadAnnouncement below).
+function doLoadAnnouncementSlide(
+  track: TrackId, title: string, body: string, icon: string | null,
+  background: string | null, fontScale?: number, blurBehindText?: boolean
+): void {
+  const t = tracks[track]
+  t.loadGeneration++
+  t.hasLiveContent = true
+  clearCountdown(track)
+  clearAutoAdvance(track)
+  t.songId = null
+  t.scriptureRef = null
+  clearSongMeta(track)
+  t.bgFit = 'cover'
+  t.deckSlides = null
+  t.sermonSlides = null
+  t.song = { title, lines: [body], background, icon }
+  t.songTextColor = null; t.songFont = null
+  t.blurBehindText = blurBehindText ?? false
+  if (fontScale != null) t.fontScale = fontScale
+  t.mode = 'announcement'
+  t.index = 0
+}
+
 // `item` is optional so the plain "load this one announcement" callers still
 // work; when it IS given, the block's generated deck loads on top and the
 // screens split into heading + content. The main projector keeps showing the
@@ -1681,8 +1710,7 @@ async function doLoadAnnouncement(track: TrackId, id: number | null, item?: Serv
     const bg = (item?.payload.background as string | null | undefined) ?? a.background ?? null
     const blur = (item?.payload.blurBehindText as boolean | undefined) ?? a.blurBehindText
     const fontScale = item?.payload.fontScale as number | undefined
-    const bgFit = item?.payload.bgFit as 'cover' | 'contain' | undefined
-    doLoadText(track, a.title, a.body, bg, fontScale, blur, undefined, bgFit)
+    doLoadAnnouncementSlide(track, a.title, a.body, a.icon, bg, fontScale, blur)
   }
   // doLoadText bumped loadGeneration, so read it back rather than capturing it earlier.
   if (item) void loadDeckOnto(track, item, tracks[track].loadGeneration)
