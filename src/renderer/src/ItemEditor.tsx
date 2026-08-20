@@ -47,6 +47,7 @@ interface ItemEditorProps {
   onAutoLabelApply: (preview: string) => void
   onBackgroundClick: () => void
   onRemoveBackground: () => void
+  onSongFontScaleChange: (scale: number) => void
   onSaveNotes: () => void
   setAutoLabelPreview: (preview: string) => void
   setAutoLabelAnalyses: (analyses: any[]) => void
@@ -84,6 +85,7 @@ export const ItemEditor = memo(function ItemEditor({
   onAutoLabelApply,
   onBackgroundClick,
   onRemoveBackground,
+  onSongFontScaleChange,
   onSaveNotes,
   setAutoLabelPreview,
   setAutoLabelAnalyses,
@@ -182,6 +184,8 @@ export const ItemEditor = memo(function ItemEditor({
           onAutoLabelApply={onAutoLabelApply}
           onBackgroundClick={onBackgroundClick}
           onRemoveBackground={onRemoveBackground}
+          fontScale={songFull?.fontScale ?? 6}
+          onFontScaleChange={onSongFontScaleChange}
           setAutoLabelPreview={setAutoLabelPreview}
           setAutoLabelAnalyses={setAutoLabelAnalyses}
           setShowAutoLabelPreview={setShowAutoLabelPreview}

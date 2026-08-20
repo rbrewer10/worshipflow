@@ -22,6 +22,8 @@ interface CardSongEditorProps {
   onAutoLabelApply: (preview: string) => void
   onBackgroundClick: () => void
   onRemoveBackground: () => void
+  fontScale: number
+  onFontScaleChange: (scale: number) => void
   setAutoLabelPreview: (preview: string) => void
   setAutoLabelAnalyses: (analyses: any[]) => void
   setShowAutoLabelPreview: (show: boolean) => void
@@ -42,6 +44,8 @@ export const CardSongEditor = memo(function CardSongEditor({
   onAutoLabelApply,
   onBackgroundClick,
   onRemoveBackground,
+  fontScale,
+  onFontScaleChange,
   setAutoLabelPreview,
   setAutoLabelAnalyses,
   setShowAutoLabelPreview
@@ -78,6 +82,21 @@ export const CardSongEditor = memo(function CardSongEditor({
           className="btn-primary text-xs disabled:opacity-40">
           Save lyrics
         </button>
+      </div>
+
+      {/* Font size — was previously only adjustable reactively, from Live
+          Control while the song was already live. Matches the slider
+          Scripture/Text/Announcement items already have here. */}
+      <div className="border-t border-border pt-3">
+        <label htmlFor="song-font-size-slider" className="mb-1.5 flex items-center justify-between text-[11px] text-content-secondary">
+          <span>Font size</span>
+          <span className="font-mono text-content-primary">{fontScale} vw</span>
+        </label>
+        <input id="song-font-size-slider" type="range" min={3} max={14} step={0.5}
+          value={fontScale}
+          onChange={(e) => onFontScaleChange(Number(e.target.value))}
+          aria-label="Font size slider from 3 to 14"
+          className="w-full accent-blue-600" />
       </div>
 
       {/* Chord display */}

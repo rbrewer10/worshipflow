@@ -4,14 +4,19 @@
 // background from your own library. Matches the song editor's BackgroundPanel look.
 
 import { useState } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, ImageIcon, X } from 'lucide-react'
 import { THEMES, getTheme, resolveColors } from '../../shared/themes'
 import type { ServiceItem, ItemStyle, ThemeColors, SongFull } from '../../shared/types'
 import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 import BackgroundLibraryGrid from './BackgroundLibraryGrid'
 import { resolveBackgroundApply } from './drawer/resolveBackgroundApply'
+import Modal from './Modal'
 import SaveStatusBadge from './SaveStatusBadge'
 import type { SaveStatus } from './useAutosave'
+
+function toAssetUrl(p: string): string {
+  return 'wf-asset://?path=' + encodeURIComponent(p)
+}
 
 export interface ItemBackgroundPanelProps {
   item: ServiceItem
@@ -39,6 +44,14 @@ export default function ItemBackgroundPanel({
   saveStatus, saveError, onRetrySave
 }: ItemBackgroundPanelProps): JSX.Element {
   const [tab, setTab] = useState<'library' | 'presets'>('library')
+  // The library grid used to apply a click immediately, in a 2-column grid
+  // squeezed into this narrow column — too small to actually judge a
+  // background by, and no chance to back out of a click. It now opens full
+  // size in a modal instead; picks there are staged in pendingPath until
+  // "Use this background" commits them, so browsing around doesn't touch
+  // the live item until you're sure.
+  const [showPicker, setShowPicker] = useState(false)
+  const [pendingPath, setPendingPath] = useState<string | null>(null)
 
   const apply = (style: ItemStyle): void => applyItemStyle(style)
   const clearStyle = (): void => applyItemStyle(null)
@@ -254,6 +267,26 @@ export default function ItemBackgroundPanel({
 
       {tab === 'library' && (
         <div className="flex flex-col gap-2">
+          <button
+            onClick={() => { setPendingPath(fileBg ?? null); setShowPicker(true) }}
+            className="group relative overflow-hidden rounded-lg border border-slate-200 hover:border-slate-300"
+            style={{ aspectRatio: '16/9' }}
+            title="Browse your background library at full size"
+          >
+            {fileBg ? (
+              <img src={toAssetUrl(fileBg)} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-100 text-slate-500">
+                <ImageIcon size={20} />
+                <span className="text-[11px] font-medium">No background selected</span>
+              </div>
+            )}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+              <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-slate-800">
+                {fileBg ? 'Change' : 'Choose'} background
+              </span>
+            </div>
+          </button>
           {fileBg && (
             <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-2.5 py-1.5">
               <span className="truncate text-xs text-slate-700" title={fileBg}>
@@ -268,14 +301,37 @@ export default function ItemBackgroundPanel({
               </button>
             </div>
           )}
-          <BackgroundLibraryGrid
-            activePath={fileBg ?? null}
-            onApply={(path) => applyBackground(path || null)}
-          />
         </div>
       )}
 
       {tab === 'presets' && presetsContent}
+
+      {showPicker && (
+        <Modal onClose={() => setShowPicker(false)} label="Choose a background" className="flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-panel-raised text-content-primary shadow-2xl">
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
+            <h2 className="text-sm font-semibold text-content-primary">Choose a background</h2>
+            <button onClick={() => setShowPicker(false)} className="btn-pill text-xs"><X size={12} /> Close</button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <BackgroundLibraryGrid
+              activePath={pendingPath}
+              onApply={(path) => setPendingPath(path || null)}
+            />
+          </div>
+          {/* Floating footer — stays put while the grid above scrolls, so
+              confirming a pick never means hunting back down to a button
+              that scrolled away with the thumbnails. */}
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-panel-raised px-5 py-3">
+            <button onClick={() => setShowPicker(false)} className="btn text-xs">Cancel</button>
+            <button
+              onClick={() => { applyBackground(pendingPath); setShowPicker(false) }}
+              className="btn-primary text-xs"
+            >
+              <Check size={13} /> Use this background
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

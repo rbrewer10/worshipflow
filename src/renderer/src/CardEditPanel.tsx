@@ -97,6 +97,16 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
     if (input) songQueue.trigger(input)
   }
 
+  // Song font size used to be adjustable only reactively, from Live Control
+  // while the song was already live — Scripture/Text/Announcement items all
+  // got a Build Service slider, songs never did. Same buildSongInput/
+  // songQueue path pickSongBg already uses, so it can't land out of order
+  // against an in-flight lyrics save.
+  const setSongFontScale = (scale: number): void => {
+    const input = buildSongInput({ fontScale: scale })
+    if (input) songQueue.trigger(input)
+  }
+
   const saveSong = (): void => {
     const input = buildSongInput()
     if (input) songQueue.trigger(input)
@@ -166,6 +176,7 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
       onAutoLabelApply={applyAutoLabels}
       onBackgroundClick={pickSongBg}
       onRemoveBackground={removeSongBg}
+      onSongFontScaleChange={setSongFontScale}
       onSaveNotes={saveNotes}
       setAutoLabelPreview={setAutoLabelPreview}
       setAutoLabelAnalyses={setAutoLabelAnalyses}

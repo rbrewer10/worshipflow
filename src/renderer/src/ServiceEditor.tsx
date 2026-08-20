@@ -432,7 +432,11 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
             column only has to hold controls, not previews. */}
         {selectedItem && (
           <div className="wf-service-bottom-strip flex shrink-0 flex-col gap-2 rounded-xl border border-border bg-panel-raised p-2">
-            <div ref={setZoneCardsAnchor} />
+            {/* Capped, not full-width — at full width on a wide monitor these
+                16:9 previews scale up with it and can eat a quarter of the
+                screen. A fixed cap keeps them a consistent, compact size
+                regardless of window width. */}
+            <div ref={setZoneCardsAnchor} className="mx-auto w-full max-w-2xl" />
             {sceneConfig && (
               <div>
                 <button
