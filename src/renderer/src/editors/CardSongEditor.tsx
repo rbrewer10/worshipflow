@@ -1,22 +1,18 @@
-import { ChordDisplay } from '../ChordDisplay'
-import { transposeLyrics } from '../chordUtils'
 import { analyzeAndLabelSections, previewAutoLabels } from '../autoLabel'
 import type { SongFull } from '../../../shared/types'
 import { memo } from 'react'
-import { Guitar, Tag, Film, Image as ImageIcon, X, Check, Minus, Plus } from 'lucide-react'
+import { Tag, Film, Image as ImageIcon, X, Check } from 'lucide-react'
 import Modal from '../Modal'
 import ReflowEditor from '../ReflowEditor'
 
 interface CardSongEditorProps {
   songFull: SongFull | null
   lyrics: string
-  showChords: boolean
   showAutoLabelPreview: boolean
   autoLabelPreview: string
   autoLabelAnalyses: any[]
   onLyricsChange: (lyrics: string) => void
   onSave: () => void
-  onShowChordsToggle: () => void
   onAutoLabelClick: () => void
   onAutoLabelPreviewClose: () => void
   onAutoLabelApply: (preview: string) => void
@@ -32,13 +28,11 @@ interface CardSongEditorProps {
 export const CardSongEditor = memo(function CardSongEditor({
   songFull,
   lyrics,
-  showChords,
   showAutoLabelPreview,
   autoLabelPreview,
   autoLabelAnalyses,
   onLyricsChange,
   onSave,
-  onShowChordsToggle,
   onAutoLabelClick,
   onAutoLabelPreviewClose,
   onAutoLabelApply,
@@ -69,9 +63,6 @@ export const CardSongEditor = memo(function CardSongEditor({
 
       {/* Lyrics controls */}
       <div className="flex gap-2">
-        <button onClick={onShowChordsToggle} className="btn text-xs">
-          <Guitar size={13} /> {showChords ? 'Hide chords' : 'Show chords'}
-        </button>
         <button onClick={handleAutoLabel} disabled={!lyrics.trim()}
           aria-label="Auto-detect and label song sections (Verse, Chorus, Bridge, etc.)"
           className="btn-secondary text-xs disabled:opacity-40">
@@ -98,36 +89,6 @@ export const CardSongEditor = memo(function CardSongEditor({
           aria-label="Font size slider from 3 to 14"
           className="w-full accent-blue-600" />
       </div>
-
-      {/* Chord display */}
-      {showChords && songFull && (
-        <div className="space-y-2 border-t border-border pt-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-widest text-content-secondary">Transpose</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => onLyricsChange(transposeLyrics(lyrics, -1))}
-                disabled={!lyrics.trim()}
-                aria-label="Transpose all chords down one semitone"
-                title="Transpose down a semitone"
-                className="rounded-lg border border-border bg-panel p-1.5 text-content-secondary hover:bg-panel-raised disabled:opacity-40"
-              >
-                <Minus size={13} />
-              </button>
-              <button
-                onClick={() => onLyricsChange(transposeLyrics(lyrics, 1))}
-                disabled={!lyrics.trim()}
-                aria-label="Transpose all chords up one semitone"
-                title="Transpose up a semitone"
-                className="rounded-lg border border-border bg-panel p-1.5 text-content-secondary hover:bg-panel-raised disabled:opacity-40"
-              >
-                <Plus size={13} />
-              </button>
-            </div>
-          </div>
-          <ChordDisplay lyrics={lyrics} showChords={showChords} onChordsChange={onLyricsChange} />
-        </div>
-      )}
 
       {/* Song background */}
       <div className="space-y-2 border-t border-border pt-3">

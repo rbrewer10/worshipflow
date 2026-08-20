@@ -33,7 +33,6 @@ interface ItemEditorProps {
   onRetrySave: () => void
   songFull: SongFull | null
   lyrics: string
-  showChords: boolean
   showAutoLabelPreview: boolean
   autoLabelPreview: string
   autoLabelAnalyses: any[]
@@ -41,7 +40,6 @@ interface ItemEditorProps {
   onLyricsChange: (lyrics: string) => void
   onNotesChange: (notes: string) => void
   onSaveSong: () => void
-  onShowChordsToggle: () => void
   onAutoLabelClick: () => void
   onAutoLabelPreviewClose: () => void
   onAutoLabelApply: (preview: string) => void
@@ -71,7 +69,6 @@ export const ItemEditor = memo(function ItemEditor({
   onRetrySave,
   songFull,
   lyrics,
-  showChords,
   showAutoLabelPreview,
   autoLabelPreview,
   autoLabelAnalyses,
@@ -79,7 +76,6 @@ export const ItemEditor = memo(function ItemEditor({
   onLyricsChange,
   onNotesChange,
   onSaveSong,
-  onShowChordsToggle,
   onAutoLabelClick,
   onAutoLabelPreviewClose,
   onAutoLabelApply,
@@ -122,7 +118,7 @@ export const ItemEditor = memo(function ItemEditor({
   const showBackground = hasBackgroundTab && activeTab === 'background'
 
   return (
-    <div className="card-lg flex flex-col gap-3 text-content-primary animate-[fade-in_0.15s_ease-out]">
+    <div className="card-lg flex min-h-0 flex-1 flex-col gap-3 text-content-primary animate-[fade-in_0.15s_ease-out]">
       <div className="sticky top-0 z-20 -mx-1 -mt-1 flex flex-col gap-3 border-b border-border bg-panel-raised/95 px-1 pb-2 pt-1 backdrop-blur">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -172,13 +168,11 @@ export const ItemEditor = memo(function ItemEditor({
         <CardSongEditor
           songFull={songFull}
           lyrics={lyrics}
-          showChords={showChords}
           showAutoLabelPreview={showAutoLabelPreview}
           autoLabelPreview={autoLabelPreview}
           autoLabelAnalyses={autoLabelAnalyses}
           onLyricsChange={onLyricsChange}
           onSave={onSaveSong}
-          onShowChordsToggle={onShowChordsToggle}
           onAutoLabelClick={onAutoLabelClick}
           onAutoLabelPreviewClose={onAutoLabelPreviewClose}
           onAutoLabelApply={onAutoLabelApply}

@@ -22,7 +22,6 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   const [showAutoLabelPreview, setShowAutoLabelPreview] = useState(false)
   const [autoLabelPreview, setAutoLabelPreview] = useState('')
   const [autoLabelAnalyses, setAutoLabelAnalyses] = useState<any[]>([])
-  const [showChords, setShowChords] = useState(true)
   useEffect(() => {
     setP(item.payload ?? {}); setNotes(item.notes ?? '')
     if (item.type === 'song' && item.ref_id != null) {
@@ -162,7 +161,6 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
       onRetrySave={retrySave}
       songFull={songFull}
       lyrics={lyrics}
-      showChords={showChords}
       showAutoLabelPreview={showAutoLabelPreview}
       autoLabelPreview={autoLabelPreview}
       autoLabelAnalyses={autoLabelAnalyses}
@@ -170,7 +168,6 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
       onLyricsChange={setLyrics}
       onNotesChange={setNotes}
       onSaveSong={saveSong}
-      onShowChordsToggle={() => setShowChords(!showChords)}
       onAutoLabelClick={handleAutoLabel}
       onAutoLabelPreviewClose={() => setShowAutoLabelPreview(false)}
       onAutoLabelApply={applyAutoLabels}
