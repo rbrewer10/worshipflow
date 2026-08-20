@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import type { Announcement, AnnouncementInput } from '../../shared/types'
+import { ANNOUNCEMENT_ICON_KEYS } from '../../shared/types'
 import { announcementExpired } from '../../shared/announcementSchedule'
 import BackgroundLibraryGrid from './BackgroundLibraryGrid'
 import { useAutosave } from './useAutosave'
 import SaveStatusBadge from './SaveStatusBadge'
+import Modal from './Modal'
+import { ANNOUNCEMENT_ICON_COMPONENTS, ANNOUNCEMENT_ICON_LABELS, resolveAnnouncementIcon } from './announcementIcons'
 
 // Edits one announcement. Loads the full record by id, saves via announcementUpdate
 // (dates/toggles save immediately; text fields save on blur to avoid a DB write per
 // keystroke). Calls onSaved so the library list refreshes.
 export default function AnnouncementEditor({ id, onSaved }: { id: number; onSaved: () => void }): JSX.Element {
   const [a, setA] = useState<Announcement | null>(null)
+  const [showImagePicker, setShowImagePicker] = useState(false)
 
   useEffect(() => {
     window.wf.announcementGet(id).then(setA)
@@ -29,6 +34,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
       body: next.body,
       display: next.display,
       background: next.background,
+      icon: next.icon,
       blurBehindText: next.blurBehindText,
       frequency: next.frequency,
       startDate: next.startDate,
@@ -84,6 +90,45 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
           ))}
         </div>
       </div>
+
+      {/* Icon (slide only) */}
+      {a.display === 'slide' && (
+        <div>
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">Icon</span>
+          <div className="flex flex-wrap gap-2">
+            {ANNOUNCEMENT_ICON_KEYS.map((key) => {
+              const Icon = ANNOUNCEMENT_ICON_COMPONENTS[key]
+              const active = a.icon === `icon:${key}`
+              return (
+                <button
+                  key={key}
+                  onClick={() => save({ icon: `icon:${key}` })}
+                  title={ANNOUNCEMENT_ICON_LABELS[key]}
+                  aria-label={`Use ${ANNOUNCEMENT_ICON_LABELS[key]} icon`}
+                  aria-pressed={active}
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+                    active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <Icon size={17} />
+                </button>
+              )
+            })}
+            <button
+              onClick={() => setShowImagePicker(true)}
+              title="Use a custom image instead"
+              aria-label="Use a custom image as the icon"
+              className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
+                resolveAnnouncementIcon(a.icon).kind === 'custom'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-slate-300 text-slate-400 hover:border-slate-400'
+              }`}
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Background + blur (slide only) */}
       {a.display === 'slide' && (
@@ -155,6 +200,21 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
         <input type="checkbox" checked={a.active} onChange={(e) => save({ active: e.target.checked })} />
         Active (uncheck to pause without deleting)
       </label>
+
+      {showImagePicker && (
+        <Modal onClose={() => setShowImagePicker(false)} label="Choose a custom icon image" className="flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-panel-raised text-content-primary shadow-2xl">
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
+            <h2 className="text-sm font-semibold text-content-primary">Choose a custom icon image</h2>
+            <button onClick={() => setShowImagePicker(false)} className="btn-pill text-xs"><X size={12} /> Close</button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <BackgroundLibraryGrid
+              activePath={resolveAnnouncementIcon(a.icon).kind === 'custom' ? a.icon : null}
+              onApply={(path) => { save({ icon: path || null }); setShowImagePicker(false) }}
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
