@@ -235,17 +235,23 @@ export default function ItemBackgroundPanel({
       </div>
 
       {/* ── Blur behind text ── */}
-      <button
-        onClick={() => toggleBlur()}
-        className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
-          blurBehindText ? 'border-blue-400 bg-blue-500/10' : 'border-slate-200 bg-white'
-        }`}
-      >
-        <span className="text-[11px] font-semibold text-slate-700">Blur behind text</span>
-        <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${blurBehindText ? 'bg-blue-600' : 'bg-slate-300'}`}>
-          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${blurBehindText ? 'translate-x-4' : 'translate-x-1'}`} />
-        </span>
-      </button>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Readability</span>
+        <button
+          onClick={() => toggleBlur()}
+          className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors ${
+            blurBehindText ? 'border-blue-400 bg-blue-500/10' : 'border-slate-200 bg-white'
+          }`}
+        >
+          <span className="flex flex-col text-left">
+            <span className="text-[11px] font-semibold text-slate-700">Blur behind text</span>
+            <span className="text-[10px] text-slate-500">Darkens &amp; blurs the background behind the text so it's easier to read</span>
+          </span>
+          <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${blurBehindText ? 'bg-blue-600' : 'bg-slate-300'}`}>
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${blurBehindText ? 'translate-x-4' : 'translate-x-1'}`} />
+          </span>
+        </button>
+      </div>
 
       {/* ── Tab strip ── */}
       <div className="flex rounded-lg bg-slate-100 p-0.5">
