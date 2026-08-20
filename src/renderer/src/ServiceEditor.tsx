@@ -434,9 +434,10 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
           <div className="wf-service-bottom-strip flex shrink-0 flex-col gap-2 rounded-xl border border-border bg-panel-raised p-2">
             {/* Capped, not full-width — at full width on a wide monitor these
                 16:9 previews scale up with it and can eat a quarter of the
-                screen. A fixed cap keeps them a consistent, compact size
-                regardless of window width. */}
-            <div ref={setZoneCardsAnchor} className="mx-auto w-full max-w-2xl" />
+                screen. A fixed cap keeps them a consistent size regardless
+                of window width without shrinking to the point of being
+                unreadable. */}
+            <div ref={setZoneCardsAnchor} className="mx-auto w-full max-w-4xl" />
             {sceneConfig && (
               <div>
                 <button
