@@ -98,7 +98,8 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
           <div className="flex flex-wrap gap-2">
             {ANNOUNCEMENT_ICON_KEYS.map((key) => {
               const Icon = ANNOUNCEMENT_ICON_COMPONENTS[key]
-              const active = a.icon === `icon:${key}`
+              const resolved = resolveAnnouncementIcon(a.icon)
+              const active = resolved.kind === 'builtin' && resolved.Icon === ANNOUNCEMENT_ICON_COMPONENTS[key]
               return (
                 <button
                   key={key}
@@ -118,6 +119,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
               onClick={() => setShowImagePicker(true)}
               title="Use a custom image instead"
               aria-label="Use a custom image as the icon"
+              aria-pressed={resolveAnnouncementIcon(a.icon).kind === 'custom'}
               className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
                 resolveAnnouncementIcon(a.icon).kind === 'custom'
                   ? 'border-blue-500 text-blue-600'
