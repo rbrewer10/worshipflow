@@ -3,11 +3,20 @@ import { X } from 'lucide-react'
 import type { Announcement, AnnouncementInput } from '../../shared/types'
 import { ANNOUNCEMENT_ICON_KEYS } from '../../shared/types'
 import { announcementExpired } from '../../shared/announcementSchedule'
+import { getTheme, resolveColors } from '../../shared/themes'
 import BackgroundLibraryGrid from './BackgroundLibraryGrid'
 import { useAutosave } from './useAutosave'
 import SaveStatusBadge from './SaveStatusBadge'
 import Modal from './Modal'
+import { AnnouncementLayer } from './Output'
 import { ANNOUNCEMENT_ICON_COMPONENTS, ANNOUNCEMENT_ICON_LABELS, resolveAnnouncementIcon } from './announcementIcons'
+
+// Live preview has no per-announcement theme override to draw on (unlike
+// slides, which can carry style.colors) — announcements always render over
+// whatever theme the live service happens to be on, so the preview just uses
+// the default theme's colors. Matches the same "no override → default theme"
+// fallback ReflowSlideThumb already uses for its own thumbnail preview.
+const PREVIEW_COLORS = resolveColors(getTheme(null))
 
 // Edits one announcement. Loads the full record by id, saves via announcementUpdate
 // (dates/toggles save immediately; text fields save on blur to avoid a DB write per
@@ -53,7 +62,8 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
   })()
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
+    <div className="flex min-h-0 flex-1 gap-4">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-auto">
       <div className="flex items-center justify-between gap-2">
         <input
           value={a.title}
@@ -202,6 +212,17 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
         <input type="checkbox" checked={a.active} onChange={(e) => save({ active: e.target.checked })} />
         Active (uncheck to pause without deleting)
       </label>
+      </div>
+
+      {a.display === 'slide' && (
+        <div className="w-80 shrink-0">
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">Live preview</span>
+          <div className="relative overflow-hidden rounded-xl bg-[#0f1117]" style={{ aspectRatio: '16/9', containerType: 'size' }}>
+            <AnnouncementLayer title={a.title} body={a.body} icon={a.icon} textColor="#fff" colors={PREVIEW_COLORS} />
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-500">Updates as you type — this is what actually goes to the projector.</p>
+        </div>
+      )}
 
       {showImagePicker && (
         <Modal onClose={() => setShowImagePicker(false)} label="Choose a custom icon image" className="flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-panel-raised text-content-primary shadow-2xl">
