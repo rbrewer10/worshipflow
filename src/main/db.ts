@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS announcement (
   body TEXT NOT NULL,
   display TEXT NOT NULL DEFAULT 'slide',
   background TEXT,
+  icon TEXT,
   frequency TEXT NOT NULL DEFAULT 'recurring',
   start_date TEXT,
   end_date TEXT,
@@ -168,6 +169,7 @@ export async function initDb(): Promise<void> {
   try { db.run('ALTER TABLE song ADD COLUMN font TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE song ADD COLUMN blur_behind_text INTEGER') } catch { /* already exists */ }
   try { db.run('ALTER TABLE announcement ADD COLUMN blur_behind_text INTEGER') } catch { /* already exists */ }
+  try { db.run('ALTER TABLE announcement ADD COLUMN icon TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service_item ADD COLUMN notes TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme TEXT') } catch { /* already exists */ }
   try { db.run('ALTER TABLE service ADD COLUMN theme_colors TEXT') } catch { /* already exists */ }
@@ -575,7 +577,7 @@ function todayIso(): string {
 function rowToAnnouncement(r: {
   id: number; title: string; body: string; display: string; background: string | null
   frequency: string; start_date: string | null; end_date: string | null; active: number
-  blur_behind_text: number | null
+  blur_behind_text: number | null; icon: string | null
 }): Announcement {
   const startDate = r.start_date ?? null
   const endDate = r.end_date ?? null
@@ -587,6 +589,7 @@ function rowToAnnouncement(r: {
     display: (r.display === 'ticker' ? 'ticker' : 'slide') as Announcement['display'],
     background: r.background ?? null,
     blurBehindText: r.blur_behind_text === 1,
+    icon: r.icon ?? null,
     frequency,
     startDate,
     endDate,
@@ -617,7 +620,7 @@ export function listAnnouncements(search = ''): AnnouncementSummary[] {
 
 export function getAnnouncement(id: number): Announcement | null {
   const stmt = db.prepare(
-    'SELECT id, title, body, display, background, frequency, start_date, end_date, active, blur_behind_text FROM announcement WHERE id = ?'
+    'SELECT id, title, body, display, background, frequency, start_date, end_date, active, blur_behind_text, icon FROM announcement WHERE id = ?'
   )
   stmt.bind([id])
   if (!stmt.step()) { stmt.free(); return null }
@@ -628,13 +631,14 @@ export function getAnnouncement(id: number): Announcement | null {
 
 export function createAnnouncement(input: AnnouncementInput): number {
   db.run(
-    'INSERT INTO announcement (title, body, display, background, blur_behind_text, frequency, start_date, end_date, active, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO announcement (title, body, display, background, blur_behind_text, icon, frequency, start_date, end_date, active, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
     [
       normalizeTitleText(input.title),
       input.body,
       input.display,
       input.background ?? null,
       input.blurBehindText ? 1 : 0,
+      input.icon ?? null,
       input.frequency,
       input.startDate ?? null,
       input.endDate ?? null,
@@ -649,13 +653,14 @@ export function createAnnouncement(input: AnnouncementInput): number {
 
 export function updateAnnouncement(id: number, input: AnnouncementInput): void {
   db.run(
-    'UPDATE announcement SET title = ?, body = ?, display = ?, background = ?, blur_behind_text = ?, frequency = ?, start_date = ?, end_date = ?, active = ? WHERE id = ?',
+    'UPDATE announcement SET title = ?, body = ?, display = ?, background = ?, blur_behind_text = ?, icon = ?, frequency = ?, start_date = ?, end_date = ?, active = ? WHERE id = ?',
     [
       normalizeTitleText(input.title),
       input.body,
       input.display,
       input.background ?? null,
       input.blurBehindText ? 1 : 0,
+      input.icon ?? null,
       input.frequency,
       input.startDate ?? null,
       input.endDate ?? null,

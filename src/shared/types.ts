@@ -3,7 +3,7 @@
 import type { ThemeColors, FontKey } from './themes'
 export type { ThemeColors } from './themes'
 
-export type Mode = 'lyrics' | 'black' | 'logo' | 'countdown' | 'livecall'
+export type Mode = 'lyrics' | 'black' | 'logo' | 'countdown' | 'livecall' | 'announcement'
 export type Intent = 'next' | 'prev' | 'black' | 'logo' | 'lyrics'
 export type TrackId = 'main' | 'second'
 export type Theme = 'modern-church' | 'minimalist' | 'vibrant' | 'dark-premium'
@@ -30,6 +30,7 @@ export interface LiveState {
   total: number
   songTitle: string
   background: string | null
+  icon?: string | null  // announcement mode only: 'icon:<key>' (built-in) or a real image path (custom)
   bgFit?: 'cover' | 'contain'  // 'contain' fits whole-slide images; 'cover' fills behind lyrics
   bgMotion?: 'pan' | 'zoom' | 'shimmer' | null
   liveServiceItemId: number | null
@@ -354,6 +355,11 @@ export interface ScriptureResult {
   usedFallback?: boolean
 }
 
+export const ANNOUNCEMENT_ICON_KEYS = [
+  'megaphone', 'music', 'calendar', 'people', 'meal', 'kids', 'outreach', 'study'
+] as const
+export type AnnouncementIconKey = typeof ANNOUNCEMENT_ICON_KEYS[number]
+
 // --- Announcements library ---
 export type AnnouncementDisplay = 'slide' | 'ticker'
 export type AnnouncementFrequency = 'once' | 'recurring'
@@ -373,6 +379,7 @@ export interface Announcement extends AnnouncementSummary {
   body: string
   background: string | null // image/video file path (slide only); null = service theme
   blurBehindText?: boolean  // slide-display only
+  icon: string | null       // 'icon:<key>' (built-in, see ANNOUNCEMENT_ICON_KEYS) or a real image path; null = default icon
 }
 
 export interface AnnouncementInput {
@@ -381,6 +388,7 @@ export interface AnnouncementInput {
   display: AnnouncementDisplay
   background?: string | null
   blurBehindText?: boolean
+  icon?: string | null
   frequency: AnnouncementFrequency
   startDate?: string | null
   endDate?: string | null

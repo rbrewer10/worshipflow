@@ -264,7 +264,7 @@ if (!gotSingleInstanceLock) {
 // Second is created eagerly too but stays empty/unused until a service has
 // track:'second' items). See docs/superpowers/specs/2026-07-24-dual-live-track-design.md.
 interface LiveTrackState {
-  song: { title: string; lines: string[]; background?: string | null; bgMotion?: string | null }
+  song: { title: string; lines: string[]; background?: string | null; bgMotion?: string | null; icon?: string | null }
   songId: number | null
   mode: Mode
   index: number
