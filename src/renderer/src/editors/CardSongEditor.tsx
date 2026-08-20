@@ -58,7 +58,12 @@ export const CardSongEditor = memo(function CardSongEditor({
           whatever room the editor panel actually has, rather than leaving
           dead space below once the panel itself was made to fill its
           column (see ItemEditor's own flex-1 fix). */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {/* min-h floor instead of min-h-0: this block is the only flexible one
+          among shrink-0 siblings, so in a short inspector column it was the one
+          that collapsed to zero — and its own shrink-0 label/hint then spilled
+          out over the Auto-label row below. With a floor it stops shrinking and
+          the editor body scrolls instead. */}
+      <div className="flex min-h-[9rem] flex-1 flex-col gap-2">
         <span className="section-header block shrink-0">Lyrics</span>
         <p className="shrink-0 text-xs text-content-secondary">A blank line starts a new slide — a label like "Chorus" starts a new section</p>
         {songFull && <ReflowEditor song={songFull} value={lyrics} onChange={onLyricsChange} />}

@@ -118,8 +118,13 @@ export const ItemEditor = memo(function ItemEditor({
   const showBackground = hasBackgroundTab && activeTab === 'background'
 
   return (
-    <div className="card-lg flex min-h-0 flex-1 flex-col gap-3 text-content-primary animate-[fade-in_0.15s_ease-out]">
-      <div className="sticky top-0 z-20 -mx-1 -mt-1 flex flex-col gap-3 border-b border-border bg-panel-raised/95 px-1 pb-2 pt-1 backdrop-blur">
+    // The card fills the inspector column (flex-1) and hard-clamps to it
+    // (overflow-hidden) so it can never spill past its own border. Everything
+    // that can vary in height lives in the scrolling body below — the header
+    // and the notes/delete footer are shrink-0, so a tall editor scrolls
+    // *inside* the card instead of squashing its siblings into each other.
+    <div className="card-lg flex min-h-0 flex-1 flex-col gap-3 overflow-hidden text-content-primary animate-[fade-in_0.15s_ease-out]">
+      <div className="-mx-1 -mt-1 flex shrink-0 flex-col gap-3 border-b border-border bg-panel-raised/95 px-1 pb-2 pt-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-400">Editing {item.type}</div>
@@ -157,6 +162,12 @@ export const ItemEditor = memo(function ItemEditor({
           </div>
         )}
       </div>
+
+      {/* Scrolling body. This is the one element allowed to overflow, and it
+          scrolls rather than spilling — an earlier attempt gave the editors a
+          flex-1 wrapper with no overflow, which let a tall form render straight
+          over the notes/delete rows below it. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
 
       {/* Live slide preview — headers/placeholders never go live, nothing to preview */}
       {showPreview !== false && !NON_LIVE_TYPES.includes(item.type) && (
@@ -276,25 +287,29 @@ export const ItemEditor = memo(function ItemEditor({
           whether it's connected, which LiveCallEditor shows directly. */}
       {item.type === 'livecall' && <LiveCallEditor />}
 
+      {/* No wrapper div — the panel is the flex item here, so its own
+          flex: 1 0 auto (grow shrink-0) lets its light surface fill whatever
+          room is left in the body instead of stopping partway down the column. */}
       {showBackground && (
-        <div>
-          <ItemBackgroundPanel
-            item={item}
-            songFull={songFull}
-            onChanged={onChanged}
-            savePayload={savePayload}
-            applySongBackground={applySongBackground}
-            onToggleSongBlur={onToggleSongBlur}
-            applyItemStyle={applyItemStyle}
-            saveStatus={saveStatus}
-            saveError={saveError}
-            onRetrySave={onRetrySave}
-          />
-        </div>
+        <ItemBackgroundPanel
+          item={item}
+          songFull={songFull}
+          onChanged={onChanged}
+          savePayload={savePayload}
+          applySongBackground={applySongBackground}
+          onToggleSongBlur={onToggleSongBlur}
+          applyItemStyle={applyItemStyle}
+          saveStatus={saveStatus}
+          saveError={saveError}
+          onRetrySave={onRetrySave}
+        />
       )}
 
-      {/* Notes */}
-      <div>
+      </div>
+
+      {/* Notes — pinned below the scrolling body so they stay reachable
+          without scrolling past a long editor. */}
+      <div className="shrink-0">
         <label htmlFor="item-notes" className="section-header block mb-2">Operator notes</label>
         <textarea id="item-notes" value={notes} onChange={(e) => onNotesChange(e.target.value)} onBlur={onSaveNotes} rows={2}
           placeholder="Notes for operator / pastor…"
@@ -303,7 +318,7 @@ export const ItemEditor = memo(function ItemEditor({
 
       <button onClick={() => onDelete(item)}
         aria-label={`Delete ${item.type} item: ${item.title}`}
-        className="btn-danger text-xs">
+        className="btn-danger shrink-0 text-xs">
         <Trash2 size={13} /> Delete item
       </button>
     </div>

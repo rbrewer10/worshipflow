@@ -219,14 +219,18 @@ export default function ItemBackgroundPanel({
 
   if (!supportsFileBackground) {
     return (
-      <div className="flex flex-col gap-3 bg-[#f4f6f9] text-slate-900">
+      <div className="flex shrink-0 grow flex-col gap-3 bg-[#f4f6f9] text-slate-900">
         {presetsContent}
       </div>
     )
   }
 
+  // grow + shrink-0 (flex: 1 0 auto): the light surface stretches to fill the
+  // rest of the editor's scrolling body when its content is short — it used to
+  // stop at its content and leave dead dark space below — but never gets
+  // squeezed under its own content when the library grid is long.
   return (
-    <div className="flex flex-col gap-3 bg-[#f4f6f9] text-slate-900">
+    <div className="flex shrink-0 grow flex-col gap-3 bg-[#f4f6f9] text-slate-900">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
           Background &amp; Color

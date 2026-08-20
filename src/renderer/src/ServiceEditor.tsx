@@ -361,8 +361,13 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
       <ThemePicker serviceId={serviceId} themeId={service.theme} colors={service.themeColors} onChange={reload} />
 
       {/* Body */}
-      <div className="wf-service-editor-body flex min-h-0 flex-1 flex-col gap-3">
-        <div className="flex min-h-0 flex-1 gap-3">
+      <div className="wf-service-editor-body flex min-h-0 flex-1 gap-3">
+        {/* Left stack: run of show + the bottom preview strip. These are grouped
+            into their own column so the inspector beside them runs the FULL
+            height of the workspace instead of stopping where the strip begins —
+            that band beside the strip was the dead space under the item editor. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+          <div className="flex min-h-0 min-w-0 flex-1 gap-3">
           {/* Center: run of show (moved from the left column) */}
           <div className="wf-service-flow flex min-w-0 flex-1 flex-col min-h-0">
             <ScheduledAnnouncements
@@ -393,38 +398,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
             />
           </div>
 
-          {/* Right: consolidated inspector — compact zone preview + item editor */}
-          {selectedItem && (
-            <div className="wf-service-inspector flex min-h-0 w-80 shrink-0 flex-col gap-3 overflow-auto overscroll-contain rounded-xl border border-border bg-panel-raised p-3">
-              <ZoneScreenGrid
-                item={selectedItem}
-                serviceId={service.id}
-                serviceTheme={service.theme}
-                serviceColors={service.themeColors}
-                songFull={selectedSongFull}
-                slides={itemSlides[selectedItem.id] ?? []}
-                trackAssignment={trackAssignment}
-                onChanged={reload}
-                zoneCardsPortalTarget={zoneCardsAnchor}
-                compact
-              />
-              <CardEditPanel
-                item={selectedItem}
-                serviceTheme={service.theme}
-                serviceColors={service.themeColors}
-                showPreview={false}
-                onClose={() => setSelectedId(null)}
-                onChanged={reload}
-                onDelete={delItem}
-              />
-            </div>
-          )}
-          {!selectedItem && (
-            <div className="wf-service-inspector flex min-h-0 w-80 shrink-0 items-center justify-center rounded-xl border border-border bg-panel-raised p-3 text-sm text-content-secondary">
-              Select an item to preview &amp; style it
-            </div>
-          )}
-        </div>
+          </div>
 
         {/* Bottom: zone-preview cards (portaled in from ZoneScreenGrid above)
             + persistent Scene Selector bar — mirrors Live Control's
@@ -466,6 +440,42 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
                 )}
               </div>
             )}
+          </div>
+        )}
+        </div>
+
+        {/* Right: consolidated inspector — compact zone preview + item editor.
+            Sits beside the whole left stack (flow AND bottom strip), so it runs
+            the full height of the workspace and the editor card below can fill
+            the entire right side. */}
+        {selectedItem && (
+          <div className="wf-service-inspector flex min-h-0 w-80 shrink-0 flex-col gap-3 overflow-auto overscroll-contain rounded-xl border border-border bg-panel-raised p-3">
+            <ZoneScreenGrid
+              item={selectedItem}
+              serviceId={service.id}
+              serviceTheme={service.theme}
+              serviceColors={service.themeColors}
+              songFull={selectedSongFull}
+              slides={itemSlides[selectedItem.id] ?? []}
+              trackAssignment={trackAssignment}
+              onChanged={reload}
+              zoneCardsPortalTarget={zoneCardsAnchor}
+              compact
+            />
+            <CardEditPanel
+              item={selectedItem}
+              serviceTheme={service.theme}
+              serviceColors={service.themeColors}
+              showPreview={false}
+              onClose={() => setSelectedId(null)}
+              onChanged={reload}
+              onDelete={delItem}
+            />
+          </div>
+        )}
+        {!selectedItem && (
+          <div className="wf-service-inspector flex min-h-0 w-80 shrink-0 items-center justify-center rounded-xl border border-border bg-panel-raised p-3 text-sm text-content-secondary">
+            Select an item to preview &amp; style it
           </div>
         )}
       </div>
