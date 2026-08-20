@@ -4,6 +4,7 @@ import type { LiveState, Mode, ThemeColors } from '../../shared/types'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
 import type { MotionEffect } from '../../shared/themes'
 import { useChurchName } from './useChurchName'
+import { resolveAnnouncementIcon } from './announcementIcons'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -21,6 +22,9 @@ export interface AudienceModel {
   mode: Mode
   layers: { front: 0 | 1; a: string; b: string }
   bgSrc: string | null
+  announcementTitle: string
+  announcementBody: string
+  announcementIcon: string | null
   clockLine: string
   fontScale: number
   tickerText: string
@@ -41,6 +45,9 @@ export function useLiveModel(): AudienceModel {
   const [mode, setMode] = useState<Mode>('lyrics')
   const [layers, setLayers] = useState<{ front: 0 | 1; a: string; b: string }>({ front: 0, a: '', b: '' })
   const [bgSrc, setBgSrc] = useState<string | null>(null)
+  const [announcementTitle, setAnnouncementTitle] = useState('')
+  const [announcementBody, setAnnouncementBody] = useState('')
+  const [announcementIcon, setAnnouncementIcon] = useState<string | null>(null)
   const [clockLine, setClockLine] = useState('')
   const [fontScale, setFontScale] = useState(6)
   const [tickerText, setTickerText] = useState('')
@@ -88,6 +95,11 @@ export function useLiveModel(): AudienceModel {
             : { front: 0, a: s.line, b: prev.b }
         )
         setTickerText('')
+      } else if (s.mode === 'announcement') {
+        setAnnouncementTitle(s.songTitle ?? '')
+        setAnnouncementBody(s.line ?? '')
+        setAnnouncementIcon(s.icon ?? null)
+        setTickerText('')
       } else if (s.songTitle?.includes('Announcement')) {
         // Ticker mode: show the line as scrolling text
         setTickerText(s.line || '')
@@ -100,7 +112,8 @@ export function useLiveModel(): AudienceModel {
 
   return {
     mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
-    slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli, rehearsal
+    slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli, rehearsal,
+    announcementTitle, announcementBody, announcementIcon
   }
 }
 
@@ -112,7 +125,8 @@ export function useLiveModel(): AudienceModel {
 export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element {
   const {
     mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
-    slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli
+    slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli,
+    announcementTitle, announcementBody, announcementIcon
   } = model
   const [bgReady, setBgReady] = useState(false)
   const [logoImg, setLogoImg] = useState<string | null>(null)
@@ -127,6 +141,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
   const black = mode === 'black'
   const logo = mode === 'logo'
   const countdown = mode === 'countdown'
+  const announcement = mode === 'announcement'
   // The call fills the frame, so everything else on the audience screen is
   // suppressed — theme background, lyric layers, CCLI footer, and ticker.
   const livecall = mode === 'livecall'
@@ -225,7 +240,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
         )
       )}
 
-      {!black && !logo && !countdown && !livecall && (
+      {!black && !logo && !countdown && !livecall && !announcement && (
         <>
           <LyricLayer text={layers.a} show={layers.front === 0} fontScale={fontScale}
             fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText} />
@@ -235,7 +250,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
       )}
 
       {/* CCLI copyright footer — shown on song slides when copyright info exists */}
-      {!black && !logo && !countdown && !livecall && (ccli.author || ccli.copyright || ccli.ccli) && (
+      {!black && !logo && !countdown && !livecall && !announcement && (ccli.author || ccli.copyright || ccli.ccli) && (
         <div className="absolute bottom-0 left-0 right-0 px-[3cqw] pb-[1.5cqh] text-center">
           <div
             className="mx-auto text-[1.1cqw] font-medium leading-snug text-white/75"
@@ -286,7 +301,16 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
         </div>
       )}
 
-      {tickerText && !black && !logo && !countdown && !livecall && (
+      {announcement && (
+        <AnnouncementLayer
+          title={announcementTitle}
+          body={announcementBody}
+          icon={announcementIcon}
+          textColor={songTextColor ?? colors.text}
+        />
+      )}
+
+      {tickerText && !black && !logo && !countdown && !livecall && !announcement && (
         <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t-4 border-amber-500 bg-gradient-to-r from-amber-900/85 via-amber-800/85 to-amber-900/85">
           <div
             className="wf-ticker-track py-[1cqh] text-[1.6cqw] font-bold text-amber-100"
@@ -427,6 +451,46 @@ function LyricLayer({ text, show, fontScale, fontFamily, color, align, blurBehin
       ) : (
         textSpan
       )}
+    </div>
+  )
+}
+
+// The split-layout body text for announcement mode — icon/image panel on the
+// left (~38% width), title (bold) + body (regular weight, smaller) on the
+// right. Renders over whatever the shared background layer above already
+// painted (per-announcement `background` field, theme, etc.) — this
+// component only owns the icon panel's own image/color and the text block,
+// same division of responsibility LyricLayer already has with its caller.
+export function AnnouncementLayer({ title, body, icon, textColor }: {
+  title: string
+  body: string
+  icon: string | null
+  textColor: string
+}): JSX.Element {
+  const resolved = resolveAnnouncementIcon(icon)
+  return (
+    <div className="absolute inset-0 flex">
+      <div className="flex w-[38%] shrink-0 items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800">
+        {resolved.kind === 'builtin' ? (
+          <resolved.Icon size="20cqw" color="#fff" strokeWidth={1.75} />
+        ) : (
+          <img src={toAssetUrl(resolved.path)} alt="" className="h-full w-full object-cover" />
+        )}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col justify-center px-[4cqw]">
+        <div
+          className="mb-[1.5cqh] text-[4cqw] font-bold leading-tight"
+          style={{ color: textColor, textShadow: '0 2px 12px rgba(0,0,0,.6)' }}
+        >
+          {title}
+        </div>
+        <div
+          className="whitespace-pre-line text-[2.2cqw] leading-snug"
+          style={{ color: textColor, textShadow: '0 2px 8px rgba(0,0,0,.6)', opacity: 0.9 }}
+        >
+          {body}
+        </div>
+      </div>
     </div>
   )
 }
