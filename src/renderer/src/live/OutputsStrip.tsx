@@ -10,6 +10,7 @@ const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 function OutputsStrip(): JSX.Element {
   const [zoneStates, setZoneStates] = useState<Record<ZoneId, ZoneState> | null>(null)
   const [zonesConnected, setZonesConnected] = useState<ZoneId[]>([])
+  const [tabletPort, setTabletPort] = useState<number | null>(null)
 
   const refreshStates = useCallback((): void => { void window.wf.zoneGetStates().then(setZoneStates) }, [])
 
@@ -26,11 +27,19 @@ function OutputsStrip(): JSX.Element {
     return () => clearInterval(t)
   }, [])
 
+  // Port is fixed for the process lifetime — fetched once, not polled.
+  useEffect(() => { void window.wf.getTabletPort().then(setTabletPort).catch(() => setTabletPort(null)) }, [])
+
   return (
     <div className="grid grid-cols-4 gap-2">
       {ZONE_IDS.map((zoneId) => (
         <div key={zoneId} className="rounded-xl border-2 border-border bg-panel p-2">
-          <ZoneStatusBox zoneId={zoneId} zoneState={zoneStates?.[zoneId]} connected={zonesConnected.includes(zoneId)} />
+          <ZoneStatusBox
+            zoneId={zoneId}
+            zoneState={zoneStates?.[zoneId]}
+            connected={zonesConnected.includes(zoneId)}
+            livePreviewSrc={tabletPort ? `http://localhost:${tabletPort}/zone/${zoneId}` : null}
+          />
         </div>
       ))}
     </div>

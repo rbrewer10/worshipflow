@@ -10,6 +10,12 @@ interface ZoneStatusBoxProps {
   // ZoneLiveGrid, which is not what an operator watches mid-service) — only a
   // literal `false` renders the disconnected state.
   connected?: boolean
+  // When set (Live Control's OutputsStrip only), embeds the zone's actual
+  // live page — the same URL a physical Pi/TV loads — instead of the
+  // schematic text placeholder, so the operator sees the true rendered
+  // output rather than a label. Left unset elsewhere (Setup's ZoneLiveGrid)
+  // since 4 live iframes running continuously isn't worth the cost there.
+  livePreviewSrc?: string | null
 }
 
 // The zone name/mode header plus the 16:9 dark preview showing what a zone is
@@ -17,7 +23,7 @@ interface ZoneStatusBoxProps {
 // (ZoneLiveGrid) and the Live tab's read-only status widget (LiveZoneStatus)
 // so the same zone always reads the same way in both places — see the
 // 2026-08-01 design spec.
-function ZoneStatusBox({ zoneId, zoneState, connected = true }: ZoneStatusBoxProps): JSX.Element {
+function ZoneStatusBox({ zoneId, zoneState, connected = true, livePreviewSrc }: ZoneStatusBoxProps): JSX.Element {
   const { primary, secondary } = readout(zoneState)
   return (
     <>
@@ -49,15 +55,23 @@ function ZoneStatusBox({ zoneId, zoneState, connected = true }: ZoneStatusBoxPro
           zone screen actually shows, dark regardless of app theme, same as
           before the visual redesign. */}
       <div className={`relative w-full ${connected ? '' : 'opacity-40'}`} style={{ paddingBottom: '56.25%' }}>
-        <div
-          className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg px-1.5 ring-1 ring-white/10"
-          style={{ background: zoneState?.mode === 'black' ? '#000' : '#2b2f36' }}
-        >
-          <span className="max-h-full overflow-hidden text-center text-[10px] font-medium leading-tight text-white/80">{primary}</span>
-          {secondary && (
-            <span className="max-h-full overflow-hidden text-center text-[9px] leading-tight text-white/40">{secondary}</span>
-          )}
-        </div>
+        {livePreviewSrc && connected ? (
+          <iframe
+            src={livePreviewSrc}
+            title={`${ZONE_NAMES[zoneId]} live preview`}
+            className="absolute inset-0 h-full w-full rounded-lg border-0 ring-1 ring-white/10"
+          />
+        ) : (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg px-1.5 ring-1 ring-white/10"
+            style={{ background: zoneState?.mode === 'black' ? '#000' : '#2b2f36' }}
+          >
+            <span className="max-h-full overflow-hidden text-center text-[10px] font-medium leading-tight text-white/80">{primary}</span>
+            {secondary && (
+              <span className="max-h-full overflow-hidden text-center text-[9px] leading-tight text-white/40">{secondary}</span>
+            )}
+          </div>
+        )}
       </div>
     </>
   )
