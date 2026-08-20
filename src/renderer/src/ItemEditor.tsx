@@ -303,7 +303,7 @@ export const ItemEditor = memo(function ItemEditor({
 
       <button onClick={() => onDelete(item)}
         aria-label={`Delete ${item.type} item: ${item.title}`}
-        className="mt-auto btn-danger text-xs">
+        className="btn-danger text-xs">
         <Trash2 size={13} /> Delete item
       </button>
     </div>
