@@ -436,8 +436,10 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
                 16:9 previews scale up with it and can eat a quarter of the
                 screen. A fixed cap keeps them a consistent size regardless
                 of window width without shrinking to the point of being
-                unreadable. */}
-            <div ref={setZoneCardsAnchor} className="mx-auto w-full max-w-4xl" />
+                unreadable. Left-aligned (not centered) per Ryan — centering
+                just wasted the space on both sides equally instead of
+                letting the cards themselves take more of it. */}
+            <div ref={setZoneCardsAnchor} className="w-full max-w-6xl" />
             {sceneConfig && (
               <div>
                 <button

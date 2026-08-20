@@ -53,16 +53,19 @@ export const CardSongEditor = memo(function CardSongEditor({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Lyrics */}
-      <div className="flex min-h-0 flex-col gap-2" style={{ height: '320px' }}>
-        <span className="section-header block">Lyrics</span>
-        <p className="text-xs text-content-secondary">A blank line starts a new slide — a label like "Chorus" starts a new section</p>
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {/* Lyrics — flex-1 instead of a fixed height so it grows to use
+          whatever room the editor panel actually has, rather than leaving
+          dead space below once the panel itself was made to fill its
+          column (see ItemEditor's own flex-1 fix). */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <span className="section-header block shrink-0">Lyrics</span>
+        <p className="shrink-0 text-xs text-content-secondary">A blank line starts a new slide — a label like "Chorus" starts a new section</p>
         {songFull && <ReflowEditor song={songFull} value={lyrics} onChange={onLyricsChange} />}
       </div>
 
       {/* Lyrics controls */}
-      <div className="flex gap-2">
+      <div className="flex shrink-0 gap-2">
         <button onClick={handleAutoLabel} disabled={!lyrics.trim()}
           aria-label="Auto-detect and label song sections (Verse, Chorus, Bridge, etc.)"
           className="btn-secondary text-xs disabled:opacity-40">
@@ -78,7 +81,7 @@ export const CardSongEditor = memo(function CardSongEditor({
       {/* Font size — was previously only adjustable reactively, from Live
           Control while the song was already live. Matches the slider
           Scripture/Text/Announcement items already have here. */}
-      <div className="border-t border-border pt-3">
+      <div className="shrink-0 border-t border-border pt-3">
         <label htmlFor="song-font-size-slider" className="mb-1.5 flex items-center justify-between text-[11px] text-content-secondary">
           <span>Font size</span>
           <span className="font-mono text-content-primary">{fontScale} vw</span>
@@ -91,7 +94,7 @@ export const CardSongEditor = memo(function CardSongEditor({
       </div>
 
       {/* Song background */}
-      <div className="space-y-2 border-t border-border pt-3">
+      <div className="shrink-0 space-y-2 border-t border-border pt-3">
         <span className="section-header">Motion Background</span>
         {songFull?.background ? (
           <div className="surface flex items-center gap-2">
