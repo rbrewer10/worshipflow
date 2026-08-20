@@ -1,7 +1,7 @@
 {
   "name": "worshipflow",
   "productName": "WorshipFlow Pro",
-  "version": "0.14.4",
+  "version": "0.15.0",
   "description": "WorshipFlow Pro — church worship presentation & sound check software for Snow Hill Church",
   "main": "./out/main/index.js",
   "author": "Ryan Brewer",
