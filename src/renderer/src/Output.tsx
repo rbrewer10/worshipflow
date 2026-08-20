@@ -307,6 +307,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
           body={announcementBody}
           icon={announcementIcon}
           textColor={songTextColor ?? colors.text}
+          colors={colors}
         />
       )}
 
@@ -461,20 +462,41 @@ function LyricLayer({ text, show, fontScale, fontFamily, color, align, blurBehin
 // painted (per-announcement `background` field, theme, etc.) — this
 // component only owns the icon panel's own image/color and the text block,
 // same division of responsibility LyricLayer already has with its caller.
-export function AnnouncementLayer({ title, body, icon, textColor }: {
+export function AnnouncementLayer({ title, body, icon, textColor, colors }: {
   title: string
   body: string
   icon: string | null
   textColor: string
+  colors: { primary: string; secondary: string; text: string }
 }): JSX.Element {
   const resolved = resolveAnnouncementIcon(icon)
+  const [imgFailed, setImgFailed] = useState(false)
+  // A custom image path can go stale (file moved/deleted, e.g. the Google
+  // Drive sync gotcha this app already has to deal with elsewhere) — fall
+  // back to the same default icon the rest of the app uses for "no icon"
+  // rather than showing a broken-image glyph on the live projector. Reset
+  // per-icon so switching to a different image gets a fresh chance to load.
+  useEffect(() => { setImgFailed(false) }, [icon])
+  const showFallback = resolved.kind === 'custom' && imgFailed
+  const fallbackIcon = resolveAnnouncementIcon(null)
   return (
     <div className="absolute inset-0 flex">
-      <div className="flex w-[38%] shrink-0 items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800">
+      <div
+        className="flex w-[38%] shrink-0 items-center justify-center"
+        style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})` }}
+      >
         {resolved.kind === 'builtin' ? (
           <resolved.Icon size="20cqw" color="#fff" strokeWidth={1.75} />
+        ) : showFallback ? (
+          fallbackIcon.kind === 'builtin' && <fallbackIcon.Icon size="20cqw" color="#fff" strokeWidth={1.75} />
         ) : (
-          <img src={toAssetUrl(resolved.path)} alt="" className="h-full w-full object-cover" />
+          <img
+            key={resolved.path}
+            src={toAssetUrl(resolved.path)}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={() => setImgFailed(true)}
+          />
         )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col justify-center px-[4cqw]">
