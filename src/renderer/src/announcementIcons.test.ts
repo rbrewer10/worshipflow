@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resolveAnnouncementIcon } from './announcementIcons'
-import { Megaphone, Music, Baby } from 'lucide-react'
+import { Megaphone, Music, CalendarDays, Users, Utensils, Baby, Heart, BookOpen } from 'lucide-react'
 
 describe('resolveAnnouncementIcon', () => {
   it('resolves a built-in icon key', () => {
@@ -23,8 +23,27 @@ describe('resolveAnnouncementIcon', () => {
     expect(r).toEqual({ kind: 'custom', path: 'C:\\Users\\ryan\\backgrounds\\choir.png' })
   })
 
-  it('resolves every key in ANNOUNCEMENT_ICON_KEYS to a distinct component', () => {
-    const r = resolveAnnouncementIcon('icon:kids')
-    expect(r).toEqual({ kind: 'builtin', Icon: Baby })
+  it.each([
+    ['icon:megaphone', Megaphone],
+    ['icon:music', Music],
+    ['icon:calendar', CalendarDays],
+    ['icon:people', Users],
+    ['icon:meal', Utensils],
+    ['icon:kids', Baby],
+    ['icon:outreach', Heart],
+    ['icon:study', BookOpen]
+  ])('resolves %s to its documented component', (key, Icon) => {
+    const r = resolveAnnouncementIcon(key)
+    expect(r).toEqual({ kind: 'builtin', Icon })
+  })
+
+  it('falls back to the default for an empty string', () => {
+    const r = resolveAnnouncementIcon('')
+    expect(r).toEqual({ kind: 'builtin', Icon: Megaphone })
+  })
+
+  it('falls back to the default for "icon:" with nothing after the prefix', () => {
+    const r = resolveAnnouncementIcon('icon:')
+    expect(r).toEqual({ kind: 'builtin', Icon: Megaphone })
   })
 })

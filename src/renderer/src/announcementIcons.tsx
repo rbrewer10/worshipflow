@@ -4,7 +4,7 @@
 // the main process too, which has no React.
 import type { LucideIcon } from 'lucide-react'
 import { Megaphone, Music, CalendarDays, Users, Utensils, Baby, Heart, BookOpen } from 'lucide-react'
-import type { AnnouncementIconKey } from '../../shared/types'
+import { ANNOUNCEMENT_ICON_KEYS, type AnnouncementIconKey } from '../../shared/types'
 
 export const ANNOUNCEMENT_ICON_COMPONENTS: Record<AnnouncementIconKey, LucideIcon> = {
   megaphone: Megaphone,
@@ -38,9 +38,8 @@ export type ResolvedAnnouncementIcon =
 export function resolveAnnouncementIcon(icon: string | null): ResolvedAnnouncementIcon {
   if (!icon) return { kind: 'builtin', Icon: Megaphone }
   if (icon.startsWith('icon:')) {
-    const key = icon.slice(5)
-    const components: Record<string, LucideIcon> = ANNOUNCEMENT_ICON_COMPONENTS
-    const Icon = Object.prototype.hasOwnProperty.call(components, key) ? components[key] : undefined
+    const key = icon.slice(5) as AnnouncementIconKey
+    const Icon = ANNOUNCEMENT_ICON_KEYS.includes(key) ? ANNOUNCEMENT_ICON_COMPONENTS[key] : undefined
     return Icon ? { kind: 'builtin', Icon } : { kind: 'builtin', Icon: Megaphone }
   }
   return { kind: 'custom', path: icon }
