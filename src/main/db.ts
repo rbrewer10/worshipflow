@@ -1,6 +1,6 @@
 import { app, safeStorage } from 'electron'
 import { join, dirname } from 'path'
-import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, statSync } from 'fs'
 import initSqlJs, { type Database } from 'sql.js'
 import type {
   SongSummary,
@@ -155,6 +155,9 @@ export async function initDb(): Promise<void> {
 
   dbPath = join(app.getPath('userData'), 'worshipflow.db')
   db = existsSync(dbPath) ? new SQL.Database(readFileSync(dbPath)) : new SQL.Database()
+  // Baseline the conflict guard against the exact file we just read, so the
+  // migrations' own persist() below compares against a real starting point.
+  rebaselineDbStamp()
   db.run('PRAGMA foreign_keys = ON;')
   db.run(SCHEMA)
   // Incremental migrations — safe to run on existing DBs.
@@ -321,6 +324,18 @@ function migrateReflowBreaks(): void {
   }
 }
 
+// Raised when persist() declines to write because the file on disk is no
+// longer the one this process loaded. Distinct from an ordinary save failure
+// because the operator's remedy is completely different — there is nothing
+// wrong with the disk, and the fix is to reopen the app rather than to free
+// up space or pause a sync client.
+export class DbConflictError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'DbConflictError'
+  }
+}
+
 // Registered by the main process so a failed save (disk full, file locked by
 // Google Drive/antivirus, permission denied) can be surfaced to the operator
 // instead of only logging to the invisible console.
@@ -348,10 +363,88 @@ export function rotateBackupGenerations(bakPath: string, keep = 3): void {
   }
 }
 
+// Identity of the database file as we last saw it. persist() writes the WHOLE
+// file from an in-memory sql.js snapshot, so if anything else replaces the file
+// behind our back, a later save silently destroys that other writer's work
+// wholesale — there is no row-level merge to fall back on.
+export interface DbFileStamp {
+  size: number
+  mtimeMs: number
+}
+
+// True when the file on disk is no longer the one we last read or wrote, i.e.
+// some other writer replaced it and our in-memory snapshot is now a fork rather
+// than a newer version of it.
+//
+// Deliberately conservative in both directions: with nothing on disk there is
+// nothing to destroy, and before our first stamp we have no baseline to compare
+// against, so neither case blocks the write. Exported (like
+// rotateBackupGenerations) purely so it's unit-testable without a real database.
+export function dbFileChangedExternally(
+  onDisk: DbFileStamp | null,
+  lastKnown: DbFileStamp | null
+): boolean {
+  if (onDisk === null || lastKnown === null) return false
+  return onDisk.size !== lastKnown.size || onDisk.mtimeMs !== lastKnown.mtimeMs
+}
+
+function stampOf(path: string): DbFileStamp | null {
+  try {
+    const s = statSync(path)
+    return { size: s.size, mtimeMs: s.mtimeMs }
+  } catch {
+    return null
+  }
+}
+
+let lastKnownStamp: DbFileStamp | null = null
+let conflictHandled = false
+
+// Re-baselines the stamp to whatever is on disk right now. Called after
+// initDb() loads the file, so the very first persist() of a session compares
+// against the exact bytes we read rather than against nothing.
+function rebaselineDbStamp(): void {
+  lastKnownStamp = stampOf(dbPath)
+  conflictHandled = false
+}
+
 function persist(): void {
   if (!dbPath) return
   const tmpPath = `${dbPath}.tmp`
   const bakPath = `${dbPath}.bak`
+
+  // Compare-and-swap guard. On 2026-08-20 two divergent database lineages were
+  // found alternating at this exact path: whichever instance saved last won
+  // outright, so a whole day of the operator's edits went missing with no error
+  // shown anywhere. Refusing the write keeps the on-disk copy intact, and the
+  // in-memory work is dumped beside it rather than thrown away, so a human can
+  // reconcile the two instead of one silently erasing the other.
+  if (dbFileChangedExternally(stampOf(dbPath), lastKnownStamp)) {
+    if (!conflictHandled) {
+      conflictHandled = true
+      let rescuePath = ''
+      try {
+        rescuePath = `${dbPath}.conflict-${new Date().toISOString().replace(/[:.]/g, '-')}`
+        writeFileSync(rescuePath, Buffer.from(db.export()))
+      } catch (dumpErr) {
+        console.error('Conflict rescue dump failed:', dumpErr)
+        rescuePath = ''
+      }
+      const err = new DbConflictError(
+        'Saving is paused — another copy of WorshipFlow changed the database. ' +
+        (rescuePath
+          ? "This session's work was saved beside it as a .conflict file. "
+          : '') +
+        'Close and reopen WorshipFlow to continue.'
+      )
+      console.error('Persist refused:', err.message, rescuePath ? `(rescue: ${rescuePath})` : '')
+      try { persistErrorHandler?.(err) } catch { /* never let notification break persist */ }
+    }
+    // Deliberately not throwing: the caller's edit already succeeded in memory,
+    // and the operator has been warned. Throwing here would surface as a
+    // generic failure on every subsequent keystroke mid-service.
+    return
+  }
 
   try {
     writeFileSync(tmpPath, Buffer.from(db.export()))
@@ -360,6 +453,7 @@ function persist(): void {
       copyFileSync(dbPath, bakPath)
     }
     renameSync(tmpPath, dbPath)
+    lastKnownStamp = stampOf(dbPath)
   } catch (err) {
     console.error('Persist failed:', err)
     if (existsSync(tmpPath)) unlinkSync(tmpPath)

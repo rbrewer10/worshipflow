@@ -39,6 +39,7 @@ import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNu
 import {
   initDb,
   onPersistError,
+  DbConflictError,
   listSongs,
   getSong,
   createSong,
@@ -3930,7 +3931,15 @@ app.whenReady().then(async () => {
   // Surface save failures to the operator instead of losing them to the console.
   onPersistError((err) => {
     logError('[persist] save failed', err)
-    notifyOperator('Save failed — your last change may not be saved. Check disk space and pause Google Drive/OneDrive sync.', 'error')
+    // A conflict isn't a disk problem, so it carries its own instructions —
+    // telling the operator to free up space would send them chasing the
+    // wrong thing entirely.
+    notifyOperator(
+      err instanceof DbConflictError
+        ? err.message
+        : 'Save failed — your last change may not be saved. Check disk space and pause Google Drive/OneDrive sync.',
+      'error'
+    )
   })
   ccliLicense = getSetting('ccli_license')
   logoPath = getSetting('logo_path')

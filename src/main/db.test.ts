@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { normalizeTitleText, rotateBackupGenerations } from './db'
+import { normalizeTitleText, rotateBackupGenerations, dbFileChangedExternally } from './db'
+import type { DbFileStamp } from './db'
 
 describe('normalizeTitleText', () => {
   it('trims leading and trailing whitespace', () => {
@@ -82,5 +83,41 @@ describe('rotateBackupGenerations', () => {
     expect(readFileSync(bakPath, 'utf8')).toBe('save3')
     expect(readFileSync(`${bakPath}.1`, 'utf8')).toBe('save2')
     expect(existsSync(`${bakPath}.2`)).toBe(false)
+  })
+})
+
+// Guards the whole-file overwrite in persist(). Two divergent database
+// lineages were once found alternating at the same path, and because persist()
+// rewrites the entire file from an in-memory snapshot, whichever instance saved
+// last erased the other outright — silently, with no error anywhere.
+describe('dbFileChangedExternally', () => {
+  const stamp = (size: number, mtimeMs: number): DbFileStamp => ({ size, mtimeMs })
+
+  it('allows the write when the file is byte-for-byte the one we last saw', () => {
+    expect(dbFileChangedExternally(stamp(274432, 1000), stamp(274432, 1000))).toBe(false)
+  })
+
+  it('blocks the write when another writer replaced the file with a different size', () => {
+    // The real incident: a 249,856-byte lineage swapped in over a 274,432-byte one.
+    expect(dbFileChangedExternally(stamp(249856, 1000), stamp(274432, 1000))).toBe(true)
+  })
+
+  it('blocks the write when the size matches but the file was rewritten', () => {
+    // Same-size overwrite is the case a naive length check would wave through.
+    expect(dbFileChangedExternally(stamp(274432, 2000), stamp(274432, 1000))).toBe(true)
+  })
+
+  it('allows the write when nothing is on disk yet — there is nothing to destroy', () => {
+    expect(dbFileChangedExternally(null, stamp(274432, 1000))).toBe(false)
+  })
+
+  it('allows the write before any baseline exists, rather than deadlocking saves', () => {
+    expect(dbFileChangedExternally(stamp(274432, 1000), null)).toBe(false)
+  })
+
+  it('treats a restored older backup as an external change', () => {
+    // Restoring a backup copies over the file behind our back; an in-memory
+    // snapshot from before the restore must not be allowed to undo it.
+    expect(dbFileChangedExternally(stamp(262144, 500), stamp(274432, 1500))).toBe(true)
   })
 })
