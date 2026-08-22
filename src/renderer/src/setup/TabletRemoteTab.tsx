@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Tablet } from 'lucide-react'
+import { Tablet, BookOpen } from 'lucide-react'
 
 function TabletRemoteTab(): JSX.Element {
   const [tabletUrl, setTabletUrl] = useState('')
@@ -39,6 +39,26 @@ function TabletRemoteTab(): JSX.Element {
             </span>
             <button onClick={regenerate} className="btn text-xs">New PIN</button>
           </div>
+        </div>
+
+        {/* Same device/PIN system as the remote above, one path further —
+            see src/main/pulpitHtml.ts. Never had an address shown anywhere
+            in the app, so there was no way to actually find it. */}
+        <h1 className="mb-1 mt-8 flex items-center gap-2 text-lg font-semibold text-content-primary">
+          <BookOpen size={18} className="text-content-secondary" /> Pastor&apos;s pulpit
+        </h1>
+        <p className="mb-5 text-sm text-content-secondary">
+          Open this address on the tablet in the pulpit. It shows the current verse next to the
+          pastor&apos;s own notes for that verse, and turns the page when the operator hits Next —
+          add verses and notes on a sermon item&apos;s "Verses" section in Build Service.
+        </p>
+
+        <div className="rounded-xl border border-border bg-panel p-5">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-content-secondary">Address</div>
+          <div className="break-all rounded-lg bg-panel-raised px-3 py-2 text-center font-mono text-sm text-blue-400">
+            {tabletUrl ? `${tabletUrl}/pulpit` : 'Starting server…'}
+          </div>
+          <p className="mt-3 text-xs text-content-secondary">Uses the same unlock PIN as the remote above.</p>
         </div>
       </div>
     </div>
