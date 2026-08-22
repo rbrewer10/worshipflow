@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   STARTER_SCENES, starterConfig, contentModeFor, expandScene, roleForMode, modeForRole,
-  defaultRoutingFor, effectiveRouting, matchScene, parseSceneConfig, validateSceneConfig
+  defaultRoutingFor, effectiveRouting, matchScene, parseSceneConfig, validateSceneConfig,
+  generatedDeckYieldsTo
 } from './zoneScenes'
 import { ZONE_ROUTING_DEFAULTS } from './types'
 import type { SceneDef } from './zoneScenes'
@@ -174,5 +175,39 @@ describe('unknown item type (row from a newer build, or a downgrade)', () => {
 
   it('effectiveRouting is safe for an unknown type with no explicit routing', () => {
     expect(() => effectiveRouting({ type: unknown, zoneRouting: null }, config)).not.toThrow()
+  })
+})
+
+describe('generatedDeckYieldsTo', () => {
+  // The reported bug: a scripture item routed "Back screens only" (Lyrics TVs
+  // on the logo) still put the verse on the Lyrics TVs, because scriptureDeck
+  // hardcodes the verse onto zones 2/3/4 and decks outranked routing.
+  it('stands down on a zone the operator explicitly set to the logo', () => {
+    expect(generatedDeckYieldsTo(true, true, 'logo')).toBe(true)
+  })
+
+  it('stands down on black and off as well', () => {
+    expect(generatedDeckYieldsTo(true, true, 'black')).toBe(true)
+    expect(generatedDeckYieldsTo(true, true, 'off')).toBe(true)
+  })
+
+  // Back Left showing the reference and Back Right the verse is exactly what
+  // the generated deck is for — those zones must keep it.
+  it('keeps the deck on zones still routed to content', () => {
+    expect(generatedDeckYieldsTo(true, true, 'text')).toBe(false)
+    expect(generatedDeckYieldsTo(true, true, 'lyrics')).toBe(false)
+    expect(generatedDeckYieldsTo(true, true, 'stage')).toBe(false)
+  })
+
+  it('never overrides a deck the operator authored by hand', () => {
+    expect(generatedDeckYieldsTo(false, true, 'logo')).toBe(false)
+  })
+
+  it('ignores routing the operator never chose, so defaults keep the deck', () => {
+    expect(generatedDeckYieldsTo(true, false, 'logo')).toBe(false)
+  })
+
+  it('is safe when the zone has no routing entry at all', () => {
+    expect(generatedDeckYieldsTo(true, true, undefined)).toBe(false)
   })
 })

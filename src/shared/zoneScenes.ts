@@ -66,6 +66,30 @@ export function roleForMode(mode: ZoneMode): ZoneRole | null {
   return null
 }
 
+// Whether a GENERATED zone deck should stand down on one zone because the
+// operator explicitly routed that zone away from content.
+//
+// Decks normally outrank per-item routing, which is right for a deck someone
+// authored in the composer — that IS their explicit instruction. But a
+// generated deck is only a smart default, and it was silently beating a real
+// choice: scriptureDeck hardcodes the verse onto zones 2/3/4, so picking "Back
+// screens only" on a scripture item left the reading on the Lyrics TVs anyway
+// and the scene chip looked broken.
+//
+// Only zones the routing takes OFF content yield — a zone still set to content
+// keeps the deck's richer per-zone layout (e.g. reference on Back Left, verse
+// on Back Right), which is the whole reason the generated deck exists.
+export function generatedDeckYieldsTo(
+  deckIsGenerated: boolean,
+  routingIsExplicit: boolean,
+  zoneMode: ZoneMode | undefined
+): boolean {
+  if (!deckIsGenerated || !routingIsExplicit || zoneMode === undefined) return false
+  const role = roleForMode(zoneMode)
+  // 'off' has no role of its own but is unambiguously "show nothing here".
+  return role === 'logo' || role === 'black' || zoneMode === 'off'
+}
+
 export function expandScene(scene: SceneDef, type: ServiceItemType): ZoneRouting {
   return {
     1: modeForRole(scene.zones?.['1'], type),

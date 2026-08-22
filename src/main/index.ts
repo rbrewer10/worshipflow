@@ -13,7 +13,7 @@ import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
 import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
-import { parseSceneConfig, validateSceneConfig, defaultRoutingFor } from '../shared/zoneScenes'
+import { parseSceneConfig, validateSceneConfig, defaultRoutingFor, generatedDeckYieldsTo } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
@@ -307,6 +307,13 @@ interface LiveTrackState {
   // must stay synchronous). t.index doubles as the deck cursor, so existing
   // next/prev/auto-advance code needs no deck-specific branch.
   deckSlides: ZoneSlide[] | null
+  // True when deckSlides came from autoDeckFor rather than a deck the operator
+  // built in the composer. A generated deck is only a default, so it yields to
+  // an explicit per-item routing choice; an authored one does not.
+  // Only ever read while deckSlides is non-null, and loadDeckOnto is the single
+  // place that sets deckSlides non-null (everywhere else clears it), so this
+  // cannot be read stale.
+  deckIsGenerated: boolean
   // The live item's OWN resolved source slides, for 'slide' slots (an index
   // into the item's normal content, not into the deck itself).
   deckSource: string[]
@@ -348,6 +355,7 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     loadGeneration: 0,
     hasLiveContent: false,
     deckSlides: null,
+    deckIsGenerated: false,
     deckSource: [],
     deckScripture: new Map(),
     sermonSlides: null
@@ -838,7 +846,10 @@ function zonePinsRecord(): ZonePins {
 }
 
 // Precedence, highest first:
-//   pin  >  deck (t.deckSlides)  >  per-item zone_routing  >  scene typeDefault  >  idleDefault
+//   pin  >  authored deck  >  per-item zone_routing  >  generated deck
+//     >  scene typeDefault  >  idleDefault
+// (A generated deck sits below explicit routing only for zones that routing
+// takes off content; for the rest it still supplies the per-zone layout.)
 function computeZoneStates(): Record<ZoneId, ZoneState> {
   const result = {} as Record<ZoneId, ZoneState>
   const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
@@ -878,19 +889,12 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       }
     }
 
-    // An authored deck says explicitly what every zone shows on the current
-    // slide — that's its whole purpose, so it wins outright over per-item
-    // auto-routing and the idle default alike. The one thing it does NOT beat
-    // is a pin, handled above: the operator asked for this screen by hand,
-    // after the deck was authored.
-    if (pinnedMode == null && t.deckSlides && t.index < t.deckSlides.length) {
-      result[zoneId] = zoneStateFromSlot(resolveSlot(t.deckSlides, t.index, zoneId), t, zoneId, live)
-      continue
-    }
-
     // Get routing for the active item on this zone's track (or defaults: scene
     // palette typeDefault, falling back to the built-in ZONE_ROUTING_DEFAULTS).
+    // Resolved BEFORE the deck below because an explicit routing choice can
+    // veto a *generated* deck — see the comment on that branch.
     let routing: ZoneRouting | null = null
+    let routingIsExplicit = false
     if (t.serviceItemId != null) {
       const item = activeServiceItems.find((it) => it.id === t.serviceItemId && it.track === zoneTrack)
       if (item) {
@@ -898,6 +902,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
         if (stored) {
           try {
             routing = JSON.parse(stored) as ZoneRouting
+            routingIsExplicit = true
           } catch (err) {
             console.error(`Failed to parse zone routing for item id=${item.id}:`, err)
             routing = defaultRoutingFor(item.type, sceneConfig)
@@ -906,6 +911,30 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
           routing = defaultRoutingFor(item.type, sceneConfig)
         }
       }
+    }
+
+    // An authored deck says explicitly what every zone shows on the current
+    // slide — that's its whole purpose, so it wins outright over per-item
+    // auto-routing and the idle default alike. The one thing it does NOT beat
+    // is a pin, handled above: the operator asked for this screen by hand,
+    // after the deck was authored.
+    //
+    // A *generated* deck is different: nobody authored it, it's just a smart
+    // default. It must not silently outrank the operator picking a scene, which
+    // is exactly what went wrong for scripture — scriptureDeck hardcodes the
+    // verse onto zones 2/3/4, so choosing "Back screens only" left the reading
+    // on the Lyrics TVs anyway and the scene chip looked broken. So an explicit
+    // routing choice vetoes a generated deck on any zone it takes off content;
+    // zones the routing still wants showing content keep the deck's richer
+    // per-zone layout.
+    const deckVetoedHere = generatedDeckYieldsTo(
+      t.deckIsGenerated,
+      routingIsExplicit,
+      routing?.[zoneId]
+    )
+    if (pinnedMode == null && t.deckSlides && t.index < t.deckSlides.length && !deckVetoedHere) {
+      result[zoneId] = zoneStateFromSlot(resolveSlot(t.deckSlides, t.index, zoneId), t, zoneId, live)
+      continue
     }
 
     // No service item is live on this track (routing is null) — e.g. nothing's
@@ -1413,12 +1442,15 @@ function autoDeckDeps(): AutoDeckDeps {
 async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: number): Promise<boolean> {
   // A hand-authored deck always wins; generation only fills the gap where there
   // isn't one, so nothing anyone built in the composer changes behaviour.
-  const slides = parseZoneSlides(getItemZoneSlides(item.id)) ?? await autoDeckFor(item, autoDeckDeps())
+  const authored = parseZoneSlides(getItemZoneSlides(item.id))
+  const slides = authored ?? await autoDeckFor(item, autoDeckDeps())
   if (!slides) return false
+  const isGenerated = authored == null
   const source = await computeItemSourceSlides(item)
   if (tracks[track].loadGeneration !== generation) return true
   const t = tracks[track]
   t.deckSlides = slides
+  t.deckIsGenerated = isGenerated
   t.deckSource = source
   t.deckScripture = new Map()
   t.song = { ...t.song, lines: slides.map((s) => slideSummary(s, source)) }
