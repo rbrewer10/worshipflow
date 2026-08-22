@@ -1100,6 +1100,17 @@ export function setServiceItemPayload(itemId: number, payload: Record<string, un
   persist()
 }
 
+// For main/index.ts's active-service-item-cache refresh: an item mutation
+// only needs to invalidate that cache when the item belongs to the currently
+// LIVE service, not whatever happens to be open in Build Service — those can
+// differ (editing next week's service while this week's is live). Must be
+// read BEFORE a delete-type mutation runs, since the row won't exist after.
+export function getServiceIdForItem(itemId: number): number | null {
+  const rows = db.exec('SELECT service_id FROM service_item WHERE id = ?', [itemId])
+  if (!rows.length || !rows[0].values.length) return null
+  return rows[0].values[0][0] as number
+}
+
 export function getItemZoneRouting(itemId: number): string | null {
   const rows = db.exec('SELECT zone_routing FROM service_item WHERE id = ?', [itemId])
   if (!rows.length || !rows[0].values.length) return null
