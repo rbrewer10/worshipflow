@@ -78,6 +78,7 @@ import {
   setServiceItemStyle,
   setServiceItemPayload,
   reorderServiceItems,
+  getServiceIdForItem,
   getItemZoneRouting,
   setItemZoneRouting,
   getItemZoneSlides,
@@ -1662,11 +1663,23 @@ function songLines(full: SongFull): string[] {
 
 async function doLoadSong(track: TrackId, id: number): Promise<void> {
   const t = tracks[track]
-  t.loadGeneration++
+  // Captured (not just bumped) and re-checked after the await, same as
+  // doLoadScripture/loadDeckOnto — getSong is synchronous today (sql.js,
+  // in-memory), so this await only yields one microtask and can't actually
+  // be overtaken yet, but that safety was accidental: nothing enforced it,
+  // unlike every other loader here. Guards against a future async DB layer,
+  // or a refactor that adds a real await inside getSong, letting a fast
+  // double song-load (double-click Next, or Next right after Go Live) let
+  // the older click's response land last and stomp the newer song in.
+  const generation = ++t.loadGeneration
   clearCountdown(track)
   clearAutoAdvance(track)
   const full = await getSong(id)
   if (!full) return
+  if (tracks[track].loadGeneration !== generation) {
+    logWarn(`[song] discarding stale load for id=${id} — track "${track}" moved on while fetching`)
+    return
+  }
   t.hasLiveContent = true
   t.songId = id
   t.scriptureRef = null
@@ -2973,6 +2986,20 @@ ipcMain.handle('wf:songs:setBlurBehindText', (_e: unknown, id: number, value: bo
   if (changed) broadcast()
 })
 
+// Invalidates the active-service-item cache after a mutation, but only when
+// the mutated item/service is the one actually live — Ryan can be editing
+// next week's service in Build Service while this week's is live, and a call
+// here must not refresh (or broadcast a theme change for) the wrong one.
+// Every wf:services:* mutation below goes through this instead of relying on
+// the renderer to remember to call wf:services:refreshActiveItems itself:
+// that was previously a convention living in exactly one renderer helper
+// (ServiceEditor.tsx's reload()), so a second edit surface calling these
+// IPCs directly would silently reproduce "newly added/edited item can't go
+// live" with nothing to catch it.
+function refreshIfActive(serviceId: number | null): void {
+  if (serviceId != null && serviceId === activeServiceId) refreshActiveServiceItems(serviceId)
+}
+
 // --- Service builder IPC ---
 ipcMain.handle('wf:services:list', () => listServices())
 ipcMain.handle('wf:services:create', (_e, name: string, date?: string) => createService(name, date))
@@ -2981,29 +3008,51 @@ ipcMain.handle('wf:services:get', (_e, id: number) => getService(id))
 ipcMain.handle('wf:service:setPublished', (_e, id: number, publishedAt: number | null) => setServicePublished(id, publishedAt))
 ipcMain.handle('wf:service:getTeam', (_e, id: number) => getServiceTeam(id))
 ipcMain.handle('wf:service:setTeam', (_e, id: number, team: import('../shared/types').ServiceTeam) => setServiceTeam(id, team))
-ipcMain.handle('wf:services:addItem', (_e, serviceId: number, item: NewServiceItem) =>
-  addServiceItem(serviceId, item)
-)
-ipcMain.handle('wf:services:replaceItem', (_e, itemId: number, type: import('../shared/types').ServiceItemType, refId: number | null, payload: Record<string, unknown>) =>
+ipcMain.handle('wf:services:addItem', (_e, serviceId: number, item: NewServiceItem) => {
+  const id = addServiceItem(serviceId, item)
+  refreshIfActive(serviceId)
+  return id
+})
+ipcMain.handle('wf:services:replaceItem', (_e, itemId: number, type: import('../shared/types').ServiceItemType, refId: number | null, payload: Record<string, unknown>) => {
+  const serviceId = getServiceIdForItem(itemId)
   replaceServiceItem(itemId, type, refId, payload)
-)
-ipcMain.handle('wf:services:removeItem', (_e, itemId: number) => removeServiceItem(itemId))
-ipcMain.handle('wf:services:duplicateItem', (_e, itemId: number) => duplicateServiceItem(itemId))
-ipcMain.handle('wf:services:moveItem', (_e, itemId: number, dir: 'up' | 'down') =>
+  refreshIfActive(serviceId)
+})
+ipcMain.handle('wf:services:removeItem', (_e, itemId: number) => {
+  const serviceId = getServiceIdForItem(itemId)  // must read before the row is deleted
+  removeServiceItem(itemId)
+  refreshIfActive(serviceId)
+})
+ipcMain.handle('wf:services:duplicateItem', (_e, itemId: number) => {
+  const serviceId = getServiceIdForItem(itemId)
+  const id = duplicateServiceItem(itemId)
+  refreshIfActive(serviceId)
+  return id
+})
+ipcMain.handle('wf:services:moveItem', (_e, itemId: number, dir: 'up' | 'down') => {
+  const serviceId = getServiceIdForItem(itemId)
   moveServiceItem(itemId, dir)
-)
-ipcMain.handle('wf:services:updateItemNotes', (_e, itemId: number, notes: string | null) =>
+  refreshIfActive(serviceId)
+})
+ipcMain.handle('wf:services:updateItemNotes', (_e, itemId: number, notes: string | null) => {
+  const serviceId = getServiceIdForItem(itemId)
   updateServiceItemNotes(itemId, notes)
-)
-ipcMain.handle('wf:services:setItemStyle', (_e, itemId: number, style: ItemStyle | null) =>
+  refreshIfActive(serviceId)
+})
+ipcMain.handle('wf:services:setItemStyle', (_e, itemId: number, style: ItemStyle | null) => {
+  const serviceId = getServiceIdForItem(itemId)
   setServiceItemStyle(itemId, style)
-)
-ipcMain.handle('wf:services:setItemPayload', (_e, itemId: number, payload: Record<string, unknown>) =>
+  refreshIfActive(serviceId)
+})
+ipcMain.handle('wf:services:setItemPayload', (_e, itemId: number, payload: Record<string, unknown>) => {
+  const serviceId = getServiceIdForItem(itemId)
   setServiceItemPayload(itemId, payload)
-)
+  refreshIfActive(serviceId)
+})
 ipcMain.handle('wf:services:reorder', (_e, serviceId: number, track: TrackId, orderedIds: number[]) => {
   assertTrackId(track)
   reorderServiceItems(serviceId, track, orderedIds)
+  refreshIfActive(serviceId)
 })
 
 // ── Service Templates IPC ─────────────────────────────────────────────────────
