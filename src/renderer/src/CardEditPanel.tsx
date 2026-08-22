@@ -111,6 +111,20 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
     if (input) songQueue.trigger(input)
   }
 
+  // Every other field in this panel autosaves on change (see savePayload
+  // below) — lyrics was the one exception, saved only on an explicit "Save
+  // lyrics" click. Switching items or closing the editor after typing lost
+  // the edit silently, with no warning: the useEffect above resets `lyrics`
+  // from the DB the moment item.id changes, and there was nothing to stop
+  // that from discarding whatever hadn't been manually saved yet.
+  // Builds the input from `next` directly rather than reading the `lyrics`
+  // state — setLyrics(next) hasn't landed in this closure yet.
+  const onLyricsChange = (next: string): void => {
+    setLyrics(next)
+    const input = buildSongInput({ sections: parseReflowText(next) })
+    if (input) songQueue.trigger(input)
+  }
+
   const savePayload = (next: Record<string, unknown>): void => {
     setP(next)
     payloadQueue.trigger(next)
@@ -143,7 +157,7 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   }
 
   const applyAutoLabels = (): void => {
-    setLyrics(autoLabelPreview)
+    onLyricsChange(autoLabelPreview)
     setShowAutoLabelPreview(false)
   }
 
@@ -165,7 +179,7 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
       autoLabelPreview={autoLabelPreview}
       autoLabelAnalyses={autoLabelAnalyses}
       notes={notes}
-      onLyricsChange={setLyrics}
+      onLyricsChange={onLyricsChange}
       onNotesChange={setNotes}
       onSaveSong={saveSong}
       onAutoLabelClick={handleAutoLabel}
