@@ -103,4 +103,47 @@ describe('recording session', () => {
     // Offset must be relative to the real video start (1000 - 500), NOT 0.
     expect(markers).toEqual([{ recId: 7, kind: 'song', label: 'Opener', offsetMs: 500 }])
   })
+
+  // Regression: ensureStarted's `recordingId != null` guard only blocks a
+  // SECOND call arriving after the first fully finished — nothing stopped two
+  // near-simultaneous onItemLive calls (e.g. double-clicking Go Live/Next
+  // right at a service's start) from both seeing recordingId == null and both
+  // awaiting startRecord before either had set it, each calling
+  // createRecording and leaving a dangling, never-finalized second row.
+  it('de-dupes two concurrent onItemLive calls into a single recording', async () => {
+    let resolveStart: () => void = () => {}
+    const startGate = new Promise<void>((resolve) => { resolveStart = resolve })
+    const { deps, markers } = makeDeps({
+      startRecord: vi.fn(() => startGate)
+    })
+    const s = createRecordingSession(deps)
+
+    // Both fire before startRecord has resolved — this is the exact race.
+    const first = s.onItemLive(makeItem(1, 'welcome', 'Welcome'), 42, 'Sunday AM', '2026-07-19')
+    const second = s.onItemLive(makeItem(2, 'song', 'Opener'), 42, 'Sunday AM', '2026-07-19')
+    resolveStart()
+    await Promise.all([first, second])
+
+    expect(deps.startRecord).toHaveBeenCalledOnce()
+    expect(deps.createRecording).toHaveBeenCalledOnce()
+    expect(markers).toHaveLength(2) // both items still get their own marker
+    expect(markers.map((m) => m.recId)).toEqual([7, 7]) // on the SAME recording row
+  })
+
+  it('allows a fresh start attempt on the SAME session after a failed one, not stuck forever', async () => {
+    let obsUp = false
+    const { deps } = makeDeps({ obsConnected: () => obsUp })
+    const s = createRecordingSession(deps)
+
+    // First item: OBS is offline, start attempt fails.
+    await s.onItemLive(makeItem(1, 'welcome', 'Welcome'), 42, 'Sunday AM', '2026-07-19')
+    expect(s.isActive()).toBe(false)
+
+    // OBS comes online before the next item — the failed attempt's in-flight
+    // guard must have cleared itself, or this would hang/no-op forever.
+    obsUp = true
+    await s.onItemLive(makeItem(2, 'song', 'Opener'), 42, 'Sunday AM', '2026-07-19')
+    expect(s.isActive()).toBe(true)
+    expect(deps.createRecording).toHaveBeenCalledOnce()
+  })
 })
