@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import LiveTriptych from './live/LiveTriptych'
-import OutputsStrip from './live/OutputsStrip'
 import LiveTools from './LiveTools'
 import ScenePresetRow from './ScenePresetRow'
 import { useService } from './ServiceContext'
@@ -43,9 +42,11 @@ function LiveView(): JSX.Element {
           <LiveTools track="main" />
         </div>
 
-        {/* Bottom: outputs + scene selector */}
+        {/* Bottom: scene selector. The four zone tiles that used to sit above
+            it were removed — the booth runs the Zone Multiview window on a
+            second screen, so repeating the same four previews here only ate
+            vertical space the operator needs for the live text. */}
         <div className="wf-live-bottom flex flex-col gap-2 border-t border-border p-3">
-          <OutputsStrip />
           {liveItem && sceneConfig && (() => {
             const routing = effectiveRouting(liveItem, sceneConfig)
             return (
