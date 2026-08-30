@@ -27,6 +27,7 @@ import type {
   ServicePerson
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
+import { relocateStoredPath } from '../shared/pathRelocation'
 import { splitLyricLines } from '../shared/lyrics'
 import type { ZoneSlide } from '../shared/zoneSlides'
 
@@ -206,7 +207,94 @@ export async function initDb(): Promise<void> {
   }
   normalizeTitles()
   clearSecondTrackAssignments()
+  relocateMovedDataPaths()
   persist()
+}
+
+// Every background/logo/icon path stored anywhere is the raw absolute path a
+// file dialog returned at pick time — fine on the machine it was created on,
+// but this app has real reasons to move: sharing a song library + backgrounds
+// with another church via a copied database, or just a new PC. Copy the DB
+// and the backgrounds/imported-media folders over and every stored path still
+// says the OLD Windows username, so the file — sitting right there — fails to
+// load with no error anywhere. Runs every startup (cheap: skips any path that
+// already resolves, which is every row on an unmoved install) rather than
+// once-and-done, since it should keep working the next time someone relocates
+// the same install again.
+function relocateMovedDataPaths(): void {
+  const userDataDir = app.getPath('userData')
+  let changed = 0
+
+  const relocate = (p: string | null): string | null => relocateStoredPath(p, userDataDir, existsSync)
+
+  const songRows: { id: number; background: string | null }[] = []
+  const songStmt = db.prepare("SELECT id, background FROM song WHERE background IS NOT NULL AND background != ''")
+  while (songStmt.step()) songRows.push(songStmt.getAsObject() as unknown as { id: number; background: string | null })
+  songStmt.free()
+  for (const row of songRows) {
+    const next = relocate(row.background)
+    if (next !== row.background) {
+      db.run('UPDATE song SET background = ? WHERE id = ?', [next, row.id])
+      changed++
+    }
+  }
+
+  const annRows: { id: number; background: string | null; icon: string | null }[] = []
+  const annStmt = db.prepare('SELECT id, background, icon FROM announcement')
+  while (annStmt.step()) annRows.push(annStmt.getAsObject() as unknown as { id: number; background: string | null; icon: string | null })
+  annStmt.free()
+  for (const row of annRows) {
+    const nextBg = relocate(row.background)
+    const nextIcon = relocate(row.icon)
+    if (nextBg !== row.background || nextIcon !== row.icon) {
+      db.run('UPDATE announcement SET background = ?, icon = ? WHERE id = ?', [nextBg, nextIcon, row.id])
+      changed++
+    }
+  }
+
+  const itemRows: { id: number; payload_json: string | null }[] = []
+  const itemStmt = db.prepare("SELECT id, payload_json FROM service_item WHERE payload_json LIKE '%background%' OR payload_json LIKE '%\"path\"%'")
+  while (itemStmt.step()) itemRows.push(itemStmt.getAsObject() as unknown as { id: number; payload_json: string | null })
+  itemStmt.free()
+  for (const row of itemRows) {
+    if (!row.payload_json) continue
+    let payload: Record<string, unknown>
+    try {
+      payload = JSON.parse(row.payload_json)
+    } catch {
+      continue // malformed payload predates this pass either way — not this function's job to fix
+    }
+    let itemChanged = false
+    if (typeof payload.background === 'string') {
+      const next = relocate(payload.background)
+      if (next !== payload.background) { payload.background = next; itemChanged = true }
+    }
+    if (typeof payload.path === 'string') {
+      const next = relocate(payload.path)
+      if (next !== payload.path) { payload.path = next; itemChanged = true }
+    }
+    if (itemChanged) {
+      db.run('UPDATE service_item SET payload_json = ? WHERE id = ?', [JSON.stringify(payload), row.id])
+      changed++
+    }
+  }
+
+  // Raw db.run rather than setSetting — setSetting persists on every call,
+  // which would mean an extra full-file write per logo key on top of the
+  // persist() this whole startup pass already ends with below.
+  for (const key of ['logo_path', 'logo_bg']) {
+    const current = getSetting(key)
+    const next = relocate(current)
+    if (next !== current) {
+      if (next == null) db.run('DELETE FROM setting WHERE key = ?', [key])
+      else db.run('INSERT INTO setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?', [key, next, next])
+      changed++
+    }
+  }
+
+  if (changed > 0) {
+    console.log(`[relocateMovedDataPaths] fixed ${changed} path(s) that had moved to this machine/user`)
+  }
 }
 
 // Pure so it's unit-testable without a DB — trims and collapses internal
