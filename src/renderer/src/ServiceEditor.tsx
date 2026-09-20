@@ -167,12 +167,15 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
   const selectedItem = service?.items.find((it) => it.id === selectedId) ?? null
 
   useEffect(() => {
+    let cancelled = false
     if (selectedItem && selectedItem.type === 'song' && selectedItem.ref_id != null) {
-      window.wf.songGet(selectedItem.ref_id).then(setSelectedSongFull)
+      const id = selectedItem.ref_id
+      window.wf.songGet(id).then((s) => { if (!cancelled) setSelectedSongFull(s) })
     } else {
       setSelectedSongFull(null)
     }
-  }, [selectedId, selectedItem?.ref_id])
+    return () => { cancelled = true }
+  }, [selectedId, selectedItem?.ref_id, selectedItem?.type])
 
   const addCard = async (type: ServiceItem['type']): Promise<void> => {
     if (type === 'image') {

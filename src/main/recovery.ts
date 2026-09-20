@@ -1,5 +1,7 @@
 import Store from 'electron-store'
 import type { ZonePins } from '../shared/zonePins'
+import { isRecoveryStale } from './recoveryStale'
+export { isRecoveryStale }
 
 // Crash recovery: persist the actual service item being played, per track, restore on launch.
 // Stores the live service item ID so we can restore the exact item after a crash,
@@ -24,7 +26,7 @@ export interface RecoverySnapshot {
   pins?: ZonePins
 }
 
-type RecoveryStore = Store<{ lastState: RecoverySnapshot | null }>
+type RecoveryStore = Store<{ lastState: RecoverySnapshot | null; cleanExit: boolean }>
 let recoveryStore: RecoveryStore | null = null
 
 // Keep construction lazy so importing the pure recovery helpers does not
@@ -32,7 +34,7 @@ let recoveryStore: RecoveryStore | null = null
 // electron-store file, but only creates it when recovery is actually read or
 // written.
 function getRecoveryStore(): RecoveryStore {
-  recoveryStore ??= new Store<{ lastState: RecoverySnapshot | null }>({ name: 'recovery' })
+  recoveryStore ??= new Store<{ lastState: RecoverySnapshot | null; cleanExit: boolean }>({ name: 'recovery' })
   return recoveryStore
 }
 
@@ -46,14 +48,30 @@ export function readRecovery(): RecoverySnapshot | null {
 
 export function writeRecovery(snap: RecoverySnapshot): void {
   try {
-    getRecoveryStore().set('lastState', snap)
+    const store = getRecoveryStore()
+    store.set('lastState', snap)
+    // A live write means this session is in progress — a crash after this
+    // should restore. before-quit sets cleanExit back to true.
+    store.set('cleanExit', false)
   } catch {
     // Never let autosave crash the live engine.
   }
 }
 
-// Pure staleness check, extracted so it's testable without touching the store
-// or Electron. See RECOVERY_STALE_MS in index.ts for the threshold rationale.
-export function isRecoveryStale(snap: Pick<RecoverySnapshot, 'ts'>, now: number, staleMs: number): boolean {
-  return now - snap.ts > staleMs
+export function markCleanExit(clean: boolean): void {
+  try {
+    getRecoveryStore().set('cleanExit', clean)
+  } catch {
+    // Same rule as writeRecovery: quitting must not throw.
+  }
 }
+
+export function wasCleanExit(): boolean {
+  try {
+    return getRecoveryStore().get('cleanExit') === true
+  } catch {
+    return false
+  }
+}
+
+

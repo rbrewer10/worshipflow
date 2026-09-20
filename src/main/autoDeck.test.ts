@@ -236,14 +236,16 @@ describe('deck loading is actually wired up for every auto-decked type', () => {
     expect(await autoDeckFor(item({ type: 'countdown', payload: { seconds: 300 } }), deps())).toBeNull()
   })
 
-  it('the Go Live chokepoint (wf:live:setItemId) loads a deck for sermon and scripture', () => {
+  it('the Go Live chokepoint (wf:live:setItemId) loads a deck for text/scripture, and sermons only when they have no verses', () => {
     // Announcements are excluded on purpose: doLoadAnnouncement already calls
     // loadDeckOnto with the item, so routing them through here too would build
     // the same deck twice.
-    const chokepoint = source.match(/if \(item && \(item\.type === 'text'[^)]*\)\) \{\s*\n\s*void loadDeckOnto/)
-    expect(chokepoint, 'the wf:live:setItemId deck-load chokepoint moved or changed shape').not.toBeNull()
-    expect(chokepoint![0]).toContain("'sermon'")
-    expect(chokepoint![0]).toContain("'scripture'")
+    // Sermons with a verses list must skip this chokepoint — Go Live used to
+    // always loadDeckOnto here, which put a passage-chunked deck on screen
+    // while Next (doLoadSermon) showed the operator's verse list.
+    expect(source).toMatch(/if \(item && \(item\.type === 'text' \|\| item\.type === 'scripture'\)\)/)
+    expect(source).toMatch(/item\.type === 'sermon'/)
+    expect(source).toMatch(/verses\.length === 0\) \{\s*\n\s*void loadDeckOnto/)
   })
 
   it('doLoadScripture accepts the item, so Next/Prev can load its deck', () => {

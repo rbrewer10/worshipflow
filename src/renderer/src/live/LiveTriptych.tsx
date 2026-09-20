@@ -54,7 +54,12 @@ function LiveTriptych({ track }: { track: TrackId }): JSX.Element {
   // otherwise it shows stale lyric content while the screen is actually
   // black or on the logo.
   const isBlack = live?.mode === 'black'
-  const isLogo = live?.mode === 'logo'
+  // Sermons load at mode 'logo' on purpose (main projector shows the church
+  // logo). Treating every logo-mode track as a cutaway hid the live sermon
+  // title/passage behind "Logo screen" the whole time the sermon was up.
+  const liveItem = items.find((it) => it.id === live?.liveServiceItemId)
+  const sermonLive = liveItem?.type === 'sermon'
+  const isLogo = live?.mode === 'logo' && !sermonLive
   const showLiveContent = !isBlack && !isLogo
 
   return (

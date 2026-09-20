@@ -88,6 +88,12 @@ export function useLiveModel(): AudienceModel {
       if (s.mode === 'countdown') {
         setClockLine(s.line)
         setTickerText('')
+      } else if (s.mode === 'lyrics' && s.songTitle === 'Announcement') {
+        // Tickers load via doLoadText(title: 'Announcement'), which sets mode
+        // 'lyrics'. The old branch lived behind that lyrics case, so tickerText
+        // was always cleared and the scrolling bar never appeared.
+        setLayers({ front: 0, a: '', b: '' })
+        setTickerText(s.line || '')
       } else if (s.mode === 'lyrics') {
         setLayers((prev) =>
           prev.front === 0
@@ -100,9 +106,6 @@ export function useLiveModel(): AudienceModel {
         setAnnouncementBody(s.line ?? '')
         setAnnouncementIcon(s.icon ?? null)
         setTickerText('')
-      } else if (s.songTitle?.includes('Announcement')) {
-        // Ticker mode: show the line as scrolling text
-        setTickerText(s.line || '')
       }
     }
     const off = window.wf.onState((s) => apply(s.main))

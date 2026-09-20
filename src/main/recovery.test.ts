@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isRecoveryStale } from './recovery'
+import { isRecoveryStale } from './recoveryStale'
 
 describe('isRecoveryStale', () => {
   const HOUR = 60 * 60 * 1000
