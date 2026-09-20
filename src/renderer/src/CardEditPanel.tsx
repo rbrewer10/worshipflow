@@ -24,12 +24,18 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
   const [autoLabelAnalyses, setAutoLabelAnalyses] = useState<any[]>([])
   useEffect(() => {
     setP(item.payload ?? {}); setNotes(item.notes ?? '')
+    let cancelled = false
     if (item.type === 'song' && item.ref_id != null) {
-      window.wf.songGet(item.ref_id).then((s) => { setSongFull(s); setLyrics(s ? sectionsToReflowText(s.sections) : '') })
+      const id = item.ref_id
+      window.wf.songGet(id).then((s) => {
+        if (cancelled) return
+        setSongFull(s); setLyrics(s ? sectionsToReflowText(s.sections) : '')
+      })
     } else {
       setSongFull(null); setLyrics('')
     }
-  }, [item.id])
+    return () => { cancelled = true }
+  }, [item.id, item.type, item.ref_id])
 
   // One save queue per independent thing this panel persists — see
   // saveQueue.ts. Routing the song record's background changes through the

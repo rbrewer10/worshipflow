@@ -32,7 +32,7 @@ import { zoneTrackFor, idleModeFor, clampSongIndex, STAGE_REHEARSAL_OFF } from '
 import type { StageRehearsalState } from '../shared/stageRehearsal'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
-import { readRecovery, writeRecovery, isRecoveryStale, type TrackSnapshot } from './recovery'
+import { readRecovery, writeRecovery, isRecoveryStale, markCleanExit, wasCleanExit, type TrackSnapshot } from './recovery'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -1230,8 +1230,10 @@ function itemCanGoLive(item: ServiceItem): boolean {
     (item.type === 'image' && !!(item.payload.path as string)) ||
     (item.type === 'welcome' && (item.payload.seconds as number) > 0) ||
     (item.type === 'ticker' && !!(item.payload.text as string)) ||
-    (item.type === 'announcement' && item.ref_id != null) ||
-    item.type === 'sermon'
+    (item.type === 'announcement' &&
+      (item.ref_id != null || ((item.payload.refIds as number[] | undefined)?.length ?? 0) > 0)) ||
+    item.type === 'sermon' ||
+    item.type === 'livecall'
   )
 }
 
@@ -2602,8 +2604,29 @@ ipcMain.handle('wf:live:setItemId', (_e, track: TrackId, id: number | null) => {
   // available, so it's the deck-load chokepoint for "Go Live". (The other path,
   // Next/Prev via handleTabletLoadItem, never calls wf:live:setItemId — it
   // already loaded the deck itself, straight from the ServiceItem it has.)
-  if (item && (item.type === 'text' || item.type === 'sermon' || item.type === 'scripture')) {
+  //
+  // Sermons with a verses list must NOT go through loadDeckOnto: Next already
+  // skips the auto-deck when verses exist (see doLoadSermon), and sending Go
+  // Live down the deck path put a passage-chunked deck on screen while Next
+  // showed the operator's verse list.
+  if (item && (item.type === 'text' || item.type === 'scripture')) {
     void loadDeckOnto(track, item, t.loadGeneration)
+  } else if (item && item.type === 'sermon') {
+    const verses = (item.payload.verses as SermonVerse[] | undefined) ?? []
+    if (verses.length === 0) {
+      void loadDeckOnto(track, item, t.loadGeneration)
+    } else {
+      doLoadSermon(
+        track,
+        (item.payload.title as string) ?? '',
+        (item.payload.speaker as string) ?? '',
+        (item.payload.passage as string) ?? '',
+        item.payload.background as string | null | undefined,
+        item.payload.blurBehindText as boolean | undefined,
+        item,
+        item.payload.bgFit as 'cover' | 'contain' | undefined
+      )
+    }
   }
   broadcast()
   if (item && track === 'main') {
@@ -3311,6 +3334,14 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
 
   if (isRecoveryStale(recovered, Date.now(), RECOVERY_STALE_MS)) {
     return { ok: true, restored: false, fallback: false, stale: true, serviceName: null }
+  }
+
+  // A normal quit writes cleanExit=true. Restoring after that put Saturday's
+  // rehearsal (or last Sunday's closer) live on the projectors the next time
+  // someone opened the app — including first-thing Sunday morning. Crash
+  // recovery is for crashes; a clean quit stays idle.
+  if (wasCleanExit()) {
+    return { ok: true, restored: false, fallback: false, stale: false, serviceName: null }
   }
 
   // The renderer fires this on mount, before the operator has necessarily
@@ -4077,6 +4108,7 @@ app.on('window-all-closed', () => {
 // Release the LAN server socket + timers on quit so a relaunch doesn't hit
 // EADDRINUSE and leave the tablet/zone/OBS layer silently dead.
 app.on('before-quit', () => {
+  markCleanExit(true)
   // Best-effort final stop so a quit mid-service still finalizes the recording +
   // writes its sidecar (fire-and-forget; the app is shutting down regardless).
   if (recordingSession.isActive()) void recordingSession.onServiceEnded()

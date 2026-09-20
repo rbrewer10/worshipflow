@@ -20,7 +20,7 @@ import TabletRemoteTab from './setup/TabletRemoteTab'
 import DiagnosticsTab from './setup/DiagnosticsTab'
 import RoomFeedTab from './setup/RoomFeedTab'
 import { getRelay } from './livecall/useLiveCall'
-import NotifyToasts from './NotifyToasts'
+import NotifyToasts, { notifyLocal } from './NotifyToasts'
 import { hasFailedSaves } from './saveRegistry'
 
 export type View =
@@ -131,7 +131,18 @@ function AppShell(): JSX.Element {
   // the recovered service before restoring tracks, so this doesn't depend on the
   // operator having already navigated to a service.
   useEffect(() => {
-    window.wf.restoreRecovery().catch(err => {
+    window.wf.restoreRecovery().then((r) => {
+      if (r.restored) {
+        notifyLocal(
+          r.serviceName
+            ? `Resumed “${r.serviceName}” after a crash.`
+            : 'Resumed the last live item after a crash.',
+          'info'
+        )
+      } else if (r.fallback) {
+        notifyLocal('Could not resume the last live item — loaded the first item instead.', 'warn')
+      }
+    }).catch(err => {
       console.error('Failed to restore recovery state:', err)
     })
   }, [])
