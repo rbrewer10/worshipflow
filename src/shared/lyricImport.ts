@@ -7,7 +7,7 @@ export interface ImportedSong {
   ccli?: string
   copyright?: string
   sections: SongSection[]
-  source: 'chordpro' | 'ccli' | 'plain'
+  source: 'chordpro' | 'ccli' | 'plain' | 'usr'
 }
 
 const DIRECTIVE = /^\s*\{([^:}]+)(?::\s*([^}]*))?\}\s*$/i
@@ -127,9 +127,92 @@ function firstLyricTitle(text: string): string | null {
   return null
 }
 
+function looksUsr(text: string): boolean {
+  return /^\s*\[File\]/im.test(text)
+    || /^\s*\[S\s+[A-Z]?\d+\]/m.test(text)
+    || (/^Title=/m.test(text) && /^\[[A-Z]{1,3}\d*\]/m.test(text))
+}
+
+function usrKind(tag: string): { kind: SongSection['kind']; label: string } {
+  const t = tag.toUpperCase()
+  if (t.startsWith('V')) return { kind: 'verse', label: `Verse ${t.slice(1) || '1'}` }
+  if (t.startsWith('C')) return { kind: 'chorus', label: t.length > 1 ? `Chorus ${t.slice(1)}` : 'Chorus' }
+  if (t.startsWith('B')) return { kind: 'bridge', label: t.length > 1 ? `Bridge ${t.slice(1)}` : 'Bridge' }
+  if (t.startsWith('T')) return { kind: 'tag', label: 'Tag' }
+  if (t.startsWith('P')) return { kind: 'section', label: 'Pre-Chorus' }
+  if (t.startsWith('I')) return { kind: 'intro', label: 'Intro' }
+  if (t.startsWith('E')) return { kind: 'ending', label: 'Ending' }
+  return { kind: 'section', label: tag }
+}
+
+function parseUsr(raw: string): ImportedSong {
+  const meta: { title?: string; author?: string; ccli?: string; copyright?: string } = {}
+  const sections: SongSection[] = []
+  let current: { kind: SongSection['kind']; label: string; lines: string[] } | null = null
+
+  const flush = (): void => {
+    if (!current) return
+    const lyrics = current.lines.join('\n').trim()
+    if (lyrics) {
+      sections.push({
+        kind: current.kind,
+        label: current.label,
+        ordinal: sections.length,
+        lyrics,
+      })
+    }
+    current = null
+  }
+
+  for (const rawLine of raw.split(/\r?\n/)) {
+    const header = rawLine.trim().match(/^\[([^\]]+)\]$/)
+    if (header) {
+      const tag = header[1].trim()
+      if (/^(File|S\s)/i.test(tag)) { flush(); continue }
+      flush()
+      current = { ...usrKind(tag), lines: [] }
+      continue
+    }
+    const kv = rawLine.match(/^(Title|Author|Copyright|CCLI|Artist)\s*=\s*(.*)$/i)
+    if (kv && !current) {
+      const key = kv[1].toLowerCase()
+      const val = kv[2].trim()
+      if (!val) continue
+      if (key === 'title') meta.title = val
+      else if (key === 'author' || key === 'artist') meta.author = meta.author ? `${meta.author} | ${val}` : val.replace(/\|/g, ' | ')
+      else if (key === 'ccli') meta.ccli = val.replace(/\D/g, '') || val
+      else if (key === 'copyright') meta.copyright = val
+      continue
+    }
+    if (current) current.lines.push(rawLine.replace(/\s*\|\s*$/, ''))
+  }
+  flush()
+
+  if (sections.length === 0) {
+    return {
+      title: meta.title || 'Untitled',
+      author: meta.author,
+      ccli: meta.ccli,
+      copyright: meta.copyright,
+      sections: parseReflowText(raw),
+      source: 'usr',
+    }
+  }
+
+  return {
+    title: meta.title || firstLyricTitle(sections[0].lyrics) || 'Untitled',
+    author: meta.author,
+    ccli: meta.ccli,
+    copyright: meta.copyright,
+    sections,
+    source: 'usr',
+  }
+}
+
 export function importLyrics(raw: string): ImportedSong | null {
   const text = raw.replace(/^\uFEFF/, '').trim()
   if (!text) return null
+  if (looksUsr(text)) return parseUsr(text)
   if (looksChordPro(text)) return parseChordPro(text)
   if (looksCcli(text)) return parseCcli(text)
   const sections = parseReflowText(text)
@@ -138,4 +221,14 @@ export function importLyrics(raw: string): ImportedSong | null {
     sections,
     source: 'plain',
   }
+}
+
+export function decodeSongFileBytes(buf: Uint8Array): string {
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+    return new TextDecoder('utf-16le').decode(buf)
+  }
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(buf)
+  }
+  return new TextDecoder('utf-8').decode(buf)
 }

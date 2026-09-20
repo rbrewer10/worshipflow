@@ -22,6 +22,7 @@ import RoomFeedTab from './setup/RoomFeedTab'
 import { getRelay } from './livecall/useLiveCall'
 import NotifyToasts, { notifyLocal } from './NotifyToasts'
 import { hasFailedSaves } from './saveRegistry'
+import LaunchSetup from './LaunchSetup'
 
 export type View =
   | 'home' | 'live' | 'service'
@@ -31,6 +32,10 @@ export type View =
 
 function AppShell(): JSX.Element {
   const [view, setViewRaw] = useState<View>('home')
+  const [setupDone, setSetupDone] = useState<boolean | null>(null)
+  useEffect(() => {
+    void window.wf.settingGet('has_completed_setup').then((v) => setSetupDone(v === '1'))
+  }, [])
   // While Stage Rehearsal is armed, the operator's attention (and keyboard)
   // is on advancing the song on the Stage Monitor, not the announcement loop
   // quietly cycling on Main — so the global shortcuts below target whichever
@@ -177,6 +182,18 @@ function AppShell(): JSX.Element {
       console.error('Failed to start Live Call relay:', err)
     })
   }, [])
+
+  if (setupDone === null) {
+    return <div className="h-full bg-[#0b0f17]" />
+  }
+  if (!setupDone) {
+    return (
+      <>
+        <NotifyToasts />
+        <LaunchSetup onDone={() => setSetupDone(true)} />
+      </>
+    )
+  }
 
   if (view === 'volunteer') {
     return (

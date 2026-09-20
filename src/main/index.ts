@@ -36,6 +36,8 @@ import { readRecovery, writeRecovery, isRecoveryStale, markCleanExit, wasCleanEx
 import { stripChords, formatSlideChords } from '../shared/chords'
 import { applyAudienceLayers } from '../shared/layers'
 import { detectNdiRuntime } from '../shared/ndiRuntime'
+import { seedSampleSunday } from './sampleSunday'
+import { importSongSelectFile, openSongSelectWindow } from './songSelect'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -2888,6 +2890,20 @@ onObsStatus((s) => {
 
 ipcMain.handle('wf:getObsUrl', () => `http://${getLocalIp()}:${boundTabletPort}/obs`)
 ipcMain.handle('wf:ndi:status', () => detectNdiRuntime((p) => existsSync(p), process.env))
+
+ipcMain.handle('wf:songselect:open', () => {
+  openSongSelectWindow(operatorWin, (song) => {
+    operatorWin?.webContents.send('wf:songselect:imported', song)
+  })
+})
+
+ipcMain.handle('wf:songselect:importFile', async () => {
+  const song = await importSongSelectFile(operatorWin)
+  if (song) operatorWin?.webContents.send('wf:songselect:imported', song)
+  return song
+})
+
+ipcMain.handle('wf:setup:seedSample', () => seedSampleSunday())
 ipcMain.handle('wf:obs:getStatus', () => getObsStatus())
 ipcMain.handle('wf:obs:connect', (_e, host: string, port: number, password: string) =>
   connectObs(host, port, password))

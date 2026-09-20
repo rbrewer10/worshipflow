@@ -448,6 +448,10 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
 
     getObsUrl: async (): Promise<string> => 'Browser preview only',
     ndiGetStatus: async () => ({ found: false, version: null, dllPath: null }),
+    songSelectOpen: async (): Promise<void> => { /* no native window in mock */ },
+    songSelectImportFile: async () => null,
+    onSongSelectImported: (): (() => void) => () => undefined,
+    seedSampleSunday: async () => ({ serviceId: 1, created: true }),
     obsOnStatus: (cb: (s: ObsStatus) => void): (() => void) => {
       cb({ connected: false, streaming: false, recording: false, currentScene: null, scenes: [], error: null, streamStartedAt: null, recordStartedAt: null, reconnecting: false })
       return () => {}

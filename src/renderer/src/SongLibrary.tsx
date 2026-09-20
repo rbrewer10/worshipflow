@@ -5,6 +5,7 @@ import CcliPanel from './CcliPanel'
 import SongEditor from './editor/SongEditor'
 import PptxImport from './PptxImport'
 import LyricImport from './LyricImport'
+import SongSelectPanel from './SongSelectPanel'
 import Modal from './Modal'
 import { useAutosave } from './useAutosave'
 import { notifyLocal, notifyLocalAction } from './NotifyToasts'
@@ -200,6 +201,7 @@ function SongLibrary(): JSX.Element {
       <div className="flex w-96 flex-col rounded-xl border border-border bg-panel p-3">
         <CcliPanel />
         <DuplicateSongsPanel onEdit={setEditorId} onDelete={remove} />
+        <SongSelectPanel onImported={() => refresh()} />
         <PptxImport onImported={() => refresh()} />
         <LyricImport onImported={() => refresh()} />
         <button

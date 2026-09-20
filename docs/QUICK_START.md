@@ -48,7 +48,7 @@ On the right of Live Control:
 
 ## 4c. Songs and setlists
 
-- **Song library → Paste lyrics** — ChordPro, a CCLI SongSelect copy, or Verse/Chorus text.
+- **Song library → SongSelect** — sign in with the church CCLI account. Search, download lyrics or a `.usr` file, WorshipFlow imports it. You can also paste lyrics or pick a file you already saved.
 - **Build service → Import → Paste setlist** — one song per line (Planning Center paste works). Scripture like `John 3:16`. Lines starting with Sermon become a sermon card. Missing songs become placeholders.
 - **Home → Save to file / Open from file** — take Sunday to the booth PC on a USB stick (`.wfservice`).
 
