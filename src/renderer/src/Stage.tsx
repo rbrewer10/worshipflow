@@ -105,12 +105,22 @@ function Stage(): JSX.Element {
             }`}
             style={{ whiteSpace: 'pre-line' }}
           >
+            {live?.chordLine && !isBlack && !isLogo && (
+              <div className="mb-[0.25em] font-mono text-[2.4vw] font-bold tracking-wide text-amber-300">
+                {live.chordLine}
+              </div>
+            )}
             {currentText || <span className="text-slate-700 italic">Nothing loaded</span>}
           </div>
         )}
       </div>
 
-      {/* Divider + next slide */}
+      {/* Overlay ticker — so the stage sees what the house lower-third says */}
+      {live?.overlayTicker && !isBlack && (
+        <div className="overflow-hidden border-t border-amber-500/40 bg-amber-900/80 px-8 py-2 text-center text-[1.4vw] font-bold text-amber-100">
+          {live.overlayTicker}
+        </div>
+      )}
       <div className="border-t border-white/[0.07] px-16 py-6">
         <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-600">
           Next

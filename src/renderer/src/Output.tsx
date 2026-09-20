@@ -28,6 +28,7 @@ export interface AudienceModel {
   clockLine: string
   fontScale: number
   tickerText: string
+  overlayTicker: string
   bgFit: 'cover' | 'contain'
   bgMotion: 'pan' | 'zoom' | 'shimmer' | null
   slideThemeId: string
@@ -51,6 +52,7 @@ export function useLiveModel(): AudienceModel {
   const [clockLine, setClockLine] = useState('')
   const [fontScale, setFontScale] = useState(6)
   const [tickerText, setTickerText] = useState('')
+  const [overlayTicker, setOverlayTicker] = useState('')
   const [bgFit, setBgFit] = useState<'cover' | 'contain'>('cover')
   const [bgMotion, setBgMotion] = useState<'pan' | 'zoom' | 'shimmer' | null>(null)
   const [slideThemeId, setSlideThemeId] = useState<string>('sanctuary')
@@ -79,6 +81,7 @@ export function useLiveModel(): AudienceModel {
       setBlurBehindText(s.blurBehindText ?? false)
       setRehearsal(s.rehearsal ?? false)
       setFontScale(s.fontScale ?? 6)
+      setOverlayTicker(s.overlayTicker ?? '')
       setCcli({
         author: s.songAuthor ?? null,
         copyright: s.songCopyright ?? null,
@@ -114,7 +117,7 @@ export function useLiveModel(): AudienceModel {
   }, [])
 
   return {
-    mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
+    mode, layers, bgSrc, clockLine, fontScale, tickerText, overlayTicker, bgFit, bgMotion,
     slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli, rehearsal,
     announcementTitle, announcementBody, announcementIcon
   }
@@ -127,7 +130,7 @@ export function useLiveModel(): AudienceModel {
 // model tells it what to show.
 export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element {
   const {
-    mode, layers, bgSrc, clockLine, fontScale, tickerText, bgFit, bgMotion,
+    mode, layers, bgSrc, clockLine, fontScale, tickerText, overlayTicker, bgFit, bgMotion,
     slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli,
     announcementTitle, announcementBody, announcementIcon
   } = model
@@ -314,15 +317,14 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
         />
       )}
 
-      {tickerText && !black && !logo && !countdown && !livecall && !announcement && (
+      {((overlayTicker || tickerText) && !black && !logo && !countdown && !livecall) && (
         <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t-4 border-amber-500 bg-gradient-to-r from-amber-900/85 via-amber-800/85 to-amber-900/85">
           <div
             className="wf-ticker-track py-[1cqh] text-[1.6cqw] font-bold text-amber-100"
-            style={{ animationDuration: `${Math.max(12, tickerText.length * 0.35)}s` }}
+            style={{ animationDuration: `${Math.max(12, (overlayTicker || tickerText).length * 0.35)}s` }}
           >
-            {/* Two identical copies → seamless loop at translateX(-50%). */}
-            <span className="px-[3cqw]">{tickerText}</span>
-            <span className="px-[3cqw]">{tickerText}</span>
+            <span className="px-[3cqw]">{overlayTicker || tickerText}</span>
+            <span className="px-[3cqw]">{overlayTicker || tickerText}</span>
           </div>
         </div>
       )}

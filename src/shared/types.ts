@@ -58,6 +58,10 @@ export interface LiveState {
   // ServiceRail preview) ignore it and keep showing the real content, since the
   // whole point of rehearsing is to see what WOULD go out.
   rehearsal?: boolean
+  // ChordPro chord line for the stage monitor only — audience screens use `line`.
+  chordLine?: string | null
+  // Lower-third overlay; independent of the current item so lyrics stay up.
+  overlayTicker?: string | null
   // The current sermon slide's scripture reference and the pastor's own notes
   // for it — null on the intro slide (index 0) and for every non-sermon item.
   // Populated by renderState() from the live track's sermonSlides array.

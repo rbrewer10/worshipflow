@@ -4,6 +4,7 @@ import type { SongSummary } from '../../shared/types'
 import CcliPanel from './CcliPanel'
 import SongEditor from './editor/SongEditor'
 import PptxImport from './PptxImport'
+import LyricImport from './LyricImport'
 import Modal from './Modal'
 import { useAutosave } from './useAutosave'
 import { notifyLocal, notifyLocalAction } from './NotifyToasts'
@@ -200,6 +201,7 @@ function SongLibrary(): JSX.Element {
         <CcliPanel />
         <DuplicateSongsPanel onEdit={setEditorId} onDelete={remove} />
         <PptxImport onImported={() => refresh()} />
+        <LyricImport onImported={() => refresh()} />
         <button
           onClick={async () => {
             const res = await window.wf.songsExportList()

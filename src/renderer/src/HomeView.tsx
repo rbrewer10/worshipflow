@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType } from 'react'
-import { ArrowRight, CalendarDays, ClipboardCheck, Play, LayoutGrid, MonitorSpeaker, ListMusic, Music, BookOpen, User, Check, TriangleAlert, Volume2 } from 'lucide-react'
+import { ArrowRight, CalendarDays, ClipboardCheck, Play, LayoutGrid, MonitorSpeaker, ListMusic, Music, BookOpen, User, Check, TriangleAlert, Usb, Radio } from 'lucide-react'
 import type { SongSummary } from '../../shared/types'
 import type { View } from './AppShell'
 import { useService } from './ServiceContext'
@@ -16,7 +16,9 @@ const CARDS: { view?: View; action?: string; Icon: IconType; label: string; sub:
   { view: 'songs',       Icon: Music,          label: 'Song library',   sub: 'Upload & manage songs' },
   { view: 'scripture',   Icon: BookOpen,       label: 'Scripture',      sub: 'Look up Bible verses' },
   { view: 'volunteer',   Icon: User,           label: 'Volunteer mode', sub: 'Simple touch screen' },
-  { view: 'soundcheck',  Icon: Volume2,        label: 'Sound check',    sub: 'Prepare the room audio' },
+  { action: 'export',    Icon: Usb,            label: 'Save to file',   sub: 'Take this service to the booth PC' },
+  { action: 'import',    Icon: Usb,            label: 'Open from file', sub: 'Load a .wfservice from a USB drive' },
+  { action: 'overlay',   Icon: Radio,          label: 'Stream overlay', sub: 'Copy the OBS browser-source URL' },
 ]
 
 const PREFLIGHT_VIEWS: View[] = ['live', 'zones', 'service', 'obs']
@@ -57,6 +59,22 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
     if (card.view) setView(card.view)
     else if (card.action === 'multiview') window.wf.multiviewOpen()
     else if (card.action === 'stage') window.wf.stageOpen()
+    else if (card.action === 'export') {
+      if (activeService) void window.wf.serviceExport(activeService.id)
+    } else if (card.action === 'import') {
+      void window.wf.serviceImportFile().then((res) => {
+        if (!res.canceled && res.serviceId != null) setView('service')
+      })
+    } else if (card.action === 'overlay') {
+      void Promise.all([window.wf.zoneGetIp(), window.wf.getTabletPort()]).then(([ip, port]) => {
+        const url = `http://${ip}:${port}/overlay`
+        void navigator.clipboard.writeText(url).then(
+          () => {},
+          () => {}
+        )
+        window.alert(`OBS Browser Source (1920×1080, transparent):\n${url}\n\nCopied to clipboard if allowed.`)
+      })
+    }
   }
 
   return (
