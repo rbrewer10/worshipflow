@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Tablet, Cpu, Radio } from 'lucide-react'
+import { Tablet, Cpu } from 'lucide-react'
 import type { ZoneId } from '../../shared/types'
 import { ZONE_NAMES } from '../../shared/types'
 import ObsPanel from './ObsPanel'
+import NdiSetupPanel from './NdiSetupPanel'
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
 
@@ -33,6 +34,8 @@ function ObsConnectTab(): JSX.Element {
       <div className="mx-auto max-w-2xl space-y-5">
         <ObsPanel />
 
+        <NdiSetupPanel serverIp={serverIp} tabletPort={tabletPort} />
+
         <div className="rounded-xl border border-border bg-panel p-5">
           <div className="mb-3 flex items-center gap-2 font-semibold text-content-primary">
             <Cpu size={15} /> Pi Display URLs
@@ -48,18 +51,6 @@ function ObsConnectTab(): JSX.Element {
             ))}
           </div>
           <p className="mt-2 text-xs text-content-tertiary">Point each Raspberry Pi's kiosk browser at its own URL above.</p>
-        </div>
-
-        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-5">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-content-primary">
-            <Radio size={15} /> Stream overlay (OBS Browser Source)
-          </div>
-          <div className="break-all rounded-lg bg-panel border border-border px-3 py-2 text-center font-mono text-xs text-amber-300">
-            http://{serverIp}:{tabletPort ?? '...'}/overlay
-          </div>
-          <p className="mt-2 text-xs text-content-secondary">
-            Add a Browser Source in OBS at 1920×1080 with a transparent background. Lyrics and the lower-third ticker follow the booth. This is the livestream feed — NDI is not required.
-          </p>
         </div>
 
         <div className="rounded-xl border border-blue-500/25 bg-blue-500/5 p-5">

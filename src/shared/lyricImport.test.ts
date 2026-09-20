@@ -45,4 +45,26 @@ Then sings my soul`)
     expect(song?.source).toBe('plain')
     expect(song?.sections.some((s) => s.kind === 'chorus')).toBe(true)
   })
+
+  it('reads a SongSelect .usr file', () => {
+    const song = importLyrics(`[File]
+Type=WorshipSongs
+[S A2456681]
+Title=Amazing Grace
+Author=John Newton
+Copyright=Public Domain
+CCLI=22025
+[V1]
+Amazing grace how sweet the sound
+That saved a wretch like me
+[C]
+How precious did that grace appear
+The hour I first believed`)
+    expect(song?.source).toBe('usr')
+    expect(song?.title).toBe('Amazing Grace')
+    expect(song?.author).toBe('John Newton')
+    expect(song?.ccli).toBe('22025')
+    expect(song?.sections.find((s) => s.kind === 'verse')?.lyrics).toContain('wretch')
+    expect(song?.sections.some((s) => s.kind === 'chorus')).toBe(true)
+  })
 })

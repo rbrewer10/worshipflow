@@ -32,6 +32,7 @@ import type {
   ServiceItemType
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
+import type { NdiRuntimeStatus } from '../shared/ndiRuntime'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
@@ -290,6 +291,15 @@ const wf = {
 
   // OBS integration
   getObsUrl: (): Promise<string> => ipcRenderer.invoke('wf:getObsUrl'),
+  ndiGetStatus: (): Promise<NdiRuntimeStatus> => ipcRenderer.invoke('wf:ndi:status'),
+  songSelectOpen: (): Promise<void> => ipcRenderer.invoke('wf:songselect:open'),
+  songSelectImportFile: (): Promise<{ id: number; title: string } | null> => ipcRenderer.invoke('wf:songselect:importFile'),
+  onSongSelectImported: (cb: (song: { id: number; title: string }) => void): (() => void) => {
+    const handler = (_e: unknown, song: { id: number; title: string }): void => cb(song)
+    ipcRenderer.on('wf:songselect:imported', handler)
+    return () => ipcRenderer.removeListener('wf:songselect:imported', handler)
+  },
+  seedSampleSunday: (): Promise<{ serviceId: number; created: boolean }> => ipcRenderer.invoke('wf:setup:seedSample'),
   obsOnStatus: (cb: (s: ObsStatus) => void): (() => void) => {
     const handler = (_e: unknown, s: ObsStatus): void => cb(s)
     ipcRenderer.on('wf:obs:status', handler)
