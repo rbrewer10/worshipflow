@@ -9,6 +9,8 @@ import { TimingPanel } from './TimingPanel'
 import { notifyLocal } from './NotifyToasts'
 import LiveZoneStatus from './zones/LiveZoneStatus'
 import LooksPanel from './zones/LooksPanel'
+import LooksModeBar from './LooksModeBar'
+import OverlayTickerPanel from './OverlayTickerPanel'
 import ServiceControlsDrawer from './live/ServiceControlsDrawer'
 
 function LiveToolsSection({ title, description, children }: { title: string; description: string; children: ReactNode }): JSX.Element {
@@ -98,6 +100,12 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
         <span><span className="font-bold text-content-primary">B</span> Black</span>
         <span><span className="font-bold text-content-primary">L</span> Logo</span>
       </div>
+
+      {/* Divider */}
+      <div className="border-t border-border" />
+
+      <LooksModeBar liveItemId={live?.liveServiceItemId ?? null} />
+      <OverlayTickerPanel track={track} value={live?.overlayTicker ?? null} />
 
       {/* Divider */}
       <div className="border-t border-border" />

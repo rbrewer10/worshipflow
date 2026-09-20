@@ -106,7 +106,7 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return false
-    await window.wf.liveLoadText(track, 'Announcement', txt)
+    await window.wf.liveSetOverlayTicker(track, txt)
   } else if (item.type === 'announcement') {
     await window.wf.liveLoadAnnouncement(track, item.ref_id, item.id)
   } else if (item.type === 'sermon') {

@@ -91,7 +91,7 @@ async function loadItem(item: ServiceItem): Promise<void> {
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return
-    await window.wf.liveLoadText('main', 'Announcement', txt)
+    await window.wf.liveSetOverlayTicker('main', txt)
   } else if (item.type === 'announcement') {
     // itemId is required for a refIds-only block — the main process looks its
     // announcement list up by item id when there's no single ref_id to load.

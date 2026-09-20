@@ -33,6 +33,7 @@ import type { StageRehearsalState } from '../shared/stageRehearsal'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery, isRecoveryStale, markCleanExit, wasCleanExit, type TrackSnapshot } from './recovery'
+import { stripChords, formatSlideChords } from '../shared/chords'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -326,6 +327,7 @@ interface LiveTrackState {
   // live item is a sermon with verses. Index-aligned with t.song.lines/t.index
   // — see buildSermonSlides. null for every non-sermon item.
   sermonSlides: SermonSlide[] | null
+  overlayTicker: string | null
 }
 
 function createTrackState(song: LiveTrackState['song']): LiveTrackState {
@@ -359,7 +361,8 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     deckIsGenerated: false,
     deckSource: [],
     deckScripture: new Map(),
-    sermonSlides: null
+    sermonSlides: null,
+    overlayTicker: null
   }
 }
 
@@ -751,11 +754,15 @@ function renderState(track: TrackId = 'main'): LiveState {
   // audience-facing Output.tsx fullscreen window on a directly-attached
   // projector) would show "Amazing Grace" before anything is actually live.
   const lines = t.hasLiveContent ? t.song.lines : []
+  const rawLine = lines[t.index] ?? ''
+  const rawNext = lines[t.index + 1] ?? ''
+  const staged = formatSlideChords(rawLine)
   return {
     mode: t.mode,
     index: t.index,
-    line: lines[t.index] ?? '',
-    next: lines[t.index + 1] ?? '',
+    line: staged.lyricLine,
+    chordLine: staged.chordLine,
+    next: stripChords(rawNext),
     total: lines.length,
     songTitle: t.hasLiveContent ? t.song.title : '',
     background: t.hasLiveContent ? (t.song.background ?? null) : null,
@@ -765,6 +772,7 @@ function renderState(track: TrackId = 'main'): LiveState {
     liveServiceItemId: t.serviceItemId,
     fontScale: t.fontScale,
     stageMessage: t.stageMessage,
+    overlayTicker: t.overlayTicker,
     ts: Date.now(),
     hmsLoadedAt: t.hmsLoadedAt,
     autoAdvanceMs: t.autoAdvanceMs,
@@ -1912,7 +1920,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'ticker') {
     const txt = item.payload.text as string
     if (!txt) return
-    doLoadText(track, 'Announcement', txt)
+    tracks[track].overlayTicker = txt
   } else if (item.type === 'announcement') {
     await doLoadAnnouncement(track, item.ref_id, item)
   } else if (item.type === 'sermon') {
@@ -2053,7 +2061,6 @@ function startTabletServer(): void {
   const server = createServer((req, res) => {
     const path = (req.url ?? '').split('?')[0].replace(/\/+$/, '')
     const zoneMatch = path.match(/^\/zone\/([1-4])$/)
-    const isObs = path === '/obs'
     const zoneId = zoneMatch ? parseInt(zoneMatch[1], 10) as ZoneId : null
     const htmlHeaders = {
       'Content-Type': 'text/html; charset=utf-8',
@@ -2068,7 +2075,7 @@ function startTabletServer(): void {
     } else if (path === '/multiview') {
       res.writeHead(200, htmlHeaders)
       res.end(MULTIVIEW_HTML)
-    } else if (isObs) {
+    } else if (path === '/obs' || path === '/overlay') {
       res.writeHead(200, htmlHeaders)
       res.end(OBS_HTML)
     } else if (path === '/phone' || path === '/room-feed') {
@@ -2650,6 +2657,12 @@ ipcMain.handle('wf:live:saveFontScale', (_e, track: TrackId) => {
 ipcMain.handle('wf:live:setStageMessage', (_e, track: TrackId, msg: string | null) => {
   assertTrackId(track)
   tracks[track].stageMessage = msg || null
+  broadcast()
+})
+
+ipcMain.handle('wf:live:setOverlayTicker', (_e, track: TrackId, text: string | null) => {
+  assertTrackId(track)
+  tracks[track].overlayTicker = text && text.trim() ? text.trim() : null
   broadcast()
 })
 

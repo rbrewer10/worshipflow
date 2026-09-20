@@ -28,24 +28,32 @@ html,body{width:100%;height:100%;background:transparent;overflow:hidden;font-fam
   white-space:pre-line;word-break:break-word;
   text-shadow:0 3px 8px rgba(0,0,0,.9),0 0 36px rgba(0,0,0,.7)
 }
+#ticker{
+  position:absolute;left:0;right:0;bottom:0;display:none;
+  padding:.8vh 4vw;background:linear-gradient(90deg,#78350f,#92400e,#78350f);
+  color:#fef3c7;font-weight:800;font-size:1.5vw;letter-spacing:.04em;
+  white-space:nowrap;overflow:hidden
+}
+#ticker.on{display:block}
 </style>
 </head>
 <body>
 <div id="wrap"><div id="box"><div id="title"></div><div id="text"></div></div></div>
+<div id="ticker"></div>
 <script>
+function stripChords(t){return (t||'').replace(/\\[[^\\]]+\\]/g,'').replace(/[ \\t]{2,}/g,' ').trim()}
 var elBox = document.getElementById('box')
 var elText = document.getElementById('text')
 var elTitle = document.getElementById('title')
+var elTicker = document.getElementById('ticker')
 var ws = null
 
 function apply(msg) {
   if (msg.type !== 'state') return
   var s = msg.state
-  // Show lyrics/scripture/text only; hide on black, logo, countdown, or empty.
   var show = (s.mode === 'lyrics') && s.line && s.line.trim() !== ''
   if (show) {
-    elText.textContent = s.line
-    // Title label (song name / scripture reference), hidden for announcements.
+    elText.textContent = stripChords(s.line)
     var title = s.songTitle || ''
     if (title && title !== 'Announcement') {
       elTitle.textContent = title
@@ -56,6 +64,13 @@ function apply(msg) {
     elBox.className = 'on'
   } else {
     elBox.className = ''
+  }
+  var overlay = (s.overlayTicker || '').trim()
+  if (overlay && s.mode !== 'black' && s.mode !== 'logo') {
+    elTicker.textContent = overlay
+    elTicker.className = 'on'
+  } else {
+    elTicker.className = ''
   }
 }
 

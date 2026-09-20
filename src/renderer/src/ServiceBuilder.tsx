@@ -8,6 +8,7 @@ import Modal from './Modal'
 import StartSundayModal, { type SundayTemplateChoice } from './StartSundayModal'
 import { DEFAULT_SERVICE_TEMPLATES } from './defaultServiceTemplates'
 import { notifyLocal, notifyLocalAction } from './NotifyToasts'
+import SetlistImport from './SetlistImport'
 
 function nextSundayISO(): string {
   const date = new Date()
@@ -316,6 +317,7 @@ function ServiceBuilder({ onOpenLive }: { onOpenLive?: () => void }): JSX.Elemen
                 title="Import a .wfplan exported from the Snow Hill Church planning app — songs match your library by title">
                 <FileUp size={12} /> Church plan
               </button>
+              <SetlistImport onImported={(id) => { refreshServices(); open(id) }} />
               {importing && <p className="col-span-2 text-center text-[11px] text-content-secondary" role="status" aria-live="polite">Importing…</p>}
             </div>
           )}

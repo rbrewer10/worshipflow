@@ -2,56 +2,24 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronUp, Mic, MicOff, Radio, Timer as TimerIcon } from 'lucide-react'
 import type { ObsStatus, TrackId } from '../../../shared/types'
-import type { SceneConfig } from '../../../shared/zoneScenes'
-import { expandScene } from '../../../shared/zoneScenes'
-import type { ServiceControlMode, ServiceControlModeMapping } from '../../../shared/serviceControlModes'
-import { DEFAULT_MODE_MAPPING, resolveModeScene } from '../../../shared/serviceControlModes'
-import { useService } from '../ServiceContext'
 import { notifyLocal } from '../NotifyToasts'
 
-const MODE_LABEL: Record<ServiceControlMode, string> = {
-  sermon: 'Sermon Mode',
-  worship: 'Worship Mode',
-  invitation: 'Invitation Mode',
-}
-
-// Quick Cues fire the same text-overlay path the ticker item type already
-// uses (window.wf.liveLoadText), briefly replacing whatever's live with a
-// short phrase. Deliberately NOT behind tap-to-confirm: unlike the dense item
-// rail or a slide grid (many closely-packed targets where a stray tap is
-// likely), this is a sparse row of 4 labeled buttons inside a drawer the
-// operator has to deliberately open first — the same "isolated, deliberate
-// control, no confirm needed" precedent LiveTools' own Black/Logo/Live row
-// already sets.
+// Quick Cues ride the overlay ticker so lyrics stay on the TVs.
 const QUICK_CUES = ['Applause', 'Amen', 'Bible', 'Thank You']
 
-function ServiceControlsDrawer({ track, liveItemId }: { track: TrackId; liveItemId: number | null }): JSX.Element {
-  const { activeService } = useService()
+function ServiceControlsDrawer({ track }: { track: TrackId; liveItemId: number | null }): JSX.Element {
   const [open, setOpen] = useState(false)
-  const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
-  const [modeMapping, setModeMapping] = useState<ServiceControlModeMapping>(DEFAULT_MODE_MAPPING)
   const [obs, setObs] = useState<ObsStatus | null>(null)
   const [timerSecs, setTimerSecs] = useState('300')
 
-  useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [])
-  useEffect(() => { void window.wf.serviceControlModesGet().then(setModeMapping) }, [])
   useEffect(() => {
     window.wf.obsGetStatus().then(setObs)
     const off = window.wf.obsOnStatus(setObs)
     return off
   }, [])
 
-  const liveItem = activeService?.items.find((it) => it.id === liveItemId) ?? null
-
-  const applyMode = (mode: ServiceControlMode): void => {
-    if (!sceneConfig || !liveItem) return
-    const scene = resolveModeScene(mode, modeMapping, sceneConfig)
-    if (!scene) return
-    void window.wf.zoneSetRouting(liveItem.id, expandScene(scene, liveItem.type))
-  }
-
   const fireQuickCue = (phrase: string): void => {
-    void window.wf.liveLoadText(track, 'Announcement', phrase)
+    void window.wf.liveSetOverlayTicker(track, phrase)
   }
 
   const startTimer = (): void => {
@@ -76,32 +44,7 @@ function ServiceControlsDrawer({ track, liveItemId }: { track: TrackId; liveItem
 
       {open && (
         <div className="mt-3 space-y-3">
-          {/* Mode shortcuts */}
-          <div className="grid grid-cols-3 gap-1.5">
-            {(['sermon', 'worship', 'invitation'] as ServiceControlMode[]).map((mode) => {
-              const scene = sceneConfig ? resolveModeScene(mode, modeMapping, sceneConfig) : null
-              const disabled = !scene || !liveItem
-              return (
-                <button
-                  key={mode}
-                  onClick={() => applyMode(mode)}
-                  disabled={disabled}
-                  title={
-                    !liveItem
-                      ? 'Nothing is live yet'
-                      : !scene
-                      ? `No scene mapped for ${MODE_LABEL[mode]} (or it was deleted) — set one in Setup`
-                      : `Apply the "${scene.name}" scene to what's live now`
-                  }
-                  className="btn text-xs disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {MODE_LABEL[mode]}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* All Mics Muted — stub, waiting on the mixer integration */}
+          {/* Quick cues ride the lower-third overlay so lyrics stay up. */}
           <button
             disabled
             title="Waiting on the mixer integration to be finished — not wired up yet"

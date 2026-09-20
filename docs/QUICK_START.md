@@ -26,19 +26,31 @@ Once a service is open, it's ready to go live.
 ## 3. Go live with the first song or item
 
 1. Click **Go live** on Home, or **Live control** in the sidebar.
-2. You'll see two places to start an item:
-   - **Left column (service list):** click an item once — it turns amber and says "tap to cancel." Leave it alone for about a second and a half and it goes live automatically. This little pause is on purpose, so you don't accidentally send the wrong song to the screen with a stray click. Tap it again during that window to cancel.
-   - **Middle area (slide thumbnails):** click any individual slide thumbnail and it goes live **immediately** — no confirmation pause. Use this when you already know exactly which slide you want.
-3. Once something is live, it's on the projector / stage screens right away.
+2. **Left column (service list):** click an item once — it turns amber. Leave it alone for about a second and a half and it goes live. Tap again during that window to cancel. That pause is so a stray click does not put the wrong song on the TVs.
+3. Once something is live, the middle of the screen is a **triptych**: CURRENT (big), NEXT, and AFTER NEXT. Click NEXT to advance.
 
 ## 4. Moving to the next slide during the service
 
-Once you're live, you don't need to keep clicking thumbnails. Use these while the booth computer window is focused (not typing in a text box):
+While the booth window is focused (not typing in a box):
 
-- **Spacebar** or the **Right Arrow (→)** key — advance to the next slide
-- **Left Arrow (←)** key — go back to the previous slide
+- **Spacebar** or **Right Arrow (→)** — next slide
+- **Left Arrow (←)** — previous slide
 
-You can also click directly on any slide thumbnail in the middle of the Live screen to jump straight to it.
+You can also click the NEXT panel.
+
+## 4b. Looks, lower third, stream
+
+On the right of Live Control:
+
+- **Worship / Word / Invitation** — one tap to route the four TVs (lyrics vs back screens vs everywhere). You do not need Pins or Scenes mid-service.
+- **Lower third** — type a line and click Show. Lyrics stay up; the amber bar scrolls over them. Quick Cues (Applause / Amen / Bible / Thank You) use the same bar.
+- **Stream overlay** — on Home, copy the OBS Browser Source URL (`/overlay`). 1920×1080, transparent. The livestream follows the booth without NDI.
+
+## 4c. Songs and setlists
+
+- **Song library → Paste lyrics** — ChordPro, a CCLI SongSelect copy, or Verse/Chorus text.
+- **Build service → Import → Paste setlist** — one song per line (Planning Center paste works). Scripture like `John 3:16`. Lines starting with Sermon become a sermon card. Missing songs become placeholders.
+- **Home → Save to file / Open from file** — take Sunday to the booth PC on a USB stick (`.wfservice`).
 
 ## 5. Blanking the screen (Black)
 
