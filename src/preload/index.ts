@@ -32,6 +32,7 @@ import type {
   ServiceItemType
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
+import type { NdiRuntimeStatus } from '../shared/ndiRuntime'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import type { Channel, AutomationRule, ReferenceMix, Heuristic } from '../main/types/sound-check-types'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
@@ -290,6 +291,7 @@ const wf = {
 
   // OBS integration
   getObsUrl: (): Promise<string> => ipcRenderer.invoke('wf:getObsUrl'),
+  ndiGetStatus: (): Promise<NdiRuntimeStatus> => ipcRenderer.invoke('wf:ndi:status'),
   obsOnStatus: (cb: (s: ObsStatus) => void): (() => void) => {
     const handler = (_e: unknown, s: ObsStatus): void => cb(s)
     ipcRenderer.on('wf:obs:status', handler)

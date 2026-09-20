@@ -35,6 +35,7 @@ import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery, isRecoveryStale, markCleanExit, wasCleanExit, type TrackSnapshot } from './recovery'
 import { stripChords, formatSlideChords } from '../shared/chords'
 import { applyAudienceLayers } from '../shared/layers'
+import { detectNdiRuntime } from '../shared/ndiRuntime'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -2886,6 +2887,7 @@ onObsStatus((s) => {
 })
 
 ipcMain.handle('wf:getObsUrl', () => `http://${getLocalIp()}:${boundTabletPort}/obs`)
+ipcMain.handle('wf:ndi:status', () => detectNdiRuntime((p) => existsSync(p), process.env))
 ipcMain.handle('wf:obs:getStatus', () => getObsStatus())
 ipcMain.handle('wf:obs:connect', (_e, host: string, port: number, password: string) =>
   connectObs(host, port, password))
