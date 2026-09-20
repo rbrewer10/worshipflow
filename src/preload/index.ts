@@ -165,6 +165,8 @@ const wf = {
   liveSaveFontScale: (track: TrackId): Promise<void> => ipcRenderer.invoke('wf:live:saveFontScale', track),
   liveSetStageMessage: (track: TrackId, msg: string | null): Promise<void> => ipcRenderer.invoke('wf:live:setStageMessage', track, msg),
   liveSetOverlayTicker: (track: TrackId, text: string | null): Promise<void> => ipcRenderer.invoke('wf:live:setOverlayTicker', track, text),
+  liveSetLayers: (track: TrackId, flags: { textHidden?: boolean; bgHidden?: boolean }): Promise<void> =>
+    ipcRenderer.invoke('wf:live:setLayers', track, flags),
   liveLoadSong: (track: TrackId, id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', track, id),
   liveLoadScripture: (track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> =>
     ipcRenderer.invoke('wf:live:loadScripture', track, reference, background, blurBehindText),

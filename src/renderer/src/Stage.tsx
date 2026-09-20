@@ -115,7 +115,11 @@ function Stage(): JSX.Element {
         )}
       </div>
 
-      {/* Overlay ticker — so the stage sees what the house lower-third says */}
+      {live?.textHidden && !isBlack && (
+        <div className="bg-amber-900/80 px-8 py-1.5 text-center text-[1.1vw] font-bold uppercase tracking-widest text-amber-200">
+          House lyrics cleared — you still see the slide
+        </div>
+      )}
       {live?.overlayTicker && !isBlack && (
         <div className="overflow-hidden border-t border-amber-500/40 bg-amber-900/80 px-8 py-2 text-center text-[1.4vw] font-bold text-amber-100">
           {live.overlayTicker}

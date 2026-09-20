@@ -11,6 +11,7 @@ import LiveZoneStatus from './zones/LiveZoneStatus'
 import LooksPanel from './zones/LooksPanel'
 import LooksModeBar from './LooksModeBar'
 import OverlayTickerPanel from './OverlayTickerPanel'
+import LayerStrip from './LayerStrip'
 import ServiceControlsDrawer from './live/ServiceControlsDrawer'
 
 function LiveToolsSection({ title, description, children }: { title: string; description: string; children: ReactNode }): JSX.Element {
@@ -97,14 +98,21 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       <div className="flex justify-around rounded-lg border border-border bg-panel-raised px-2 py-1.5 text-[10px] text-content-secondary">
         <span><span className="font-bold text-content-primary">Space</span> Next</span>
         <span><span className="font-bold text-content-primary">←→</span> Prev/Next</span>
-        <span><span className="font-bold text-content-primary">B</span> Black</span>
-        <span><span className="font-bold text-content-primary">L</span> Logo</span>
+        <span><span className="font-bold text-content-primary">C</span> Lyrics</span>
+        <span><span className="font-bold text-content-primary">G</span> BG</span>
+        <span><span className="font-bold text-content-primary">X</span> Overlay</span>
       </div>
 
       {/* Divider */}
       <div className="border-t border-border" />
 
       <LooksModeBar liveItemId={live?.liveServiceItemId ?? null} />
+      <LayerStrip
+        track={track}
+        textHidden={live?.textHidden ?? false}
+        bgHidden={live?.bgHidden ?? false}
+        overlayOn={Boolean(live?.overlayTicker)}
+      />
       <OverlayTickerPanel track={track} value={live?.overlayTicker ?? null} />
 
       {/* Divider */}

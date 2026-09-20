@@ -29,6 +29,8 @@ export interface AudienceModel {
   fontScale: number
   tickerText: string
   overlayTicker: string
+  textHidden: boolean
+  bgHidden: boolean
   bgFit: 'cover' | 'contain'
   bgMotion: 'pan' | 'zoom' | 'shimmer' | null
   slideThemeId: string
@@ -53,6 +55,8 @@ export function useLiveModel(): AudienceModel {
   const [fontScale, setFontScale] = useState(6)
   const [tickerText, setTickerText] = useState('')
   const [overlayTicker, setOverlayTicker] = useState('')
+  const [textHidden, setTextHidden] = useState(false)
+  const [bgHidden, setBgHidden] = useState(false)
   const [bgFit, setBgFit] = useState<'cover' | 'contain'>('cover')
   const [bgMotion, setBgMotion] = useState<'pan' | 'zoom' | 'shimmer' | null>(null)
   const [slideThemeId, setSlideThemeId] = useState<string>('sanctuary')
@@ -82,6 +86,8 @@ export function useLiveModel(): AudienceModel {
       setRehearsal(s.rehearsal ?? false)
       setFontScale(s.fontScale ?? 6)
       setOverlayTicker(s.overlayTicker ?? '')
+      setTextHidden(s.textHidden ?? false)
+      setBgHidden(s.bgHidden ?? false)
       setCcli({
         author: s.songAuthor ?? null,
         copyright: s.songCopyright ?? null,
@@ -117,7 +123,8 @@ export function useLiveModel(): AudienceModel {
   }, [])
 
   return {
-    mode, layers, bgSrc, clockLine, fontScale, tickerText, overlayTicker, bgFit, bgMotion,
+    mode, layers, bgSrc: bgHidden ? null : bgSrc, clockLine, fontScale, tickerText, overlayTicker,
+    textHidden, bgHidden, bgFit, bgMotion,
     slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli, rehearsal,
     announcementTitle, announcementBody, announcementIcon
   }
@@ -130,7 +137,7 @@ export function useLiveModel(): AudienceModel {
 // model tells it what to show.
 export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element {
   const {
-    mode, layers, bgSrc, clockLine, fontScale, tickerText, overlayTicker, bgFit, bgMotion,
+    mode, layers, bgSrc, clockLine, fontScale, tickerText, overlayTicker, textHidden, bgHidden, bgFit, bgMotion,
     slideThemeId, slideThemeColors, songTextColor, songFont, blurBehindText, ccli,
     announcementTitle, announcementBody, announcementIcon
   } = model
@@ -195,7 +202,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black" style={{ containerType: 'size' }}>
       {/* Theme background — shown when no per-item background is active and not black */}
-      {!black && !livecall && !showVideo && (
+      {!black && !livecall && !showVideo && !bgHidden && (
         theme.kind === 'static'
           ? <div className="absolute inset-0" style={{ background: staticBackgroundCss(theme, colors) }} />
           : <MotionBackground effect={theme.effect!} colors={colors} />
@@ -246,7 +253,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
         )
       )}
 
-      {!black && !logo && !countdown && !livecall && !announcement && (
+      {!black && !logo && !countdown && !livecall && !announcement && !textHidden && (
         <>
           <LyricLayer text={layers.a} show={layers.front === 0} fontScale={fontScale}
             fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText} />
@@ -256,7 +263,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
       )}
 
       {/* CCLI copyright footer — shown on song slides when copyright info exists */}
-      {!black && !logo && !countdown && !livecall && !announcement && (ccli.author || ccli.copyright || ccli.ccli) && (
+      {!black && !logo && !countdown && !livecall && !announcement && !textHidden && (ccli.author || ccli.copyright || ccli.ccli) && (
         <div className="absolute bottom-0 left-0 right-0 px-[3cqw] pb-[1.5cqh] text-center">
           <div
             className="mx-auto text-[1.1cqw] font-medium leading-snug text-white/75"

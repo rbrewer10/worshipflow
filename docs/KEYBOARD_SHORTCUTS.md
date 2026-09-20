@@ -18,7 +18,10 @@ These shortcuts are active anywhere in the main app window (Live control, Volunt
 |---|---|
 | `B` | Show a black (blank) screen |
 | `L` | Show the church logo screen |
-| `S` | Return to normal lyrics/slides display |
+| `S` | Return to normal lyrics/slides (un-clears layers) |
+| `C` | Clear lyrics — background stays (ProPresenter “clear slide”) |
+| `G` | Clear background — lyrics stay |
+| `X` | Clear the lower-third overlay |
 
 ---
 

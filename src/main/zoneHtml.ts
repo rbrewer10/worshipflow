@@ -23,6 +23,22 @@ const SHARED_JS = `
     document.body.style.transform=s===1?'none':'scale('+s+')';
     document.body.style.transformOrigin='center center';
   }
+  function applyOverlay(){
+    var el=document.getElementById('wf-overlay');
+    if(!el){
+      el=document.createElement('div');
+      el.id='wf-overlay';
+      el.style.cssText='display:none;position:fixed;left:0;right:0;bottom:0;z-index:50;padding:1.2vh 4vw;background:linear-gradient(90deg,#78350f,#92400e);color:#fef3c7;font-weight:800;font-size:1.8vw;letter-spacing:.04em;text-align:center;';
+      document.body.appendChild(el);
+    }
+    var t=(state.overlayTicker||'').trim();
+    if(t && state.mode!=='black' && state.mode!=='logo' && state.mode!=='off'){
+      el.textContent=t;
+      el.style.display='block';
+    } else {
+      el.style.display='none';
+    }
+  }
   function fitText(el,maxVw,minVw,availW,availH){
     if(!el) return;
     el.style.fontSize=maxVw+'vw';
@@ -254,6 +270,7 @@ ${body}
           // is rehearsing through — never the actual live content.
           state=msg.rehearsal ? {mode:'off',line:'',next:'',title:'',index:0,total:0,background:null,themeColors:null,fontScale:6,secondsLeft:0,stageMessage:null,imagePath:null,bgColor:null,bgOverlay:null,textAlign:null,textPosition:null,blurBehindText:false,scale:state.scale} : msg.states[ZONE];
           applyScale();
+          applyOverlay();
           render();
           lcApplyMode();
         }
