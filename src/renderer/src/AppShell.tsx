@@ -73,6 +73,27 @@ function AppShell(): JSX.Element {
 
       const key = e.key.toLowerCase()
 
+      // C = clear lyrics (keep background)
+      if (key === 'c') {
+        e.preventDefault()
+        void window.wf.liveSetLayers(shortcutTrack, { textHidden: true })
+        return
+      }
+
+      // G = clear background (keep lyrics)
+      if (key === 'g') {
+        e.preventDefault()
+        void window.wf.liveSetLayers(shortcutTrack, { bgHidden: true })
+        return
+      }
+
+      // X = clear overlay ticker
+      if (key === 'x') {
+        e.preventDefault()
+        void window.wf.liveSetOverlayTicker(shortcutTrack, null)
+        return
+      }
+
       // B = black screen
       if (key === 'b') {
         e.preventDefault()

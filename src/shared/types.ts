@@ -62,6 +62,9 @@ export interface LiveState {
   chordLine?: string | null
   // Lower-third overlay; independent of the current item so lyrics stay up.
   overlayTicker?: string | null
+  // ProPresenter-style independent layers. Audience only — stage keeps the slide.
+  textHidden?: boolean
+  bgHidden?: boolean
   // The current sermon slide's scripture reference and the pastor's own notes
   // for it — null on the intro slide (index 0) and for every non-sermon item.
   // Populated by renderState() from the live track's sermonSlides array.
@@ -294,6 +297,7 @@ export interface ZoneState {
   // item. computeZoneStates stamps this onto every ZoneState right before
   // broadcast, so it's always populated regardless of which branch built the rest.
   scale?: number
+  overlayTicker?: string | null
 }
 
 // Per-service-item zone routing: what each zone shows when this item is live.

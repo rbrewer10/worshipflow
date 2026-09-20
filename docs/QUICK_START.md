@@ -44,7 +44,7 @@ On the right of Live Control:
 
 - **Worship / Word / Invitation** — one tap to route the four TVs (lyrics vs back screens vs everywhere). You do not need Pins or Scenes mid-service.
 - **Lower third** — type a line and click Show. Lyrics stay up; the amber bar scrolls over them. Quick Cues (Applause / Amen / Bible / Thank You) use the same bar.
-- **Stream overlay** — on Home, copy the OBS Browser Source URL (`/overlay`). 1920×1080, transparent. The livestream follows the booth without NDI.
+- **Layers** — like ProPresenter: **C** hides lyrics (background stays), **G** hides the background (words stay), **X** clears the lower third. **S** or Space brings lyrics back. The stage monitor still shows the current slide when the house is cleared.
 
 ## 4c. Songs and setlists
 

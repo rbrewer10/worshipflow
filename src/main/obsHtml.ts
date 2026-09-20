@@ -51,7 +51,7 @@ var ws = null
 function apply(msg) {
   if (msg.type !== 'state') return
   var s = msg.state
-  var show = (s.mode === 'lyrics') && s.line && s.line.trim() !== ''
+  var show = (s.mode === 'lyrics') && s.line && s.line.trim() !== '' && !s.textHidden
   if (show) {
     elText.textContent = stripChords(s.line)
     var title = s.songTitle || ''

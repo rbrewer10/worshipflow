@@ -376,6 +376,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     liveSaveFontScale: noop,
     liveSetStageMessage: async (_track: TrackId, msg: string | null): Promise<void> => publish({ stageMessage: msg }),
     liveSetOverlayTicker: async (_track: TrackId, text: string | null): Promise<void> => publish({ overlayTicker: text }),
+    liveSetLayers: async (_track: TrackId, flags: { textHidden?: boolean; bgHidden?: boolean }): Promise<void> => publish(flags),
     liveLoadSong: async (_track: TrackId, id: number): Promise<void> => {
       const song = songs.find((s) => s.id === id)
       if (song) publish({ songTitle: song.title, index: 0, line: demoLines[0], next: demoLines[1], total: demoLines.length })

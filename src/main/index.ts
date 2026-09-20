@@ -34,6 +34,7 @@ import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery, isRecoveryStale, markCleanExit, wasCleanExit, type TrackSnapshot } from './recovery'
 import { stripChords, formatSlideChords } from '../shared/chords'
+import { applyAudienceLayers } from '../shared/layers'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -328,6 +329,8 @@ interface LiveTrackState {
   // — see buildSermonSlides. null for every non-sermon item.
   sermonSlides: SermonSlide[] | null
   overlayTicker: string | null
+  textHidden: boolean
+  bgHidden: boolean
 }
 
 function createTrackState(song: LiveTrackState['song']): LiveTrackState {
@@ -362,7 +365,9 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     deckSource: [],
     deckScripture: new Map(),
     sermonSlides: null,
-    overlayTicker: null
+    overlayTicker: null,
+    textHidden: false,
+    bgHidden: false
   }
 }
 
@@ -773,6 +778,8 @@ function renderState(track: TrackId = 'main'): LiveState {
     fontScale: t.fontScale,
     stageMessage: t.stageMessage,
     overlayTicker: t.overlayTicker,
+    textHidden: t.textHidden,
+    bgHidden: t.bgHidden,
     ts: Date.now(),
     hmsLoadedAt: t.hmsLoadedAt,
     autoAdvanceMs: t.autoAdvanceMs,
@@ -818,6 +825,7 @@ function emptyZoneState(live: LiveState): ZoneState {
     textAlign: null,
     textPosition: null,
     blurBehindText: live.blurBehindText ?? false,
+    overlayTicker: live.overlayTicker ?? null,
   }
 }
 
@@ -1032,7 +1040,19 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
   // Stamped after the loop, not per-branch: some zoneIds resolve through
   // titleCardZoneState/zoneStateFromSlot instead of `base` above, and scale is
   // a screen property, not a content one — every path should get it the same way.
-  for (const zoneId of ZONE_IDS) result[zoneId].scale = zoneScales[zoneId] ?? 100
+  for (const zoneId of ZONE_IDS) {
+    result[zoneId].scale = zoneScales[zoneId] ?? 100
+    const zoneTrack = zoneTrackFor(zoneId, stageRehearsal, activeZoneTrackAssignment[zoneId])
+    const t = tracks[zoneTrack]
+    const cleared = applyAudienceLayers(
+      { line: result[zoneId].line, background: result[zoneId].background },
+      { textHidden: t.textHidden, bgHidden: t.bgHidden },
+      { isStage: zoneId === 4 }
+    )
+    result[zoneId].line = cleared.line
+    result[zoneId].background = cleared.background
+    result[zoneId].overlayTicker = t.overlayTicker
+  }
   return result
 }
 
@@ -1274,6 +1294,7 @@ function processIntent(track: TrackId, type: Intent): void {
   }
   const last = t.song.lines.length - 1
   if (type === 'next') {
+    t.textHidden = false
     if (t.mode === 'countdown') {
       // A live countdown/welcome is a single view — Next moves to the next item.
       const nextItem = adjacentLiveItem(track, 1)
@@ -1310,12 +1331,14 @@ function processIntent(track: TrackId, type: Intent): void {
       clearCountdown(track); t.mode = 'lyrics'
     } else if (t.index < last) {
       t.index++; logServiceEvent(`next: ${t.index}/${last}`)
+      t.textHidden = false
     } else {
       // At the last slide of this item — advance to the next service item.
       const nextItem = adjacentLiveItem(track, 1)
       if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
     }
   } else if (type === 'prev') {
+    t.textHidden = false
     if (t.mode === 'livecall') {
       // See the mirroring 'next' branch above — one continuous view, step to
       // the previous item rather than un-blanking to nothing.
@@ -1331,7 +1354,7 @@ function processIntent(track: TrackId, type: Intent): void {
       // for the same reason as the 'next' branch above.
       clearCountdown(track); t.mode = 'lyrics'
     }
-    else if (t.index > 0) { t.index--; logServiceEvent(`prev: ${t.index}/${last}`) }
+    else if (t.index > 0) { t.index--; logServiceEvent(`prev: ${t.index}/${last}`); t.textHidden = false }
     else {
       // At the first slide — step back to the previous service item.
       const prevItem = adjacentLiveItem(track, -1)
@@ -1339,7 +1362,13 @@ function processIntent(track: TrackId, type: Intent): void {
     }
   } else if (type === 'black') { clearCountdown(track); t.mode = 'black'; logServiceEvent('black') }
   else if (type === 'logo') { clearCountdown(track); t.mode = 'logo'; logServiceEvent('logo') }
-  else if (type === 'lyrics') { clearCountdown(track); t.mode = 'lyrics'; logServiceEvent('lyrics') }
+  else if (type === 'lyrics') {
+    clearCountdown(track)
+    t.mode = 'lyrics'
+    t.textHidden = false
+    t.bgHidden = false
+    logServiceEvent('lyrics')
+  }
   broadcast()
 }
 
@@ -2666,6 +2695,13 @@ ipcMain.handle('wf:live:setOverlayTicker', (_e, track: TrackId, text: string | n
   broadcast()
 })
 
+ipcMain.handle('wf:live:setLayers', (_e, track: TrackId, flags: { textHidden?: boolean; bgHidden?: boolean }) => {
+  assertTrackId(track)
+  if (typeof flags?.textHidden === 'boolean') tracks[track].textHidden = flags.textHidden
+  if (typeof flags?.bgHidden === 'boolean') tracks[track].bgHidden = flags.bgHidden
+  broadcast()
+})
+
 
 // --- Logo IPCs ---
 ipcMain.handle('wf:logo:get', () => ({ logoPath, logoBg }))
@@ -3635,6 +3671,7 @@ ipcMain.handle('wf:live:setBackground', (_e, track: TrackId, path: string) => {
   assertTrackId(track)
   const t = tracks[track]
   t.song = { ...t.song, background: path }
+  t.bgHidden = false
   broadcast()
 })
 
