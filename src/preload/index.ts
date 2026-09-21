@@ -293,9 +293,9 @@ const wf = {
   getObsUrl: (): Promise<string> => ipcRenderer.invoke('wf:getObsUrl'),
   ndiGetStatus: (): Promise<NdiRuntimeStatus> => ipcRenderer.invoke('wf:ndi:status'),
   songSelectOpen: (): Promise<void> => ipcRenderer.invoke('wf:songselect:open'),
-  songSelectImportFile: (): Promise<{ id: number; title: string } | null> => ipcRenderer.invoke('wf:songselect:importFile'),
-  onSongSelectImported: (cb: (song: { id: number; title: string }) => void): (() => void) => {
-    const handler = (_e: unknown, song: { id: number; title: string }): void => cb(song)
+  songSelectImportFile: (): Promise<{ id: number; title: string; created?: boolean; ccli?: string } | null> => ipcRenderer.invoke('wf:songselect:importFile'),
+  onSongSelectImported: (cb: (song: { id: number; title: string; created?: boolean; ccli?: string }) => void): (() => void) => {
+    const handler = (_e: unknown, song: { id: number; title: string; created?: boolean; ccli?: string }): void => cb(song)
     ipcRenderer.on('wf:songselect:imported', handler)
     return () => ipcRenderer.removeListener('wf:songselect:imported', handler)
   },

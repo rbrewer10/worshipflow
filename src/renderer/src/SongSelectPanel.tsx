@@ -5,7 +5,12 @@ import { notifyLocal } from './NotifyToasts'
 function SongSelectPanel({ onImported }: { onImported: (id: number) => void }): JSX.Element {
   useEffect(() => {
     return window.wf.onSongSelectImported((song) => {
-      notifyLocal(`Imported “${song.title}” from SongSelect`, 'info')
+      notifyLocal(
+        song.created === false
+          ? `“${song.title}” is already in your library`
+          : `Imported “${song.title}” from SongSelect`,
+        'info'
+      )
       onImported(song.id)
     })
   }, [onImported])
@@ -14,7 +19,7 @@ function SongSelectPanel({ onImported }: { onImported: (id: number) => void }): 
     <div className="mb-3 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-2">
       <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-blue-300">SongSelect by CCLI</div>
       <p className="mb-2 text-[11px] text-content-secondary">
-        Sign in with the church SongSelect account. Search a song, download lyrics or a .usr file — WorshipFlow imports it. CCLI no longer offers a partner API, so this is the official path: your login, their site, our library.
+        Sign in, open a song, Lyrics → Download → Text File. A popup confirms it landed in your library. Downloading the same song twice will not make a copy.
       </p>
       <div className="flex gap-1.5">
         <button
