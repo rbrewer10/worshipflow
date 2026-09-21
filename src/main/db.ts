@@ -627,6 +627,38 @@ export function getSong(id: number): SongFull | null {
   }
 }
 
+export function findExistingSong(input: { ccli?: string | null; title: string; author?: string | null }): { id: number; title: string } | null {
+  const digits = (input.ccli ?? '').replace(/\D/g, '')
+  if (digits) {
+    const stmt = db.prepare('SELECT id, title, ccli FROM song WHERE ccli IS NOT NULL AND TRIM(ccli) != ""')
+    let hit: { id: number; title: string } | null = null
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as { id: number; title: string; ccli: string }
+      if (String(row.ccli).replace(/\D/g, '') === digits) {
+        hit = { id: row.id, title: row.title }
+        break
+      }
+    }
+    stmt.free()
+    if (hit) return hit
+  }
+
+  const title = normalizeTitleText(input.title)
+  if (!title) return null
+  const stmt = db.prepare('SELECT id, title, author FROM song WHERE title = ? COLLATE NOCASE')
+  stmt.bind([title])
+  const matches: { id: number; title: string; author: string | null }[] = []
+  while (stmt.step()) matches.push(stmt.getAsObject() as { id: number; title: string; author: string | null })
+  stmt.free()
+  if (matches.length === 0) return null
+  const author = input.author ? normalizeTitleText(input.author).toLowerCase() : ''
+  if (author) {
+    const byAuthor = matches.find((m) => (m.author ?? '').trim().toLowerCase() === author)
+    if (byAuthor) return { id: byAuthor.id, title: byAuthor.title }
+  }
+  return { id: matches[0].id, title: matches[0].title }
+}
+
 export function createSong(input: SongInput): number {
   db.run('BEGIN')
   try {
