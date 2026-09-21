@@ -738,26 +738,30 @@ const FLEX_SCRIPT = `
 // No visual effects — clarity is paramount for the worship team.
 const STAGE_CSS = `
 #wrap{width:100vw;height:100vh;display:flex;flex-direction:column;background:#000;overflow:hidden}
-#topbar{display:flex;align-items:center;justify-content:space-between;padding:1.5vh 3vw;border-bottom:1px solid rgba(255,255,255,0.08)}
-#songtitle{font-size:2vw;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.05em}
-#clock{font-size:2.5vw;font-weight:700;color:rgba(255,255,255,0.35);font-variant-numeric:tabular-nums}
-#stagemsg{display:none;padding:1.5vh 3vw;background:#7c2d00;border-bottom:2px solid #f97316}
+#topbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:1.5vh 3vw;border-bottom:1px solid rgba(255,255,255,0.08)}
+#songtitle{font-size:2vw;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.05em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#clock{font-size:2.5vw;font-weight:700;color:rgba(255,255,255,0.35);font-variant-numeric:tabular-nums;flex-shrink:0;margin-left:2vw}
+#stagemsg{display:none;flex:0 0 auto;padding:1.5vh 3vw;background:#7c2d00;border-bottom:2px solid #f97316}
 #stagemsg span{font-size:2.2vw;font-weight:800;color:#fed7aa}
-#current{flex:1;display:flex;align-items:center;justify-content:center;padding:3vw 5vw;text-align:center}
-#divider{height:1px;background:rgba(255,255,255,0.08);margin:0 3vw}
-#nextsection{padding:2vh 3vw;min-height:18vh;display:flex;flex-direction:column;justify-content:center}
-#nextlabel{font-size:1.2vw;font-weight:700;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.2em;margin-bottom:1vh}
-#nextline{font-size:3vw;font-weight:700;color:rgba(255,255,255,0.45);line-height:1.3;white-space:pre-line}
-#slidecounter{padding:1vh 3vw;text-align:right;font-size:1.5vw;color:rgba(255,255,255,0.2)}
+#current{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:2vh 5vw;text-align:center}
+#current > div{max-width:100%;max-height:100%;overflow:hidden}
+#divider{flex:0 0 auto;height:1px;background:rgba(255,255,255,0.08);margin:0 3vw}
+#nextsection{flex:0 1 22vh;max-height:24vh;min-height:0;overflow:hidden;padding:1.5vh 3vw 1vh;display:flex;flex-direction:column;justify-content:center}
+#nextlabel{flex:0 0 auto;font-size:1.2vw;font-weight:700;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.2em;margin-bottom:0.6vh}
+#nextline{flex:1 1 auto;min-height:0;overflow:hidden;font-size:2.4vw;font-weight:700;color:rgba(255,255,255,0.45);line-height:1.25;white-space:pre-line}
+#slidecounter{flex:0 0 auto;padding:0.8vh 3vw 1.2vh;text-align:right;font-size:1.5vw;color:rgba(255,255,255,0.2)}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .fade-in{animation:fadeIn 0.3s ease both}
 `
 
 const STAGE_SCRIPT = `
+  var wrapEl=document.getElementById('wrap');
   var songTitle=document.getElementById('songtitle');
   var clockEl=document.getElementById('clock');
   var stageMsg=document.getElementById('stagemsg');
   var current=document.getElementById('current');
+  var nextSection=document.getElementById('nextsection');
+  var nextLabel=document.getElementById('nextlabel');
   var nextLine=document.getElementById('nextline');
   var slideCounter=document.getElementById('slidecounter');
   var prevLine=null;
@@ -770,6 +774,7 @@ const STAGE_SCRIPT = `
   function render(){
     window.__wfOverflow=false;
     var m=state.mode;
+    wrapEl.style.paddingBottom=(state.overlayTicker&&m!=='black'&&m!=='logo'&&m!=='off')?'5.5vh':'0';
     if(state.stageMessage){
       stageMsg.style.display='block';
       stageMsg.querySelector('span').textContent=state.stageMessage;
@@ -802,21 +807,30 @@ const STAGE_SCRIPT = `
       var sp=sermonParts(state);
       var sub=[sp.speaker,sp.passage].filter(Boolean).join('  \\u2022  ');
       // #current is a flex row — wrap both lines so they stack instead of sitting side by side.
-      current.innerHTML='<div style="width:100%">'
+      current.innerHTML='<div style="width:100%;max-height:100%;overflow:hidden">'
         +'<div style="font-size:7vw;font-weight:900;line-height:1.15;color:#fff">'+esc(state.title||'')+'</div>'
         +(sub?'<div style="margin-top:2vh;font-size:2.4vw;font-weight:700;letter-spacing:0.06em;color:rgba(255,255,255,0.45)">'+esc(sub)+'</div>':'')
         +'</div>';
-      var wrap=current.firstChild;
-      var subH=wrap.children.length>1?wrap.children[1].getBoundingClientRect().height+window.innerHeight*0.02:0;
-      fitText(wrap.firstChild,7,3,current.clientWidth-window.innerWidth*0.10,current.clientHeight-subH-window.innerWidth*0.06);
+      var sWrap=current.firstChild;
+      var subH=sWrap.children.length>1?sWrap.children[1].getBoundingClientRect().height+window.innerHeight*0.02:0;
+      fitText(sWrap.firstChild,7,3,current.clientWidth-window.innerWidth*0.10,current.clientHeight-subH);
       nextLine.textContent='';slideCounter.textContent='';return;
     }
     var fs=Math.max(5,Math.min(state.fontScale||6,12));
     var lineChanged=state.line!==prevLine;prevLine=state.line;
     current.innerHTML='<div class="'+(lineChanged?'fade-in':'')+'" style="font-size:'+fs+'vw;font-weight:900;line-height:1.2;color:#fff;white-space:pre-line">'+esc(state.line||'\\u2014')+'</div>';
-    // #current is a bounded flex:1 box (padding 3vw 5vw) — fit within its real content area.
-    fitText(current.firstChild,fs,3,current.clientWidth-window.innerWidth*0.10,current.clientHeight-window.innerWidth*0.06);
+    // min-height:0 on #current makes this a real remaining-space box; without
+    // it flex would not shrink below the unsized verse and #wrap clipped Next.
+    var cs=getComputedStyle(current);
+    var availW=current.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+    var availH=current.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+    fitText(current.firstChild,fs,3,availW,availH);
     nextLine.textContent=state.next||'';
+    if(state.next){
+      var nextHead=(nextLabel&&nextLabel.offsetHeight)||0;
+      var nextH=Math.max(nextSection.clientHeight-nextHead-window.innerHeight*0.01, window.innerHeight*0.08);
+      fitText(nextLine,2.4,1.1,nextSection.clientWidth,nextH);
+    }
     slideCounter.textContent=state.total>1?'Slide '+(state.index+1)+' of '+state.total:'';
   }
   render();
