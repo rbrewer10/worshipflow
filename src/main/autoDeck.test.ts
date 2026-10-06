@@ -255,3 +255,28 @@ describe('deck loading is actually wired up for every auto-decked type', () => {
     expect(source).toMatch(/if \(item\) void loadDeckOnto\(track, item, generation\)/)
   })
 })
+
+// QA B3-N3: a whole-chapter reading repeated the entire chapter on slides 2-5.
+describe('autoDeckFor — whole-chapter readings', () => {
+  const psalm100 = (over: Partial<AutoDeckDeps> = {}): AutoDeckDeps => deps({
+    lookupScripture: async () => ({
+      ok: true,
+      reference: 'Psalms 100',
+      verses: [1, 2, 3, 4, 5].map((n) => ({ n, text: 'x'.repeat(15) })),
+    }),
+    ...over,
+  })
+
+  it('scripture item "Psalm 100": every slide gets its own verses, not the whole chapter', async () => {
+    const deck = await autoDeckFor(item({ type: 'scripture', payload: { reference: 'Psalm 100' } }), psalm100())
+    const refs = deck!.map((s) => (s.zones[2] as { reference: string }).reference)
+    expect(refs).toEqual(['Psalms 100:1', 'Psalms 100:2', 'Psalms 100:3', 'Psalms 100:4', 'Psalms 100:5'])
+    expect(new Set(refs).size).toBe(refs.length)
+  })
+
+  it('sermon reading of a whole chapter narrows too', async () => {
+    const deck = await autoDeckFor(item({ type: 'sermon', payload: { title: 'Joy', passage: 'Psalm 100' } }), psalm100())
+    expect(deck!.slice(1).map((s) => (s.zones[2] as { reference: string }).reference))
+      .toEqual(['Psalms 100:1', 'Psalms 100:2', 'Psalms 100:3', 'Psalms 100:4', 'Psalms 100:5'])
+  })
+})

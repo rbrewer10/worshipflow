@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseReferenceList, formatReferenceList, isMultiReference, subReference, bookChapter } from './scriptureRefs'
+import { parseReferenceList, formatReferenceList, isMultiReference, subReference, bookChapter, wholeChapter } from './scriptureRefs'
 
 describe('parseReferenceList', () => {
   it('returns a single reference unchanged', () => {
@@ -75,8 +75,20 @@ describe('subReference', () => {
     expect(subReference('1 Corinthians 13:4-7', 4, 5)).toBe('1 Corinthians 13:4-5')
   })
 
-  it('returns a whole-chapter reference unchanged — nothing to narrow to', () => {
-    expect(subReference('Psalm 23', 1, 3)).toBe('Psalm 23')
+  // QA B3-N3: "Psalm 100" put the whole psalm on every slide, so Space looked
+  // like it did nothing four times.
+  it('narrows a whole-chapter reference to the verses on this slide', () => {
+    expect(subReference('Psalm 23', 1, 3)).toBe('Psalm 23:1-3')
+    expect(subReference('Psalms 100', 4, 4)).toBe('Psalms 100:4')
+    expect(subReference('1 Corinthians 13', 4, 7)).toBe('1 Corinthians 13:4-7')
+    expect(subReference('Song of Solomon 2', 1, 2)).toBe('Song of Solomon 2:1-2')
+  })
+
+  it('leaves a chapter range or anything unparseable as written', () => {
+    expect(subReference('Psalm 23-24', 1, 3)).toBe('Psalm 23-24')
+    expect(subReference('Psalm 23 - 24', 1, 3)).toBe('Psalm 23 - 24')
+    expect(subReference('Jude', 1, 3)).toBe('Jude')
+    expect(subReference('', 1, 3)).toBe('')
   })
 })
 
@@ -88,5 +100,15 @@ describe('bookChapter', () => {
 
   it('is null when there is no verse part', () => {
     expect(bookChapter('Psalm 23')).toBeNull()
+  })
+})
+
+describe('wholeChapter (QA B3-N3)', () => {
+  it('recognises book + chapter only', () => {
+    expect(wholeChapter('Psalms 100')).toBe('Psalms 100')
+    expect(wholeChapter(' 2 Kings 5 ')).toBe('2 Kings 5')
+    expect(wholeChapter('John 3:16')).toBeNull()
+    expect(wholeChapter('100')).toBeNull()
+    expect(wholeChapter('Psalm 23-24')).toBeNull()
   })
 })
