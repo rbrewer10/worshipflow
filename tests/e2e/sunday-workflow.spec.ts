@@ -1,103 +1,115 @@
 import { test, expect } from '@playwright/test'
-import type { Page } from '@playwright/test'
-import { launchApp, closeApp } from './electronApp'
+import { launchApp, closeApp, operatorWindow, outputWindow, completeFirstRun, visibleText } from './electronApp'
 
 // Exercises the actual "run a Sunday" loop end-to-end against the real built
 // app: create a song, build a service, send it live, and verify the change
 // reaches the REAL audience-facing output window (via WF_SIM), not just the
-// operator's own state. This is the "full Sunday-workflow test" the audit
-// asked for — logic tests alone can't catch a wire-up bug between the
-// operator UI and what the congregation's screen actually renders.
+// operator's own state. Logic tests alone can't catch a wire-up bug between
+// the operator UI and what the congregation's screen actually renders.
+//
+// Updated for the 0.20 UI: a fresh profile opens to the first-run wizard, the
+// nav menus are "Media/Library" and "Settings", and the song editor is one
+// continuous lyrics textarea (ReflowEditor).
 test('build a service, go live, advance, and black all reach the real output window', async () => {
   const { app, userDataDir } = await launchApp()
   try {
-    await expect.poll(() => app.windows().length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
-    const pages = app.windows()
-    const operator = pages.find((p) => !p.url().includes('#/output')) as Page
-    const output = pages.find((p) => p.url().includes('#/output')) as Page
-    expect(operator).toBeTruthy()
-    expect(output).toBeTruthy()
+    const operator = await operatorWindow(app)
+    const output = await outputWindow(app)
+    await completeFirstRun(operator)
 
     // Sanity: a pristine app must never show the Phase-0 demo song's lyrics
-    // on the real output (this was Phase 1's "demo-state leak" fix — this
-    // test is also a regression guard for it).
-    await expect(operator.getByText('Good morning').or(operator.getByText('Good afternoon')).or(operator.getByText('Good evening'))).toBeVisible()
-    await expect(output.getByText('Amazing grace')).not.toBeVisible()
+    // on the real output (Phase 1's "demo-state leak" fix).
+    await expect(operator.getByText(/Good (morning|afternoon|evening)/)).toBeVisible()
+    expect(await visibleText(output)).not.toMatch(/Amazing grace/i)
 
     // --- Create a song ---
-    // Songs moved behind the Library menu in the 2026-08-01 nav regrouping.
-    // Nav clicks are scoped to the main nav because LiveDrawer renders its own
-    // app-wide "Songs" tab button — an unscoped name match is ambiguous and
-    // fails Playwright strict mode. (That ambiguity predates this change: it
-    // is why this spec could never have passed as originally written.)
     const mainNav = operator.getByRole('navigation', { name: 'Main' })
-    await mainNav.getByRole('button', { name: 'Library' }).click()
+    await mainNav.getByRole('button', { name: 'Media/Library' }).click()
     await operator.getByRole('menuitem', { name: 'Songs' }).click()
     await operator.getByRole('button', { name: 'New Song' }).click()
     await operator.getByPlaceholder('Song title…').fill('E2E Test Song')
-    await operator.getByRole('button', { name: 'Create' }).click()
+    await operator.getByRole('button', { name: 'Create', exact: true }).click()
 
-    // Give it one line of real lyrics so the output window has something
-    // concrete to assert on, rather than just an empty slide.
-    const editSlideButton = operator.getByRole('button', { name: 'Edit slide text' })
-    await editSlideButton.click()
-    const lyricsInput = operator.getByLabel('Slide lyrics')
-    await lyricsInput.fill('Testing one two three')
-    await lyricsInput.blur()
-    await expect(operator.getByText('Testing one two three')).toBeVisible()
+    const lyrics = operator.getByLabel('Song lyrics')
+    await lyrics.fill('Testing one two three\n\nSecond slide words')
+    await lyrics.blur()
+    // Autosave is debounced; wait for the song to actually hold the lyrics.
+    await expect.poll(async () => operator.evaluate(async () => {
+      const songs = await window.wf.songsList('')
+      const s = songs.find((x) => x.title === 'E2E Test Song')
+      if (!s) return ''
+      const full = await window.wf.songGet(s.id)
+      return full?.sections.map((sec) => sec.lyrics).join('\n') ?? ''
+    }), { timeout: 10_000 }).toContain('Second slide words')
 
     // --- Build a service and add the song ---
     await mainNav.getByRole('button', { name: 'Build service' }).click()
     await operator.getByLabel('Enter a new service name').fill('E2E Test Service')
     await operator.getByRole('button', { name: 'Create new service' }).click()
-    await operator.getByRole('button', { name: 'Add item' }).click()
-    await operator.getByLabel('Song from library').selectOption({ label: 'E2E Test Song' })
+    await mainNav.getByRole('button', { name: 'Media/Library' }).click()
+    await operator.getByRole('menuitem', { name: 'Songs' }).click()
+    await operator.getByRole('button', { name: 'Add E2E Test Song to current service' }).click()
 
     // --- Go live ---
-    await mainNav.getByRole('button', { name: 'Live' }).click()
+    await mainNav.getByRole('button', { name: 'Live Control' }).click()
     await operator.getByRole('button', { name: 'Go live: E2E Test Song' }).click()
     // The rail's tap-to-confirm gesture auto-fires ~1.5s after arming
-    // (see usePendingConfirm) — this is deliberate Sunday-safety friction
-    // from the click-consistency fix, not a bug to work around.
-    await expect(output.getByText('Testing one two three')).toBeVisible({ timeout: 3000 })
+    // (see usePendingConfirm) — deliberate Sunday-safety friction.
+    await expect.poll(() => visibleText(output), { timeout: 5000 }).toContain('Testing one two three')
+
+    // --- Advance reaches the real screen ---
+    await operator.keyboard.press('ArrowRight')
+    await expect.poll(() => visibleText(output)).toContain('Second slide words')
 
     // --- Black reaches the real screen ---
-    // Uses the "B" keyboard shortcut (also regression-tests the Phase-1 fix
-    // scoping global shortcuts to the Live tab) rather than clicking, since
-    // several icon-only buttons share "Black" as part of their accessible name.
+    // The "B" shortcut also regression-tests the Phase-1 fix scoping global
+    // shortcuts to the Live tab.
     await operator.keyboard.press('b')
-    await expect(output.getByText('Testing one two three')).not.toBeVisible()
+    await expect.poll(() => visibleText(output)).not.toContain('Second slide words')
   } finally {
     await closeApp(app, userDataDir)
   }
 })
 
-// Guards the 2026-08-01 nav regrouping: the menus must be openable and
-// navigable by keyboard alone, since that is the part a mouse-only manual
-// check will never exercise.
-test('library and setup menus are keyboard operable', async () => {
+// Guards the nav regrouping: the menus must be openable and navigable by
+// keyboard alone, since that is the part a mouse-only manual check never
+// exercises.
+test('library and settings menus are keyboard operable', async () => {
   const { app, userDataDir } = await launchApp()
   try {
-    await expect.poll(() => app.windows().length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
-    const operator = app.windows().find((p) => !p.url().includes('#/output')) as Page
+    const operator = await operatorWindow(app)
+    await completeFirstRun(operator)
     const mainNav = operator.getByRole('navigation', { name: 'Main' })
 
-    const setup = mainNav.getByRole('button', { name: 'Setup' })
-    await setup.focus()
+    const settings = mainNav.getByRole('button', { name: 'Settings' })
+    await settings.focus()
     await operator.keyboard.press('ArrowDown')
-    await expect(operator.getByRole('menu', { name: 'Setup' })).toBeVisible()
+    await expect(operator.getByRole('menu', { name: 'Settings' })).toBeVisible()
     await expect(operator.getByRole('menuitem', { name: 'Screens & zones' })).toBeFocused()
 
     await operator.keyboard.press('ArrowUp')
     await expect(operator.getByRole('menuitem', { name: 'Diagnostics & backups' })).toBeFocused()
 
     await operator.keyboard.press('Escape')
-    await expect(operator.getByRole('menu', { name: 'Setup' })).not.toBeVisible()
-    await expect(setup).toBeFocused()
+    await expect(operator.getByRole('menu', { name: 'Settings' })).not.toBeVisible()
+    await expect(settings).toBeFocused()
 
-    await mainNav.getByRole('button', { name: 'Library' }).click()
+    await mainNav.getByRole('button', { name: 'Media/Library' }).click()
     await operator.getByRole('menuitem', { name: 'Backgrounds' }).click()
     await expect(operator.getByRole('heading', { name: 'Backgrounds' })).toBeVisible()
+  } finally {
+    await closeApp(app, userDataDir)
+  }
+})
+
+// e2e isolation guard: the dev build used to ignore --user-data-dir and write
+// into <cwd>/.worshipflow-dev, so every run shared one database.
+test('each launch gets its own throwaway profile', async () => {
+  const { app, userDataDir, profileDir } = await launchApp()
+  try {
+    await operatorWindow(app)
+    const userData = await app.evaluate(({ app: a }) => a.getPath('userData'))
+    expect(userData).toBe(profileDir)
   } finally {
     await closeApp(app, userDataDir)
   }

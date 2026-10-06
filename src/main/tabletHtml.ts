@@ -1,4 +1,18 @@
-export const TABLET_PORT = 3691
+export const DEFAULT_TABLET_PORT = 3691
+
+/**
+ * The LAN server port. WF_HTTP_PORT overrides it for test/QA runs so a test
+ * instance never collides with (or talks to) a real one on 3691; anything
+ * that isn't a whole number in 1024-65535 is ignored. Not a user setting.
+ */
+export function tabletPortFromEnv(env: Record<string, string | undefined> = process.env): number {
+  const raw = env.WF_HTTP_PORT?.trim()
+  if (!raw || !/^\d+$/.test(raw)) return DEFAULT_TABLET_PORT
+  const n = Number(raw)
+  return n >= 1024 && n <= 65535 ? n : DEFAULT_TABLET_PORT
+}
+
+export const TABLET_PORT = tabletPortFromEnv()
 
 function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
