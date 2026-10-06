@@ -10,6 +10,7 @@ import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
 import { randomUUID, randomInt, randomBytes } from 'crypto'
 import { createServer, type IncomingMessage } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
+import { promises as fsPromises } from 'fs'
 import os from 'os'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
@@ -126,8 +127,9 @@ import {
   setRecordingAi,
   listStoredMediaPaths,
   rewriteStoredMediaPaths,
+  databaseMentions,
 } from './db'
-import { importMediaFile, mediaProblemFor, migrateOutsidePaths, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
+import { importMediaFile, mediaProblemFor, migrateOutsidePaths, planImportedMediaCleanup, safeCleanupName, MediaImportRefused, servablePath, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
 import {
   listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder,
   listBackgroundFolders, createBackgroundFolder, renameBackgroundFolder, moveBackground, deleteBackgroundFolder
@@ -229,44 +231,12 @@ const APP_ICON = existsSync(iconFile) ? iconFile : undefined
 function mediaRoots(): MediaRoots {
   const ud = app.getPath('userData')
   const mediaDir = join(ud, 'imported-media')
-  return { mediaDir, allowedRoots: [join(ud, 'backgrounds'), mediaDir, join(ud, 'generated')] }
+  return { mediaDir, allowedRoots: [join(ud, 'backgrounds'), mediaDir, join(ud, 'generated')], userDataDir: ud }
 }
 
 function validateMediaPath(requestedPath: string): string | null {
-  const allowedRoots = mediaRoots().allowedRoots
-
-  try {
-    const resolved = resolve(requestedPath)
-    // Resolve to real path (follow symlinks, get canonical path)
-    const realPath = realpathSync(resolved)
-
-    // The church logo image and logo motion background are explicitly chosen by the
-    // user via Settings and can live anywhere they picked them (Downloads, a mapped
-    // drive, etc.). Allow those exact configured files regardless of folder.
-    for (const configured of [logoPath, logoBg]) {
-      if (!configured) continue
-      try {
-        if (realpathSync(resolve(configured)) === realPath) return realPath
-      } catch { /* configured file missing — fall through */ }
-    }
-
-    // Check if REAL path is within any allowed root
-    for (const root of allowedRoots) {
-      const rel = relative(root, realPath)
-      // relative() returns ".." prefix if outside the root. On Windows, relative()
-      // between paths on different drives (or a UNC path) returns an ABSOLUTE path
-      // instead of a ".."-prefixed one, since there's no relative form across drives —
-      // reject that case too, or it would incorrectly pass containment.
-      if (!rel.startsWith('..') && !isAbsolute(rel) && existsSync(realPath)) {
-        return realPath
-      }
-    }
-
-    return null // path is outside allowed roots or doesn't exist
-  } catch (err) {
-    console.error('Invalid path:', requestedPath, err)
-    return null
-  }
+  // Pure logic in mediaImport.ts (servablePath) so it's unit-tested (QA A3-N1).
+  return servablePath(requestedPath, mediaRoots().allowedRoots, [logoPath, logoBg])
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -2013,6 +1983,16 @@ function applyItemTheme(track: TrackId, item: ServiceItem | undefined): void {
 }
 
 function doLoadMedia(track: TrackId, filePath: string, title: string): void {
+  // QA B2-N1 / B3-N4: never fail silently — a file the projector can't load
+  // used to be a blank screen with a 403 only in the log. Here, not in one
+  // caller, so the rail, Volunteer "Go live", Next/Space and the tablet all warn.
+  const problem = mediaProblemFor(filePath, (x) => validateMediaPath(x) !== null)
+  if (problem) {
+    const name = basename(filePath)
+    notifyOperator(problem === 'missing'
+      ? `Can't show “${name}” — the file isn't on this computer any more. Re-link it in Build service.`
+      : `Can't show “${name}” — it isn't in WorshipFlow's media folder. Re-link it in Build service.`, 'warn')
+  }
   const t = tracks[track]
   t.loadGeneration++
   t.hasLiveContent = true
@@ -2060,15 +2040,6 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return
-    // QA B2-N1: never fail silently — a file the projector can't load used to
-    // be a blank screen with a 403 only in the log.
-    const problem = mediaProblemFor(p, (x) => validateMediaPath(x) !== null)
-    if (problem) {
-      const name = basename(p)
-      notifyOperator(problem === 'missing'
-        ? `Can't show “${name}” — the file isn't on this computer any more. Re-link it in Build service.`
-        : `Can't show “${name}” — it isn't in WorshipFlow's media folder. Re-link it in Build service.`, 'warn')
-    }
     doLoadMedia(track, p, item.title)
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
@@ -2283,10 +2254,16 @@ function startTabletServer(): void {
       const ext = (validPath.split('.').pop() ?? '').toLowerCase()
       const MIME: Record<string, string> = {
         jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-        gif: 'image/gif', webp: 'image/webp', avif: 'image/avif',
+        gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', bmp: 'image/bmp',
         mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/mp4',
       }
-      const mime = MIME[ext] ?? 'application/octet-stream'
+      // Media types only (QA A3-N1) — no generic binary fallback.
+      const mime = MIME[ext]
+      if (!mime) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' })
+        res.end('Access denied: not a picture or video')
+        return
+      }
       const safeEnd = (): void => { if (!res.writableEnded) res.end() }
       try {
         const stat = statSync(validPath)
@@ -2307,6 +2284,7 @@ function startTabletServer(): void {
             'Accept-Ranges': 'bytes',
             'Content-Length': end - start + 1,
             'Content-Type': mime,
+            'X-Content-Type-Options': 'nosniff',
             'Cache-Control': 'public, max-age=3600',
           })
           const stream = createReadStream(validPath, { start, end })
@@ -2316,6 +2294,7 @@ function startTabletServer(): void {
           const buf = readFileSync(validPath)
           res.writeHead(200, {
             'Content-Type': mime,
+            'X-Content-Type-Options': 'nosniff',
             'Content-Length': buf.length,
             'Accept-Ranges': 'bytes',
             'Cache-Control': 'public, max-age=3600',
@@ -4318,6 +4297,7 @@ ipcMain.handle('wf:media:pick', async (): Promise<{ canceled: boolean; path?: st
   try {
     return { canceled: false, path: await importMediaFile(res.filePaths[0], mediaRoots()) }
   } catch (err) {
+    if (err instanceof MediaImportRefused) return { canceled: false, error: `Can't use ${err.message}.` }
     const why = (err as NodeJS.ErrnoException)?.code === 'ENOSPC' ? 'the disk is full' : ((err as Error)?.message ?? String(err))
     logWarn(`[media] couldn't copy ${res.filePaths[0]} into imported-media: ${why}`)
     return { canceled: false, error: `Couldn't copy ${basename(res.filePaths[0])} into WorshipFlow's media folder (${why}).` }
@@ -4330,11 +4310,17 @@ ipcMain.handle('wf:media:pick', async (): Promise<{ canceled: boolean; path?: st
 // longer exist are left alone; Build service flags them with a Re-link button
 // and Go Live warns. Never throws; one run at a time.
 let mediaMigration: Promise<void> | null = null
+const mediaReported = new Set<string>()
+function firstMediaReport(key: string): boolean {
+  if (mediaReported.has(key)) return false
+  mediaReported.add(key)
+  return true
+}
 function migrateOutsideMedia(reason: string): Promise<void> {
   if (mediaMigration) return mediaMigration
   mediaMigration = (async () => {
     try {
-      const { relinked, failed, missing } = await migrateOutsidePaths(listStoredMediaPaths(), mediaRoots(), (p) => validateMediaPath(p) !== null)
+      const { relinked, failed, missing, refused } = await migrateOutsidePaths(listStoredMediaPaths(), mediaRoots(), (p) => validateMediaPath(p) !== null)
       const rows = rewriteStoredMediaPaths(relinked)
       if (relinked.size > 0) {
         logInfo(`[media] ${reason}: copied ${relinked.size} outside picture/video file(s) into imported-media (${rows} row(s) updated)`)
@@ -4342,8 +4328,11 @@ function migrateOutsideMedia(reason: string): Promise<void> {
         operatorWin?.webContents.send('wf:media:relinked', { count: relinked.size })
         notifyOperator(`Copied ${relinked.size} picture/video file${relinked.size === 1 ? '' : 's'} into WorshipFlow's media folder so ${relinked.size === 1 ? 'it shows' : 'they show'} on the projector.`, 'info')
       }
-      for (const f of failed) logWarn(`[media] ${reason}: couldn't copy ${f.path}: ${f.error}`)
-      if (missing.length > 0) logWarn(`[media] ${reason}: ${missing.length} stored picture/video path(s) no longer exist (Build service shows Re-link)`)
+      // Each path is reported once per session, not on every service open (A3-N7).
+      for (const f of failed) if (firstMediaReport(`fail:${f.path}`)) logWarn(`[media] ${reason}: couldn't copy ${f.path}: ${f.error}`)
+      for (const r of refused) if (firstMediaReport(`refused:${r.path}`)) logWarn(`[media] ${reason}: not copying ${r.path} — ${r.reason} (QA A3-N1)`)
+      const newMissing = missing.filter((m) => firstMediaReport(`missing:${m}`))
+      if (newMissing.length > 0) logWarn(`[media] ${reason}: ${newMissing.length} stored picture/video path(s) no longer exist (Build service shows Re-link)`)
     } catch (err) {
       logWarn(`[media] ${reason}: migration failed: ${(err as Error)?.message ?? err}`)
     } finally {
@@ -4351,6 +4340,42 @@ function migrateOutsideMedia(reason: string): Promise<void> {
     }
   })()
   return mediaMigration
+}
+
+// QA A3-N6: imported-media only ever grew. Once per launch (after the
+// migration): delete copies cut short more than an hour ago, and copies
+// nothing in the database mentions any more — but only after they've been
+// unreferenced for 30 days (remembered in imported-media/.cleanup.json), so
+// an undo, a re-import or restoring a backup still finds them. Never throws;
+// never touches anything but plain files directly inside imported-media.
+async function cleanImportedMedia(): Promise<void> {
+  const { mediaDir } = mediaRoots()
+  const statePath = join(mediaDir, '.cleanup.json')
+  try {
+    if (!existsSync(mediaDir)) return
+    const entries = await fsPromises.readdir(mediaDir, { withFileTypes: true })
+    const files: Array<{ name: string; mtimeMs: number }> = []
+    for (const e of entries) {
+      if (!e.isFile() || !safeCleanupName(e.name)) continue
+      try { files.push({ name: e.name, mtimeMs: (await fsPromises.stat(join(mediaDir, e.name))).mtimeMs }) } catch { /* vanished */ }
+    }
+    let orphanSince: Record<string, number> = {}
+    try { orphanSince = JSON.parse(await fsPromises.readFile(statePath, 'utf8')) as Record<string, number> } catch { /* first run */ }
+    const candidates = files.filter((f) => !f.name.startsWith('.')).map((f) => f.name)
+    const referenced = databaseMentions(candidates)
+    for (const configured of [logoPath, logoBg]) if (configured) referenced.add(basename(configured))
+    const plan = planImportedMediaCleanup(files, (n) => referenced.has(n), orphanSince, Date.now())
+    let freed = 0
+    for (const name of plan.remove) {
+      if (!safeCleanupName(name)) continue
+      const full = join(mediaDir, name)
+      try { freed += (await fsPromises.stat(full)).size; await fsPromises.rm(full, { force: true }) } catch { /* in use / gone */ }
+    }
+    await fsPromises.writeFile(statePath, JSON.stringify(plan.orphanSince))
+    if (plan.remove.length > 0) logInfo(`[media] cleanup: removed ${plan.remove.length} unused/partial file(s) from imported-media (${Math.round(freed / 1048576)} MB)`)
+  } catch (err) {
+    logWarn(`[media] cleanup failed: ${(err as Error)?.message ?? err}`)
+  }
 }
 
 // Create a timestamped backup of the database on app launch
@@ -4883,7 +4908,7 @@ app.whenReady().then(async () => {
   layoutOutputs()
   broadcast()
   // Copy pictures/videos older versions stored outside the app folder (B2-N1).
-  void migrateOutsideMedia('startup')
+  void migrateOutsideMedia('startup').then(() => cleanImportedMedia())
   // Reconnect to OBS in the background if the operator connected before (non-blocking).
   void initObsAutoConnect()
   // Startup-only update check (never repeats while the app stays open) — see

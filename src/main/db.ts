@@ -396,6 +396,32 @@ export function listStoredMediaPaths(): string[] {
   return [...out]
 }
 
+// QA A3-N6 cleanup: which of these imported-media file names does ANY text
+// value in ANY table still mention? Deliberately broader than
+// listStoredMediaPaths() — PPTX decks, settings, future columns — because a
+// false "unused" would delete a picture someone still needs on Sunday.
+export function databaseMentions(names: string[]): Set<string> {
+  const found = new Set<string>()
+  if (names.length === 0) return found
+  const pending = new Set(names)
+  const tables: string[] = []
+  const t = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+  while (t.step()) tables.push(String(t.getAsObject().name))
+  t.free()
+  for (const table of tables) {
+    if (pending.size === 0) break
+    const stmt = db.prepare(`SELECT * FROM "${table.replace(/"/g, '""')}"`)
+    while (stmt.step() && pending.size > 0) {
+      for (const v of stmt.get()) {
+        if (typeof v !== 'string' || v.length < 5) continue
+        for (const n of pending) if (v.includes(n)) { found.add(n); pending.delete(n) }
+      }
+    }
+    stmt.free()
+  }
+  return found
+}
+
 // Swap stored media paths old → new everywhere listStoredMediaPaths() looks,
 // then persist once. Exact-string matches only, so nothing else is touched.
 // Returns how many rows changed.
