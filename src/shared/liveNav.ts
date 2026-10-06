@@ -12,6 +12,8 @@ export interface NavInput {
   hasSermonSlides: boolean
   index: number
   lastIndex: number
+  /** Nothing has gone live on this track yet this session (QA B2-N3). */
+  pristine?: boolean
 }
 
 export type NavAction =
@@ -21,8 +23,17 @@ export type NavAction =
   | { kind: 'unblank' }
   /** Go to the adjacent go-live item; if there is none, `fallback`. */
   | { kind: 'adjacent'; dir: 1 | -1; fallback: 'logo' | 'logo-after-countdown' | 'none' }
+  /** Nothing live yet: Next starts the service on its first go-live item. */
+  | { kind: 'start' }
+  /** Nothing to do (Prev with nothing live). */
+  | { kind: 'none' }
 
 export function planNav(dir: 1 | -1, s: NavInput): NavAction {
+  // QA B2-N3: with nothing live yet, Space/N/→ did nothing visible while the
+  // hidden index of the startup placeholder crept up (0→11), so the first
+  // "Next" of the morning was swallowed. Next now starts the service; Prev
+  // does nothing (and neither touches the index).
+  if (s.pristine) return dir === 1 ? { kind: 'start' } : { kind: 'none' }
   // A countdown/welcome is one continuous view. Next moves on; with nothing
   // after it, go to the logo rather than strand the frozen timer value as a
   // lyric slide. Prev moves back; with nothing before it, the press is ignored

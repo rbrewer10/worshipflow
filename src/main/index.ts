@@ -171,7 +171,7 @@ import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
 import { createContentRunner } from './content'
 import { ACTIVE_SERVICE_SETTING, activeServiceSettingValue, parseActiveServiceSetting } from '../shared/activeService'
-import { shouldClearHiddenText } from '../shared/layerReset'
+import { shouldClearHiddenText, modeAfterAsyncLoad, textHideApplies } from '../shared/layerReset'
 
 export { TABLET_PORT }
 
@@ -370,6 +370,9 @@ interface LiveTrackState {
   // loadGeneration at the moment "Clear lyrics" (C) was last turned on — so a
   // slow load that started before it doesn't undo it (QA A-N4, shared/layerReset.ts).
   textHiddenAtGeneration: number
+  // loadGeneration when Black or Logo was last pressed — an async load that
+  // started before then keeps the operator's blank (QA A2-N2, shared/layerReset.ts).
+  blankedAtGeneration: number
   // Set true by every load* function the first time real content (a service
   // item OR an ad-hoc Quick Scripture/Quick Countdown lookup) is loaded onto
   // this track — distinguishes "genuinely nothing loaded yet, still on the
@@ -437,6 +440,7 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     autoAdvanceLoop: false,
     loadGeneration: 0,
     textHiddenAtGeneration: -1,
+    blankedAtGeneration: -1,
     hasLiveContent: false,
     deckSlides: null,
     deckIsGenerated: false,
@@ -1416,7 +1420,15 @@ function processIntent(track: TrackId, type: Intent): void {
     //    verses-sermons, which deliberately sit at mode 'logo' and advance on
     //    their own index — otherwise the first press after going live on a
     //    sermon was swallowed ("Next is broken").
-    const action = planNav(dir, { mode: t.mode, hasDeck: !!t.deckSlides, hasSermonSlides: !!t.sermonSlides, index: t.index, lastIndex: last })
+    const action = planNav(dir, { mode: t.mode, hasDeck: !!t.deckSlides, hasSermonSlides: !!t.sermonSlides, index: t.index, lastIndex: last, pristine: !t.hasLiveContent && t.serviceItemId == null })
+    if (action.kind === 'start') {
+      // Nothing live yet (B2-N3): go live on the first item of this track that
+      // can go live — skipping section headers and placeholders.
+      const first = activeServiceItems.find((it) => it.track === track && itemCanGoLive(it))
+      if (first) { logServiceEvent(`${type}: start service at item ${first.id}`); void handleTabletLoadItem(track, first.id) }
+      return
+    }
+    if (action.kind === 'none') return
     if (action.kind === 'adjacent') {
       const item = adjacentLiveItem(track, action.dir)
       if (item) { void handleTabletLoadItem(track, item.id); return }
@@ -1433,8 +1445,8 @@ function processIntent(track: TrackId, type: Intent): void {
       t.index += action.delta
       logServiceEvent(`${type}: ${t.index}/${last}`)
     }
-  } else if (type === 'black') { clearCountdown(track); t.mode = 'black'; logServiceEvent('black') }
-  else if (type === 'logo') { clearCountdown(track); t.mode = 'logo'; logServiceEvent('logo') }
+  } else if (type === 'black') { clearCountdown(track); t.mode = 'black'; t.blankedAtGeneration = t.loadGeneration; logServiceEvent('black') }
+  else if (type === 'logo') { clearCountdown(track); t.mode = 'logo'; t.blankedAtGeneration = t.loadGeneration; logServiceEvent('logo') }
   else if (type === 'lyrics') {
     clearCountdown(track)
     t.mode = 'lyrics'
@@ -1774,7 +1786,8 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = blurBehindText ?? false
   if (fontScale != null) t.fontScale = fontScale
-  t.mode = 'lyrics'
+  // Keep a Black/Logo pressed while this verse was loading (QA A2-N2).
+  t.mode = modeAfterAsyncLoad(t.mode, t.blankedAtGeneration, generation)
   t.index = 0
   // Same as doLoadText/doLoadSermon: an ad-hoc Quick Scripture passes no item
   // and keeps the flat verse list, but a real scripture SERVICE item gets its
@@ -1826,7 +1839,7 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
   t.songMeta = { author: full.author, copyright: full.copyright, ccli: full.ccli }
   t.hmsLoadedAt = Date.now()  // Start hymn timer
   t.verseNumber = 1
-  t.mode = 'lyrics'
+  t.mode = modeAfterAsyncLoad(t.mode, t.blankedAtGeneration, generation)  // A2-N2
   t.index = 0
   logServiceEvent(`load-song: ${full.title}`)
   // Record CCLI usage once per service (reset when the active service changes).
@@ -2949,7 +2962,13 @@ ipcMain.handle('wf:live:setOverlayTicker', (_e, track: TrackId, text: string | n
 
 ipcMain.handle('wf:live:setLayers', (_e, track: TrackId, flags: { textHidden?: boolean; bgHidden?: boolean }) => {
   assertTrackId(track)
-  if (typeof flags?.textHidden === 'boolean') {
+  if (flags?.textHidden === true && !textHideApplies(tracks[track].mode)) {
+    // Nothing to hide on a countdown or picture (B2-N11) — don't light
+    // "Lyrics off" for nothing or carry it into the next item.
+    notifyOperator(tracks[track].mode === 'countdown'
+      ? 'C hides lyrics — a countdown has none. Press B for black or L for the logo.'
+      : 'C hides lyrics — a picture or video has none. Press B for black or L for the logo.', 'info')
+  } else if (typeof flags?.textHidden === 'boolean') {
     tracks[track].textHidden = flags.textHidden
     if (flags.textHidden) tracks[track].textHiddenAtGeneration = tracks[track].loadGeneration
   }
