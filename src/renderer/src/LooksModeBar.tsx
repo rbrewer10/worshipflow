@@ -4,6 +4,7 @@ import { expandScene } from '../../shared/zoneScenes'
 import type { ServiceControlMode, ServiceControlModeMapping } from '../../shared/serviceControlModes'
 import { DEFAULT_MODE_MAPPING, resolveModeScene } from '../../shared/serviceControlModes'
 import { useService } from './ServiceContext'
+import { activeLookMode } from '../../shared/liveLayersUi'
 
 const MODE_LABEL: Record<ServiceControlMode, string> = {
   worship: 'Worship',
@@ -21,18 +22,21 @@ function LooksModeBar({ liveItemId }: { liveItemId: number | null }): JSX.Elemen
   const { activeService } = useService()
   const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null)
   const [modeMapping, setModeMapping] = useState<ServiceControlModeMapping>(DEFAULT_MODE_MAPPING)
-  const [active, setActive] = useState<ServiceControlMode | null>(null)
+  // Optimistic highlight for the item just clicked (the service in context
+  // reloads a moment later); otherwise derived from the live item (QA B19).
+  const [clicked, setClicked] = useState<{ itemId: number; mode: ServiceControlMode } | null>(null)
 
   useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [])
   useEffect(() => { void window.wf.serviceControlModesGet().then(setModeMapping) }, [])
 
   const liveItem = activeService?.items.find((it) => it.id === liveItemId) ?? null
+  const active = clicked && liveItem && clicked.itemId === liveItem.id ? clicked.mode : activeLookMode(liveItem, sceneConfig, modeMapping)
 
   const applyMode = (mode: ServiceControlMode): void => {
     if (!sceneConfig || !liveItem) return
     const scene = resolveModeScene(mode, modeMapping, sceneConfig)
     if (!scene) return
-    setActive(mode)
+    setClicked({ itemId: liveItem.id, mode })
     void window.wf.zoneSetRouting(liveItem.id, expandScene(scene, liveItem.type))
   }
 
@@ -49,7 +53,7 @@ function LooksModeBar({ liveItemId }: { liveItemId: number | null }): JSX.Elemen
               key={mode}
               onClick={() => applyMode(mode)}
               disabled={disabled}
-              title={!liveItem ? 'Nothing is live yet' : !scene ? 'Map this look in Setup' : MODE_HINT[mode]}
+              title={!liveItem ? 'Nothing is live yet' : !scene ? 'Map this look in Setup' : `${MODE_HINT[mode]} — saved to “${liveItem.title}”`}
               className={`rounded-lg border px-2 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
                 on
                   ? 'border-blue-500/50 bg-blue-500/15 text-blue-300'

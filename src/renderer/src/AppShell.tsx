@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { layerTogglePatch } from '../../shared/liveLayersUi'
 import type { TrackId } from '../../shared/types'
 import { ServiceProvider } from './ServiceContext'
 import TopBar from './TopBar'
@@ -78,17 +79,13 @@ function AppShell(): JSX.Element {
 
       const key = e.key.toLowerCase()
 
-      // C = clear lyrics (keep background)
-      if (key === 'c') {
+      // C = toggle lyrics (keep background), G = toggle background (keep
+      // lyrics) — same as the on-screen Clear lyrics / Clear BG buttons (QA B20;
+      // they used to only turn layers off, so a second C did nothing).
+      if (key === 'c' || key === 'g') {
         e.preventDefault()
-        void window.wf.liveSetLayers(shortcutTrack, { textHidden: true })
-        return
-      }
-
-      // G = clear background (keep lyrics)
-      if (key === 'g') {
-        e.preventDefault()
-        void window.wf.liveSetLayers(shortcutTrack, { bgHidden: true })
+        const which = key === 'c' ? 'text' : 'bg'
+        void window.wf.getState(shortcutTrack).then((s) => window.wf.liveSetLayers(shortcutTrack, layerTogglePatch(s, which)))
         return
       }
 

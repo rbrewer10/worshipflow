@@ -16,7 +16,9 @@ function OverlayTickerPanel({ track, value }: { track: TrackId; value: string | 
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') send(text) }}
+          // QA B21: Enter in an EMPTY box used to send null and clear the live
+          // lower third. Clearing is the Clear button's job.
+          onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) send(text) }}
           placeholder={value || 'Announcement over lyrics…'}
           className="min-w-0 flex-1 rounded-lg border border-border bg-panel px-2 py-1.5 text-xs outline-none focus:border-blue-500"
         />
