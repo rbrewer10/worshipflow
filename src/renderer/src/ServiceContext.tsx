@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ServiceFull, ServiceSummary } from '../../shared/types'
+import { pickInitialService } from '../../shared/activeService'
 
 interface ServiceCtx {
   services: ServiceSummary[]
@@ -45,10 +46,18 @@ export function ServiceProvider({ children }: { children: ReactNode }): JSX.Elem
     else window.wf.serviceGet(id).then(setActiveService)
   }
 
+  // QA B-N1: adopt the service main has active (it survives relaunches and the
+  // setup wizard); list[0] is only a fallback. See shared/activeService.ts.
   useEffect(() => {
-    window.wf.servicesList().then((list) => {
+    void Promise.all([window.wf.servicesList(), window.wf.getActiveServiceId().catch(() => null)]).then(([list, mainActive]) => {
       setServices(list)
-      if (list.length > 0) selectService(list[0].id)
+      const pick = pickInitialService(list, mainActive)
+      if (!pick) return
+      if (pick.tellMain) selectService(pick.id)
+      else {
+        setActiveServiceId(pick.id)
+        window.wf.serviceGet(pick.id).then(setActiveService)
+      }
     })
   }, [])
 

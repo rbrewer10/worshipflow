@@ -156,6 +156,7 @@ import { createRecordingSession } from './recording'
 import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
 import { createContentRunner } from './content'
+import { ACTIVE_SERVICE_SETTING, activeServiceSettingValue, parseActiveServiceSetting } from '../shared/activeService'
 
 export { TABLET_PORT }
 
@@ -2811,7 +2812,7 @@ ipcMain.handle('wf:regenerateTabletPin', () => regenerateTabletPin())
 // when items are added/edited in Build Service, so callers must explicitly
 // refresh it after any such change or newly-added items silently fail to go
 // live (found in the UI, invisible to the live-routing layer).
-function refreshActiveServiceItems(serviceId: number): void {
+function refreshActiveServiceItems(serviceId: number, opts: { silent?: boolean } = {}): void {
   const svc = getService(serviceId)
   // A deleted/nonexistent serviceId (e.g. from a stale recovery snapshot) must not
   // be left as the "active" one — otherwise later code trusting a non-null
@@ -2831,7 +2832,23 @@ function refreshActiveServiceItems(serviceId: number): void {
       applyItemTheme(track, item)
     }
   }
-  broadcast()  // projector needs the new theme, not just the tablet
+  if (!opts.silent) broadcast()  // projector needs the new theme, not just the tablet
+}
+
+// QA B-N1: the active service survives a relaunch. Restored silently at startup
+// (before any window exists), because broadcast() also writes the crash-recovery
+// snapshot and must not overwrite the one restoreRecovery is about to read.
+function restoreActiveServiceFromSettings(): void {
+  try {
+    const id = parseActiveServiceSetting(getSetting(ACTIVE_SERVICE_SETTING))
+    if (id != null && getService(id)) refreshActiveServiceItems(id, { silent: true })
+  } catch (err) {
+    logWarn(`[service] could not restore the active service: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+function rememberActiveService(serviceId: number | null): void {
+  try { setSetting(ACTIVE_SERVICE_SETTING, activeServiceSettingValue(serviceId)) } catch { /* advisory */ }
 }
 
 ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
@@ -2840,6 +2857,7 @@ ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   // one would hold a card from a service nobody is running any more.
   zonePins.clear()
   warnedMissingPins.clear()
+  rememberActiveService(serviceId)
   if (serviceId == null) {
     activeServiceId = null
     activeServiceItems = []
@@ -4241,6 +4259,7 @@ app.whenReady().then(async () => {
   // Reconcile any recording left open by a crash/hard-quit so it doesn't stay
   // dangling forever — mark it ended now.
   closeDanglingRecordings(Date.now())
+  restoreActiveServiceFromSettings()
   // Surface save failures to the operator instead of losing them to the console.
   onPersistError((err) => {
     logError('[persist] save failed', err)
