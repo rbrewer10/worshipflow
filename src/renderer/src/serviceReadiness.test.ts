@@ -29,4 +29,13 @@ describe('computeServiceReadiness', () => {
     expect(result.ready).toBe(true)
     expect(result.warnings.map((issue) => issue.id)).toContain('background-1')
   })
+
+  // QA B2-N1: a picture the projector can't load must not pass review silently.
+  it('blocks an image item whose file is missing or outside the media folder', () => {
+    const img = (id: number, mediaProblem?: 'missing' | 'outside') => ({ id, ordinal: id, type: 'image' as const, ref_id: null, payload: { path: `/home/me/Pictures/p${id}.jpg` }, title: `Photo ${id}`, notes: null, style: null, zoneRouting: null, track: 'main' as const, mediaProblem })
+    const result = computeServiceReadiness(service({ items: [img(1, 'outside'), img(2, 'missing'), img(3)] }), songs)
+    expect(result.blocking.map((i) => i.id)).toEqual(expect.arrayContaining(['media-1', 'media-2']))
+    expect(result.issues.map((i) => i.id)).not.toContain('media-3')
+    expect(result.blocking.find((i) => i.id === 'media-2')?.label).toMatch(/Re-link/)
+  })
 })

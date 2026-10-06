@@ -222,6 +222,7 @@ export const ItemEditor = memo(function ItemEditor({
       {showContent && item.type === 'image' && (
         <ImageEditor
           imagePath={(payload.path as string) ?? '—'}
+          mediaProblem={item.mediaProblem}
           onPathChange={(path) => savePayload({ ...payload, path })}
         />
       )}

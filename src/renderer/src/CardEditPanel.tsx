@@ -5,6 +5,7 @@ import { parseReflowText, sectionsToReflowText } from '../../shared/reflowText'
 import { analyzeAndLabelSections, previewAutoLabels } from './autoLabel'
 import { useAutosave } from './useAutosave'
 import { combineSaveStatus } from './saveQueue'
+import { notifyLocal } from './NotifyToasts'
 
 function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, onClose, onChanged, onDelete }: {
   item: ServiceItem
@@ -89,9 +90,10 @@ function CardEditPanel({ item, serviceTheme, serviceColors, showPreview = true, 
 
   const pickSongBg = async (): Promise<void> => {
     if (!songFull) return
-    const result = await window.wf.dialogOpenFile()
-    if (!result.canceled && result.filePaths[0]) {
-      const input = buildSongInput({ background: result.filePaths[0] })
+    const result = await window.wf.mediaPick() // copies into the media folder (B2-N1)
+    if (result.error) { notifyLocal(result.error, 'error'); return }
+    if (!result.canceled && result.path) {
+      const input = buildSongInput({ background: result.path })
       if (input) songQueue.trigger(input)
     }
   }
