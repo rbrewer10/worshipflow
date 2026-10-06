@@ -73,3 +73,34 @@ describe('QA A-L3 / A-L4 wiring', () => {
     expect(src).toMatch(/screen\.on\('display-removed', \(_e, removed\) => rehomeAuxWindows\(removed\)\)/)
   })
 })
+
+describe('QA A-N3: crashed windows come back', () => {
+  it('a second launch revives a crashed (not destroyed) operator and outputs', () => {
+    const h = slice("app.on('second-instance'", 1200)
+    expect(h).toContain('reviveCrashedWindows()')
+    const r = slice('function reviveCrashedWindows', 600)
+    expect(r).toMatch(/webContents\.isCrashed\(\)/)
+    expect(r).toMatch(/rendererRecovery\.reset\(key\)/)
+    expect(r).toMatch(/webContents\.reload\(\)/)
+  })
+  it('past the crash cap a retry is scheduled with back-off instead of giving up', () => {
+    const w = slice('function watchRenderer', 2400)
+    expect(w).toMatch(/rendererRecovery\.retryAfterMs\(key\)/)
+    expect(w).toMatch(/crashRetryTimers\.set\(key, setTimeout/)
+  })
+  it('notices raised while the operator is crashed or reloading are held and replayed', () => {
+    const n = slice('function notifyOperator', 500)
+    expect(n).toMatch(/isCrashed\(\) \|\| operatorWin\.webContents\.isLoading\(\)/)
+    expect(n).toContain('pendingOperatorNotices.push')
+    expect(main).toMatch(/setTimeout\(flushOperatorNotices/)
+  })
+})
+
+describe('QA A-N6: close prompt', () => {
+  it('uses what is showing now, not "anything was ever live"', () => {
+    const c = slice("operatorWin.on('close'", 1600)
+    expect(c).toContain('anyTrackShowing()')
+    expect(c).toContain('closePromptText(')
+    expect(c).not.toContain('The projectors are live.')
+  })
+})

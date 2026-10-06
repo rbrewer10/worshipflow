@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText, wasOnRemovedDisplay } from './windowPolicy'
+import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText, wasOnRemovedDisplay, trackShowing, closePromptText, CRASH_RETRY_BACKOFF_MS } from './windowPolicy'
 
 const idle = { isQuitting: false, anyLiveContent: false, obsStreaming: false, obsRecording: false }
 
@@ -56,5 +56,54 @@ describe('QA A-L4: aux windows on an unplugged display', () => {
   })
   it('a window on the operator screen is left alone', () => {
     expect(wasOnRemovedDisplay({ x: 80, y: 80, width: 960, height: 540 }, tv, [primary])).toBe(false)
+  })
+})
+
+describe('QA A-N3: a window past the crash cap is retried, not abandoned', () => {
+  it('after the cap, retries back off 30 s → 2 min → 5 min', () => {
+    const r = new RendererRecovery(3, 60_000)
+    for (let i = 0; i < 3; i++) expect(r.allowReload('output:1', i * 1000)).toBe(true)
+    expect(r.allowReload('output:1', 4000)).toBe(false)
+    expect(r.retryAfterMs('output:1')).toBe(30_000)
+    expect(r.allowReload('output:1', 35_000)).toBe(false) // the retry crashed too, still inside the window
+    expect(r.retryAfterMs('output:1')).toBe(120_000)
+    expect(r.retryAfterMs('output:1')).toBe(CRASH_RETRY_BACKOFF_MS[2])
+    expect(r.retryAfterMs('output:1')).toBe(CRASH_RETRY_BACKOFF_MS[2])
+  })
+  it('once the crash window has passed, crashes reload immediately again and the back-off resets', () => {
+    const r = new RendererRecovery(3, 60_000)
+    for (let i = 0; i < 3; i++) r.allowReload('k', i)
+    expect(r.allowReload('k', 10)).toBe(false)
+    r.retryAfterMs('k')
+    expect(r.allowReload('k', 200_000)).toBe(true)
+    expect(r.retryAfterMs('k')).toBe(30_000)
+  })
+  it('reset() (the app launched again) clears the cap', () => {
+    const r = new RendererRecovery(3, 60_000)
+    for (let i = 0; i < 3; i++) r.allowReload('operator', i)
+    expect(r.allowReload('operator', 5)).toBe(false)
+    r.reset('operator')
+    expect(r.allowReload('operator', 6)).toBe(true)
+  })
+})
+
+describe('QA A-N6: the close prompt reflects what is on screen', () => {
+  it('black and logo are not "showing" for songs; lyrics/countdown/announcement/livecall are', () => {
+    expect(trackShowing({ hasLiveContent: true, mode: 'black' })).toBe(false)
+    expect(trackShowing({ hasLiveContent: true, mode: 'logo' })).toBe(false)
+    for (const mode of ['lyrics', 'countdown', 'announcement', 'livecall']) expect(trackShowing({ hasLiveContent: true, mode })).toBe(true)
+    expect(trackShowing({ hasLiveContent: false, mode: 'lyrics' })).toBe(false)
+  })
+  it('a deck/sermon sitting at logo is still showing its slides; Black is not', () => {
+    expect(trackShowing({ hasLiveContent: true, mode: 'logo', hasSlides: true })).toBe(true)
+    expect(trackShowing({ hasLiveContent: true, mode: 'black', hasSlides: true })).toBe(false)
+  })
+  it('after Black/Logo with nothing streaming, closing quits without the "projectors are live" prompt', () => {
+    expect(operatorCloseDecision({ isQuitting: false, anyLiveContent: trackShowing({ hasLiveContent: true, mode: 'black' }), obsStreaming: false, obsRecording: false })).toBe('quit')
+  })
+  it('the prompt names the real reason', () => {
+    expect(closePromptText({ showing: true, obsStreaming: false, obsRecording: false }).message).toMatch(/showing the service/)
+    expect(closePromptText({ showing: false, obsStreaming: true, obsRecording: false }).message).toMatch(/OBS is streaming/)
+    expect(closePromptText({ showing: false, obsStreaming: false, obsRecording: true }).message).toMatch(/OBS is recording/)
   })
 })
