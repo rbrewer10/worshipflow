@@ -1,5 +1,6 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net, powerMonitor } from 'electron'
 import { isRestorableBackupName, parseBackupFilename, type BackupKind } from '../shared/backupNames'
+import { nextOrderSnapshot, pickAdjacentItem } from '../shared/deckAdjacent'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
@@ -1331,16 +1332,14 @@ function itemCanGoLive(item: ServiceItem): boolean {
 }
 
 // Find the next/previous go-live service item relative to the current one, within the same track.
+// Last item order per track that still contained the live item, so Next/Prev
+// keep working if the live item is deleted from Build service (QA B10).
+const liveOrderSnapshot: Record<TrackId, number[] | null> = { main: null, second: null }
+
 function adjacentLiveItem(track: TrackId, dir: 1 | -1): ServiceItem | undefined {
   const t = tracks[track]
-  if (t.serviceItemId == null) return undefined
   const trackItems = activeServiceItems.filter((it) => it.track === track)
-  const idx = trackItems.findIndex((it) => it.id === t.serviceItemId)
-  if (idx < 0) return undefined
-  const rest = dir === 1
-    ? trackItems.slice(idx + 1)
-    : trackItems.slice(0, idx).reverse()
-  return rest.find(itemCanGoLive)
+  return pickAdjacentItem(trackItems, t.serviceItemId, dir, itemCanGoLive, liveOrderSnapshot[track])
 }
 
 // Send a transient banner to the operator window (non-technical-friendly toast).
@@ -2968,8 +2967,15 @@ function refreshActiveServiceItems(serviceId: number): void {
   // A deleted/nonexistent serviceId (e.g. from a stale recovery snapshot) must not
   // be left as the "active" one — otherwise later code trusting a non-null
   // activeServiceId as proof it points at a real service would be wrong.
+  const sameService = activeServiceId === serviceId
+  const oldItems = activeServiceItems
   activeServiceId = svc ? serviceId : null
   activeServiceItems = (svc as { items: ServiceItem[] } | null)?.items ?? []
+  for (const track of ['main', 'second'] as TrackId[]) {
+    liveOrderSnapshot[track] = sameService
+      ? nextOrderSnapshot(oldItems.filter((it) => it.track === track).map((it) => it.id), tracks[track].serviceItemId, liveOrderSnapshot[track])
+      : null
+  }
   activeServiceName = (svc as { name?: string } | null)?.name ?? ''
   activeServiceDate = (svc as { service_date?: string | null } | null)?.service_date ?? null
   serviceSlideTheme = (svc as { theme?: string | null } | null)?.theme || DEFAULT_THEME_ID
