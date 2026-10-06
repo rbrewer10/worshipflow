@@ -7,6 +7,7 @@ import { useChurchName } from './useChurchName'
 import { resolveAnnouncementIcon } from './announcementIcons'
 import { audienceKind } from '../../shared/liveDisplay'
 import { fitScale } from '../../shared/fitText'
+import { IDENTIFY_MS, outputBadges } from '../../shared/outputBadges'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -371,15 +372,27 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
   )
 }
 
-// A "dumb" fullscreen output window. Subscribes to broadcast state and renders it,
-// plus operator-only diagnostics badges (FPS meter + output id).
+// A "dumb" fullscreen output window. Subscribes to broadcast state and renders it.
+// Diagnostics badges (FPS meter + output id) are dev/diag-only — this window is
+// the real projector (QA B13): see shared/outputBadges.ts.
 function Output(): JSX.Element {
-  const id = new URLSearchParams(window.location.search).get('id')
+  const params = new URLSearchParams(window.location.search)
+  const id = params.get('id')
   const model = useLiveModel()
   const [fps, setFps] = useState(0)
+  const [openedAt] = useState(() => Date.now())
+  const [, setTick] = useState(0)
+  const badges = outputBadges({ dev: import.meta.env.DEV, diag: params.get('diag') === '1', msSinceOpen: Date.now() - openedAt })
 
-  // On-screen FPS meter (smoothness measurement).
+  // Re-render once the identify window has passed so "OUT n" disappears.
   useEffect(() => {
+    const t = window.setTimeout(() => setTick((n) => n + 1), IDENTIFY_MS + 50)
+    return () => window.clearTimeout(t)
+  }, [])
+
+  // On-screen FPS meter (smoothness measurement) — only runs when it is shown.
+  useEffect(() => {
+    if (!badges.fps) return
     let raf = 0
     let frames = 0
     let last = performance.now()
@@ -394,7 +407,7 @@ function Output(): JSX.Element {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [])
+  }, [badges.fps])
 
   // Rehearsal mode: this is a REAL physical output, so it must never show
   // live content while rehearsing — the operator's own previews (LiveMirror,
@@ -414,10 +427,12 @@ function Output(): JSX.Element {
     <div className="relative h-screen w-screen overflow-hidden bg-black" style={{ cursor: 'none' }}>
       <AudienceStage model={model} />
 
-      <div className="absolute right-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-blue-400">
-        {fps} fps
-      </div>
-      {id && (
+      {badges.fps && (
+        <div className="absolute right-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-blue-400">
+          {fps} fps
+        </div>
+      )}
+      {id && badges.id && (
         <div className="absolute left-3 top-2 rounded bg-black/45 px-2 py-1 font-mono text-[13px] font-semibold text-blue-400">
           OUT {id}
         </div>
