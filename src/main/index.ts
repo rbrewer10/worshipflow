@@ -16,6 +16,7 @@ import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor, generatedDeckYieldsTo } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
+import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText } from '../shared/windowPolicy'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseReferenceList, formatReferenceList, subReference } from '../shared/scriptureRefs'
@@ -265,6 +266,11 @@ const outputWins = new Map<string, BrowserWindow>()
 // the actual zone displays keep being served by the OLD, now-orphaned instance
 // and never see anything the user does in the new one. Single-instance lock
 // makes a second launch just focus the existing window instead.
+// Set in before-quit. Window close guards (operator confirm, output Alt+F4
+// block) only apply while the app is NOT shutting down.
+let isQuitting = false
+const rendererRecovery = new RendererRecovery()
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
   // app.quit() is async and does NOT stop this module from continuing to run —
@@ -274,10 +280,17 @@ if (!gotSingleInstanceLock) {
   app.exit(0)
 } else {
   app.on('second-instance', () => {
-    if (operatorWin) {
-      if (operatorWin.isMinimized()) operatorWin.restore()
-      operatorWin.focus()
+    // QA A-C2: if the operator window is gone (closed, or its renderer died
+    // and the window was torn down), double-clicking the desktop icon must
+    // bring control back instead of silently doing nothing.
+    if (!app.isReady() || isQuitting) return
+    if (!operatorWin || operatorWin.isDestroyed()) {
+      createOperator()
+      return
     }
+    if (operatorWin.isMinimized()) operatorWin.restore()
+    operatorWin.show()
+    operatorWin.focus()
   })
 }
 
@@ -2399,6 +2412,7 @@ function createStageWindow(): void {
     if (stageWin && !stageWin.isDestroyed()) stageWin.webContents.send('wf:state', buildStatePayload())
   })
   stageWin.on('closed', () => { stageWin = null })
+  watchRenderer(stageWin, 'stage', 'The stage display')
   loadRoute(stageWin, '/stage')
 }
 
@@ -2468,7 +2482,36 @@ function createOperator(): void {
     shell.openExternal(d.url)
     return { action: 'deny' }
   })
+  operatorWin.on('close', (e) => {
+    const win = operatorWin
+    const decision = operatorCloseDecision({
+      isQuitting,
+      anyLiveContent: anyTrackLive(),
+      obsStreaming: getObsStatus().streaming,
+      obsRecording: getObsStatus().recording
+    })
+    if (decision === 'allow') return
+    // Never close the operator on its own — outputs would be orphaned (QA A-C2).
+    e.preventDefault()
+    if (decision === 'quit') { app.quit(); return }
+    if (operatorCloseConfirmOpen || !win || win.isDestroyed()) return
+    operatorCloseConfirmOpen = true
+    void dialog.showMessageBox(win, {
+      type: 'warning',
+      title: 'Close WorshipFlow?',
+      message: 'The projectors are live. Close WorshipFlow?',
+      detail: 'Closing WorshipFlow turns off every projector, stage screen and zone display.',
+      buttons: ['Keep WorshipFlow open', 'Close WorshipFlow'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
+    }).then(({ response }) => {
+      operatorCloseConfirmOpen = false
+      if (response === 1) app.quit()
+    }).catch(() => { operatorCloseConfirmOpen = false })
+  })
   operatorWin.on('closed', () => { operatorWin = null })
+  watchRenderer(operatorWin, 'operator', 'The operator screen')
   operatorWin.webContents.on('did-finish-load', () => {
     // A renderer reload discards the JS realm without running React's
     // unmount cleanup, so useRoomFeed's roomFeedNotifyCapturing(false) call
@@ -2484,6 +2527,45 @@ function createOperator(): void {
 interface OutputOpts {
   x: number; y: number; width: number; height: number
   fullscreen: boolean; alwaysOnTop?: boolean; id: number
+  /** The manual on-screen fallback (no projector detected) — closable. */
+  windowedFallback?: boolean
+}
+
+let operatorCloseConfirmOpen = false
+
+function anyTrackLive(): boolean {
+  return (['main', 'second'] as TrackId[]).some((id) => tracks[id].hasLiveContent)
+}
+
+// QA A-H3: a renderer that dies (GPU/OOM crash, e.g. a heavy video background)
+// used to leave a dead/sad-face projector or a blank operator UI until the app
+// was restarted. Reload it automatically — outputs/stage re-sync their state in
+// did-finish-load — with a crash-loop cap, and tell the operator.
+function watchRenderer(win: BrowserWindow, key: string, label: string): void {
+  win.webContents.on('render-process-gone', (_e, details) => {
+    if (details.reason === 'clean-exit' || isQuitting || win.isDestroyed()) return
+    const what = crashReasonText(details.reason)
+    logError(`[window] ${key} renderer gone: ${details.reason} (exit ${details.exitCode})`)
+    if (rendererRecovery.allowReload(key, Date.now())) {
+      setTimeout(() => { if (!win.isDestroyed() && !isQuitting) win.webContents.reload() }, 300)
+      notifyOperator(`${label} ${what} and was reloaded automatically.`, 'warn')
+    } else {
+      notifyOperator(`${label} keeps crashing (${what}). Try a simpler background, or restart WorshipFlow after the service.`, 'error')
+    }
+    broadcast()
+  })
+  win.on('unresponsive', () => {
+    logWarn(`[window] ${key} renderer unresponsive`)
+    if (key !== 'operator') notifyOperator(`${label} is not responding.`, 'warn')
+  })
+  win.on('responsive', () => logInfo(`[window] ${key} renderer responsive again`))
+}
+
+/** Output windows that are actually able to show something (QA A-H3: a crashed one doesn't count). */
+function workingOutputCount(): number {
+  let n = 0
+  for (const w of outputWins.values()) if (!w.isDestroyed() && !w.webContents.isCrashed()) n++
+  return n
 }
 
 function createOutput(label: string, opts: OutputOpts): void {
@@ -2499,7 +2581,16 @@ function createOutput(label: string, opts: OutputOpts): void {
   win.webContents.on('did-finish-load', () => {
     if (!win.isDestroyed()) win.webContents.send('wf:state', buildStatePayload())
   })
-  win.on('closed', () => outputWins.delete(label))
+  // QA A-H7: Alt+F4 on the projector must not drop it to the desktop mid-service.
+  win.on('close', (e) => {
+    if (outputCloseAllowed({ isQuitting, windowedFallback: !!opts.windowedFallback })) return
+    e.preventDefault()
+    notifyOperator('The projector window can\'t be closed while WorshipFlow is running. Use Black or Logo to clear the screen.', 'warn')
+  })
+  // layoutOutputs() destroys and re-creates windows under the same label; only
+  // forget this label if it still points at THIS window.
+  win.on('closed', () => { if (outputWins.get(label) === win) outputWins.delete(label) })
+  watchRenderer(win, `output:${label}`, `Projector output ${opts.id}`)
   outputWins.set(label, win)
   loadRoute(win, '/output', { id: String(opts.id) })
 }
@@ -2565,7 +2656,7 @@ function layoutOutputs(windowedFallback = false): void {
     }
     createOutput('main', {
       x: primary.bounds.x + 120, y: primary.bounds.y + 120,
-      width: 960, height: 540, fullscreen: false, id: 1
+      width: 960, height: 540, fullscreen: false, id: 1, windowedFallback: true
     })
   } else {
     externals.forEach((d, i) =>
@@ -2585,7 +2676,7 @@ ipcMain.handle('wf:getInfo', (): AppInfo => ({
   song: tracks.main.song,
   state: renderState('main'),
   displays: describeDisplays(),
-  outputs: outputWins.size,
+  outputs: workingOutputCount(),
   zonesConnected: getConnectedZoneIds(),
   startupMs: Date.now() - startTime,
   appVersion: app.getVersion(),
@@ -4340,6 +4431,7 @@ app.on('window-all-closed', () => {
 // Release the LAN server socket + timers on quit so a relaunch doesn't hit
 // EADDRINUSE and leave the tablet/zone/OBS layer silently dead.
 app.on('before-quit', () => {
+  isQuitting = true
   markCleanExit(true)
   // Best-effort final stop so a quit mid-service still finalizes the recording +
   // writes its sidecar (fire-and-forget; the app is shutting down regardless).
