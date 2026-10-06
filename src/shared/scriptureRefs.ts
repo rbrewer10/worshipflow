@@ -41,11 +41,25 @@ export function bookChapter(reference: string): string | null {
   return match ? match[1].trim() : null
 }
 
-// "John 3:16-18" + verses 16..17 -> "John 3:16-17". Falls back to the original
-// when the reference has no chapter:verse shape to rebuild from (a whole-chapter
-// reference like "Psalm 23"), which is correct: there is nothing to narrow to.
+/**
+ * "Psalms 100" from "Psalms 100" — a whole-chapter reference (an optional
+ * book number, a book name, one chapter number, no verse), else null.
+ * Called on the lookup's own normalized reference, so a bare number here is
+ * always a chapter (a single-chapter book's verse comes back as "Jude 1:3").
+ */
+export function wholeChapter(reference: string): string | null {
+  const match = reference.trim().match(/^((?:[1-3]\s*)?[a-z][a-z .']*?)\s+(\d+)$/i)
+  return match ? `${match[1].trim()} ${match[2]}` : null
+}
+
+// "John 3:16-18" + verses 16..17 -> "John 3:16-17". A whole-chapter reference
+// is narrowed too: "Psalm 100" + verses 1..3 -> "Psalm 100:1-3". Returning the
+// whole chapter for every chunk (the old behaviour) put the entire psalm on
+// every slide, so Space looked like it did nothing four times (QA B3-N3).
+// Anything else with no chapter:verse shape (a chapter range "Psalm 23-24")
+// is left as written.
 export function subReference(reference: string, from: number, to: number): string {
-  const base = bookChapter(reference)
+  const base = bookChapter(reference) ?? wholeChapter(reference)
   if (!base) return reference
   return from === to ? `${base}:${from}` : `${base}:${from}-${to}`
 }
