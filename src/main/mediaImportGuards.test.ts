@@ -19,7 +19,16 @@ describe('media pickers copy into the app folder (B2-N1)', () => {
     const src = read('main/index.ts')
     expect(src).toMatch(/ipcMain\.handle\('wf:media:pick'[\s\S]{0,1200}importMediaFile\(/)
     expect(src).toMatch(/wf:service:importImages[\s\S]{0,1500}importMediaFile\(f, mediaRoots\(\)\)/)
-    expect(src).toMatch(/item\.type === 'image'\) \{[\s\S]{0,400}mediaProblemFor\(p/)
-    expect(src).toMatch(/void migrateOutsideMedia\('startup'\)/)
+    // B3-N4: the warning lives in doLoadMedia, so every Go Live path (rail, Volunteer, Next, tablet) gets it.
+    expect(src).toMatch(/function doLoadMedia\([^)]*\): void \{[\s\S]{0,600}mediaProblemFor\(filePath/)
+    expect(src).toMatch(/void migrateOutsideMedia\('startup'\)\.then\(\(\) => cleanImportedMedia\(\)\)/)
+  })
+  it('A3-N1: the projector/LAN gate is servablePath with userData guarded; /file serves media MIME types only', () => {
+    const src = read('main/index.ts')
+    expect(src).toMatch(/return servablePath\(requestedPath, mediaRoots\(\)\.allowedRoots, \[logoPath, logoBg\]\)/)
+    expect(src).toMatch(/userDataDir: ud \}/)
+    expect(src).not.toMatch(/application\/octet-stream/)
+    expect(src).toMatch(/Access denied: not a picture or video/)
+    expect(src).toMatch(/'X-Content-Type-Options': 'nosniff'/)
   })
 })
