@@ -62,6 +62,12 @@ export interface LiveState {
   chordLine?: string | null
   // Lower-third overlay; independent of the current item so lyrics stay up.
   overlayTicker?: string | null
+  // True only for a ticker-display announcement (doLoadTickerAnnouncement):
+  // the audience output shows `line` as a scrolling strip instead of a slide.
+  // Replaces the old "songTitle === 'Announcement'" sentinel, which also
+  // matched every untitled text card (QA A-C1) and scrolled the word
+  // "Announcement" itself (QA A-H2).
+  isTicker?: boolean
   // ProPresenter-style independent layers. Audience only — stage keeps the slide.
   textHidden?: boolean
   bgHidden?: boolean

@@ -146,6 +146,8 @@ import {
 } from './obs'
 import { logInfo, logWarn, logError, getRecentLogLines, getLogsDir } from './logger'
 import { initAutoUpdate } from './autoUpdate'
+import { planNav } from '../shared/liveNav'
+import { textCardSlides, tickerLine } from '../shared/liveDisplay'
 import { createRecordingSession } from './recording'
 import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
@@ -332,6 +334,9 @@ interface LiveTrackState {
   // — see buildSermonSlides. null for every non-sermon item.
   sermonSlides: SermonSlide[] | null
   overlayTicker: string | null
+  // True only while a ticker-display announcement is loaded (QA A-C1/A-H2):
+  // the explicit replacement for the old songTitle === 'Announcement' sentinel.
+  isTicker: boolean
   textHidden: boolean
   bgHidden: boolean
 }
@@ -369,6 +374,7 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     deckScripture: new Map(),
     sermonSlides: null,
     overlayTicker: null,
+    isTicker: false,
     textHidden: false,
     bgHidden: false
   }
@@ -781,6 +787,7 @@ function renderState(track: TrackId = 'main'): LiveState {
     fontScale: t.fontScale,
     stageMessage: t.stageMessage,
     overlayTicker: t.overlayTicker,
+    isTicker: t.hasLiveContent && t.isTicker,
     textHidden: t.textHidden,
     bgHidden: t.bgHidden,
     ts: Date.now(),
@@ -1296,72 +1303,38 @@ function processIntent(track: TrackId, type: Intent): void {
     clearAutoAdvance(track)
   }
   const last = t.song.lines.length - 1
-  if (type === 'next') {
+  if (type === 'next' || type === 'prev') {
+    const dir: 1 | -1 = type === 'next' ? 1 : -1
     t.textHidden = false
-    if (t.mode === 'countdown') {
-      // A live countdown/welcome is a single view — Next moves to the next item.
-      const nextItem = adjacentLiveItem(track, 1)
-      if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
-      // Nothing after the countdown — go to the logo hold screen instead of
-      // stranding the frozen timer value (e.g. "0:42") as a lyric slide.
-      clearCountdown(track); t.song = { title: '', lines: [], background: null }; t.mode = 'logo'
-    } else if (t.mode === 'livecall') {
-      // A call is one continuous view, not a sequence of slides — there is
-      // nothing to un-blank or step through within it. Before this branch
-      // existed, the general "un-blank" case below caught mode 'livecall' too
-      // (it is never 'lyrics') and flipped it straight to 'lyrics' on the
-      // FIRST Next press, silently kicking the operator's own preview/output
-      // window off the call while the zone screens — routed by item type, not
-      // by t.mode — kept showing it. That split, with no error anywhere, is
-      // worse than any other mode's swallowed-press bug this session found.
-      const nextItem = adjacentLiveItem(track, 1)
-      if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
-      t.mode = 'logo'
-    } else if (t.mode !== 'lyrics' && !t.deckSlides && !t.sermonSlides) {
-      // Black/logo were operator-blanked — Next un-blanks back to the slide.
-      //
-      // Skipped when a deck is loaded. A sermon deliberately loads at
-      // mode 'logo' (see doLoadSermon), and the deck path in computeZoneStates
-      // ignores t.mode entirely — so this branch used to eat the operator's
-      // FIRST Next press after going live on a sermon, changing nothing on any
-      // screen. It read as "Next is broken"; it took two presses to reach
-      // verse one.
-      //
-      // Also skipped when t.sermonSlides is set: a verses-based sermon skips
-      // the legacy deck entirely (doLoadSermon), leaving t.deckSlides null
-      // even though it's fully live — without this exception the same
-      // swallowed-first-press bug came back for verses sermons specifically.
+    // Decision table lives in shared/liveNav.ts (unit-tested). Notes on the
+    // individual cases:
+    //  - countdown: one continuous view. Next moves to the next item (or the
+    //    logo, never the frozen timer value as a lyric slide); Prev moves to
+    //    the previous item or is ignored so the timer keeps running (QA B3 —
+    //    Prev used to fall into "un-blank", freezing e.g. "4:57" on screen).
+    //  - livecall: one continuous view, not a sequence of slides; un-blanking
+    //    flipped it to 'lyrics' and kicked the operator's own output off the
+    //    call while zone screens kept showing it.
+    //  - un-blank: black/logo were operator-blanked. Skipped for decks and
+    //    verses-sermons, which deliberately sit at mode 'logo' and advance on
+    //    their own index — otherwise the first press after going live on a
+    //    sermon was swallowed ("Next is broken").
+    const action = planNav(dir, { mode: t.mode, hasDeck: !!t.deckSlides, hasSermonSlides: !!t.sermonSlides, index: t.index, lastIndex: last })
+    if (action.kind === 'adjacent') {
+      const item = adjacentLiveItem(track, action.dir)
+      if (item) { void handleTabletLoadItem(track, item.id); return }
+      if (action.fallback === 'logo-after-countdown') {
+        clearCountdown(track); t.song = { title: '', lines: [], background: null }; t.mode = 'logo'
+      } else if (action.fallback === 'logo') {
+        t.mode = 'logo'
+      }
+      // fallback 'none' (e.g. Prev with nothing before a countdown): leave the
+      // track as it is — the countdown timer keeps running.
+    } else if (action.kind === 'unblank') {
       clearCountdown(track); t.mode = 'lyrics'
-    } else if (t.index < last) {
-      t.index++; logServiceEvent(`next: ${t.index}/${last}`)
-      t.textHidden = false
     } else {
-      // At the last slide of this item — advance to the next service item.
-      const nextItem = adjacentLiveItem(track, 1)
-      if (nextItem) { void handleTabletLoadItem(track, nextItem.id); return }
-    }
-  } else if (type === 'prev') {
-    t.textHidden = false
-    if (t.mode === 'livecall') {
-      // See the mirroring 'next' branch above — one continuous view, step to
-      // the previous item rather than un-blanking to nothing.
-      const prevItem = adjacentLiveItem(track, -1)
-      if (prevItem) { void handleTabletLoadItem(track, prevItem.id); return }
-      t.mode = 'logo'
-    } else if (t.mode !== 'lyrics' && !t.deckSlides && !t.sermonSlides) {
-      // Same "un-blank eats the first press" bug the 'next' branch documents
-      // above, mirrored here: this had no deck exception at all, so pressing
-      // Prev right after going live on a sermon (mode 'logo', index 0) only
-      // flipped the mode and never stepped back to the previous item. Also
-      // exempts verses-based sermons (t.sermonSlides set, t.deckSlides null)
-      // for the same reason as the 'next' branch above.
-      clearCountdown(track); t.mode = 'lyrics'
-    }
-    else if (t.index > 0) { t.index--; logServiceEvent(`prev: ${t.index}/${last}`); t.textHidden = false }
-    else {
-      // At the first slide — step back to the previous service item.
-      const prevItem = adjacentLiveItem(track, -1)
-      if (prevItem) { void handleTabletLoadItem(track, prevItem.id); return }
+      t.index += action.delta
+      logServiceEvent(`${type}: ${t.index}/${last}`)
     }
   } else if (type === 'black') { clearCountdown(track); t.mode = 'black'; logServiceEvent('black') }
   else if (type === 'logo') { clearCountdown(track); t.mode = 'logo'; logServiceEvent('logo') }
@@ -1376,6 +1349,18 @@ function processIntent(track: TrackId, type: Intent): void {
 }
 
 // --- Extracted load functions (used by IPC handlers and tablet loadItem) ---
+// Per-item state every loader resets when NEW content goes live on a track.
+//  - textHidden: QA B2 — "Clear lyrics" (C) used to carry over to the next
+//    item's Go Live, so the congregation got no words while the operator's
+//    CURRENT preview looked normal. Like ProPresenter, a new item brings the
+//    lyrics back; bgHidden (G) stays sticky by design.
+//  - isTicker: only doLoadTickerAnnouncement sets it.
+function resetPerItemLayers(track: TrackId): void {
+  const t = tracks[track]
+  t.textHidden = false
+  t.isTicker = false
+}
+
 // `item`, when given, is the live ServiceItem this text came from — used to
 // look up and load its authored zone-slide deck (if any). Ad-hoc loads (Quick
 // Text, tickers, announcements) pass no item, so they never carry a deck.
@@ -1391,10 +1376,10 @@ function doLoadText(track: TrackId, title: string, body: string, background: str
   t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
   t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
-  const lines: string[] = []
-  if (title) lines.push(title)
-  body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).forEach((b) => lines.push(b))
-  t.song = { title: title || 'Announcement', lines: lines.length ? lines : [title], background }
+  resetPerItemLayers(track)
+  // An untitled card keeps an empty title. It used to default to
+  // 'Announcement', which the output treated as "render as ticker" (QA A-C1).
+  t.song = { title, lines: textCardSlides(title, body), background }
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = blurBehindText ?? false
   // Only a text item's own saved font size overrides the live size — tickers/
@@ -1418,6 +1403,7 @@ function doLoadSermon(track: TrackId, title: string, speaker: string, passage: s
   clearSongMeta(track)
   t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // dropped here; loadDeckOnto repopulates it below if `item` has one
+  resetPerItemLayers(track)
   const line = [speaker, passage].filter(Boolean).join('\n')
   const verses = (item?.payload.verses as SermonVerse[] | undefined) ?? []
   const slides = buildSermonSlides(line, verses, lookupScripture)
@@ -1454,6 +1440,7 @@ function doLoadLiveCall(track: TrackId, title: string): void {
   t.scriptureRef = null
   clearSongMeta(track)
   t.deckSlides = null
+  resetPerItemLayers(track)
   t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   t.song = { title, lines: [''], background: null }
   t.songTextColor = null; t.songFont = null
@@ -1572,6 +1559,7 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
   clearSongMeta(track)
   t.bgFit = bgFit ?? 'cover'
   t.deckSlides = null  // countdowns never carry a deck
+  resetPerItemLayers(track)
   t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   let remaining = seconds
@@ -1669,6 +1657,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   }
   const t = tracks[track]
   t.hasLiveContent = true
+  resetPerItemLayers(track)
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -1723,6 +1712,7 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
     return
   }
   t.hasLiveContent = true
+  resetPerItemLayers(track)
   t.songId = id
   t.scriptureRef = null
   t.bgFit = 'cover'
@@ -1767,6 +1757,7 @@ function doLoadAnnouncementSlide(
   clearSongMeta(track)
   t.bgFit = 'cover'
   t.deckSlides = null
+  resetPerItemLayers(track)
   t.sermonSlides = null
   t.song = { title, lines: [body], background, icon }
   t.songTextColor = null; t.songFont = null
@@ -1774,6 +1765,18 @@ function doLoadAnnouncementSlide(
   if (fontScale != null) t.fontScale = fontScale
   t.mode = 'announcement'
   t.index = 0
+}
+
+// Ticker-display announcement: ONE slide holding the body, flagged isTicker
+// so the audience output scrolls it as a strip (QA A-C1/A-H2 — this used to
+// go through doLoadText(track, 'Announcement', body), making the title slide
+// "Announcement" the first thing scrolled, and the title the ticker sentinel).
+function doLoadTickerAnnouncement(track: TrackId, title: string, body: string): void {
+  doLoadText(track, title || 'Announcement', '')
+  const t = tracks[track]
+  const line = tickerLine(body) || title
+  t.song = { title: title || 'Announcement', lines: [line], background: null }
+  t.isTicker = true
 }
 
 // `item` is optional so the plain "load this one announcement" callers still
@@ -1789,8 +1792,7 @@ async function doLoadAnnouncement(track: TrackId, id: number | null, item?: Serv
   const a = getAnnouncement(firstId)
   if (!a) return
   if (a.display === 'ticker') {
-    // Title literally 'Announcement' triggers the ticker renderer (existing mechanism).
-    doLoadText(track, 'Announcement', a.body)
+    doLoadTickerAnnouncement(track, a.title, a.body)
   } else {
     // The service item's own background/fontScale (set via its "My Backgrounds"
     // picker) wins when present; falls back to the announcement record's own
@@ -1908,6 +1910,7 @@ function doLoadMedia(track: TrackId, filePath: string, title: string): void {
   clearSongMeta(track)
   t.bgFit = 'contain'  // a whole-slide image — fit it entirely on screen
   t.deckSlides = null  // media loads never carry a deck
+  resetPerItemLayers(track)
   t.sermonSlides = null  // not mine to keep — only doLoadSermon sets this
   t.song = { title: title || 'Media', lines: [''], background: filePath }
   t.songTextColor = null; t.songFont = null
