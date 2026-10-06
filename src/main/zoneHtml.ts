@@ -841,8 +841,20 @@ const STAGE_SCRIPT = `
         +(sub?'<div style="margin-top:2vh;font-size:2.4vw;font-weight:700;letter-spacing:0.06em;color:rgba(255,255,255,0.45)">'+esc(sub)+'</div>':'')
         +'</div>';
       var sWrap=current.firstChild;
-      var subH=sWrap.children.length>1?sWrap.children[1].getBoundingClientRect().height+window.innerHeight*0.02:0;
-      fitText(sWrap.firstChild,7,3,current.clientWidth-window.innerWidth*0.10,current.clientHeight-subH);
+      // QA A2-N4: fit into the CONTENT box (clientHeight includes padding),
+      // then make sure the speaker/passage line fits too — with a stage
+      // message and a lower third up it was cut in half behind the ticker
+      // band, and nothing flagged it.
+      var scs=getComputedStyle(current);
+      var sAvailW=current.clientWidth-parseFloat(scs.paddingLeft)-parseFloat(scs.paddingRight);
+      var sAvailH=current.clientHeight-parseFloat(scs.paddingTop)-parseFloat(scs.paddingBottom);
+      var subEl=sWrap.children.length>1?sWrap.children[1]:null;
+      var subH=subEl?subEl.getBoundingClientRect().height+window.innerHeight*0.02:0;
+      fitText(sWrap.firstChild,7,3,Math.min(sAvailW,current.clientWidth-window.innerWidth*0.10),sAvailH-subH);
+      if(subEl&&sWrap.scrollHeight>sAvailH+1){
+        fitText(subEl,2.4,1.2,sAvailW,Math.max(window.innerHeight*0.03,sAvailH-sWrap.firstChild.offsetHeight-window.innerHeight*0.02));
+      }
+      if(sWrap.scrollHeight>sAvailH+1) window.__wfOverflow=true;
       nextLine.textContent='';slideCounter.textContent='';return;
     }
     var fs=Math.max(5,Math.min(state.fontScale||6,12));
