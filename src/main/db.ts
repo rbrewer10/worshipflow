@@ -27,7 +27,7 @@ import type {
   ServicePerson
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
-import { bakMtime, copyToBak, shouldRotateBak, writeFileDurable } from './bakRotation'
+import { bakMtime, copyToBak, shouldRotateBak, stampNow, writeFileDurable } from './bakRotation'
 import { relocateStoredPath } from '../shared/pathRelocation'
 import { splitLyricLines } from '../shared/lyrics'
 import type { ZoneSlide } from '../shared/zoneSlides'
@@ -537,10 +537,16 @@ function persist(): void {
 
   try {
     writeFileDurable(tmpPath, db.export())
-    // QA A-M1: a new .bak generation at most once an hour (see bakRotation.ts),
-    // not on every save — otherwise three quick setting changes wipe them all.
-    if (existsSync(dbPath) && shouldRotateBak(bakMtime(bakPath), Date.now())) {
-      rotateBackupGenerations(bakPath)
+    // QA A-M1: .bak stays "the previous save" (what corruption recovery
+    // restores, so at most one edit is lost), but the older generations .bak.1
+    // and .bak.2 only move on at most once an hour (see bakRotation.ts) —
+    // otherwise three quick setting changes wiped every copy of a mistake.
+    if (existsSync(dbPath)) {
+      const gen1 = `${bakPath}.1`
+      if (existsSync(bakPath) && shouldRotateBak(bakMtime(gen1), Date.now())) {
+        rotateBackupGenerations(bakPath)
+        stampNow(gen1)
+      }
       copyToBak(dbPath, bakPath)
     }
     renameSync(tmpPath, dbPath)

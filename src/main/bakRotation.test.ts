@@ -53,12 +53,12 @@ describe('.bak generations survive a burst of saves (QA A-M1 repro)', () => {
     const db0 = await freshDb()
     await db0.initDb()
     db0.createSong({ title: 'Amazing Grace', sections: [{ kind: 'verse', label: 'V1', ordinal: 0, lyrics: 'Amazing grace' }] } as never)
-    // Pretend the song was saved over an hour ago (the last .bak generation is old).
     const bak = join(userData, 'worshipflow.db.bak')
     const db = await freshDb()
     await db.initDb()
+    // Pretend the last hourly generation was taken over an hour ago.
     const old = new Date(Date.now() - 2 * BAK_INTERVAL_MS)
-    utimesSync(bak, old, old)
+    if (existsSync(`${bak}.1`)) utimesSync(`${bak}.1`, old, old)
 
     const id = db.listSongs('Amazing Grace')[0].id
     db.deleteSong(id)
@@ -72,16 +72,27 @@ describe('.bak generations survive a burst of saves (QA A-M1 repro)', () => {
     expect(holding.length).toBeGreaterThan(0)
   })
 
-  it('a launch with many saves rewrites at most one generation', async () => {
+  it('a launch with many saves does not churn the hourly generations', async () => {
     const db0 = await freshDb()
     await db0.initDb()
     db0.setSetting('church_name', 'first')
     const bak = join(userData, 'worshipflow.db.bak')
-    const before = statSync(bak).mtimeMs
     const db = await freshDb()
     await db.initDb()
+    db.setSetting('church_name', 'second')
+    const gen1Before = statSync(`${bak}.1`).mtimeMs
+    const gen1Bytes = readFileSync(`${bak}.1`)
     for (let i = 0; i < 10; i++) db.setSetting('church_name', `n${i}`)
-    expect(statSync(bak).mtimeMs).toBe(before)
+    expect(statSync(`${bak}.1`).mtimeMs).toBe(gen1Before)
+    expect(Buffer.compare(readFileSync(`${bak}.1`), gen1Bytes)).toBe(0)
     expect(existsSync(`${bak}.2`)).toBe(false)
+  })
+
+  it('.bak is always the previous save, so corruption recovery loses at most one edit', async () => {
+    const db = await freshDb()
+    await db.initDb()
+    for (let i = 0; i < 5; i++) db.createSong({ title: `Song ${i}`, sections: [{ kind: 'verse', label: 'V1', ordinal: 0, lyrics: 'x' }] } as never)
+    const titles = await songTitlesIn(join(userData, 'worshipflow.db.bak'))
+    expect(titles).toEqual(['Song 0', 'Song 1', 'Song 2', 'Song 3'])
   })
 })
