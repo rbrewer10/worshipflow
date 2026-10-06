@@ -171,3 +171,39 @@ test('B4-N1: a reference that will not resolve is blocking in Review plan, and G
     expect((await liveState(op)).liveServiceItemId).toBe(before)
   } finally { await closeApp(app, userDataDir) }
 })
+
+// QA retest5 A5-N1 (High): "Isa 9:6" put Jeremiah 9:6 on the projector and
+// "Jer 29:11" fell through to Lamentations. A5-N2: "John 3:16; 5:24" dropped 5:24.
+test('A5-N1: abbreviated books go live as the right passage; A5-N2: a bookless passage after ";" continues the book', async () => {
+  test.setTimeout(180_000)
+  const { app, userDataDir } = await launchApp()
+  try {
+    const op = await operatorWindow(app)
+    await completeFirstRun(op, { sample: true })
+    const READS: Array<[string, RegExp[], RegExp]> = [
+      ['Isa 9:6', [/For unto us a child is born/], /habitation is in the midst of deceit/],
+      ['Jer 29:11', [/For I know the thoughts that I think toward you/], /^$/],
+      ['John 3:16; 5:24', [/For God so loved the world/, /He that heareth my word/], /^$/],
+    ]
+    const ids = await op.evaluate(async (refs) => {
+      const wf = (window as any).wf
+      const sid = await wf.serviceCreate('Abbrev', '2026-10-11')
+      await wf.setActiveService(sid)
+      await wf.serviceAddItem(sid, { type: 'text', payload: { title: 'Start', body: 'Start slide' } })
+      const out: number[] = []
+      for (const reference of refs) out.push(await wf.serviceAddItem(sid, { type: 'scripture', payload: { reference } }))
+      await wf.serviceAddItem(sid, { type: 'text', payload: { title: 'End', body: 'End slide' } })
+      return out
+    }, READS.map(([r]) => r))
+    await reloadOperator(op)
+    await goToLiveControl(op)
+    for (let i = 0; i < READS.length; i++) {
+      const [ref, want, never] = READS[i]
+      if ((await liveState(op)).liveServiceItemId !== ids[i]) await goLive(op, ref)
+      expect((await liveState(op)).liveServiceItemId, `${ref} didn't go live`).toBe(ids[i])
+      const text = (await stepThrough(app, op, ids[i])).join('\n')
+      for (const w of want) expect(text, ref).toMatch(w)
+      if (never.source !== '^$') expect(text, `${ref} showed the wrong book`).not.toMatch(never)
+    }
+  } finally { await closeApp(app, userDataDir) }
+})
