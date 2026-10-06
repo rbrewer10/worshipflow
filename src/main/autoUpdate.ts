@@ -77,8 +77,7 @@ async function doRequestInstall(deps: AutoUpdateDeps): Promise<InstallResult> {
   const show = (opts: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> =>
     parent && !parent.isDestroyed() ? dialog.showMessageBox(parent, opts) : dialog.showMessageBox(opts)
 
-  const blocked = deps.installBlockReason()
-  if (blocked) {
+  const showBlocked = async (blocked: string): Promise<InstallResult> => {
     await show({
       type: 'info',
       title: 'Update later',
@@ -90,6 +89,9 @@ async function doRequestInstall(deps: AutoUpdateDeps): Promise<InstallResult> {
     })
     return 'blocked'
   }
+
+  const blocked = deps.installBlockReason()
+  if (blocked) return showBlocked(blocked)
 
   const { response } = await show({
     type: 'question',
@@ -103,8 +105,12 @@ async function doRequestInstall(deps: AutoUpdateDeps): Promise<InstallResult> {
     noLink: true
   })
   if (response !== 1) return 'later'
-  // Re-check: something may have gone live while the dialog was open.
-  if (deps.installBlockReason()) return requestInstall(deps)
+  // Re-check: something may have gone live while the dialog was open. Say so
+  // here — re-entering requestInstall() returned the very promise we're
+  // inside, which waited on itself forever and left the button dead for the
+  // session (QA A2-N7).
+  const blockedNow = deps.installBlockReason()
+  if (blockedNow) return showBlocked(blockedNow)
   logInfo(`[autoUpdate] operator confirmed install of ${downloadedVersion}`)
   // Silent (no volunteer-facing installer wizard), relaunch afterwards.
   autoUpdater.quitAndInstall(true, true)
