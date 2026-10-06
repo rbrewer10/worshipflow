@@ -27,7 +27,10 @@ describe('QA B2: a new item brings hidden lyrics back', () => {
   ]
   for (const sig of loaders) {
     it(`${sig.replace(/^(async )?function /, '').replace('(', '')} resets per-item layers`, () => {
-      expect(body(sig)).toMatch(/resetPerItemLayers\(track(, generation)?\)/)
+      // The whole function (to its closing brace at column 0), not a fixed
+      // window: doLoadScripture grew with the B4-N1 multi-chapter work.
+      const fn = body(sig, 20000)
+      expect(fn.slice(0, fn.indexOf('\n}\n') + 2)).toMatch(/resetPerItemLayers\(track(, generation)?\)/)
     })
   }
   it('resetPerItemLayers clears textHidden (but not bgHidden)', () => {
