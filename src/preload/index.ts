@@ -286,7 +286,7 @@ const wf = {
   logsOpenFolder: (): Promise<void> => ipcRenderer.invoke('wf:logs:openFolder'),
 
   // Database backups (one automatic snapshot per launch — see createTimestampedBackup)
-  backupsList: (): Promise<{ filename: string; timestamp: number }[]> =>
+  backupsList: (): Promise<{ filename: string; timestamp: number; kind?: 'launch' | 'pre-restore' }[]> =>
     ipcRenderer.invoke('wf:backups:list'),
   backupsRestore: (filename: string): Promise<void> =>
     ipcRenderer.invoke('wf:backups:restore', filename),

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FileText, FolderOpen } from 'lucide-react'
 import type { AppInfo } from '../../../shared/types'
+import { isShowingContent, restoreConfirmText, type BackupKind } from '../../../shared/backupNames'
 
 function fmtBackupTime(ts: number): string {
   const d = new Date(ts)
@@ -12,19 +13,17 @@ function fmtBackupTime(ts: number): string {
 // "backups silently exist" and "an operator can actually use one" without
 // touching the filesystem by hand.
 function BackupsPanel(): JSX.Element {
-  const [backups, setBackups] = useState<{ filename: string; timestamp: number }[]>([])
+  const [backups, setBackups] = useState<{ filename: string; timestamp: number; kind?: BackupKind }[]>([])
   const [restoring, setRestoring] = useState<string | null>(null)
 
   useEffect(() => { window.wf.backupsList().then(setBackups) }, [])
 
-  const restore = (filename: string, timestamp: number): void => {
+  const restore = async (filename: string, timestamp: number, kind: BackupKind = 'launch'): Promise<void> => {
     const when = fmtBackupTime(timestamp)
-    if (!confirm(
-      `Restore the database to how it was on ${when}?\n\n` +
-      'Everything added or changed since then will be gone. The app will ' +
-      'restart automatically — your current database is also backed up first, ' +
-      'just in case.'
-    )) return
+    // QA A-M3: the restart blanks every screen — say so, louder if something is live.
+    const states = await Promise.all([window.wf.getState('main'), window.wf.getState('second')]).catch(() => [])
+    const liveNow = states.some((st) => isShowingContent(st?.mode))
+    if (!confirm(restoreConfirmText(when, kind, liveNow))) return
     setRestoring(filename)
     window.wf.backupsRestore(filename).catch((err) => {
       setRestoring(null)
@@ -46,9 +45,12 @@ function BackupsPanel(): JSX.Element {
         <ul className="max-h-48 space-y-1 overflow-auto">
           {backups.map((b) => (
             <li key={b.filename} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-panel-raised">
-              <span className="text-content-primary">{fmtBackupTime(b.timestamp)}</span>
+              <span className="text-content-primary">
+                {fmtBackupTime(b.timestamp)}
+                {b.kind === 'pre-restore' && <span className="ml-2 text-content-secondary">(before a restore — undo)</span>}
+              </span>
               <button
-                onClick={() => restore(b.filename, b.timestamp)}
+                onClick={() => void restore(b.filename, b.timestamp, b.kind)}
                 disabled={restoring != null}
                 className="rounded-md border border-border bg-panel-raised px-2.5 py-1 font-semibold text-content-secondary hover:bg-border-strong disabled:opacity-50"
               >
