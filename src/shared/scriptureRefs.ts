@@ -63,3 +63,30 @@ export function subReference(reference: string, from: number, to: number): strin
   if (!base) return reference
   return from === to ? `${base}:${from}` : `${base}:${from}-${to}`
 }
+
+/**
+ * The reference for one slide's verses. When the lookup gave chapters (KJV
+ * always does; bible-api.com too) the slide is addressed exactly, even across
+ * a chapter boundary ("John 3:36-4:2"); otherwise it falls back to narrowing
+ * the passage's own reference (subReference).
+ */
+export function rangeReference(
+  result: { reference?: string; book?: string },
+  fallbackReference: string,
+  range: { from: number; to: number; fromC?: number; toC?: number }
+): string {
+  if (result.book && range.fromC != null && range.toC != null) {
+    if (range.fromC === range.toC) {
+      return range.from === range.to ? `${result.book} ${range.fromC}:${range.from}` : `${result.book} ${range.fromC}:${range.from}-${range.to}`
+    }
+    return `${result.book} ${range.fromC}:${range.from}-${range.toC}:${range.to}`
+  }
+  return subReference(result.reference ?? fallbackReference, range.from, range.to)
+}
+
+/** "16  For God so loved…", or "24:1  The earth is…" when a reading spans chapters. */
+export function verseLines(verses: Array<{ n: number; c?: number; text: string }>): string[] {
+  if (verses.length === 1) return [verses[0].text]
+  const multiChapter = new Set(verses.map((v) => v.c ?? 0)).size > 1
+  return verses.map((v) => `${multiChapter && v.c != null ? `${v.c}:` : ''}${v.n}  ${v.text}`)
+}

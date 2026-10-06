@@ -1,4 +1,6 @@
 import type { ServiceFull, ServiceItem, ServicePerson, SongSummary } from '../../shared/types'
+import { parseReferenceList } from '../../shared/scriptureRefs'
+import { referenceProblem } from '../../shared/scriptureParse'
 
 export type ServiceIssueLevel = 'blocking' | 'warning'
 
@@ -41,6 +43,23 @@ export function computeServiceReadiness(service: ServiceFull, songs: SongSummary
     }
     if (item.type === 'scripture' && !(item.payload.reference as string | undefined)?.trim()) {
       issues.push({ id: `scripture-${item.id}`, level: 'blocking', label: 'Add a scripture reference', detail: 'Enter a passage before publishing this reading.', itemId: item.id })
+    } else if (item.type === 'scripture') {
+      // QA B4-N1: a reference the lookup can't read used to pass review and
+      // then do nothing at Go Live. Same grammar as the lookup itself.
+      for (const ref of parseReferenceList(item.payload.reference as string)) {
+        const problem = referenceProblem(ref)
+        if (problem) {
+          issues.push({ id: `scripture-ref-${item.id}-${ref}`, level: 'blocking', label: `Fix the reference “${ref}”`, detail: `${problem} It won't go live as written.`, itemId: item.id })
+        }
+      }
+    }
+    if (item.type === 'sermon' && (item.payload.passage as string | undefined)?.trim()) {
+      // The sermon deck looks the passage up as one reference.
+      const passage = (item.payload.passage as string).trim()
+      const problem = referenceProblem(passage)
+      if (problem) {
+        issues.push({ id: `sermon-ref-${item.id}`, level: 'warning', label: `Check the sermon passage “${passage}”`, detail: `${problem} The sermon card shows, but the reading slides won't.`, itemId: item.id })
+      }
     }
     if ((item.type === 'text' || item.type === 'sermon') && !Object.values(item.payload).some((value) => typeof value === 'string' && value.trim())) {
       issues.push({ id: `content-${item.id}`, level: 'blocking', label: `Add content to “${itemLabel(item)}”`, detail: 'This item is empty and cannot be reviewed yet.', itemId: item.id })

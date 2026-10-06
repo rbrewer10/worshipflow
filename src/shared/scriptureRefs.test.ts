@@ -112,3 +112,21 @@ describe('wholeChapter (QA B3-N3)', () => {
     expect(wholeChapter('Psalm 23-24')).toBeNull()
   })
 })
+
+describe('rangeReference / verseLines (QA B4-N1: readings across chapters)', () => {
+  it('addresses each slide exactly, including across a chapter boundary', async () => {
+    const { rangeReference } = await import('./scriptureRefs')
+    const r = { reference: 'John 3:35-36, 4:1-3', book: 'John' }
+    expect(rangeReference(r, 'x', { from: 35, to: 36, fromC: 3, toC: 3 })).toBe('John 3:35-36')
+    expect(rangeReference(r, 'x', { from: 36, to: 2, fromC: 3, toC: 4 })).toBe('John 3:36-4:2')
+    expect(rangeReference(r, 'x', { from: 3, to: 3, fromC: 4, toC: 4 })).toBe('John 4:3')
+    // no chapters known (an online result without them): old narrowing
+    expect(rangeReference({ reference: 'Psalms 100' }, 'Psalm 100', { from: 1, to: 2 })).toBe('Psalms 100:1-2')
+  })
+  it('prefixes the chapter on verse lines only when a reading spans chapters', async () => {
+    const { verseLines } = await import('./scriptureRefs')
+    expect(verseLines([{ n: 1, c: 23, text: 'a' }, { n: 2, c: 23, text: 'b' }])).toEqual(['1  a', '2  b'])
+    expect(verseLines([{ n: 6, c: 23, text: 'a' }, { n: 1, c: 24, text: 'b' }])).toEqual(['23:6  a', '24:1  b'])
+    expect(verseLines([{ n: 16, text: 'only' }])).toEqual(['only'])
+  })
+})

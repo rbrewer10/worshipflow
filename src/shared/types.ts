@@ -356,6 +356,9 @@ export const DEFAULT_ZONE_TRACK: Record<ZoneId, TrackId> = { 1: 'main', 2: 'main
 export interface ScriptureVerse {
   n: number
   text: string
+  // Chapter, when known — a reading can now span chapters ("Psalm 23-24",
+  // "John 3:35-4:3"), where verse numbers start again (QA B4-N1).
+  c?: number
 }
 
 // One entry per reference in a scripture item's field, for validating the whole
@@ -371,6 +374,8 @@ export interface ScriptureRefCheck {
 export interface ScriptureResult {
   ok: boolean
   reference?: string
+  // Canonical book name ("Psalms"), for building per-slide sub-references.
+  book?: string
   verses?: ScriptureVerse[]
   error?: string
   // True when an online translation lookup failed and this is the bundled KJV
