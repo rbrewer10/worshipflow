@@ -77,6 +77,17 @@ describe('recording session', () => {
     expect(toasts.some((t) => /OBS/i.test(t))).toBe(true)
   })
 
+  it('QA B22: the OBS-offline toast shows once per service, not on every Go Live', async () => {
+    const { deps, toasts } = makeDeps({ obsConnected: () => false })
+    const s = createRecordingSession(deps)
+    await Promise.all([s.onItemLive(makeItem(1, 'welcome', 'Welcome'), 42, 'Sunday AM', '2026-07-19'), s.onItemLive(makeItem(1, 'welcome', 'Welcome'), 42, 'Sunday AM', '2026-07-19')])
+    await s.onItemLive(makeItem(2, 'song', 'Amazing Grace'), 42, 'Sunday AM', '2026-07-19')
+    expect(toasts.filter((t) => /OBS is offline/.test(t))).toHaveLength(1)
+    await s.onServiceEnded()
+    await s.onItemLive(makeItem(3, 'welcome', 'Welcome'), 43, 'Next Sunday', '2026-07-26')
+    expect(toasts.filter((t) => /OBS is offline/.test(t))).toHaveLength(2)
+  })
+
   it('does not start when auto-record is disabled', async () => {
     const { deps } = makeDeps({ autoRecordEnabled: () => false })
     const s = createRecordingSession(deps)

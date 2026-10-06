@@ -38,3 +38,13 @@ export const SAMPLE_SONGS: SongInput[] = [
 ]
 
 export const SAMPLE_SERVICE_NAME = 'Sample Sunday'
+
+// QA B23: Sample Sunday was created with no date, so a brand-new install
+// greeted the operator with "1 thing to fix". Give it the coming Sunday
+// (today if it is Sunday), as a local-calendar YYYY-MM-DD.
+export function nextSundayIso(now: Date): string {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7))
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}

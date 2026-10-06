@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import type { LiveState, TrackId } from '../../../shared/types'
 import { useService } from '../ServiceContext'
 import { resolveUpcoming } from '../liveUpcoming'
+import { hiddenLayerNotice } from '../../../shared/liveLayersUi'
 
 // Replaces the click-any-slide SlideGrid for the main track. CURRENT/NEXT are
 // read straight off LiveState (main process already computes them); AFTER
@@ -61,6 +62,8 @@ function LiveTriptych({ track }: { track: TrackId }): JSX.Element {
   const sermonLive = liveItem?.type === 'sermon'
   const isLogo = live?.mode === 'logo' && !sermonLive
   const showLiveContent = !isBlack && !isLogo
+  const layerNotice = hiddenLayerNotice(live)
+  const lyricsHidden = !!live?.textHidden && live?.mode === 'lyrics'
 
   return (
     <div className="wf-live-triptych grid h-full min-w-0 flex-1 grid-cols-[minmax(0,1.55fr)_minmax(190px,0.85fr)] grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden p-3">
@@ -70,7 +73,13 @@ function LiveTriptych({ track }: { track: TrackId }): JSX.Element {
           <span>{showLiveContent ? (live?.songTitle || 'Current') : 'Current'}</span>
           {showLiveContent && live && live.total > 0 && <span className="tabular-nums">Slide {live.index + 1} of {live.total}</span>}
         </div>
-        <p className="whitespace-pre-line text-center text-3xl font-semibold leading-snug text-content-primary">
+        {/* QA B20: the preview used to look normal while the audience saw no words. */}
+        {layerNotice && (
+          <div role="status" className="self-center rounded-md bg-amber-500/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-300 ring-1 ring-amber-500/40">
+            {layerNotice} — press C / G or S to show
+          </div>
+        )}
+        <p className={`whitespace-pre-line text-center text-3xl font-semibold leading-snug ${lyricsHidden ? 'text-content-tertiary line-through decoration-amber-500/60' : 'text-content-primary'}`}>
           {isBlack
             ? <span className="italic text-content-tertiary">Screen is black</span>
             : isLogo

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { estimateItemDurationSeconds, estimateServiceDuration, formatDurationEstimate } from './serviceDuration'
+import { durationLabel, estimateItemDurationSeconds, estimateServiceDuration, formatDurationEstimate } from './serviceDuration'
 import type { ServiceItem } from './types'
 
 function item(overrides: Partial<ServiceItem>): ServiceItem {
@@ -49,4 +49,16 @@ describe('formatDurationEstimate', () => {
   it('shows a floor label under one minute', () => {
     expect(formatDurationEstimate(30)).toBe('< 1 min')
   })
+})
+
+describe('durationLabel (QA B23)', () => {
+  const mk = (type: ServiceItem['type'], payload: Record<string, unknown> = {}): ServiceItem => ({ id: Math.random(), ordinal: 0, type, ref_id: null, payload, title: '', notes: null, style: null, zoneRouting: null, track: 'main' })
+  it('a 101-item service with one countdown says the estimate is partial', () => {
+    const items = [mk('countdown', { seconds: 300 }), ...Array.from({ length: 100 }, () => mk('song'))]
+    expect(durationLabel(items)).toBe('~5 min timed (1 of 101 items)')
+  })
+  it('headers are not counted as untimed items', () => {
+    expect(durationLabel([mk('header'), mk('countdown', { seconds: 600 })])).toBe('~10 min')
+  })
+  it('nothing timed → no label', () => expect(durationLabel([mk('song')])).toBeNull())
 })

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { hiddenLayerNotice } from '../../shared/liveLayersUi'
 import { useChurchName } from './useChurchName'
 import {
   BookOpen,
@@ -211,12 +212,16 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
       else if (e.code === 'ArrowLeft') { e.preventDefault(); send('prev') }
       else if (k === 'b') send('black')
       else if (k === 'l') send('logo')
+      // QA B20: S shows lyrics + background again, same as the operator's S
+      // (layers hidden from the main operator screen had no way back here).
+      else if (k === 's') send('lyrics')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   const mode = live?.mode ?? 'lyrics'
+  const volunteerLayerNotice = hiddenLayerNotice(live)
   const isBlack = mode === 'black'
   const isLogo = mode === 'logo'
   const isCountdown = mode === 'countdown'
@@ -238,6 +243,15 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
         <TopBtn active={!isBlack && !isLogo} onClick={() => send('lyrics')}>
           Lyrics
         </TopBtn>
+        {volunteerLayerNotice && (
+          <button
+            onClick={() => send('lyrics')}
+            title="Show lyrics and background on the screens again (S)"
+            className="rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-bold text-amber-300 ring-1 ring-amber-500/40 hover:bg-amber-500/25"
+          >
+            {volunteerLayerNotice} — tap to show
+          </button>
+        )}
         <div className="mx-2 h-5 w-px bg-border" />
         <select
           value={activeServiceId ?? ''}

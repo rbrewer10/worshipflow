@@ -1,4 +1,5 @@
 import type { ServiceItem } from './types'
+import { NON_LIVE_TYPES } from './types'
 
 // Best-effort total: only item types that store an explicit duration
 // contribute. Most items (songs, scripture, text, etc.) have no known
@@ -35,4 +36,14 @@ export function formatDurationEstimate(totalSeconds: number): string {
   if (totalSeconds < 60) return '< 1 min'
   const minutes = Math.round(totalSeconds / 60)
   return `~${minutes} min`
+}
+
+// QA B23: a 101-item service read "~5 min" because only the countdown has a
+// known duration. Say what the number covers whenever it isn't everything.
+export function durationLabel(items: ServiceItem[]): string | null {
+  const est = estimateServiceDuration(items)
+  if (est.knownItemCount === 0) return null
+  const timeable = items.filter((it) => !NON_LIVE_TYPES.includes(it.type)).length
+  const base = formatDurationEstimate(est.totalSeconds)
+  return est.knownItemCount >= timeable ? base : `${base} timed (${est.knownItemCount} of ${timeable} items)`
 }

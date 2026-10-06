@@ -1,4 +1,4 @@
-import { SAMPLE_SERVICE_NAME, SAMPLE_SONGS } from '../shared/sampleSunday'
+import { SAMPLE_SERVICE_NAME, SAMPLE_SONGS, nextSundayIso } from '../shared/sampleSunday'
 import { addServiceItem, createService, createSong, listServices, listSongs } from './db'
 
 export function seedSampleSunday(): { serviceId: number; created: boolean } {
@@ -10,7 +10,7 @@ export function seedSampleSunday(): { serviceId: number; created: boolean } {
     return hit ? hit.id : createSong(song)
   })
 
-  const serviceId = createService(SAMPLE_SERVICE_NAME)
+  const serviceId = createService(SAMPLE_SERVICE_NAME, nextSundayIso(new Date()))
   addServiceItem(serviceId, { type: 'header', payload: { label: 'Welcome' } })
   addServiceItem(serviceId, { type: 'countdown', payload: { seconds: 300 } })
   addServiceItem(serviceId, { type: 'text', payload: { title: 'Welcome', body: 'Welcome to worship. Please silence your phones.' } })
