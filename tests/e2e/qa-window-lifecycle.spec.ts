@@ -113,6 +113,9 @@ test('A-N3: an operator that crashed past the cap comes back when the app is lau
     const op = await operatorWindow(app)
     await outputWindow(app)
     await completeFirstRun(op)
+    // Let first-run finish settling — crashing mid-navigation makes Playwright itself report "Target crashed".
+    await op.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 20_000 })
+    await op.waitForTimeout(500)
     const crashOperator = (): Promise<void> => app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer()
     })
