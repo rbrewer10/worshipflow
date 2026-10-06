@@ -171,9 +171,16 @@ const startTime = Date.now()
 // a workspace-local folder so it can run in restricted environments without touching or
 // locking the production profile. Runs at module load, before whenReady and before any
 // getPath('userData') use.
+//
+// Unpackaged runs honour an explicit `--user-data-dir=<dir>` (or WF_USER_DATA_DIR)
+// so the Playwright e2e suite really does get a throwaway profile per test —
+// without this, every e2e run silently shared <repo>/.worshipflow-dev with the
+// developer's own dev database and with every other run. Packaged builds are
+// unchanged: they always use the real %APPDATA%\worshipflow profile.
+const devUserDataOverride = app.commandLine.getSwitchValue('user-data-dir') || process.env['WF_USER_DATA_DIR'] || ''
 const userDataPath = app.isPackaged
   ? join(app.getPath('appData'), 'worshipflow')
-  : join(process.cwd(), '.worshipflow-dev')
+  : (devUserDataOverride ? resolve(devUserDataOverride) : join(process.cwd(), '.worshipflow-dev'))
 app.setPath('userData', userDataPath)
 // Some development containers do not expose a usable GPU process. Keep the
 // packaged app on normal hardware acceleration, but let local development

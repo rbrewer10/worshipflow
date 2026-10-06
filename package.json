@@ -6,6 +6,10 @@
   "main": "./out/main/index.js",
   "author": "Ryan Brewer",
   "private": true,
+  "engines": {
+    "node": ">=24.15.0 <24.16.0",
+    "npm": ">=11"
+  },
   "allowScripts": {
     "@serialport/bindings-cpp": true,
     "electron": true,
@@ -25,6 +29,7 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
+    "test:e2e:nobuild": "playwright test",
     "lint": "eslint src/renderer/src",
     "release": "node scripts/release.mjs"
   },
