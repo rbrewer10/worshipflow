@@ -20,6 +20,21 @@ describe('planNav', () => {
     expect(planNav(1, { ...base, mode: 'announcement' })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'none' })
     expect(planNav(-1, { ...base, mode: 'announcement' })).toEqual({ kind: 'adjacent', dir: -1, fallback: 'none' })
   })
+  it('QA B4-N2: an announcement BLOCK (deck) steps through every announcement, then moves on', () => {
+    const block = { ...base, mode: 'announcement', hasDeck: true, lastIndex: 2 }
+    expect(planNav(1, { ...block, index: 0 })).toEqual({ kind: 'step', delta: 1 })
+    expect(planNav(1, { ...block, index: 1 })).toEqual({ kind: 'step', delta: 1 })
+    expect(planNav(1, { ...block, index: 2 })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'none' })
+    expect(planNav(-1, { ...block, index: 2 })).toEqual({ kind: 'step', delta: -1 })
+    expect(planNav(-1, { ...block, index: 0 })).toEqual({ kind: 'adjacent', dir: -1, fallback: 'none' })
+    // a two-announcement block, as in QA's repro
+    expect(planNav(1, { ...base, mode: 'announcement', hasDeck: true, index: 0, lastIndex: 1 })).toEqual({ kind: 'step', delta: 1 })
+    expect(planNav(1, { ...base, mode: 'announcement', hasDeck: true, index: 1, lastIndex: 1 })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'none' })
+  })
+  it('B3-N8 still holds for a single announcement card (no deck), whatever its index', () => {
+    expect(planNav(1, { ...base, mode: 'announcement', index: 0, lastIndex: 0 })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'none' })
+    expect(planNav(1, { ...base, mode: 'announcement', index: 0, lastIndex: 3 })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'none' })
+  })
   it('black / logo un-blank back to the slide', () => {
     expect(planNav(1, { ...base, mode: 'black' })).toEqual({ kind: 'unblank' })
     expect(planNav(-1, { ...base, mode: 'logo' })).toEqual({ kind: 'unblank' })
