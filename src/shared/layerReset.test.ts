@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { shouldClearHiddenText, modeAfterAsyncLoad } from './layerReset'
+import { shouldClearHiddenText, modeAfterAsyncLoad, textHideApplies } from './layerReset'
 
 describe('shouldClearHiddenText (QA B2 / A-N4)', () => {
   it('C pressed before Go Live is cleared by the new item (B2)', () => {
@@ -57,5 +57,18 @@ describe('A2-N2 wiring (source guard)', () => {
       expect(body).toMatch(/t\.mode = modeAfterAsyncLoad\(t\.mode, t\.blankedAtGeneration, generation\)/)
       expect(body.slice(0, body.indexOf('modeAfterAsyncLoad'))).not.toMatch(/t\.mode = 'lyrics'/)
     }
+  })
+})
+
+describe('textHideApplies (QA B2-N11)', () => {
+  it('C is ignored on a countdown or picture, applies to lyrics / text / scripture', () => {
+    expect(textHideApplies('countdown')).toBe(false)
+    expect(textHideApplies('image')).toBe(false)
+    expect(textHideApplies('lyrics')).toBe(true)
+    expect(textHideApplies('black')).toBe(true) // pre-arming C while blanked still works
+  })
+  it('setLayers checks it before hiding text', () => {
+    const main = readFileSync(join(__dirname, '..', 'main', 'index.ts'), 'utf8')
+    expect(main).toMatch(/flags\?\.textHidden === true && !textHideApplies\(tracks\[track\]\.mode\)/)
   })
 })

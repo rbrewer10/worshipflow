@@ -24,3 +24,11 @@ export function modeAfterAsyncLoad<M extends string>(currentMode: M | 'black' | 
   if ((currentMode === 'black' || currentMode === 'logo') && blankedAtGeneration >= loadStartGeneration) return currentMode
   return 'lyrics'
 }
+
+// QA B2-N11: C ("Clear lyrics") during a countdown lit "Lyrics off" but changed
+// nothing on screen (the countdown/picture has no lyric layer), then the hidden
+// state silently carried into the next lyric item. C now only applies where
+// there are words to hide; elsewhere it's ignored with a short notice.
+export function textHideApplies(mode: string): boolean {
+  return mode !== 'countdown' && mode !== 'image'
+}
