@@ -112,3 +112,21 @@ describe('QA A-H4: no blocking error boxes in the main process', () => {
     }
   })
 })
+
+describe('QA A-L7: the recent-download memory does not grow forever', () => {
+  it('entries older than the 12s window are dropped', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-10-11T09:00:00'))
+      const { ss } = await fresh()
+      for (let i = 0; i < 50; i++) ss.wasJustImported(`ccli:${i}`)
+      expect(ss.recentImportKeyCount()).toBe(50)
+      expect(ss.wasJustImported('ccli:7')).toBe(true) // same song within 12s → quiet
+      vi.setSystemTime(new Date('2026-10-11T09:00:13'))
+      expect(ss.wasJustImported('ccli:7')).toBe(false)
+      expect(ss.recentImportKeyCount()).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
