@@ -419,7 +419,7 @@ const wf = {
     ipcRenderer.invoke('wf:roomfeed:config'),
   roomFeedNotifyCapturing: (active: boolean): Promise<void> =>
     ipcRenderer.invoke('wf:roomfeed:notifyCapturing', active),
-  restoreRecovery: (): Promise<{ ok: boolean; restored: boolean; fallback: boolean; stale: boolean; serviceName: string | null }> =>
+  restoreRecovery: (): Promise<{ ok: boolean; restored: boolean; fallback: boolean; stale: boolean; serviceName: string | null; blanked?: 'black' | 'logo' | null }> =>
     ipcRenderer.invoke('wf:app:restoreRecovery'),
   multiviewOpen: (): Promise<void> =>
     ipcRenderer.invoke('wf:multiview:open'),

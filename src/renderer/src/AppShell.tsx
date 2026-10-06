@@ -156,14 +156,10 @@ function AppShell(): JSX.Element {
   useEffect(() => {
     window.wf.restoreRecovery().then((r) => {
       if (r.restored) {
-        notifyLocal(
-          r.serviceName
-            ? `Resumed “${r.serviceName}” after a crash.`
-            : 'Resumed the last live item after a crash.',
-          'info'
-        )
+        const where = r.serviceName ? `Resumed “${r.serviceName}” after a crash` : 'Resumed the last live item after a crash'
+        notifyLocal(r.blanked ? `${where} — screens still on ${r.blanked === 'black' ? 'Black' : 'Logo'}.` : `${where}.`, 'info')
       } else if (r.fallback) {
-        notifyLocal('Could not resume the last live item — loaded the first item instead.', 'warn')
+        notifyLocal('Could not resume the last live item — the screens are on the logo. Pick an item to go live.', 'warn')
       }
     }).catch(err => {
       console.error('Failed to restore recovery state:', err)
