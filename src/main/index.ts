@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
+import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net, powerMonitor } from 'electron'
 import { isRestorableBackupName, parseBackupFilename, type BackupKind } from '../shared/backupNames'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
@@ -18,7 +18,7 @@ import { stageItemTitle } from '../shared/stageNext'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor, generatedDeckYieldsTo } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
-import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText } from '../shared/windowPolicy'
+import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText, wasOnRemovedDisplay } from '../shared/windowPolicy'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseReferenceList, formatReferenceList, subReference } from '../shared/scriptureRefs'
@@ -272,7 +272,25 @@ const outputWins = new Map<string, BrowserWindow>()
 // Set in before-quit. Window close guards (operator confirm, output Alt+F4
 // block) only apply while the app is NOT shutting down.
 let isQuitting = false
+let quitStarted = false  // before-quit or an OS session-end already ran
 const rendererRecovery = new RendererRecovery()
+
+// QA A-L3: a Windows shutdown / log-off doesn't run before-quit, so cleanExit
+// was never written and the next launch (within 12 h) was treated as a crash
+// and pushed the last live item back onto the projectors. Windows emits
+// session-end on each window (WM_ENDSESSION) just before the process is ended:
+// record a clean exit there, and drop the close guards.
+function onSessionEnd(): void {
+  if (quitStarted) return
+  isQuitting = true
+  quitStarted = true
+  logInfo('[lifecycle] OS session ending — recording a clean exit')
+  markCleanExit(true)
+  if (recordingSession.isActive()) void recordingSession.onServiceEnded()
+}
+function watchSessionEnd(win: BrowserWindow): void {
+  win.on('session-end', onSessionEnd)
+}
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
@@ -2428,6 +2446,25 @@ function createStageWindow(): void {
   loadRoute(stageWin, '/stage')
 }
 
+// QA A-L4: layoutOutputs() only rebuilds the projector outputs. A fullscreen,
+// frameless Stage window on an unplugged display could be dropped by Windows
+// onto the operator's screen and cover the UI — close it and say so (it can be
+// reopened when the screen is back). The framed multiview is just moved back
+// onto the primary display as a normal window.
+function rehomeAuxWindows(removed: Electron.Display): void {
+  const remaining = screen.getAllDisplays().filter((d) => d.id !== removed.id).map((d) => d.bounds)
+  if (stageWin && !stageWin.isDestroyed() && wasOnRemovedDisplay(stageWin.getBounds(), removed.bounds, remaining)) {
+    logWarn('[displays] stage display removed — closing the stage window')
+    stageWin.close()
+    notifyOperator('The stage screen was disconnected, so the Stage window was closed. Reopen it once the screen is back.', 'warn')
+  }
+  if (multiviewWin && !multiviewWin.isDestroyed() && wasOnRemovedDisplay(multiviewWin.getBounds(), removed.bounds, remaining)) {
+    const p = screen.getPrimaryDisplay().workArea
+    if (multiviewWin.isFullScreen()) multiviewWin.setFullScreen(false)
+    multiviewWin.setBounds({ x: p.x + 100, y: p.y + 100, width: Math.min(1280, p.width - 200), height: Math.min(720, p.height - 200) })
+  }
+}
+
 function createMultiviewWindow(): void {
   if (multiviewWin && !multiviewWin.isDestroyed()) { multiviewWin.focus(); return }
   const primary = screen.getPrimaryDisplay()
@@ -2524,6 +2561,7 @@ function createOperator(): void {
   })
   operatorWin.on('closed', () => { operatorWin = null })
   watchRenderer(operatorWin, 'operator', 'The operator screen')
+  watchSessionEnd(operatorWin)
   operatorWin.webContents.on('did-finish-load', () => {
     // A renderer reload discards the JS realm without running React's
     // unmount cleanup, so useRoomFeed's roomFeedNotifyCapturing(false) call
@@ -2604,6 +2642,7 @@ function createOutput(label: string, opts: OutputOpts): void {
   win.on('closed', () => { if (outputWins.get(label) === win) outputWins.delete(label) })
   watchRenderer(win, `output:${label}`, `Projector output ${opts.id}`)
   outputWins.set(label, win)
+  watchSessionEnd(win)
   loadRoute(win, '/output', { id: String(opts.id) })
 }
 
@@ -4417,6 +4456,9 @@ app.whenReady().then(async () => {
   // down and rebuild the live output (a mid-service black flash).
   screen.on('display-added', scheduleLayoutOutputs)
   screen.on('display-removed', scheduleLayoutOutputs)
+  screen.on('display-removed', (_e, removed) => rehomeAuxWindows(removed))
+  // Linux/macOS equivalent of Windows' session-end (QA A-L3).
+  powerMonitor.on('shutdown', onSessionEnd)
   screen.on('display-metrics-changed', scheduleLayoutOutputs)
 
   app.on('activate', () => {
@@ -4435,6 +4477,7 @@ app.on('window-all-closed', () => {
 // EADDRINUSE and leave the tablet/zone/OBS layer silently dead.
 app.on('before-quit', () => {
   isQuitting = true
+  quitStarted = true
   markCleanExit(true)
   // Best-effort final stop so a quit mid-service still finalizes the recording +
   // writes its sidecar (fire-and-forget; the app is shutting down regardless).

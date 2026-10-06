@@ -59,3 +59,17 @@ describe('QA A-H3: renderer crash recovery', () => {
     expect(slice('function workingOutputCount(', 300)).toContain('isCrashed()')
   })
 })
+
+describe('QA A-L3 / A-L4 wiring', () => {
+  const src = readFileSync(join(__dirname, 'index.ts'), 'utf8')
+  it('Windows shutdown/log-off records a clean exit', () => {
+    expect(src).toMatch(/win\.on\('session-end', onSessionEnd\)/)
+    expect(src).toMatch(/function onSessionEnd\(\): void \{[\s\S]*?markCleanExit\(true\)/)
+    expect(src).toMatch(/watchSessionEnd\(operatorWin\)/)
+    expect(src).toMatch(/outputWins\.set\(label, win\)\n\s*watchSessionEnd\(win\)/)
+    expect(src).toMatch(/powerMonitor\.on\('shutdown', onSessionEnd\)/)
+  })
+  it('unplugging a display re-homes the stage and multiview windows', () => {
+    expect(src).toMatch(/screen\.on\('display-removed', \(_e, removed\) => rehomeAuxWindows\(removed\)\)/)
+  })
+})
