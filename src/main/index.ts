@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
+import { isRestorableBackupName, parseBackupFilename, type BackupKind } from '../shared/backupNames'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
@@ -4042,17 +4043,7 @@ function pruneBackups(bakDir: string, keep: number): void {
   }
 }
 
-// Turns "worshipflow-20260730T221530.db" back into a real Date, the inverse of
-// createTimestampedBackup's `now.toISOString().replace(/[:-]/g, '').split('.')[0]`.
-// Returns null (rather than an Invalid Date) for anything that doesn't match,
-// so a stray or hand-renamed file in the backups folder can't corrupt the list.
-function parseBackupTimestamp(filename: string): Date | null {
-  const m = filename.match(/^worshipflow-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})\.db$/)
-  if (!m) return null
-  const [, y, mo, d, h, mi, s] = m
-  const date = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`)
-  return Number.isNaN(date.getTime()) ? null : date
-}
+// (Backup filename parsing lives in shared/backupNames.ts.)
 
 // The automatic per-launch backup (createTimestampedBackup) protects against a
 // bad migration, but the backups just sat in a folder with no way to actually
@@ -4061,15 +4052,16 @@ function parseBackupTimestamp(filename: string): Date | null {
 // (restoring into the live sql.js instance mid-session would mean resetting
 // every module-level cache in this file by hand — relaunching the whole app
 // is the same recovery path the operator already gets after any crash).
-ipcMain.handle('wf:backups:list', (): { filename: string; timestamp: number }[] => {
+ipcMain.handle('wf:backups:list', (): { filename: string; timestamp: number; kind: BackupKind }[] => {
   const bakDir = join(app.getPath('userData'), 'backups')
   if (!existsSync(bakDir)) return []
   try {
+    // Launch snapshots AND pre-restore copies (QA A-M3: the latter undo a wrong restore).
     return readdirSync(bakDir)
-      .map((filename) => ({ filename, date: parseBackupTimestamp(filename) }))
-      .filter((f): f is { filename: string; date: Date } => f.date != null)
-      .sort((a, b) => b.date.getTime() - a.date.getTime())
-      .map((f) => ({ filename: f.filename, timestamp: f.date.getTime() }))
+      .map((filename) => ({ filename, parsed: parseBackupFilename(filename) }))
+      .filter((f): f is { filename: string; parsed: NonNullable<ReturnType<typeof parseBackupFilename>> } => f.parsed != null)
+      .sort((a, b) => b.parsed.timestamp - a.parsed.timestamp)
+      .map((f) => ({ filename: f.filename, timestamp: f.parsed.timestamp, kind: f.parsed.kind }))
   } catch (err) {
     logError('[backups] failed to list', err)
     return []
@@ -4077,7 +4069,7 @@ ipcMain.handle('wf:backups:list', (): { filename: string; timestamp: number }[] 
 })
 
 ipcMain.handle('wf:backups:restore', async (_e, filename: string): Promise<void> => {
-  if (!/^worshipflow-\d{8}T\d{6}\.db$/.test(filename)) {
+  if (!isRestorableBackupName(filename)) {
     throw new Error(`Invalid backup filename: ${filename}`)
   }
   const bakDir = join(app.getPath('userData'), 'backups')
