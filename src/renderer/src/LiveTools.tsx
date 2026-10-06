@@ -169,14 +169,18 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       )}
 
       {/* Safety Reset — deliberately loud, always visible; force all 4 zones
-          to the logo without touching audio. Relocated from LooksPanel. */}
-      <button
-        onClick={() => void window.wf.zoneSafetyReset()}
-        title="Force all 4 zones to the logo — screens only, doesn't touch audio"
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20"
-      >
-        <ShieldAlert size={13} /> Safety Reset
-      </button>
+          to the logo without touching audio. Relocated from LooksPanel.
+          Sticky so it stays on screen when this column has to scroll on a
+          1280/1366-px laptop (QA B17). */}
+      <div className="sticky bottom-0 z-10 -my-1 bg-panel py-1">
+        <button
+          onClick={() => void window.wf.zoneSafetyReset()}
+          title="Force all 4 zones to the logo — screens only, doesn't touch audio"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20"
+        >
+          <ShieldAlert size={13} /> Safety Reset
+        </button>
+      </div>
 
       {/* Lower-frequency output and routing controls stay available without
           pushing the operator's primary controls below the fold. */}
