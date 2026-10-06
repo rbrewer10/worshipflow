@@ -186,7 +186,11 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
       </div>
 
       {showAdd && (
-        <div className="mb-2 shrink-0 rounded-xl border border-blue-500/20 bg-blue-500/[0.04] p-3">
+        // Shrinks and scrolls (min ~4.5rem) instead of holding its full height,
+        // so on a 1600x760 window with the scheduled banner and an item
+        // selected its second row stays reachable and the flow list keeps
+        // its floor below (QA B2-N4).
+        <div data-testid="add-content-panel" className="wf-service-add-panel mb-2 min-h-[4.5rem] shrink overflow-y-auto overscroll-contain rounded-xl border border-blue-500/20 bg-blue-500/[0.04] p-3">
         <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-widest text-content-secondary">Add to Sunday flow</span>
             <button onClick={() => setShowAdd(false)} className="text-content-tertiary hover:text-content-primary" aria-label="Close add content"><X size={14} /></button>
@@ -228,7 +232,9 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
         </div>
       )}
 
-      <div className="wf-service-item-list min-h-0 flex-1 overflow-auto pr-1">
+      {/* Never squeezed below ~160px (QA B2-N4: it reached 0 px with the add
+          panel open); whatever is above it shrinks/scrolls first. */}
+      <div className="wf-service-item-list min-h-[160px] flex-1 overflow-auto pr-1">
         {items.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <ListMusic size={28} className="mb-3 text-content-tertiary" />

@@ -12,9 +12,16 @@ describe('operator window floor (QA B17)', () => {
     expect(main).toMatch(/minWidth: OPERATOR_MIN_WIDTH,/)
     expect(main).not.toMatch(/minWidth: 1300/)
   })
-  it('Safety Reset stays pinned when the tools column scrolls', () => {
+  it('Safety Reset stays on screen when the tools column scrolls — as a footer outside the scroll area, so it covers nothing (B17, B2-N10)', () => {
     const tools = readFileSync(join(__dirname, '../renderer/src/LiveTools.tsx'), 'utf8')
-    expect(tools).toMatch(/sticky bottom-0[^"]*">\s*<button\s+onClick=\{\(\) => void window\.wf\.zoneSafetyReset\(\)\}/)
+    expect(tools).not.toMatch(/sticky bottom-0/)
+    const scroll = tools.indexOf('wf-live-tools-scroll')
+    const scrollEnd = tools.indexOf('<ServiceControlsDrawer')
+    const footer = tools.indexOf('wf-live-tools-footer shrink-0')
+    expect(scroll).toBeGreaterThan(-1)
+    expect(footer).toBeGreaterThan(scrollEnd)
+    expect(tools.slice(footer)).toMatch(/^[^>]*>\s*<button\s+onClick=\{\(\) => void window\.wf\.zoneSafetyReset\(\)\}/)
+    expect(tools.match(/zoneSafetyReset\(\)/g)).toHaveLength(1)
   })
 })
 
@@ -27,5 +34,9 @@ describe('song library tools (QA B18)', () => {
   it('remembers the operator’s choice', () => {
     expect(songToolsOpen('1', 400, false)).toBe(true)
     expect(songToolsOpen('0', 0, false)).toBe(false)
+  })
+  it('QA B2-N5: once open this session it stays open after the first paste', () => {
+    expect(songToolsOpen(null, 1, false, true)).toBe(true)
+    expect(songToolsOpen('0', 1, false, true)).toBe(false) // the operator's own collapse still wins
   })
 })
