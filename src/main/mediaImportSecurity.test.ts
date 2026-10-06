@@ -7,6 +7,9 @@ import {
   safeCleanupName, servablePath, ORPHAN_GRACE_MS, PARTIAL_COPY_MAX_AGE_MS, type MediaRoots
 } from './mediaImport'
 
+// Real leading bytes: since QA A4-N1 the import checks content, not just the name.
+const JPG = (body: string): Buffer => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(body)])
+
 // QA A3-N1 (High, security): a crafted .wfservice could point image items at
 // ~/.ssh/id_rsa, worshipflow.db, recovery.json or a relative path; the
 // migration copied them into imported-media and the PIN-less LAN /file route
@@ -30,7 +33,7 @@ beforeEach(() => {
   writeFileSync(join(ud, 'recovery.json'), '{}')
   writeFileSync(join(ud, 'backups', 'old.png'), 'PNG-IN-USERDATA')
   writeFileSync(join(home, 'Pictures', 'secret.txt'), 'private notes')
-  writeFileSync(join(home, 'Pictures', 'cross.jpg'), 'JPEG')
+  writeFileSync(join(home, 'Pictures', 'cross.jpg'), JPG('JPEG'))
 })
 afterEach(() => rmSync(root, { recursive: true, force: true }))
 
@@ -85,7 +88,7 @@ describe('A3-N1: importMediaFile copies only absolute picture/video files from o
   it('still copies an ordinary picture', async () => {
     const dest = await importMediaFile(join(home, 'Pictures', 'cross.jpg'), roots)
     expect(dest.startsWith(roots.mediaDir)).toBe(true)
-    expect(readFileSync(dest, 'utf8')).toBe('JPEG')
+    expect(readFileSync(dest)).toEqual(JPG('JPEG'))
   })
 })
 

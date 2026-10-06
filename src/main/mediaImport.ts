@@ -12,7 +12,8 @@
 // wires it to dialogs, the database and the startup migration.
 
 import { createHash } from 'crypto'
-import { promises as fsp, existsSync, statSync, realpathSync } from 'fs'
+import { promises as fsp, constants as fsConstants, createWriteStream, existsSync, statSync, realpathSync } from 'fs'
+import { pipeline } from 'stream/promises'
 import { basename, extname, join, relative, isAbsolute, resolve, sep } from 'path'
 
 export const MEDIA_EXTENSIONS = ['mp4', 'webm', 'mov', 'm4v', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']
@@ -133,6 +134,45 @@ export function refuseImportReason(srcPath: string, real: string | null, roots: 
   return null
 }
 
+/**
+ * QA A4-N1: what the first bytes say a file is. The extension alone let a
+ * hard link to a text file, or a database renamed .mp4, into imported-media,
+ * where the LAN /file route served it as a picture/video.
+ */
+export type SniffedMedia = 'jpeg' | 'png' | 'gif' | 'webp' | 'bmp' | 'avif' | 'isobmff' | 'quicktime' | 'webm'
+
+export function sniffMedia(head: Uint8Array): SniffedMedia | null {
+  const b = Buffer.from(head.buffer, head.byteOffset, head.byteLength)
+  const ascii = (start: number, end: number): string => b.subarray(start, end).toString('latin1')
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpeg'
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png'
+  if (b.length >= 6 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a')) return 'gif'
+  if (b.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'webp'
+  if (b.length >= 18 && ascii(0, 2) === 'BM' && [12, 40, 52, 56, 64, 108, 124].includes(b.readUInt32LE(14))) return 'bmp'
+  if (b.length >= 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'webm'
+  if (b.length >= 12 && ascii(4, 8) === 'ftyp') {
+    const brand = ascii(8, 12)
+    if (brand === 'avif' || brand === 'avis') return 'avif'
+    return brand === 'qt  ' ? 'quicktime' : 'isobmff'
+  }
+  // Older QuickTime files start with another top-level atom.
+  if (b.length >= 8 && ['moov', 'mdat', 'wide', 'free', 'skip', 'pnot'].includes(ascii(4, 8))) return 'quicktime'
+  return null
+}
+
+const PICTURES = new Set<SniffedMedia>(['jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'])
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v'])
+
+/**
+ * Do the bytes back up the extension? A picture must be a picture and a video
+ * a video; within that, a mislabelled file (a JPEG saved as .png, a QuickTime
+ * .mp4) is fine — the projector decodes by content.
+ */
+export function contentMatchesExtension(p: string, sniffed: SniffedMedia | null): boolean {
+  if (!sniffed) return false
+  return VIDEO_EXTENSIONS.has(extOf(p)) ? !PICTURES.has(sniffed) : PICTURES.has(sniffed)
+}
+
 function realOrResolved(p: string): string {
   try { return realpathSync(p) } catch { return resolve(p) }
 }
@@ -161,15 +201,35 @@ export async function importMediaFile(srcPath: string, roots: MediaRoots, opts: 
       if (statSync(dest).size === st.size) return dest // same file picked again
     } catch { /* fall through and re-copy */ }
   }
+  // QA A4-N1: open the file once and use THAT handle for every check and the
+  // copy. Re-opening the path for the copy let a swap in between (the picked
+  // file replaced by a symlink to the database) land other bytes. O_NOFOLLOW
+  // (where the OS has it) refuses a symlink put at the resolved path; the
+  // dev/inode check catches a swapped file everywhere else.
+  const handle = await fsp.open(real, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0)).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'ELOOP' || err.code === 'EMLINK') throw new MediaImportRefused(srcPath, 'changed while it was being copied')
+    throw err
+  })
   // Copy to a temp name and rename, so a copy cut short (USB pulled, disk
   // full) never leaves a truncated file that a later pick would "reuse".
   const tmp = `${dest}.part-${process.pid}-${Date.now()}`
   try {
-    await fsp.copyFile(real, tmp)
+    const opened = await handle.stat()
+    if (!opened.isFile() || opened.ino !== st.ino || opened.dev !== st.dev) {
+      throw new MediaImportRefused(srcPath, 'changed while it was being copied')
+    }
+    const head = Buffer.alloc(32)
+    const { bytesRead } = await handle.read(head, 0, head.length, 0)
+    if (!contentMatchesExtension(real, sniffMedia(head.subarray(0, bytesRead)))) {
+      throw new MediaImportRefused(srcPath, "isn't a picture or video (its contents don't match its name)")
+    }
+    await pipeline(handle.createReadStream({ start: 0, autoClose: false }), createWriteStream(tmp, { flags: 'wx' }))
     await fsp.rename(tmp, dest)
   } catch (err) {
     await fsp.rm(tmp, { force: true }).catch(() => undefined)
     throw err
+  } finally {
+    await handle.close().catch(() => undefined)
   }
   return dest
 }
