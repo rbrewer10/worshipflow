@@ -40,3 +40,15 @@ describe('song library tools (QA B18)', () => {
     expect(songToolsOpen('0', 1, false, true)).toBe(false) // the operator's own collapse still wins
   })
 })
+
+describe('Build service at 1600x760 (QA B3-N1, B3-N2) — real hit-tests are in tests/e2e/qa-retest3.spec.ts', () => {
+  it('B3-N1: the import tools scroll and shrink, so a tall setlist preview never runs under the Live drawer', () => {
+    const src = readFileSync(join(__dirname, '../renderer/src/ServiceBuilder.tsx'), 'utf8')
+    expect(src).toMatch(/className="wf-service-list flex min-h-0 /)
+    expect(src).toMatch(/data-testid="service-import-tools" className="[^"]*\bmin-h-0 shrink\b[^"]*\boverflow-y-auto\b/)
+  })
+  it('B3-N2: the flow column scrolls instead of spilling under the zone strip', () => {
+    const src = readFileSync(join(__dirname, '../renderer/src/ServiceEditor.tsx'), 'utf8')
+    expect(src).toMatch(/data-testid="service-flow" className="wf-service-flow [^"]*\boverflow-y-auto\b/)
+  })
+})
