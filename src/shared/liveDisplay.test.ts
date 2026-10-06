@@ -36,3 +36,13 @@ describe('tickerLine (QA A-H2: the ticker scrolls the body, not the word "Announ
     expect(tickerLine('Potluck after service!\n\nBring a dish.')).toBe('Potluck after service! Bring a dish.')
   })
 })
+
+describe('nextPreview — the NEXT line names the next announcement in a block (QA B5-N1)', () => {
+  it('leads with the next slide\'s title when it differs from the current one', async () => {
+    const { nextPreview } = await import('./liveDisplay')
+    expect(nextPreview({ songTitle: 'Potluck Sunday', next: 'Wednesday 7 PM', nextTitle: 'Choir Practice' })).toBe('Choir Practice — Wednesday 7 PM')
+    expect(nextPreview({ songTitle: 'Potluck Sunday', next: 'part two', nextTitle: 'Potluck Sunday' })).toBe('part two')
+    expect(nextPreview({ songTitle: 'Amazing Grace', next: 'Through many dangers', nextTitle: undefined })).toBe('Through many dangers')
+    expect(nextPreview({ songTitle: 'X', next: '', nextTitle: 'Y' })).toBe('')
+  })
+})

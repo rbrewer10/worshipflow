@@ -147,7 +147,7 @@ import {
 import { logInfo, logWarn, logError, getRecentLogLines, getLogsDir } from './logger'
 import { initAutoUpdate } from './autoUpdate'
 import { planNav } from '../shared/liveNav'
-import { textCardSlides, tickerLine } from '../shared/liveDisplay'
+import { nextPreview, textCardSlides, tickerLine } from '../shared/liveDisplay'
 import { createRecordingSession } from './recording'
 import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
@@ -274,7 +274,7 @@ if (!gotSingleInstanceLock) {
 // Second is created eagerly too but stays empty/unused until a service has
 // track:'second' items). See docs/superpowers/specs/2026-07-24-dual-live-track-design.md.
 interface LiveTrackState {
-  song: { title: string; lines: string[]; background?: string | null; bgMotion?: string | null; icon?: string | null }
+  song: { title: string; lines: string[]; background?: string | null; bgMotion?: string | null; icon?: string | null; slideTitles?: string[] | null }
   songId: number | null
   mode: Mode
   index: number
@@ -767,6 +767,10 @@ function getLocalIp(): string {
   return '127.0.0.1'
 }
 
+/** The title over slide `index`: the slide's own (announcement block, QA B5-N1) or the item's. */
+function slideTitleAt(t: { song: { title: string; slideTitles?: string[] | null } }, index: number): string {
+  return t.song.slideTitles?.[index] || t.song.title
+}
 
 function renderState(track: TrackId = 'main'): LiveState {
   const t = tracks[track]
@@ -787,7 +791,8 @@ function renderState(track: TrackId = 'main'): LiveState {
     chordLine: staged.chordLine,
     next: stripChords(rawNext),
     total: lines.length,
-    songTitle: t.hasLiveContent ? t.song.title : '',
+    songTitle: t.hasLiveContent ? slideTitleAt(t, t.index) : '',
+    nextTitle: t.hasLiveContent && t.index + 1 < lines.length ? slideTitleAt(t, t.index + 1) : '',
     background: t.hasLiveContent ? (t.song.background ?? null) : null,
     icon: t.hasLiveContent ? (t.song.icon ?? null) : null,
     bgMotion: t.hasLiveContent ? ((t.song.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null) : null,
@@ -1031,7 +1036,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     } else if (mode === 'stage') {
       // Stage always shows lyrics content with next preview.
       base.line = live.line
-      base.next = live.next
+      base.next = nextPreview(live)
       base.title = live.songTitle
       // No background on stage monitor.
     } else if (mode === 'countdown') {
@@ -1150,6 +1155,10 @@ function zoneStateFromSlot(slot: ZoneSlot, t: LiveTrackState, zoneId: ZoneId, li
   // it is the screen the pastor reads from — without this it sits empty and the
   // monitor is half useless. Costs nothing on the other zones.
   base.next = deckNextText(t, zoneId)
+  // Zone 4 is always the stage monitor page, whose top bar is the title: in an
+  // announcement block that's the current announcement's (QA B5-N1). Audience
+  // zones keep the deck's own heading slot instead of a second title.
+  if (zoneId === 4 && t.deckSlides?.[t.index]?.title && !base.title) base.title = t.deckSlides[t.index].title as string
   return base
 }
 
@@ -1160,6 +1169,9 @@ function deckNextText(t: LiveTrackState, zoneId: ZoneId): string {
   const nextIndex = t.index + 1
   if (nextIndex >= t.deckSlides.length) return ''
   const slot = resolveSlot(t.deckSlides, nextIndex, zoneId)
+  // The next announcement in a block is named, not run on as if it were more of this one (QA B5-N1).
+  const nextTitle = t.deckSlides[nextIndex].title
+  if (nextTitle && nextTitle !== t.deckSlides[t.index]?.title && slot.kind === 'text' && slot.text) return `${nextTitle} — ${slot.text}`
   if (slot.kind === 'text' || slot.kind === 'sermon') return slot.text ?? ''
   if (slot.kind === 'slide') return t.deckSource[slot.index ?? -1] ?? ''
   if (slot.kind === 'scripture') return t.deckScripture.get(`${nextIndex}:${zoneId}`) ?? ''
@@ -1503,7 +1515,10 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
   t.deckIsGenerated = isGenerated
   t.deckSource = source
   t.deckScripture = new Map()
-  t.song = { ...t.song, lines: slides.map((s) => slideSummary(s, source)) }
+  // QA B5-N1: an announcement block heads each slide with its own
+  // announcement's title (it used to keep the first one over every body).
+  const slideTitles = slides.some((s) => s.title) ? slides.map((s) => s.title ?? t.song.title) : null
+  t.song = { ...t.song, lines: slides.map((s) => slideSummary(s, source)), slideTitles }
   t.index = 0
   // Every caller fires this async and broadcasts immediately — BEFORE the deck
   // exists (the awaits above land on a later turn). Without a broadcast here
@@ -1802,15 +1817,21 @@ function doLoadTickerAnnouncement(track: TrackId, title: string, body: string): 
 
 // `item` is optional so the plain "load this one announcement" callers still
 // work; when it IS given, the block's generated deck loads on top and the
-// screens split into heading + content. The main projector keeps showing the
-// first announcement either way, which is what it did before blocks existed.
+// screens split into heading + content. The first announcement is shown until
+// the deck lands; from then on every slide carries its own announcement's
+// title (QA B5-N1 — the first title used to stay over every later body).
 async function doLoadAnnouncement(track: TrackId, id: number | null, item?: ServiceItem | null): Promise<void> {
   const refIds = Array.isArray(item?.payload.refIds)
     ? (item!.payload.refIds as unknown[]).filter((n): n is number => typeof n === 'number')
     : []
-  const firstId = refIds[0] ?? id
-  if (firstId == null) return
-  const a = getAnnouncement(firstId)
+  // A deleted announcement drops out of a block (as in the deck), so start
+  // from the first one that still exists rather than giving up on the block.
+  const candidates = refIds.length ? refIds : id != null ? [id] : []
+  let a: ReturnType<typeof getAnnouncement> = null
+  for (const candidate of candidates) {
+    a = getAnnouncement(candidate)
+    if (a) break
+  }
   if (!a) return
   if (a.display === 'ticker') {
     doLoadTickerAnnouncement(track, a.title, a.body)
