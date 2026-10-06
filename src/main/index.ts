@@ -2486,7 +2486,8 @@ function createOutput(label: string, opts: OutputOpts): void {
   })
   win.on('closed', () => outputWins.delete(label))
   outputWins.set(label, win)
-  loadRoute(win, '/output', { id: String(opts.id) })
+  // WF_OUTPUT_DIAG=1 keeps the fps/OUT badges on a packaged build (QA B13).
+  loadRoute(win, '/output', { id: String(opts.id), ...(process.env.WF_OUTPUT_DIAG === '1' ? { diag: '1' } : {}) })
 }
 
 // Signature of the current physical display arrangement — used to ignore spurious
