@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
-import { describeImport, parseServiceBundle, referencedMediaPaths, sameSong, songContentDiffers, songInputFrom, uniqueServiceName, type BundleItem, type ImportSummary } from '../shared/serviceBundle'
+import { describeImport, parseServiceBundle, referencedMediaPaths, sameSong, songContentDiffers, songInputFrom, uniqueServiceName, announcementRefs, bundleAnnouncementFrom, announcementInputFrom, sameAnnouncement, remapAnnouncementItem, BUNDLE_VERSION, type BundleAnnouncement, type BundleItem, type ImportSummary } from '../shared/serviceBundle'
 import type { ServiceImportResult } from '../shared/types'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
@@ -3494,7 +3494,16 @@ ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ ca
       return { ...item, song }
     })
   )
-  const bundle = { version: 2, name: svc.name, service_date: svc.service_date, published_at: svc.published_at ?? null, team: svc.team, theme: svc.theme, themeColors: svc.themeColors, items: itemsWithSongs }
+  // B2-N2: embed every announcement the service points at (ref_id or a
+  // block's refIds) — the id alone means nothing on the booth PC.
+  const announcements: Record<string, BundleAnnouncement> = {}
+  for (const item of svc.items) {
+    for (const id of announcementRefs(item)) {
+      const a = getAnnouncement(id)
+      if (a) announcements[String(id)] = bundleAnnouncementFrom(a)
+    }
+  }
+  const bundle = { version: BUNDLE_VERSION, name: svc.name, service_date: svc.service_date, published_at: svc.published_at ?? null, team: svc.team, theme: svc.theme, themeColors: svc.themeColors, items: itemsWithSongs, announcements }
   const { filePath, canceled } = await dialog.showSaveDialog({
     title: 'Export Service',
     defaultPath: `${svc.name.replace(/[/\\?%*:|"<>]/g, '-')}.wfservice`,
@@ -3564,17 +3573,41 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
     serviceName: renamedName, renamedFrom: renamedName !== bundle.name ? bundle.name : null,
     items: 0, skipped: parsed.skipped, songsAdded: 0, songsMatched: 0,
     songsUpdated: [], songsKept: [], songsCopied: [],
-    missingMedia: referencedMediaPaths(bundle).filter((p) => !existsSync(p))
+    missingMedia: referencedMediaPaths(bundle).filter((p) => !existsSync(p)),
+    announcementsAdded: 0, announcementsMatched: 0, announcementsMissing: [],
+    newerVersion: parsed.newerVersion
   }
   const createdSongs: number[] = []
+  const createdAnnouncements: number[] = []
+  const announcementIds = new Map<number, number>()  // exporting PC's id → this PC's
   let serviceId: number | null = null
   const copyIds = new Map<number, number>()  // local song id → its "(from file)" copy
   try {
     serviceId = createService(renamedName, bundle.service_date ?? undefined)
     if (bundle.theme) setServiceTheme(serviceId, bundle.theme, bundle.themeColors ?? null)
     if (bundle.team) setServiceTeam(serviceId, bundle.team as import('../shared/types').ServiceTeam)
+    // B2-N2: match each embedded announcement to the booth library (same
+    // title + words + display) or add it, then remap the items' ids below.
+    if (Object.keys(bundle.announcements).length) {
+      const local = listAnnouncements().map((a) => getAnnouncement(a.id)).filter((a): a is NonNullable<typeof a> => !!a)
+      for (const [key, incoming] of Object.entries(bundle.announcements)) {
+        const match = local.find((a) => sameAnnouncement(a, incoming))
+        if (match) { announcementIds.set(Number(key), match.id); summary.announcementsMatched!++; continue }
+        const id = createAnnouncement(announcementInputFrom(incoming))
+        createdAnnouncements.push(id)
+        announcementIds.set(Number(key), id)
+        summary.announcementsAdded!++
+      }
+    }
     for (const item of bundle.items) {
       let ref_id: number | null = null
+      let payload = item.payload
+      if (item.type === 'announcement') {
+        const remapped = remapAnnouncementItem(item, announcementIds)
+        ref_id = remapped.ref_id
+        payload = remapped.payload
+        if (remapped.missing) summary.announcementsMissing!.push(item.title || 'Announcement')
+      }
       if (item.song) {
         const plan = plans.find((p) => p.item === item)!
         if (plan.localId == null) {
@@ -3590,7 +3623,7 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
           if (plan.differs && choice === 'keep' && !summary.songsKept.includes(item.song.title)) summary.songsKept.push(item.song.title)
         }
       }
-      const itemId = addServiceItem(serviceId, { type: item.type, ref_id, payload: item.payload, track: item.track })
+      const itemId = addServiceItem(serviceId, { type: item.type, ref_id, payload, track: item.track })
       if (item.notes) updateServiceItemNotes(itemId, item.notes)
       if (item.style) setServiceItemStyle(itemId, item.style)
       if (item.zoneRouting) setItemZoneRouting(itemId, JSON.stringify(item.zoneRouting))
@@ -3603,6 +3636,7 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
     logError(`[import] .wfservice import failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
     try { if (serviceId != null) deleteService(serviceId) } catch { /* best effort */ }
     for (const id of createdSongs) { try { deleteSong(id) } catch { /* best effort */ } }
+    for (const id of createdAnnouncements) { try { deleteAnnouncement(id) } catch { /* best effort */ } }
     return { canceled: false, serviceId: null, error: `The service couldn't be imported (${err instanceof Error ? err.message : String(err)}). Nothing was changed.` }
   }
   // Library updates last, once the service itself imported cleanly.
@@ -3615,7 +3649,7 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
     }
   }
   logInfo(`[import] ${describeImport(summary)}`)
-  return { canceled: false, serviceId, summary: describeImport(summary), warn: summary.skipped.length > 0 || summary.missingMedia.length > 0 }
+  return { canceled: false, serviceId, summary: describeImport(summary), warn: summary.skipped.length > 0 || summary.missingMedia.length > 0 || (summary.announcementsMissing?.length ?? 0) > 0 || !!summary.newerVersion }
 })
 
 // Import a service plan exported from the Snow Hill Church app (.wfplan / .json).
