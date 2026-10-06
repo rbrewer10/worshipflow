@@ -44,7 +44,11 @@ export function planNav(dir: 1 | -1, s: NavInput): NavAction {
   // QA B3-N8: an announcement card is content, not a blank — the "un-blank"
   // branch below redrew it as a lyric slide (title dropped) and ate the press.
   // It is one card: move on, or stay put at the end of the service.
-  if (s.mode === 'announcement') return { kind: 'adjacent', dir, fallback: 'none' }
+  // QA B4-N2: but an announcement BLOCK (several announcements, one item)
+  // loads a generated deck — that steps through its slides like any deck
+  // (below) and only moves on after the last one. Checking the mode alone
+  // skipped every announcement after the first while the stage showed NEXT.
+  if (s.mode === 'announcement' && !s.hasDeck && !s.hasSermonSlides) return { kind: 'adjacent', dir, fallback: 'none' }
   // Decks and verses-sermons advance on their own index regardless of mode
   // (a sermon deliberately sits at 'logo'), so only plain blanked content
   // un-blanks here.
