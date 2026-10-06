@@ -53,6 +53,7 @@ import {
   initDb,
   checkDatabaseOnStartup,
   forceRestoreLatestBackup,
+  restoreMissingFromBackup,
   validateDatabaseFile,
   onPersistError,
   DbConflictError,
@@ -156,7 +157,7 @@ import {
   initObsAutoConnect
 } from './obs'
 import { logInfo, logWarn, logError, getRecentLogLines, getLogsDir } from './logger'
-import { atomicCopy, type DbStartupReport } from './dbRecovery'
+import { atomicCopy, moveAside, readRestoreAttempt, recordRestoreAttempt, clearRestoreAttempt, type DbStartupReport } from './dbRecovery'
 import { initAutoUpdate } from './autoUpdate'
 import { updateInstallBlockReason } from '../shared/updatePolicy'
 import { planNav } from '../shared/liveNav'
@@ -165,6 +166,7 @@ import { createRecordingSession } from './recording'
 import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
 import { createContentRunner } from './content'
+import { ACTIVE_SERVICE_SETTING, activeServiceSettingValue, parseActiveServiceSetting } from '../shared/activeService'
 
 export { TABLET_PORT }
 
@@ -2964,7 +2966,7 @@ ipcMain.handle('wf:regenerateTabletPin', () => regenerateTabletPin())
 // when items are added/edited in Build Service, so callers must explicitly
 // refresh it after any such change or newly-added items silently fail to go
 // live (found in the UI, invisible to the live-routing layer).
-function refreshActiveServiceItems(serviceId: number): void {
+function refreshActiveServiceItems(serviceId: number, opts: { silent?: boolean } = {}): void {
   const svc = getService(serviceId)
   // A deleted/nonexistent serviceId (e.g. from a stale recovery snapshot) must not
   // be left as the "active" one — otherwise later code trusting a non-null
@@ -2991,7 +2993,23 @@ function refreshActiveServiceItems(serviceId: number): void {
       applyItemTheme(track, item)
     }
   }
-  broadcast()  // projector needs the new theme, not just the tablet
+  if (!opts.silent) broadcast()  // projector needs the new theme, not just the tablet
+}
+
+// QA B-N1: the active service survives a relaunch. Restored silently at startup
+// (before any window exists), because broadcast() also writes the crash-recovery
+// snapshot and must not overwrite the one restoreRecovery is about to read.
+function restoreActiveServiceFromSettings(): void {
+  try {
+    const id = parseActiveServiceSetting(getSetting(ACTIVE_SERVICE_SETTING))
+    if (id != null && getService(id)) refreshActiveServiceItems(id, { silent: true })
+  } catch (err) {
+    logWarn(`[service] could not restore the active service: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+function rememberActiveService(serviceId: number | null): void {
+  try { setSetting(ACTIVE_SERVICE_SETTING, activeServiceSettingValue(serviceId)) } catch { /* advisory */ }
 }
 
 ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
@@ -3000,6 +3018,7 @@ ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   // one would hold a card from a service nobody is running any more.
   zonePins.clear()
   warnedMissingPins.clear()
+  rememberActiveService(serviceId)
   if (serviceId == null) {
     activeServiceId = null
     activeServiceItems = []
@@ -4098,9 +4117,19 @@ ipcMain.handle('wf:dialog:openFile', async () => {
     : await dialog.showOpenDialog(opts)
 })
 
+// The database bytes as they were before initDb() ran its migrations. Read in
+// memory and only written to backups/ once initDb() has succeeded (QA A-N1): a
+// file that fails to start must never become the newest "launch backup", or the
+// recovery path keeps restoring it.
+function readPreInitSnapshot(): Buffer | null {
+  try {
+    const p = join(app.getPath('userData'), 'worshipflow.db')
+    return existsSync(p) ? readFileSync(p) : null
+  } catch { return null }
+}
+
 // Create a timestamped backup of the database on app launch
-function createTimestampedBackup(): void {
-  const dbPath = join(app.getPath('userData'), 'worshipflow.db')
+function createTimestampedBackup(snapshot: Buffer | null): void {
   const bakDir = join(app.getPath('userData'), 'backups')
 
   try {
@@ -4108,8 +4137,8 @@ function createTimestampedBackup(): void {
     const now = new Date()
     const timestamp = now.toISOString().replace(/[:\-]/g, '').split('.')[0]
     const backupPath = join(bakDir, `worshipflow-${timestamp}.db`)
-    if (existsSync(dbPath)) {
-      copyFileSync(dbPath, backupPath)
+    if (snapshot && snapshot.length > 0) {
+      writeFileSync(backupPath, snapshot)
       console.log(`Backup created: ${backupPath}`)
     }
     pruneBackups(bakDir, 40)
@@ -4302,21 +4331,52 @@ async function confirmStartWithEmptyLibrary(report: Extract<DbStartupReport, { s
   const { response } = await dialog.showMessageBox({
     type: 'error',
     title: 'WorshipFlow Pro — database problem',
-    message: "WorshipFlow's song and service database is damaged, and no good backup was found.",
+    message: report.damagedInPlace
+      ? "WorshipFlow's song and service database is damaged, and no backup could be restored."
+      : "WorshipFlow couldn't check its song and service database.",
     detail:
       `Problem: ${report.reason}\n\n` +
       (report.corruptPath ? `The damaged file was kept (not deleted) at:\n${report.corruptPath}\n\n` : '') +
-      'You can start with an empty library now (the damaged file stays where it is, so it can still be recovered later), ' +
+      'You can start with an empty library now (the damaged file is kept beside it, so it can still be recovered later), ' +
       'or quit and copy a backup into the data folder.',
-    buttons: ['Start with an empty library', 'Open data folder', 'Quit'],
+    buttons: [report.damagedInPlace ? 'Start with an empty library' : 'Try to open it anyway', 'Open data folder', 'Quit'],
     defaultId: 2,
     cancelId: 2,
     noLink: true
   })
-  if (response === 0) return true
+  if (response === 0) {
+    // The damaged file is still in place (nothing was restored): set it aside now
+    // so initDb() starts clean, and it stays recoverable.
+    if (report.damagedInPlace) {
+      const kept = moveAside(join(userDataDir(), 'worshipflow.db'))
+      if (kept) logWarn(`[db] starting with an empty library; damaged file kept at ${kept}`)
+    }
+    return true
+  }
   if (response === 1) await shell.openPath(userDataDir())
   app.exit(1)
   return false
+}
+
+// QA A-N2: worshipflow.db is missing but a good backup exists (a failed restore
+// copy, OneDrive/antivirus moving it, someone deleting it). Starting silently
+// with an empty library used to overwrite the .bak copies within seconds.
+async function confirmMissingDatabase(report: Extract<DbStartupReport, { status: 'missing' }>): Promise<DbStartupReport | null> {
+  const when = new Date(report.candidateMtimeMs).toLocaleString()
+  logWarn(`[db] database file missing; newest good backup is ${report.candidate}`)
+  const { response } = await dialog.showMessageBox({
+    type: 'warning',
+    title: 'WorshipFlow Pro — database missing',
+    message: "WorshipFlow's song and service database is missing, but a backup was found.",
+    detail: `Newest good backup: ${basename(report.candidate)} (saved ${when}).\n\nRestore it, or start with an empty library?`,
+    buttons: ['Restore the backup', 'Start with an empty library', 'Quit'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true
+  })
+  if (response === 1) return { status: 'fresh' }
+  if (response === 2) { app.exit(1); return null }
+  return restoreMissingFromBackup()
 }
 
 // The file validated but initDb() still threw (e.g. a migration failed).
@@ -4324,6 +4384,30 @@ async function confirmStartWithEmptyLibrary(report: Extract<DbStartupReport, { s
 // process with no window.
 async function handleDbInitFailure(err: unknown): Promise<void> {
   const reason = err instanceof Error ? err.message : String(err)
+  // QA A-N1: one automatic restore only. If the restored backup fails too, the
+  // problem is the software, not the data — restoring older and older backups
+  // would walk the library backwards. Leave everything where it is.
+  const previous = readRestoreAttempt(userDataDir())
+  if (previous) {
+    logError('[db] initDb failed again after an automatic restore; not restoring another backup', reason)
+    const { response } = await dialog.showMessageBox({
+      type: 'error',
+      title: 'WorshipFlow Pro — database problem',
+      message: 'WorshipFlow still can\'t open its database, even after restoring a backup.',
+      detail:
+        `Problem: ${reason}\n\n` +
+        'This usually means a software problem rather than damaged data, so no further backups were restored. ' +
+        'Nothing has been deleted' + (previous.corruptPath ? ` — the newest data is in:\n${previous.corruptPath}` : '.') +
+        '\n\nPlease contact your WorshipFlow administrator and send the logs from the data folder.',
+      buttons: ['Open data folder', 'Quit'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    })
+    if (response === 0) await shell.openPath(userDataDir())
+    app.exit(1)
+    return
+  }
   const { response } = await dialog.showMessageBox({
     type: 'error',
     title: 'WorshipFlow Pro — database problem',
@@ -4341,15 +4425,14 @@ async function handleDbInitFailure(err: unknown): Promise<void> {
       const result = await forceRestoreLatestBackup()
       if (result.status === 'recovered') {
         logWarn(`[db] restored ${result.restoredFrom} after initDb failure; damaged copy kept at ${result.corruptPath}`)
+        recordRestoreAttempt(userDataDir(), { at: Date.now(), restoredFrom: result.restoredFrom, corruptPath: result.corruptPath })
         app.relaunch()
       } else {
         await dialog.showMessageBox({
           type: 'error',
           title: 'WorshipFlow Pro — database problem',
           message: 'No other good backup was found.',
-          detail: (result.status === 'unrecoverable' && result.corruptPath)
-            ? `The current file was kept at:\n${result.corruptPath}\n\nThe next launch will start with an empty library.`
-            : 'Please contact your WorshipFlow administrator.',
+          detail: 'The current database file was left where it is (nothing was deleted). Please contact your WorshipFlow administrator.',
           buttons: ['OK']
         })
       }
@@ -4424,15 +4507,23 @@ app.whenReady().then(async () => {
   try {
     dbReport = await checkDatabaseOnStartup()
   } catch (err) {
+    // QA A-N2: never carry on as if the check passed — a thrown restore copy
+    // used to fall through to a silent empty library.
     logError('[db] startup validation failed to run', err)
+    dbReport = { status: 'unrecoverable', reason: `the startup check failed (${err instanceof Error ? err.message : String(err)})`, corruptPath: null }
+  }
+  if (dbReport.status === 'missing') {
+    const next = await confirmMissingDatabase(dbReport)
+    if (!next) return
+    dbReport = next
   }
   if (dbReport.status === 'unrecoverable') {
     if (!(await confirmStartWithEmptyLibrary(dbReport))) return
   }
-  // Snapshot the last-good database file BEFORE initDb() runs migrations, so a bad
-  // migration can never poison the day's backup. Runs after validation so a
-  // corrupt file is never copied into backups/ as if it were a good one.
-  createTimestampedBackup()
+  // Snapshot the database bytes BEFORE initDb() runs migrations (so a bad
+  // migration can't poison the day's backup), but only write the launch backup
+  // once initDb() has succeeded (QA A-N1).
+  const preInitSnapshot = readPreInitSnapshot()
   // The database must be initialized before anything reads it — SoundCheckState
   // loads its saved rules/reference mixes during initialize(), so initDb() has to
   // run first or that read hits an undefined db handle and silently fails.
@@ -4443,9 +4534,12 @@ app.whenReady().then(async () => {
     await handleDbInitFailure(err)
     return
   }
+  createTimestampedBackup(preInitSnapshot)
+  clearRestoreAttempt(userDataDir())
   // Reconcile any recording left open by a crash/hard-quit so it doesn't stay
   // dangling forever — mark it ended now.
   closeDanglingRecordings(Date.now())
+  restoreActiveServiceFromSettings()
   // Surface save failures to the operator instead of losing them to the console.
   onPersistError((err) => {
     logError('[persist] save failed', err)

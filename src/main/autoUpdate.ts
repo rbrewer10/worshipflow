@@ -62,7 +62,16 @@ export function initAutoUpdate(deps: AutoUpdateDeps): void {
 
 export type InstallResult = 'installing' | 'blocked' | 'later' | 'none'
 
-async function requestInstall(deps: AutoUpdateDeps): Promise<InstallResult> {
+// A double-click on "Update ready…" used to open two confirm dialogs (QA
+// retest info note). The second click joins the first request instead.
+let installRequest: Promise<InstallResult> | null = null
+
+function requestInstall(deps: AutoUpdateDeps): Promise<InstallResult> {
+  if (!installRequest) installRequest = doRequestInstall(deps).finally(() => { installRequest = null })
+  return installRequest
+}
+
+async function doRequestInstall(deps: AutoUpdateDeps): Promise<InstallResult> {
   if (!app.isPackaged || downloadedVersion === null) return 'none'
   const parent = deps.parentWindow()
   const show = (opts: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> =>

@@ -3,7 +3,7 @@ import { normalizeCcli, titleMatchIsSameSong } from '../shared/songMatch'
 import { join, dirname } from 'path'
 import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, statSync } from 'fs'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
-import { checkAndRecoverDatabase, forceRecoverDatabase, validateDbFile, type DbStartupReport, type DbValidation } from './dbRecovery'
+import { checkAndRecoverDatabase, forceRecoverDatabase, restoreMissingDatabase, validateDbFile, type DbStartupReport, type DbValidation } from './dbRecovery'
 import type {
   SongSummary,
   SongFull,
@@ -179,6 +179,13 @@ export async function forceRestoreLatestBackup(): Promise<DbStartupReport> {
   const SQL = await loadSql()
   const userData = app.getPath('userData')
   return forceRecoverDatabase(SQL, join(userData, 'worshipflow.db'), join(userData, 'backups'))
+}
+
+/** The database file is missing and the operator chose to restore the newest good backup (QA A-N2). */
+export async function restoreMissingFromBackup(): Promise<DbStartupReport> {
+  const SQL = await loadSql()
+  const userData = app.getPath('userData')
+  return restoreMissingDatabase(SQL, join(userData, 'worshipflow.db'), join(userData, 'backups'))
 }
 
 /** Validate any database file (backups before restoring them, etc.). */
