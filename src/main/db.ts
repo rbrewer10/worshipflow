@@ -27,6 +27,7 @@ import type {
   ServicePerson
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
+import { copyToBak, lastRotationMs, markRotated, shouldRotateBak, writeFileDurable } from './bakRotation'
 import { relocateStoredPath } from '../shared/pathRelocation'
 import { splitLyricLines } from '../shared/lyrics'
 import type { ZoneSlide } from '../shared/zoneSlides'
@@ -535,10 +536,19 @@ function persist(): void {
   }
 
   try {
-    writeFileSync(tmpPath, Buffer.from(db.export()))
+    writeFileDurable(tmpPath, db.export())
+    // QA A-M1: .bak stays "the previous save" (what corruption recovery
+    // restores, so at most one edit is lost), but the older generations .bak.1
+    // and .bak.2 only move on at most once an hour (see bakRotation.ts) —
+    // otherwise three quick setting changes wiped every copy of a mistake.
     if (existsSync(dbPath)) {
-      rotateBackupGenerations(bakPath)
-      copyFileSync(dbPath, bakPath)
+      // The hourly clock is a sidecar, so .bak.1/.bak.2 keep the mtime of
+      // the save they hold and recovery ranks them correctly (QA A2-N3).
+      if (existsSync(bakPath) && shouldRotateBak(lastRotationMs(bakPath), Date.now())) {
+        rotateBackupGenerations(bakPath)
+        markRotated(bakPath)
+      }
+      copyToBak(dbPath, bakPath)
     }
     renameSync(tmpPath, dbPath)
     lastKnownStamp = stampOf(dbPath)
