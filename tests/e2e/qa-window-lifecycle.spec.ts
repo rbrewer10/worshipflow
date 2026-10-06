@@ -87,3 +87,47 @@ test('A-H3: crashed output and operator renderers reload by themselves', async (
     await expect.poll(async () => (await windowList(app)).every((w) => !w.crashed), { timeout: 10_000 }).toBe(true)
   } finally { await closeApp(app, userDataDir) }
 })
+
+test('A-N6: after Logo, closing the operator quits without the "projectors are live" prompt', async () => {
+  const { app, userDataDir } = await launchApp()
+  try {
+    const op = await operatorWindow(app)
+    await outputWindow(app)
+    await completeFirstRun(op)
+    await op.evaluate(() => (window as any).wf.liveLoadText('main', 'Welcome', 'Hello'))
+    await op.evaluate(() => (window as any).wf.sendIntent('main', 'logo'))
+    await op.waitForTimeout(300)
+    await app.evaluate(({ dialog }) => {
+      const g = globalThis as any
+      g.__asked = 0
+      ;(dialog as any).showMessageBox = async () => { g.__asked++; return { response: 0 } }
+    })
+    await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.close() })
+    expect(await processExited(app, 10_000)).toBe(true)
+  } finally { rmSync(userDataDir, { recursive: true, force: true }) }
+})
+
+test('A-N3: an operator that crashed past the cap comes back when the app is launched again', async () => {
+  const { app, userDataDir } = await launchApp()
+  try {
+    const op = await operatorWindow(app)
+    await outputWindow(app)
+    await completeFirstRun(op)
+    const crashOperator = (): Promise<void> => app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer()
+    })
+    const operatorCrashed = (): Promise<boolean> => app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.isCrashed())
+    for (let i = 0; i < 3; i++) {
+      await crashOperator()
+      await expect.poll(operatorCrashed, { timeout: 10_000 }).toBe(false) // reloaded automatically
+      await new Promise((r) => setTimeout(r, 700))
+    }
+    await crashOperator() // 4th within a minute: past the cap
+    await new Promise((r) => setTimeout(r, 2000))
+    expect(await operatorCrashed()).toBe(true)
+    // Double-clicking the icon again (what single-instance delivers to us).
+    await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, [], '') })
+    await expect.poll(operatorCrashed, { timeout: 10_000 }).toBe(false)
+  } finally { await closeApp(app, userDataDir) }
+})
