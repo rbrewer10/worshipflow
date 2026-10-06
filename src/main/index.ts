@@ -13,6 +13,7 @@ import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
 import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
+import { stageItemTitle } from '../shared/stageNext'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor, generatedDeckYieldsTo } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
@@ -838,6 +839,14 @@ function renderState(track: TrackId = 'main'): LiveState {
 // The all-blank ZoneState every rendering path (normal routing, and the deck
 // path below) starts from and fills in — kept as one function so the two
 // paths can never drift apart on a field neither of them meant to set.
+// Stage monitor "Up next" on the last slide of an item (QA A-H1): Next jumps
+// to the next live-able service item, so show its title.
+function nextItemTitleFor(track: TrackId): string | null {
+  const item = adjacentLiveItem(track, 1)
+  if (!item) return null
+  return stageItemTitle(item.type, item.title, item.payload)
+}
+
 function emptyZoneState(live: LiveState): ZoneState {
   return {
     mode: 'off',
@@ -1049,6 +1058,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       base.line = live.line
       base.next = live.next
       base.title = live.songTitle
+      if (!live.next) base.nextItemTitle = nextItemTitleFor(zoneTrack)
       // No background on stage monitor.
     } else if (mode === 'countdown') {
       // Parse countdown from the live line ("M:SS" format).

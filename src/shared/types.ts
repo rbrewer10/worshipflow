@@ -287,6 +287,9 @@ export interface ZoneState {
   secondsLeft: number
   // stage extras
   stageMessage: string | null
+  // Stage monitor, last slide of an item: title of the next service item, so
+  // the "Next" preview isn't an empty box (Next jumps to that item).
+  nextItemTitle?: string | null
   // image
   imagePath: string | null
   // sermon backdrop extras (mode 'sermon'): the designed title card's subtext
