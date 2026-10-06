@@ -39,7 +39,8 @@ import { zoneTrackFor, idleModeFor, clampSongIndex, STAGE_REHEARSAL_OFF } from '
 import type { StageRehearsalState } from '../shared/stageRehearsal'
 import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
-import { readRecovery, writeRecovery, isRecoveryStale, markCleanExit, wasCleanExit, type TrackSnapshot } from './recovery'
+import { readRecovery, writeRecovery, isRecoveryStale, markCleanExit, wasCleanExit, type TrackSnapshot, type RecoverySnapshot } from './recovery'
+import { StartupRecovery } from './startupRecovery'
 import { stripChords, formatSlideChords } from '../shared/chords'
 import { applyAudienceLayers } from '../shared/layers'
 import { detectNdiRuntime } from '../shared/ndiRuntime'
@@ -678,6 +679,9 @@ let lastAutoScene: string | null = null
 // JSON snapshot of everything else "actually live": per-track item/index/mode
 // plus zone pins (a crash mid-hold must not silently drop a pinned screen).
 let lastWrittenRecoveryKey: string | null = null
+// QA A2-N1: the previous session's snapshot, read once before this session's
+// first recovery write (see startupRecovery.ts) — restoreRecovery uses it.
+const startupRecovery = new StartupRecovery<RecoverySnapshot>(readRecovery, wasCleanExit)
 
 // Rehearsal mode: a global, session-only (never persisted — always starts OFF)
 // flag carried on LiveState. Real physical outputs check it and show nothing;
@@ -1322,6 +1326,9 @@ function broadcast(): void {
   const recoveryPins = zonePinsRecord()
   const recoveryKey = JSON.stringify({ main: recoveryMain, second: recoverySecond, pins: recoveryPins })
   if (recoveryKey !== lastWrittenRecoveryKey) {
+    // Never overwrite the previous session's crash snapshot before it's been
+    // read (A2-N1) — the first broadcast at startup used to do exactly that.
+    startupRecovery.capture()
     lastWrittenRecoveryKey = recoveryKey
     writeRecovery({
       serviceId: activeServiceId,
@@ -3684,7 +3691,11 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
   stale: boolean
   serviceName: string | null
 }> => {
-  const recovered = readRecovery()
+  // The snapshot as it was when this process started (A2-N1) — by now
+  // recovery.json already holds this session's own state. Handed out once, so
+  // a renderer reload/crash-revive doesn't re-load the old item.
+  const startup = startupRecovery.take()
+  const recovered = startup?.snap ?? null
   if (!recovered) return { ok: true, restored: false, fallback: false, stale: false, serviceName: null }
 
   if (isRecoveryStale(recovered, Date.now(), RECOVERY_STALE_MS)) {
@@ -3695,7 +3706,7 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
   // rehearsal (or last Sunday's closer) live on the projectors the next time
   // someone opened the app — including first-thing Sunday morning. Crash
   // recovery is for crashes; a clean quit stays idle.
-  if (wasCleanExit()) {
+  if (startup?.cleanExit) {
     return { ok: true, restored: false, fallback: false, stale: false, serviceName: null }
   }
 
@@ -4647,6 +4658,8 @@ function announceDbRecovery(report: Extract<DbStartupReport, { status: 'recovere
 app.whenReady().then(async () => {
   // Belt-and-suspenders: never touch the DB or open windows on a losing instance.
   if (!gotSingleInstanceLock) return
+  // Read last session's crash snapshot before anything can broadcast (A2-N1).
+  startupRecovery.capture()
   protocol.handle('wf-asset', async (request) => {
     const url = new URL(request.url)
     const pathParam = url.searchParams.get('path')
