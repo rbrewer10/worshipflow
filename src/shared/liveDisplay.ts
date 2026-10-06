@@ -34,3 +34,16 @@ export function textCardSlides(title: string, body: string): string[] {
 export function tickerLine(body: string): string {
   return body.replace(/\s+/g, ' ').trim()
 }
+
+/**
+ * The NEXT preview text (stage, Volunteer, tablet, pulpit). When the next slide
+ * belongs under a different heading — the next announcement in a block — its
+ * title leads, so "Next" never shows one announcement's body as if it were
+ * part of the current one (QA B5-N1).
+ */
+export function nextPreview(s: Pick<LiveState, 'next' | 'songTitle' | 'nextTitle'>): string {
+  const next = s.next ?? ''
+  if (!next) return ''
+  const title = s.nextTitle ?? ''
+  return title && title !== s.songTitle ? `${title} — ${next}` : next
+}

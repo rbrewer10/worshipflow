@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import type { Intent, LiveState, ServiceFull, ServiceItem, ServiceSummary } from '../../shared/types'
 import { localDateString } from '../../shared/localDate'
+import { nextPreview } from '../../shared/liveDisplay'
 
 const ICON: Record<ServiceItem['type'], JSX.Element> = {
   song: <Music size={14} />,
@@ -347,7 +348,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
               )}
               {live?.next && (
                 <div className="rounded-lg border border-border bg-panel px-4 py-2 text-sm text-content-secondary">
-                  Next: {live.next}
+                  Next: {nextPreview(live)}
                 </div>
               )}
             </>

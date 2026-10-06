@@ -146,6 +146,9 @@ body{display:flex;flex-direction:column}
 </div>
 
 <script>
+// QA B5-N1: the next announcement in a block is named in NEXT (mirrors shared/liveDisplay nextPreview).
+function nextPreview(s){var n=s.next||'';if(!n)return '';var t=s.nextTitle||'';return (t&&t!==s.songTitle)?(t+' \u2014 '+n):n}
+
 var elCur = document.getElementById('cur')
 var elNxt = document.getElementById('nxt')
 var elNxtW = document.getElementById('nxt-wrap')
@@ -261,7 +264,7 @@ function apply(msg) {
 
   var showNext = mode !== 'black' && mode !== 'logo' && mode !== 'countdown'
   elNxtW.style.display = showNext ? '' : 'none'
-  elNxt.textContent = s.next || '—'
+  elNxt.textContent = nextPreview(s) || '—'
 
   var title = s.songTitle || 'WorshipFlow'
   var prog = (s.total > 0) ? (' · ' + (s.index + 1) + ' of ' + s.total) : ''

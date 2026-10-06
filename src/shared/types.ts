@@ -29,6 +29,8 @@ export interface LiveState {
   next: string
   total: number
   songTitle: string
+  // The next slide's title when slides carry their own (an announcement block, QA B5-N1).
+  nextTitle?: string
   background: string | null
   icon?: string | null  // announcement mode only: 'icon:<key>' (built-in) or a real image path (custom)
   bgFit?: 'cover' | 'contain'  // 'contain' fits whole-slide images; 'cover' fills behind lyrics
