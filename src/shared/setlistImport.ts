@@ -9,7 +9,7 @@ export interface SetlistEntry {
 const SCRIPTURE = /^(?:(?:[1-3]|I{1,3})\s+)?[A-Za-z][A-Za-z]+\s+\d+(?::\d+(?:\s*[–-]\s*\d+)?)?(?:\s*[;,&].*)?$/
 
 function isScripture(line: string): boolean {
-  const t = line.replace(/^(scripture|reading|bible)\s*[:.-]\s*/i, '').trim()
+  const t = line.replace(/^(scripture reading|scripture|reading|bible)\s*[:.-]\s*/i, '').trim()
   return SCRIPTURE.test(t)
 }
 
@@ -28,14 +28,18 @@ function isSermon(line: string): boolean {
 // readiness check (QA B16).
 const ELEMENT_WORDS = [
   'welcome', 'announcements?', 'greeting', 'meet (?:and|&) greet', 'communion', "the lord'?s supper", "lord'?s supper",
-  'offering', 'offertory', 'tithes?(?: (?:and|&) offerings?)?', 'giving',
+  'offerings?', 'offertory', 'tithes?(?: (?:and|&) offerings?)?', 'giving', 'call to worship', 'scripture reading',
   '(?:opening |closing |pastoral |congregational |offertory )?prayer(?: (?:of|for) [a-z ]+)?', 'prayer time',
   'benediction', 'dismissal', 'baptism', 'teaching moment', "children'?s (?:moment|time|sermon)", 'kids (?:moment|dismissal)',
   'altar call', 'invitation', 'response', 'reflection', 'video', 'meditation', 'moment of silence', 'passing of the peace', 'the peace',
 ]
 const ELEMENT = new RegExp(`^(?:${ELEMENT_WORDS.join('|')})$`, 'i')
 
+// QA B-N3: the whole line is tried first — splitting on "&" / " and " made
+// "Tithes & Offerings" two parts, so the tithes-and-offerings pattern could
+// never match and the line became a "Song:" placeholder.
 function isServiceElement(line: string): boolean {
+  if (ELEMENT.test(line.trim())) return true
   const parts = line.split(/\s*(?:\/|&| and |\+|,)\s*/i).map((p) => p.trim()).filter(Boolean)
   return parts.length > 0 && parts.every((p) => ELEMENT.test(p))
 }
@@ -58,8 +62,8 @@ export function parseSetlist(raw: string): SetlistEntry[] {
       out.push({ kind: 'element', title: line })
       continue
     }
-    if (isScripture(line) || /^(scripture|reading|bible)\s*[:.-]/i.test(line)) {
-      const title = line.replace(/^(scripture|reading|bible)\s*[:.-]\s*/i, '').trim()
+    if (isScripture(line) || /^(scripture reading|scripture|reading|bible)\s*[:.-]/i.test(line)) {
+      const title = line.replace(/^(scripture reading|scripture|reading|bible)\s*[:.-]\s*/i, '').trim()
       out.push({ kind: 'scripture', title })
       continue
     }
