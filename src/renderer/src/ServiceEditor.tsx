@@ -370,7 +370,11 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
             height of the workspace instead of stopping where the strip begins —
             that band beside the strip was the dead space under the item editor. */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-          <div className="flex min-h-0 min-w-0 flex-1 gap-3">
+          {/* Floor of 20rem so the run of show (banner + toolbar + add panel +
+              the list's 160px floor) can't be squeezed to nothing by the
+              zone-preview strip below — the strip shrinks and scrolls instead
+              (QA B2-N4). */}
+          <div className="wf-service-flow-row flex min-h-[20rem] min-w-0 flex-1 gap-3">
           {/* Center: run of show (moved from the left column) */}
           <div className="wf-service-flow flex min-w-0 flex-1 flex-col min-h-0">
             <ScheduledAnnouncements
@@ -408,7 +412,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
             OutputsStrip-then-ScenePresetRow bottom bar, so the narrow right
             column only has to hold controls, not previews. */}
         {selectedItem && (
-          <div className="wf-service-bottom-strip flex shrink-0 flex-col gap-2 rounded-xl border border-border bg-panel-raised p-2">
+          <div className="wf-service-bottom-strip flex min-h-0 shrink flex-col gap-2 overflow-y-auto overscroll-contain rounded-xl border border-border bg-panel-raised p-2">
             {/* Capped, not full-width — at full width on a wide monitor these
                 16:9 previews scale up with it and can eat a quarter of the
                 screen. A fixed cap keeps them a consistent size regardless

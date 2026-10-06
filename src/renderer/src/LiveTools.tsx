@@ -71,7 +71,11 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
   const clearStageMessage = (): void => { setStageMsg(''); window.wf.liveSetStageMessage(track, null) }
 
   return (
-    <aside className="wf-live-tools flex w-96 shrink-0 flex-col gap-4 overflow-auto border-l border-border bg-panel p-4">
+    <aside className="wf-live-tools flex w-96 shrink-0 flex-col border-l border-border bg-panel">
+      {/* Everything but Safety Reset scrolls; Safety Reset is a footer outside
+          the scroll area (QA B2-N10: as a sticky bar inside it, it sat on top
+          of the Presenter notes / Stage message cards on a 1280x720 laptop). */}
+      <div className="wf-live-tools-scroll flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4">
       {/* Emergency controls */}
       <div className="flex gap-2">
         <button
@@ -168,19 +172,6 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
         </div>
       )}
 
-      {/* Safety Reset — deliberately loud, always visible; force all 4 zones
-          to the logo without touching audio. Relocated from LooksPanel.
-          Sticky so it stays on screen when this column has to scroll on a
-          1280/1366-px laptop (QA B17). */}
-      <div className="sticky bottom-0 z-10 -my-1 bg-panel py-1">
-        <button
-          onClick={() => void window.wf.zoneSafetyReset()}
-          title="Force all 4 zones to the logo — screens only, doesn't touch audio"
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20"
-        >
-          <ShieldAlert size={13} /> Safety Reset
-        </button>
-      </div>
 
       {/* Lower-frequency output and routing controls stay available without
           pushing the operator's primary controls below the fold. */}
@@ -192,6 +183,21 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       {/* Sermon/Worship/Invitation Mode, Livestream Check, Quick Cues, Timer */}
       <ServiceControlsDrawer track={track} liveItemId={live?.liveServiceItemId ?? null} />
 
+      </div>
+
+      {/* Safety Reset — deliberately loud, always visible; force all 4 zones
+          to the logo without touching audio. Relocated from LooksPanel. A
+          footer below the scrolling tools, so it's always on screen on a
+          1280/1366-px laptop (QA B17) without covering anything (B2-N10). */}
+      <div className="wf-live-tools-footer shrink-0 border-t border-border bg-panel px-4 py-2">
+        <button
+          onClick={() => void window.wf.zoneSafetyReset()}
+          title="Force all 4 zones to the logo — screens only, doesn't touch audio"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20"
+        >
+          <ShieldAlert size={13} /> Safety Reset
+        </button>
+      </div>
     </aside>
   )
 }

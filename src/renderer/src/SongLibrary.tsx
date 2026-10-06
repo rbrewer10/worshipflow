@@ -59,6 +59,9 @@ function DuplicateSongsPanel({ onEdit, onDelete }: { onEdit: (id: number) => voi
   )
 }
 
+// Module-level so switching tabs (which remounts this view) keeps it (B2-N5).
+let songToolsLatched = false
+
 function SongLibrary(): JSX.Element {
   const { activeServiceId, activeService, reloadActiveService } = useService()
   const [songs, setSongs] = useState<SongSummary[]>([])
@@ -67,7 +70,13 @@ function SongLibrary(): JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; title: string } | null>(null)
   const [toolsPref, setToolsPrefState] = useState<string | null>(() => localStorage.getItem('wf-song-tools-open'))
   const setToolsPref = (v: '0' | '1'): void => { localStorage.setItem('wf-song-tools-open', v); setToolsPrefState(v) }
-  const toolsOpen = songToolsOpen(toolsPref, songs.length, search.trim() !== '')
+  const [songsLoaded, setSongsLoaded] = useState(false)
+  const toolsOpen = songToolsOpen(toolsPref, songs.length, search.trim() !== '', songToolsLatched)
+  // Once open by default on a (loaded) empty library, stay open for the
+  // session, so the second paste doesn't need a re-expand (B2-N5).
+  useEffect(() => {
+    if (songsLoaded && toolsOpen && toolsPref == null) songToolsLatched = true
+  }, [songsLoaded, toolsOpen, toolsPref])
   // "New Song" used to create a permanent "New Song" DB record on the first
   // click, before the operator had typed anything — abandoning it left a
   // placeholder in the real library (the audit found several). Naming it
@@ -86,7 +95,7 @@ function SongLibrary(): JSX.Element {
   const duplicateTitle = existingTitles.find((t) => t.trim().toLowerCase() === newTitle.trim().toLowerCase())
 
   const refresh = (q = search): void => {
-    window.wf.songsList(q).then(setSongs)
+    window.wf.songsList(q).then((list) => { setSongs(list); setSongsLoaded(true) })
   }
 
   useEffect(() => {
