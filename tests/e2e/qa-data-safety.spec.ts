@@ -57,3 +57,29 @@ test('A-C3: a corrupt database is recovered from a backup and the app still open
     await again.app.close()
   } finally { await closeApp(first.app, root) }
 })
+
+test('B-N1: the active service survives a relaunch, even when a newer service exists', async () => {
+  const first = await launchApp()
+  const root = first.userDataDir
+  try {
+    const op = await operatorWindow(first.app)
+    await completeFirstRun(op, { sample: true })
+    const ids = await op.evaluate(async () => {
+      const w = (window as any).wf
+      const real = await w.serviceCreate('Real Sunday Oct 11', '2026-10-11')
+      await w.setActiveService(real)
+      // Created after the prepared service, so it is list[0] (newest).
+      const newer = await w.serviceCreate('Next week draft', '2026-10-18')
+      return { real, newer }
+    })
+    await first.app.close()
+
+    const again = await launchApp({ root })
+    try {
+      const op2 = await operatorWindow(again.app)
+      await op2.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 20_000 })
+      await op2.waitForTimeout(1000) // let the renderer's mount-time selection run
+      expect(await op2.evaluate(() => (window as any).wf.getActiveServiceId())).toBe(ids.real)
+    } finally { await again.app.close() }
+  } finally { await closeApp(first.app, root) }
+})
