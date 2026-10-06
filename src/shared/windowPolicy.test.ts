@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText } from './windowPolicy'
+import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText, wasOnRemovedDisplay } from './windowPolicy'
 
 const idle = { isQuitting: false, anyLiveContent: false, obsStreaming: false, obsRecording: false }
 
@@ -42,5 +42,19 @@ describe('RendererRecovery (QA A-H3)', () => {
   it('describes crash reasons in plain words', () => {
     expect(crashReasonText('oom')).toBe('ran out of memory')
     expect(crashReasonText('weird')).toBe('stopped')
+  })
+})
+
+describe('QA A-L4: aux windows on an unplugged display', () => {
+  const primary = { x: 0, y: 0, width: 1920, height: 1080 }
+  const tv = { x: 1920, y: 0, width: 1920, height: 1080 }
+  it('a window centred on the removed display was on it', () => {
+    expect(wasOnRemovedDisplay({ x: 1920, y: 0, width: 1920, height: 1080 }, tv, [primary])).toBe(true)
+  })
+  it('a window already moved by the OS onto no remaining display also counts', () => {
+    expect(wasOnRemovedDisplay({ x: 5000, y: 0, width: 800, height: 600 }, tv, [primary])).toBe(true)
+  })
+  it('a window on the operator screen is left alone', () => {
+    expect(wasOnRemovedDisplay({ x: 80, y: 80, width: 960, height: 540 }, tv, [primary])).toBe(false)
   })
 })

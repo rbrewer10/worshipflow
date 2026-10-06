@@ -69,3 +69,16 @@ export function crashReasonText(reason: string): string {
     default: return 'stopped'
   }
 }
+
+// QA A-L4: when a display is unplugged, a stage window that was fullscreen on
+// it can be moved by Windows onto the operator's screen — frameless and
+// fullscreen, covering the operator UI. Was this window on the removed display
+// (or now on no display at all)?
+export interface Rect { x: number; y: number; width: number; height: number }
+const contains = (r: Rect, px: number, py: number): boolean => px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height
+export function wasOnRemovedDisplay(win: Rect, removed: Rect, remaining: Rect[]): boolean {
+  const cx = win.x + win.width / 2
+  const cy = win.y + win.height / 2
+  if (contains(removed, cx, cy)) return true
+  return !remaining.some((d) => contains(d, cx, cy))
+}
