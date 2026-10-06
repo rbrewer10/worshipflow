@@ -1,7 +1,8 @@
 import { app, safeStorage } from 'electron'
 import { join, dirname } from 'path'
 import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, statSync } from 'fs'
-import initSqlJs, { type Database } from 'sql.js'
+import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
+import { checkAndRecoverDatabase, forceRecoverDatabase, validateDbFile, type DbStartupReport, type DbValidation } from './dbRecovery'
 import type {
   SongSummary,
   SongFull,
@@ -29,6 +30,7 @@ import type {
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
 import { relocateStoredPath } from '../shared/pathRelocation'
 import { splitLyricLines } from '../shared/lyrics'
+import { isExistingInstall, CONFIGURED_SETTING_KEYS } from '../shared/firstRun'
 import type { ZoneSlide } from '../shared/zoneSlides'
 
 let db: Database
@@ -150,9 +152,40 @@ CREATE TABLE IF NOT EXISTS recording_marker (
 );
 `
 
+let sqlPromise: Promise<SqlJsStatic> | null = null
+function loadSql(): Promise<SqlJsStatic> {
+  if (!sqlPromise) {
+    const sqlDistDir = dirname(require.resolve('sql.js'))
+    sqlPromise = initSqlJs({ locateFile: (f) => join(sqlDistDir, f) })
+  }
+  return sqlPromise
+}
+
+/**
+ * Run BEFORE the launch backup and initDb(): validates worshipflow.db and, if
+ * it's damaged, moves it aside and restores the newest good backup (QA A-C3).
+ * See dbRecovery.ts.
+ */
+export async function checkDatabaseOnStartup(): Promise<DbStartupReport> {
+  const SQL = await loadSql()
+  const userData = app.getPath('userData')
+  return checkAndRecoverDatabase(SQL, join(userData, 'worshipflow.db'), join(userData, 'backups'))
+}
+
+/** initDb() failed on a file that validated: restore an older, different good backup. */
+export async function forceRestoreLatestBackup(): Promise<DbStartupReport> {
+  const SQL = await loadSql()
+  const userData = app.getPath('userData')
+  return forceRecoverDatabase(SQL, join(userData, 'worshipflow.db'), join(userData, 'backups'))
+}
+
+/** Validate any database file (backups before restoring them, etc.). */
+export async function validateDatabaseFile(path: string): Promise<DbValidation> {
+  return validateDbFile(await loadSql(), path)
+}
+
 export async function initDb(): Promise<void> {
-  const sqlDistDir = dirname(require.resolve('sql.js'))
-  const SQL = await initSqlJs({ locateFile: (f) => join(sqlDistDir, f) })
+  const SQL = await loadSql()
 
   dbPath = join(app.getPath('userData'), 'worshipflow.db')
   db = existsSync(dbPath) ? new SQL.Database(readFileSync(dbPath)) : new SQL.Database()
@@ -208,7 +241,34 @@ export async function initDb(): Promise<void> {
   normalizeTitles()
   clearSecondTrackAssignments()
   relocateMovedDataPaths()
+  markExistingInstallSetupComplete()
   persist()
+}
+
+// QA B1: 0.20.0 gated the whole UI on a new `has_completed_setup` flag that
+// no migration ever set, so every 0.19 booth PC opened to the first-run wizard
+// after auto-updating. Any database that already has a library, services, or
+// configured settings is an existing install — mark setup done once, here,
+// before the renderer ever asks. Raw db.run (persisted by initDb's own
+// persist()) for the same reason relocateMovedDataPaths avoids setSetting.
+export function markExistingInstallSetupComplete(): boolean {
+  if (getSetting('has_completed_setup') === '1') return false
+  const count = (table: string): number => {
+    const r = db.exec(`SELECT COUNT(*) FROM ${table}`)
+    return Number(r[0]?.values[0]?.[0] ?? 0)
+  }
+  const settings: Record<string, string | null> = {}
+  for (const k of CONFIGURED_SETTING_KEYS) settings[k] = getSetting(k)
+  const existing = isExistingInstall({
+    songs: count('song'),
+    services: count('service'),
+    announcements: count('announcement'),
+    settings
+  })
+  if (!existing) return false
+  db.run("INSERT INTO setting (key, value) VALUES ('has_completed_setup', '1') ON CONFLICT(key) DO UPDATE SET value = '1'")
+  console.log('[initDb] existing install detected — first-run wizard marked complete')
+  return true
 }
 
 // Every background/logo/icon path stored anywhere is the raw absolute path a
