@@ -1328,7 +1328,15 @@ function processIntent(track: TrackId, type: Intent): void {
     //    verses-sermons, which deliberately sit at mode 'logo' and advance on
     //    their own index — otherwise the first press after going live on a
     //    sermon was swallowed ("Next is broken").
-    const action = planNav(dir, { mode: t.mode, hasDeck: !!t.deckSlides, hasSermonSlides: !!t.sermonSlides, index: t.index, lastIndex: last })
+    const action = planNav(dir, { mode: t.mode, hasDeck: !!t.deckSlides, hasSermonSlides: !!t.sermonSlides, index: t.index, lastIndex: last, pristine: !t.hasLiveContent && t.serviceItemId == null })
+    if (action.kind === 'start') {
+      // Nothing live yet (B2-N3): go live on the first item of this track that
+      // can go live — skipping section headers and placeholders.
+      const first = activeServiceItems.find((it) => it.track === track && itemCanGoLive(it))
+      if (first) { logServiceEvent(`${type}: start service at item ${first.id}`); void handleTabletLoadItem(track, first.id) }
+      return
+    }
+    if (action.kind === 'none') return
     if (action.kind === 'adjacent') {
       const item = adjacentLiveItem(track, action.dir)
       if (item) { void handleTabletLoadItem(track, item.id); return }
