@@ -112,27 +112,35 @@ test('A2-N1: after a crash (SIGKILL) mid-service, relaunching puts the live item
   } finally { await closeApp(first.app, root) }
 })
 
+/** Click a rail "Go live" and wait out the 1.5 s tap-to-cancel window, so the (slow) load has started. */
+async function clickGoLiveAndWaitForLoadStart(op: Page, title: string): Promise<void> {
+  const btn = op.getByRole('button', { name: `Go live: ${title}`, exact: true }).first()
+  await btn.click()
+  await expect(btn.locator('.animate-pulse')).toHaveCount(1)
+  await expect(btn.locator('.animate-pulse')).toHaveCount(0, { timeout: 5000 })
+  await op.waitForTimeout(300)
+}
+
 test('A2-N2: Black pressed while a slow online verse is loading stays black when the verse arrives', async () => {
   const { app, userDataDir } = await launchApp()
   try {
     const op = await operatorWindow(app)
     await completeFirstRun(op, { sample: true })
     await wfCall(op, 'featuresSetBibleTranslation', 'web')
-    // A slow bible-api.com (2.5 s) — main's global fetch, stubbed.
+    // A slow bible-api.com (3 s) — main's global fetch, stubbed.
     await app.evaluate(() => {
       const g = globalThis as any
       const real = g.fetch
       g.fetch = async (url: unknown, init: unknown) => {
         if (!String(url).includes('bible-api.com')) return real(url, init)
-        await new Promise((r) => setTimeout(r, 2500))
+        await new Promise((r) => setTimeout(r, 3000))
         return new Response(JSON.stringify({ reference: 'John 3:16-17', verses: [{ verse: 16, text: 'For God so loved the world (WEB stub)' }, { verse: 17, text: 'Second verse (WEB stub)' }] }), { status: 200, headers: { 'content-type': 'application/json' } })
       }
     })
     await goToLiveControl(op)
     const svc = await sampleService(op)
     const scripture = svc.items.find((i: any) => i.type === 'scripture')
-    await op.getByRole('button', { name: `Go live: ${scripture.title}`, exact: true }).first().click()
-    await op.waitForTimeout(300)
+    await clickGoLiveAndWaitForLoadStart(op, scripture.title)
     await op.evaluate(() => (window as any).wf.sendIntent('main', 'black'))
     expect((await liveState(op)).mode).toBe('black')
     await expect.poll(async () => (await liveState(op)).liveServiceItemId, { timeout: 10_000 }).toBe(scripture.id)
@@ -146,8 +154,7 @@ test('A2-N2: Black pressed while a slow online verse is loading stays black when
     const amazing = svc.items.find((i: any) => i.title === 'Amazing Grace')
     await op.getByRole('button', { name: `Go live: ${amazing.title}`, exact: true }).first().click()
     await expect.poll(async () => (await liveState(op)).liveServiceItemId).toBe(amazing.id)
-    await op.getByRole('button', { name: `Go live: ${scripture.title}`, exact: true }).first().click()
-    await op.waitForTimeout(300)
+    await clickGoLiveAndWaitForLoadStart(op, scripture.title)
     await op.evaluate(() => (window as any).wf.sendIntent('main', 'logo'))
     await expect.poll(async () => (await liveState(op)).liveServiceItemId, { timeout: 10_000 }).toBe(scripture.id)
     await op.waitForTimeout(500)
