@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
-import { isRestorableBackupName, parseBackupFilename, type BackupKind } from '../shared/backupNames'
+import { isRestorableBackupName, parseBackupFilename, type BackupKind, preRestoreCopiesToPrune } from '../shared/backupNames'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
@@ -3955,6 +3955,10 @@ function pruneBackups(bakDir: string, keep: number): void {
     for (const f of files.slice(0, Math.max(0, files.length - keep))) {
       try { unlinkSync(join(bakDir, f)) } catch { /* ignore individual failures */ }
     }
+    // Pre-restore copies rotate separately; the newest 10 are kept.
+    for (const f of preRestoreCopiesToPrune(readdirSync(bakDir), 10)) {
+      try { unlinkSync(join(bakDir, f)) } catch { /* ignore individual failures */ }
+    }
   } catch (err) {
     console.error('Failed to prune backups:', err)
   }
@@ -4007,6 +4011,8 @@ ipcMain.handle('wf:backups:restore', async (_e, filename: string): Promise<void>
     atomicCopy(backupPath, dbPath)
   } catch (err) {
     logError('[backups] restore failed', err)
+    // Nothing changed, so the safety copy taken for this attempt isn't needed.
+    try { if (existsSync(preRestorePath)) unlinkSync(preRestorePath) } catch { /* leave it */ }
     throw err instanceof Error ? err : new Error(String(err))
   }
   // app.exit() skips before-quit; mark the exit clean ourselves so the
@@ -4121,8 +4127,36 @@ function userDataDir(): string {
 // No good backup anywhere: the damaged file has been moved aside; let the
 // operator decide rather than silently starting empty. Returns true to
 // continue (with an empty library), false if the app is exiting.
-async function confirmStartWithEmptyLibrary(report: Extract<DbStartupReport, { status: 'unrecoverable' }>): Promise<boolean> {
+async function confirmStartWithEmptyLibrary(report: Extract<DbStartupReport, { status: 'unrecoverable' }>): Promise<boolean | 'retry'> {
+  // QA A2-N5: a good backup exists but couldn't be copied (disk full, OneDrive
+  // or antivirus holding the file). This used to fall into the "couldn't
+  // check / Try to open it anyway" wording, and that button actually started
+  // an empty library. Say what happened and offer a retry.
+  if (report.restoreFailed) {
+    logError('[db] a good backup exists but could not be restored', report.reason)
+    const { response } = await dialog.showMessageBox({
+      type: 'error',
+      title: 'WorshipFlow Pro — couldn’t restore the backup',
+      message: "WorshipFlow found a good backup but couldn't put it in place.",
+      detail:
+        `Problem: ${report.reason}\n\n` +
+        'This usually means the disk is full, or another program (OneDrive, Google Drive, antivirus) has the file open. ' +
+        'Free some disk space or close that program, then choose Try again. Your backups have not been touched.',
+      buttons: ['Try again', 'Start with an empty library', 'Quit'],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true
+    })
+    if (response === 0) return 'retry'
+    if (response === 2) { app.exit(1); return false }
+    if (report.damagedInPlace) {
+      const kept = moveAside(join(userDataDir(), 'worshipflow.db'))
+      if (kept) logWarn(`[db] starting with an empty library; damaged file kept at ${kept}`)
+    }
+    return true
+  }
   logError('[db] database damaged and no good backup found', report.reason)
+  const dbExists = existsSync(join(userDataDir(), 'worshipflow.db'))
   const { response } = await dialog.showMessageBox({
     type: 'error',
     title: 'WorshipFlow Pro — database problem',
@@ -4134,7 +4168,8 @@ async function confirmStartWithEmptyLibrary(report: Extract<DbStartupReport, { s
       (report.corruptPath ? `The damaged file was kept (not deleted) at:\n${report.corruptPath}\n\n` : '') +
       'You can start with an empty library now (the damaged file is kept beside it, so it can still be recovered later), ' +
       'or quit and copy a backup into the data folder.',
-    buttons: [report.damagedInPlace ? 'Start with an empty library' : 'Try to open it anyway', 'Open data folder', 'Quit'],
+    // "Try to open it anyway" only makes sense when there IS a file to open.
+    buttons: [report.damagedInPlace || !dbExists ? 'Start with an empty library' : 'Try to open it anyway', 'Open data folder', 'Quit'],
     defaultId: 2,
     cancelId: 2,
     noLink: true
@@ -4220,7 +4255,7 @@ async function handleDbInitFailure(err: unknown): Promise<void> {
       const result = await forceRestoreLatestBackup()
       if (result.status === 'recovered') {
         logWarn(`[db] restored ${result.restoredFrom} after initDb failure; damaged copy kept at ${result.corruptPath}`)
-        recordRestoreAttempt(userDataDir(), { at: Date.now(), restoredFrom: result.restoredFrom, corruptPath: result.corruptPath })
+        recordRestoreAttempt(userDataDir(), { at: Date.now(), restoredFrom: result.restoredFrom, corruptPath: result.corruptPath, restoredFromMtimeMs: result.restoredFromMtimeMs })
         app.relaunch()
       } else {
         await dialog.showMessageBox({
@@ -4244,11 +4279,15 @@ async function handleDbInitFailure(err: unknown): Promise<void> {
 // Async message box attached to the operator window: never blocks live control.
 function announceDbRecovery(report: Extract<DbStartupReport, { status: 'recovered' }>): void {
   const when = new Date(report.restoredFromMtimeMs).toLocaleString()
+  // A2-N8: "damaged (the database file was missing)" read oddly.
+  const what = report.reason === 'the database file was missing'
+    ? 'The database file was missing'
+    : `The database file was damaged (${report.reason})`
   const detail =
-    `The database file was damaged (${report.reason}), so WorshipFlow restored the newest good backup, saved ${when} ` +
+    `${what}, so WorshipFlow restored the newest good backup, saved ${when} ` +
     `(${basename(report.restoredFrom)}).\n\nAnything changed after that time may be missing — check this Sunday's service.` +
     (report.corruptPath ? `\n\nThe damaged file was kept (not deleted) at:\n${report.corruptPath}` : '')
-  logWarn(`[db] recovered from ${report.restoredFrom}; damaged file kept at ${report.corruptPath ?? '(could not keep)'}`)
+  logWarn(`[db] recovered from ${report.restoredFrom}; ${report.corruptPath ? `damaged file kept at ${report.corruptPath}` : (report.reason === 'the database file was missing' ? 'no damaged file to keep (it was missing)' : 'damaged file could not be kept')}`)
   const show = (): void => {
     const opts = {
       type: 'warning' as const,
@@ -4312,8 +4351,21 @@ app.whenReady().then(async () => {
     if (!next) return
     dbReport = next
   }
-  if (dbReport.status === 'unrecoverable') {
-    if (!(await confirmStartWithEmptyLibrary(dbReport))) return
+  while (dbReport.status === 'unrecoverable') {
+    const choice = await confirmStartWithEmptyLibrary(dbReport)
+    if (choice === false) return
+    if (choice === true) break
+    // 'retry' (A2-N5): run the same restore again.
+    try {
+      dbReport = existsSync(join(userDataDir(), 'worshipflow.db')) ? await checkDatabaseOnStartup() : await restoreMissingFromBackup()
+    } catch (err) {
+      dbReport = { status: 'unrecoverable', reason: `the restore failed (${err instanceof Error ? err.message : String(err)})`, corruptPath: null, restoreFailed: true }
+    }
+    if (dbReport.status === 'missing') {
+      const next = await confirmMissingDatabase(dbReport)
+      if (!next) return
+      dbReport = next
+    }
   }
   // Snapshot the database bytes BEFORE initDb() runs migrations (so a bad
   // migration can't poison the day's backup), but only write the launch backup
@@ -4330,7 +4382,16 @@ app.whenReady().then(async () => {
     return
   }
   createTimestampedBackup(preInitSnapshot)
+  // QA A2-N6: the "couldn't open — restore and restart?" path relaunches; tell
+  // the operator on this launch which backup was restored, like the
+  // validation path does, instead of clearing the marker silently.
+  const restoredAfterInitFailure = readRestoreAttempt(userDataDir())
   clearRestoreAttempt(userDataDir())
+  if (restoredAfterInitFailure && dbReport.status !== 'recovered') {
+    let mtime = restoredAfterInitFailure.restoredFromMtimeMs ?? 0
+    if (!mtime) { try { mtime = statSync(restoredAfterInitFailure.restoredFrom).mtimeMs } catch { mtime = restoredAfterInitFailure.at } }
+    dbReport = { status: 'recovered', reason: "WorshipFlow couldn't start on the previous database file", restoredFrom: restoredAfterInitFailure.restoredFrom, restoredFromMtimeMs: mtime, corruptPath: restoredAfterInitFailure.corruptPath }
+  }
   // Reconcile any recording left open by a crash/hard-quit so it doesn't stay
   // dangling forever — mark it ended now.
   closeDanglingRecordings(Date.now())

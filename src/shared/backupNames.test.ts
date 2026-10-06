@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isRestorableBackupName, parseBackupFilename, restoreConfirmText } from './backupNames'
+import { isRestorableBackupName, parseBackupFilename, preRestoreCopiesToPrune, restoreConfirmText } from './backupNames'
 
 describe('backup names (QA A-M3)', () => {
   it('parses launch snapshots as UTC timestamps', () => {
@@ -20,5 +20,13 @@ describe('backup names (QA A-M3)', () => {
     expect(calm).not.toMatch(/LIVE/)
     expect(restoreConfirmText('10/6 8:00 AM', 'launch', true)).toMatch(/^⚠ SOMETHING IS LIVE/)
     expect(restoreConfirmText('10/6 8:00 AM', 'pre-restore', false)).toMatch(/^Undo the last restore/)
+  })
+})
+
+describe('preRestoreCopiesToPrune (retest-2 info: pre-restore copies never pruned)', () => {
+  it('keeps the newest N pre-restore copies and never touches launch backups', () => {
+    const files = ['worshipflow-pre-restore-1000000000001.db', 'worshipflow-20261006T120000.db', 'worshipflow-pre-restore-1000000000003.db', 'worshipflow-pre-restore-1000000000002.db', 'notes.txt']
+    expect(preRestoreCopiesToPrune(files, 2)).toEqual(['worshipflow-pre-restore-1000000000001.db'])
+    expect(preRestoreCopiesToPrune(files, 10)).toEqual([])
   })
 })
