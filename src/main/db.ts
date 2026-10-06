@@ -27,6 +27,7 @@ import type {
   ServicePerson
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
+import { bakMtime, copyToBak, shouldRotateBak, writeFileDurable } from './bakRotation'
 import { relocateStoredPath } from '../shared/pathRelocation'
 import { splitLyricLines } from '../shared/lyrics'
 import type { ZoneSlide } from '../shared/zoneSlides'
@@ -535,10 +536,12 @@ function persist(): void {
   }
 
   try {
-    writeFileSync(tmpPath, Buffer.from(db.export()))
-    if (existsSync(dbPath)) {
+    writeFileDurable(tmpPath, db.export())
+    // QA A-M1: a new .bak generation at most once an hour (see bakRotation.ts),
+    // not on every save — otherwise three quick setting changes wipe them all.
+    if (existsSync(dbPath) && shouldRotateBak(bakMtime(bakPath), Date.now())) {
       rotateBackupGenerations(bakPath)
-      copyFileSync(dbPath, bakPath)
+      copyToBak(dbPath, bakPath)
     }
     renameSync(tmpPath, dbPath)
     lastKnownStamp = stampOf(dbPath)
