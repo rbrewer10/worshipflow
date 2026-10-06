@@ -50,3 +50,16 @@ export function restoreConfirmText(when: string, kind: BackupKind, liveNow: bool
 
 /** Modes where a restart would visibly blank service content. */
 export const isShowingContent = (mode: string | undefined): boolean => mode === 'lyrics' || mode === 'countdown' || mode === 'announcement' || mode === 'livecall'
+
+/**
+ * Pre-restore copies beyond the newest `keep` (oldest first) — QA retest-2
+ * info: one DB-sized copy per restore attempt was never pruned. The newest
+ * ones stay, so "undo the last restore" always works.
+ */
+export function preRestoreCopiesToPrune(filenames: readonly string[], keep: number): string[] {
+  const pre = filenames
+    .map((f) => ({ f, p: parseBackupFilename(f) }))
+    .filter((x) => x.p?.kind === 'pre-restore')
+    .sort((a, b) => a.p!.timestamp - b.p!.timestamp)
+  return pre.slice(0, Math.max(0, pre.length - keep)).map((x) => x.f)
+}

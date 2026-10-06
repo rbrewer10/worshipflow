@@ -143,7 +143,9 @@ export type DbStartupReport =
   | { status: 'missing'; candidate: string; candidateMtimeMs: number }
   | { status: 'recovered'; reason: string; restoredFrom: string; restoredFromMtimeMs: number; corruptPath: string | null }
   /** `damagedInPlace`: the bad file is still at dbPath (call moveAside before starting empty). */
-  | { status: 'unrecoverable'; reason: string; corruptPath: string | null; damagedInPlace?: boolean }
+  | { status: 'unrecoverable'; reason: string; corruptPath: string | null; damagedInPlace?: boolean
+      /** A good backup exists but couldn't be copied / swapped in (disk full, file locked) — worth a retry (QA A2-N5). */
+      restoreFailed?: boolean }
 
 function sha1(buf: Uint8Array): string {
   return createHash('sha1').update(buf).digest('hex')
@@ -200,7 +202,7 @@ function restoreFrom(candidates: RecoveryCandidate[], dbPath: string, now: Date,
     try { staged = { tmp: stageCopy(c.path, dbPath), from: c }; break } catch (err) { lastErr = err instanceof Error ? err.message : String(err) }
   }
   if (!staged) {
-    return { status: 'unrecoverable', reason: `${reason}; a backup exists but couldn't be copied (${lastErr})`, corruptPath: null, damagedInPlace: existsSync(dbPath) }
+    return { status: 'unrecoverable', reason: `${reason}; a backup exists but couldn't be copied (${lastErr})`, corruptPath: null, damagedInPlace: existsSync(dbPath), restoreFailed: true }
   }
   const corruptPath = existsSync(dbPath) ? moveAside(dbPath, now) : null
   try {
@@ -209,7 +211,7 @@ function restoreFrom(candidates: RecoveryCandidate[], dbPath: string, now: Date,
     try { unlinkSync(staged.tmp) } catch { /* ignore */ }
     // Put the original back if we moved it, so the next launch sees the same state.
     if (corruptPath && !existsSync(dbPath)) { try { renameSync(corruptPath, dbPath) } catch { /* leave it at corruptPath */ } }
-    return { status: 'unrecoverable', reason: `${reason}; couldn't put the backup in place (${err instanceof Error ? err.message : String(err)})`, corruptPath: existsSync(dbPath) ? null : corruptPath, damagedInPlace: existsSync(dbPath) }
+    return { status: 'unrecoverable', reason: `${reason}; couldn't put the backup in place (${err instanceof Error ? err.message : String(err)})`, corruptPath: existsSync(dbPath) ? null : corruptPath, damagedInPlace: existsSync(dbPath), restoreFailed: true }
   }
   return { status: 'recovered', reason, restoredFrom: staged.from.path, restoredFromMtimeMs: staged.from.mtimeMs, corruptPath }
 }
@@ -274,7 +276,7 @@ export function forceRecoverDatabase(SQL: SqlJsStatic, dbPath: string, backupsDi
 
 const ATTEMPT_FILE = 'db-restore-attempt.json'
 
-export interface RestoreAttempt { at: number; restoredFrom: string; corruptPath: string | null }
+export interface RestoreAttempt { at: number; restoredFrom: string; corruptPath: string | null; restoredFromMtimeMs?: number }
 
 export function readRestoreAttempt(userDataDir: string): RestoreAttempt | null {
   try {

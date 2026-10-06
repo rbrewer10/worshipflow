@@ -242,6 +242,7 @@ describe('QA A-N2: a failed restore copy or a missing file never means a silent 
     if (r.status === 'unrecoverable') {
       expect(r.reason).toMatch(/couldn't be copied/)
       expect(r.damagedInPlace).toBe(true)
+      expect(r.restoreFailed).toBe(true) // A2-N5: offered a retry, not "couldn't check"
     }
     expect(readFileSync(dbPath).equals(bad)).toBe(true)
   })
@@ -257,6 +258,15 @@ describe('QA A-N2: a failed restore copy or a missing file never means a silent 
     expect(titleIn(dbPath)).toMatch(/^bak/)
   })
 
+  it('QA A2-N5: missing database + the restore copy fails → restoreFailed (retry offered), nothing touched', () => {
+    write(`${dbPath}.bak`, dbBytes('bak'))
+    mkdirSync(`${dbPath}.restore-tmp`)
+    const r = restoreMissingDatabase(SQL, dbPath, backups)
+    expect(r).toMatchObject({ status: 'unrecoverable', restoreFailed: true, damagedInPlace: false })
+    expect(existsSync(dbPath)).toBe(false)
+    expect(existsSync(`${dbPath}.bak`)).toBe(true)
+  })
+
   it('a missing database with no backups is still a fresh install', () => {
     expect(checkAndRecoverDatabase(SQL, dbPath, backups).status).toBe('fresh')
   })
@@ -265,7 +275,7 @@ describe('QA A-N2: a failed restore copy or a missing file never means a silent 
 describe('startup wiring (source guards)', () => {
   const src = readFileSync(join(__dirname, 'index.ts'), 'utf8')
   const start = src.indexOf('let dbReport: DbStartupReport')
-  const boot = src.slice(start, start + 3000)
+  const boot = src.slice(start, start + 6000)
   it('the launch backup is written only after initDb() succeeds (A-N1)', () => {
     expect(boot.indexOf('createTimestampedBackup(preInitSnapshot)')).toBeGreaterThan(boot.indexOf('await initDb()'))
     expect(boot.indexOf('readPreInitSnapshot()')).toBeLessThan(boot.indexOf('await initDb()'))
@@ -280,5 +290,15 @@ describe('startup wiring (source guards)', () => {
     expect(src).toMatch(/readRestoreAttempt\(userDataDir\(\)\)/)
     expect(src).toMatch(/recordRestoreAttempt\(userDataDir\(\)/)
     expect(boot).toMatch(/clearRestoreAttempt\(userDataDir\(\)\)/)
+  })
+  it('A2-N5: a failed restore offers Try again, and "Try to open it anyway" needs a file to open', () => {
+    expect(src).toMatch(/if \(report\.restoreFailed\) \{[\s\S]{0,1200}buttons: \['Try again', 'Start with an empty library', 'Quit'\]/)
+    expect(src).toMatch(/report\.damagedInPlace \|\| !dbExists \? 'Start with an empty library' : 'Try to open it anyway'/)
+    expect(boot).toMatch(/while \(dbReport\.status === 'unrecoverable'\)/)
+  })
+  it('A2-N6: after the restore-and-restart path the operator is told which backup was restored', () => {
+    expect(boot).toMatch(/const restoredAfterInitFailure = readRestoreAttempt\(userDataDir\(\)\)\s*\n\s*clearRestoreAttempt/)
+    expect(boot).toMatch(/dbReport = \{ status: 'recovered', reason: "WorshipFlow couldn't start on the previous database file"/)
+    expect(src).toMatch(/if \(dbReport\.status === 'recovered'\) announceDbRecovery\(dbReport\)/)
   })
 })
