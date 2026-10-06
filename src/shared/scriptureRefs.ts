@@ -1,3 +1,5 @@
+import { normalizeReference, parseScriptureReference } from './scriptureParse'
+
 // Parsing for the multi-passage scripture field.
 //
 // A Scripture item used to hold exactly one reference, so a reading that
@@ -16,10 +18,43 @@
 const SEPARATOR = /[;\n]+/
 
 export function parseReferenceList(input: string): string[] {
-  return input
-    .split(SEPARATOR)
-    .map((ref) => ref.trim())
-    .filter((ref) => ref.length > 0)
+  const out: string[] = []
+  let book: string | null = null
+  let chapterContext: number | null = null
+  for (const raw of input.split(SEPARATOR)) {
+    const part = raw.trim()
+    if (!part) continue
+    const spec = normalizeReference(part)
+    // QA A5-N2: "John 3:16-18; 5:24" — a passage with no book carries the
+    // previous one forward (and its chapter, for a bare verse: "John 3:16; 18").
+    if (book && /^\d[\d:,-]*$/.test(spec)) {
+      const expanded: string = spec.includes(':') || chapterContext == null ? `${book} ${spec}` : `${book} ${chapterContext}:${spec}`
+      out.push(expanded)
+      chapterContext = lastChapterContext(expanded) ?? chapterContext
+      continue
+    }
+    out.push(part)
+    const parsed = parseScriptureReference(part)
+    book = parsed.ok ? parsed.book : null
+    chapterContext = parsed.ok ? lastChapterContext(part) : null
+  }
+  return out
+}
+
+/** The chapter a following bare number is a verse of: set by the last "c:v", cleared by a whole chapter. */
+function lastChapterContext(reference: string): number | null {
+  const spec = /(\d[\d:,-]*)$/.exec(normalizeReference(reference))?.[1] ?? ''
+  const last = spec.split(',').pop() ?? ''
+  const end = last.split('-').pop() ?? ''
+  if (end.includes(':')) return Number(end.split(':')[0])
+  // "3:16-18": the range's start sets the chapter; "23" / "23-24": whole chapters, no verse context.
+  const start = last.split('-')[0]
+  if (start.includes(':')) return Number(start.split(':')[0])
+  const parsed = parseScriptureReference(reference)
+  if (parsed.ok && parsed.segments.length && parsed.segments[parsed.segments.length - 1].from != null) {
+    return parsed.segments[parsed.segments.length - 1].chapter // "John 3:16, 18"
+  }
+  return null
 }
 
 // The single stored string for a list of references. Round-trips with

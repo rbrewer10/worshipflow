@@ -40,22 +40,82 @@ export function normBook(s: string): string {
     .trim()
 }
 
+export type BookName = (typeof BIBLE_BOOKS)[number]
+
+// Abbreviations and other names, keyed by the BOOK NAME, never by a hand-typed
+// index: QA A5-N1 was "isa: 23, jer: 24" (one off), which put Jeremiah 9:6 on
+// screen for "Isa 9:6". Anything that is already a unique prefix of a book
+// name ("Gen", "Neh", "1 Thess") resolves without an entry here; these are the
+// SBL-style and common short forms that aren't. Deliberately absent, because
+// they mean different books in different systems: "Jud" (Judges or Jude),
+// "Jo" (Joshua/Job/Joel/John/Jonah), "Hb" (Habakkuk or Hebrews), "Ph".
+export const BOOK_ALIASES: Readonly<Record<string, BookName>> = {
+  gn: 'Genesis',
+  exod: 'Exodus', ex: 'Exodus', exo: 'Exodus',
+  lv: 'Leviticus',
+  nm: 'Numbers', nb: 'Numbers',
+  dt: 'Deuteronomy',
+  jsh: 'Joshua',
+  judg: 'Judges', jdg: 'Judges', jg: 'Judges', jdgs: 'Judges',
+  rth: 'Ruth', ru: 'Ruth',
+  '1 sm': '1 Samuel', '2 sm': '2 Samuel',
+  '1 kgs': '1 Kings', '2 kgs': '2 Kings', '1 kg': '1 Kings', '2 kg': '2 Kings',
+  '1 chr': '1 Chronicles', '2 chr': '2 Chronicles',
+  ne: 'Nehemiah',
+  est: 'Esther', esth: 'Esther',
+  jb: 'Job',
+  psalm: 'Psalms', ps: 'Psalms', psa: 'Psalms', pss: 'Psalms', psm: 'Psalms',
+  prv: 'Proverbs', pr: 'Proverbs',
+  eccl: 'Ecclesiastes', ecc: 'Ecclesiastes', qoh: 'Ecclesiastes', qoheleth: 'Ecclesiastes',
+  song: 'Song of Solomon', 'song of songs': 'Song of Solomon', canticles: 'Song of Solomon', sos: 'Song of Solomon', ss: 'Song of Solomon', cant: 'Song of Solomon',
+  isa: 'Isaiah', is: 'Isaiah',
+  jer: 'Jeremiah', jr: 'Jeremiah',
+  lam: 'Lamentations',
+  ezek: 'Ezekiel', ezk: 'Ezekiel',
+  dan: 'Daniel', dn: 'Daniel',
+  hos: 'Hosea',
+  jl: 'Joel',
+  am: 'Amos',
+  obad: 'Obadiah', ob: 'Obadiah',
+  jnh: 'Jonah',
+  mic: 'Micah', mi: 'Micah',
+  nah: 'Nahum',
+  hab: 'Habakkuk',
+  zeph: 'Zephaniah', zep: 'Zephaniah',
+  hag: 'Haggai',
+  zech: 'Zechariah', zec: 'Zechariah',
+  mal: 'Malachi',
+  matt: 'Matthew', mt: 'Matthew',
+  mk: 'Mark', mrk: 'Mark',
+  lk: 'Luke', luk: 'Luke',
+  jn: 'John', jhn: 'John',
+  rom: 'Romans', rm: 'Romans', ro: 'Romans',
+  '1 cor': '1 Corinthians', '2 cor': '2 Corinthians', '1 co': '1 Corinthians', '2 co': '2 Corinthians',
+  gal: 'Galatians',
+  eph: 'Ephesians',
+  phil: 'Philippians', php: 'Philippians', pp: 'Philippians',
+  col: 'Colossians',
+  '1 thess': '1 Thessalonians', '2 thess': '2 Thessalonians', '1 th': '1 Thessalonians', '2 th': '2 Thessalonians',
+  '1 tim': '1 Timothy', '2 tim': '2 Timothy',
+  tit: 'Titus',
+  phlm: 'Philemon', philem: 'Philemon', phm: 'Philemon',
+  heb: 'Hebrews',
+  jas: 'James', jm: 'James',
+  '1 pet': '1 Peter', '2 pet': '2 Peter', '1 pt': '1 Peter', '2 pt': '2 Peter',
+  '1 jn': '1 John', '2 jn': '2 John', '3 jn': '3 John', '1 jhn': '1 John', '2 jhn': '2 John', '3 jhn': '3 John',
+  jude: 'Jude', jd: 'Jude',
+  rev: 'Revelation', rv: 'Revelation', re: 'Revelation', revelations: 'Revelation', 'the revelation': 'Revelation',
+}
+
 const BOOK_INDEX = new Map<string, number>()
 BIBLE_BOOKS.forEach((name, i) => BOOK_INDEX.set(normBook(name), i))
-const ALIASES: Record<string, number> = {
-  psalm: 18,
-  'song of songs': 21,
-  canticles: 21,
-  gen: 0, exod: 1, ex: 1, lev: 2, num: 3, deut: 4, dt: 4, josh: 5, judg: 6,
-  '1 sam': 8, '2 sam': 9, ps: 18, psa: 18, prov: 19, eccl: 20, isa: 23, jer: 24,
-  ezek: 25, dan: 26, matt: 39, mt: 39, mk: 40, lk: 41, jn: 42, rom: 44,
-  '1 cor': 45, '2 cor': 46, gal: 47, eph: 48, phil: 49, col: 50, heb: 57,
-  jas: 58, rev: 65,
-  // Single-chapter books' usual abbreviations (A4-N2).
-  obad: 30, ob: 30, phlm: 56, philem: 56, phm: 56, jud: 64, jude: 64,
-  '1 jn': 61, '2 jn': 62, '3 jn': 63
+for (const [alias, name] of Object.entries(BOOK_ALIASES)) {
+  const i = BIBLE_BOOKS.indexOf(name)
+  // Unreachable while BookName is checked by the compiler; kept so a bad
+  // edit can never silently map to the wrong book at runtime.
+  if (i < 0) throw new Error(`scripture alias "${alias}" names no book "${name}"`)
+  BOOK_INDEX.set(normBook(alias), i)
 }
-Object.entries(ALIASES).forEach(([k, v]) => BOOK_INDEX.set(normBook(k), v))
 
 export function resolveBook(s: string): number | null {
   const key = normBook(s)
