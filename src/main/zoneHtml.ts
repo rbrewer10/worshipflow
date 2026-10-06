@@ -35,6 +35,14 @@ const SHARED_JS = `
     if(t && state.mode!=='black' && state.mode!=='logo' && state.mode!=='off'){
       el.textContent=t;
       el.style.display='block';
+      // QA A-N5: a long lower third wrapped to as many lines as it needed and
+      // squeezed the stage lyrics until they clipped. Cap the band at 10vh and
+      // shrink its text to fit (floor 0.9vw; anything beyond is cut off).
+      el.style.maxHeight='10vh';el.style.overflow='hidden';
+      var ocs=getComputedStyle(el);
+      var oH=window.innerHeight*0.10-parseFloat(ocs.paddingTop)-parseFloat(ocs.paddingBottom);
+      var oSize=1.8;el.style.fontSize=oSize+'vw';
+      while(el.scrollHeight-parseFloat(ocs.paddingTop)-parseFloat(ocs.paddingBottom)>oH+1 && oSize>0.9){ oSize=Math.max(0.9,oSize-0.1);el.style.fontSize=oSize+'vw'; }
     } else {
       el.style.display='none';
     }
@@ -859,6 +867,10 @@ const STAGE_SCRIPT = `
       var nextW=nextSection.clientWidth-parseFloat(ncs.paddingLeft)-parseFloat(ncs.paddingRight);
       var nextH=Math.max(nextSection.clientHeight-parseFloat(ncs.paddingTop)-parseFloat(ncs.paddingBottom)-nextHead-window.innerHeight*0.006, window.innerHeight*0.04);
       fitText(nextLine,2.4,1.1,nextW,nextH);
+      // QA A-N5: with a stage message and a lower third up too, the Next preview
+      // can leave the verse too little room. The verse wins: drop Next when the
+      // lyric box would fall below 40% of the screen.
+      if(current.clientHeight<window.innerHeight*0.4) showNext(false);
     }
     current.innerHTML='<div class="'+(lineChanged?'fade-in':'')+'" style="font-size:'+fs+'vw;font-weight:900;line-height:1.2;color:#fff;white-space:pre-line;overflow-wrap:anywhere">'+esc(state.line||'\\u2014')+'</div>';
     // min-height:0 on #current makes this a real remaining-space box; without
