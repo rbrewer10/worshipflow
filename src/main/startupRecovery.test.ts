@@ -42,10 +42,59 @@ describe('StartupRecovery', () => {
   })
 })
 
+describe('A3-N4: write hold', () => {
+  it('holds writes until take(), then allows them', () => {
+    let now = 1000
+    const sr = new StartupRecovery(() => ({ id: 1 }), () => false, 30_000, () => now)
+    expect(sr.writesAllowed()).toBe(false) // not even captured yet
+    sr.capture()
+    now += 1000
+    expect(sr.writesAllowed()).toBe(false)
+    expect(sr.holdRemainingMs()).toBe(29_000)
+    sr.take()
+    expect(sr.writesAllowed()).toBe(true)
+    expect(sr.holdRemainingMs()).toBe(0)
+  })
+  it('releases on its own if the operator window never asks to restore', () => {
+    let now = 0
+    const sr = new StartupRecovery(() => null, () => false, 30_000, () => now)
+    sr.capture()
+    now = 29_999
+    expect(sr.writesAllowed()).toBe(false)
+    now = 30_000
+    expect(sr.writesAllowed()).toBe(true)
+  })
+})
+
 describe('index.ts wiring (A2-N1)', () => {
   const src = readFileSync(join(__dirname, 'index.ts'), 'utf-8')
   it('captures the previous snapshot before the first recovery write', () => {
-    expect(src).toMatch(/startupRecovery\.capture\(\)\s*\n\s*lastWrittenRecoveryKey = recoveryKey\s*\n\s*writeRecovery\(/)
+    const b = src.slice(src.indexOf('function broadcast(): void {'))
+    const cap = b.indexOf('startupRecovery.capture()')
+    const write = b.indexOf('writeRecovery(')
+    expect(cap).toBeGreaterThan(-1)
+    expect(cap).toBeLessThan(write)
+  })
+  it('A3-N4: holds the write until the restore has run (or the hold expires), then writes', () => {
+    const b = src.slice(src.indexOf('function broadcast(): void {'))
+    expect(b.slice(0, b.indexOf('writeRecovery('))).toMatch(/!startupRecovery\.writesAllowed\(\)/)
+    const handler = src.slice(src.indexOf("ipcMain.handle('wf:app:restoreRecovery'"))
+    // every early return still persists this session's state
+    expect(handler.slice(0, handler.indexOf('\n})\n'))).toMatch(/const nothing = [\s\S]{0,200}broadcast\(\)/)
+  })
+  it('A3-N2: restore brings back Black / Logo / C and paints no intermediate frame', () => {
+    const handler = src.slice(src.indexOf("ipcMain.handle('wf:app:restoreRecovery'"))
+    const body = handler.slice(0, handler.indexOf('\n})\n'))
+    expect(body).toMatch(/recoveredLayers\(snap, t\.mode\)/)
+    expect(body).toMatch(/t\.textHidden = layers\.textHidden/)
+    expect(body).toMatch(/suppressBroadcast = true[\s\S]*restoreTrack\('main'[\s\S]*suppressBroadcast = false/)
+    expect(src).toMatch(/textHidden: t\.textHidden, bgHidden: t\.bgHidden \}\)/)
+  })
+  it('A3-N5: a missing item falls back to the logo, never puts the first item (countdown) live', () => {
+    const handler = src.slice(src.indexOf("ipcMain.handle('wf:app:restoreRecovery'"))
+    const fallback = handler.slice(handler.indexOf('} else {', handler.indexOf('const restoreTrack')), handler.indexOf('suppressBroadcast = true'))
+    expect(fallback).not.toMatch(/handleTabletLoadItem/)
+    expect(fallback).toMatch(/t\.mode = 'logo'/)
   })
   it('captures at the very top of whenReady', () => {
     expect(src).toMatch(/app\.whenReady\(\)\.then\(async \(\) => \{[\s\S]{0,300}startupRecovery\.capture\(\)/)

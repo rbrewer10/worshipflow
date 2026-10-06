@@ -34,6 +34,7 @@ import { DEFAULT_THEME_ID, getTheme, resolveColors } from '../shared/themes'
 import { DEMO_SONG } from './demoSong'
 import { readRecovery, writeRecovery, isRecoveryStale, markCleanExit, wasCleanExit, type TrackSnapshot, type RecoverySnapshot } from './recovery'
 import { StartupRecovery } from './startupRecovery'
+import { recoveredLayers } from './recoveryPlan'
 import { stripChords, formatSlideChords } from '../shared/chords'
 import { applyAudienceLayers } from '../shared/layers'
 import { detectNdiRuntime } from '../shared/ndiRuntime'
@@ -1227,23 +1228,32 @@ function buildStatePayload(): { main: LiveState; second: LiveState | null; stage
   return { main: renderState('main'), second: secondActive ? renderState('second') : null, stageRehearsal }
 }
 
+// While crash recovery reloads the last item it must not paint an
+// intermediate frame (lyrics at slide 1 before Black / the saved slide is
+// re-applied — QA A3-N2). restoreRecovery broadcasts once at the end.
+let suppressBroadcast = false
+let recoveryHoldTimer: ReturnType<typeof setTimeout> | null = null
+
 function broadcast(): void {
+  if (suppressBroadcast) return
   const payload = buildStatePayload()
   for (const w of [operatorWin, stageWin, ...outputWins.values()]) {
     if (w && !w.isDestroyed()) w.webContents.send('wf:state', payload)
   }
-  const recoveryMain: TrackSnapshot = { liveServiceItemId: tracks.main.serviceItemId, slideIndex: tracks.main.index, mode: tracks.main.mode }
-  const recoverySecond: TrackSnapshot | null = payload.second
-    ? { liveServiceItemId: tracks.second.serviceItemId, slideIndex: tracks.second.index, mode: tracks.second.mode }
-    : null
+  const snapOf = (t: LiveTrackState): TrackSnapshot => ({ liveServiceItemId: t.serviceItemId, slideIndex: t.index, mode: t.mode, textHidden: t.textHidden, bgHidden: t.bgHidden })
+  const recoveryMain: TrackSnapshot = snapOf(tracks.main)
+  const recoverySecond: TrackSnapshot | null = payload.second ? snapOf(tracks.second) : null
   // Pins are live-operation state, so a crash mid-sermon must not silently
   // release a held screen — restoreRecovery puts them back.
   const recoveryPins = zonePinsRecord()
   const recoveryKey = JSON.stringify({ main: recoveryMain, second: recoverySecond, pins: recoveryPins })
-  if (recoveryKey !== lastWrittenRecoveryKey) {
-    // Never overwrite the previous session's crash snapshot before it's been
-    // read (A2-N1) — the first broadcast at startup used to do exactly that.
-    startupRecovery.capture()
+  // Never overwrite the previous session's crash snapshot before it's been
+  // read (A2-N1) — nor before it's been restored (A3-N4): a second crash in
+  // that window used to lose it.
+  startupRecovery.capture()
+  if (recoveryKey !== lastWrittenRecoveryKey && !startupRecovery.writesAllowed()) {
+    recoveryHoldTimer ??= setTimeout(() => { recoveryHoldTimer = null; broadcast() }, startupRecovery.holdRemainingMs() + 50)
+  } else if (recoveryKey !== lastWrittenRecoveryKey) {
     lastWrittenRecoveryKey = recoveryKey
     writeRecovery({
       serviceId: activeServiceId,
@@ -3402,25 +3412,27 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
   fallback: boolean
   stale: boolean
   serviceName: string | null
+  blanked: 'black' | 'logo' | null
 }> => {
   // The snapshot as it was when this process started (A2-N1) — by now
   // recovery.json already holds this session's own state. Handed out once, so
   // a renderer reload/crash-revive doesn't re-load the old item.
   const startup = startupRecovery.take()
   const recovered = startup?.snap ?? null
-  if (!recovered) return { ok: true, restored: false, fallback: false, stale: false, serviceName: null }
-
-  if (isRecoveryStale(recovered, Date.now(), RECOVERY_STALE_MS)) {
-    return { ok: true, restored: false, fallback: false, stale: true, serviceName: null }
+  // Writes are allowed again now (A3-N4); persist this session's state.
+  const nothing = (stale = false): { ok: boolean; restored: boolean; fallback: boolean; stale: boolean; serviceName: string | null; blanked: null } => {
+    broadcast()
+    return { ok: true, restored: false, fallback: false, stale, serviceName: null, blanked: null }
   }
+  if (!recovered) return nothing()
+
+  if (isRecoveryStale(recovered, Date.now(), RECOVERY_STALE_MS)) return nothing(true)
 
   // A normal quit writes cleanExit=true. Restoring after that put Saturday's
   // rehearsal (or last Sunday's closer) live on the projectors the next time
   // someone opened the app — including first-thing Sunday morning. Crash
   // recovery is for crashes; a clean quit stays idle.
-  if (startup?.cleanExit) {
-    return { ok: true, restored: false, fallback: false, stale: false, serviceName: null }
-  }
+  if (startup?.cleanExit) return nothing()
 
   // The renderer fires this on mount, before the operator has necessarily
   // opened any service, so activeServiceItems is very likely still empty —
@@ -3437,8 +3449,9 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
 
   let restoredAny = false
   let fallbackAny = false
+  let blanked: 'black' | 'logo' | null = null
 
-  const restoreTrack = async (track: TrackId, snap: { liveServiceItemId: number | null; slideIndex: number } | null): Promise<void> => {
+  const restoreTrack = async (track: TrackId, snap: TrackSnapshot | null): Promise<void> => {
     if (!snap?.liveServiceItemId) return
     const item = activeServiceItems.find((i) => i.id === snap.liveServiceItemId && i.track === track)
     if (item) {
@@ -3447,20 +3460,37 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
       if (snap.slideIndex >= 0 && snap.slideIndex < t.song.lines.length) {
         t.index = snap.slideIndex
       }
+      // Black / Logo / C as the room last saw them (QA A3-N2).
+      const layers = recoveredLayers(snap, t.mode)
+      t.textHidden = layers.textHidden
+      t.bgHidden = layers.bgHidden
+      if (layers.screen) {
+        clearCountdown(track)
+        t.mode = layers.screen
+        if (track === 'main') blanked = layers.screen
+      }
       restoredAny = true
     } else {
-      // Item was deleted; load first same-track item as fallback
-      const firstItem = activeServiceItems.find((i) => i.track === track)
-      if (firstItem) {
-        await handleTabletLoadItem(track, firstItem.id)
-        tracks[track].index = 0
+      // The item is gone (deleted, or a bad id). Putting the first item live
+      // used to put the pre-service countdown up mid-service (QA A3-N5) —
+      // keep the screens on the logo and let the operator pick.
+      if (activeServiceItems.some((i) => i.track === track)) {
+        const t = tracks[track]
+        clearCountdown(track)
+        clearAutoAdvance(track)
+        t.mode = 'logo'
         fallbackAny = true
       }
     }
   }
 
-  await restoreTrack('main', recovered.main)
-  await restoreTrack('second', recovered.second)
+  suppressBroadcast = true
+  try {
+    await restoreTrack('main', recovered.main)
+    await restoreTrack('second', recovered.second)
+  } finally {
+    suppressBroadcast = false
+  }
 
   // Put held screens back exactly as the operator left them — except a
   // titleCard pin whose item is gone from the service (deleted, or a different
@@ -3481,17 +3511,20 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
   broadcast()
 
   if (restoredAny) {
-    notifyOperator(serviceName ? `Restored "${serviceName}" after a restart.` : 'Restored where you left off after a restart.', 'info')
+    const where = serviceName ? `Restored "${serviceName}" after a restart` : 'Restored where you left off after a restart'
+    notifyOperator(blanked
+      ? `${where} — the screens are still on ${blanked === 'black' ? 'Black' : 'the logo'}, as you left them. Press Space to show the slide.`
+      : `${where}.`, 'info')
   } else if (fallbackAny) {
     notifyOperator(
       serviceName
-        ? `Couldn't find the exact spot in "${serviceName}" — showing the start instead.`
-        : "Couldn't find the exact spot after a restart — showing the start instead.",
+        ? `Couldn't find the exact spot in "${serviceName}" after a restart — the screens are on the logo. Pick the item to go live.`
+        : "Couldn't find the exact spot after a restart — the screens are on the logo. Pick the item to go live.",
       'warn'
     )
   }
 
-  return { ok: true, restored: restoredAny, fallback: fallbackAny, stale: false, serviceName }
+  return { ok: true, restored: restoredAny, fallback: fallbackAny, stale: false, serviceName, blanked }
 })
 
 ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {

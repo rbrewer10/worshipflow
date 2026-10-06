@@ -1,4 +1,8 @@
 import Store from 'electron-store'
+import { app } from 'electron'
+import { join } from 'path'
+import { logWarn } from './logger'
+import { quarantineCorruptJson } from './recoveryPlan'
 import type { ZonePins } from '../shared/zonePins'
 import { isRecoveryStale } from './recoveryStale'
 export { isRecoveryStale }
@@ -10,6 +14,10 @@ export interface TrackSnapshot {
   liveServiceItemId: number | null
   slideIndex: number
   mode: string
+  // C / background-off at the time of the crash (QA A3-N2). Optional: older
+  // snapshots don't have them.
+  textHidden?: boolean
+  bgHidden?: boolean
 }
 
 export interface RecoverySnapshot {
@@ -34,7 +42,15 @@ let recoveryStore: RecoveryStore | null = null
 // electron-store file, but only creates it when recovery is actually read or
 // written.
 function getRecoveryStore(): RecoveryStore {
-  recoveryStore ??= new Store<{ lastState: RecoverySnapshot | null; cleanExit: boolean }>({ name: 'recovery' })
+  if (recoveryStore) return recoveryStore
+  // QA A3-N3: a corrupt/zero-byte file used to make every get/set throw
+  // forever. Move it aside (logged once) and let conf start a fresh one;
+  // clearInvalidConfig covers anything that slips past the check.
+  try {
+    const aside = quarantineCorruptJson(join(app.getPath('userData'), 'recovery.json'))
+    if (aside) logWarn(`[recovery] recovery.json was unreadable — moved it to ${aside} and started a new one`)
+  } catch { /* never block startup on this */ }
+  recoveryStore = new Store<{ lastState: RecoverySnapshot | null; cleanExit: boolean }>({ name: 'recovery', clearInvalidConfig: true })
   return recoveryStore
 }
 

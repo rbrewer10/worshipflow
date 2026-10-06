@@ -18,14 +18,39 @@ export interface StartupSnapshot<S> {
   cleanExit: boolean
 }
 
+// QA A3-N4: capture() kept an in-memory copy, but this session's first
+// broadcast still wrote its idle state to disk straight away — a second crash
+// in the ~1 s before the renderer restored lost the snapshot. Writes are now
+// held until the restore has run (take()), or until RECOVERY_WRITE_HOLD_MS has
+// passed in case the operator window never asks (so a long session is still
+// protected).
+export const RECOVERY_WRITE_HOLD_MS = 30_000
+
 export class StartupRecovery<S> {
   private captured: StartupSnapshot<S> | null = null
   private consumed = false
+  private capturedAt = 0
 
   constructor(
     private readonly readSnapshot: () => S | null,
-    private readonly readCleanExit: () => boolean
+    private readonly readCleanExit: () => boolean,
+    private readonly holdMs = RECOVERY_WRITE_HOLD_MS,
+    private readonly clock: () => number = Date.now
   ) {}
+
+  /** May this session overwrite the on-disk snapshot yet? */
+  writesAllowed(): boolean {
+    if (this.consumed) return true
+    if (!this.captured) return false
+    return this.clock() - this.capturedAt >= this.holdMs
+  }
+
+  /** ms until writesAllowed() turns true on its own (0 when it already is). */
+  holdRemainingMs(): number {
+    if (this.writesAllowed()) return 0
+    if (!this.captured) return this.holdMs
+    return Math.max(0, this.holdMs - (this.clock() - this.capturedAt))
+  }
 
   /** Read the previous session's state if not already read. Idempotent. Call before any write. */
   capture(): void {
@@ -35,6 +60,7 @@ export class StartupRecovery<S> {
     try { snap = this.readSnapshot() } catch { snap = null }
     try { cleanExit = this.readCleanExit() } catch { cleanExit = false }
     this.captured = { snap, cleanExit }
+    this.capturedAt = this.clock()
   }
 
   get isCaptured(): boolean {
