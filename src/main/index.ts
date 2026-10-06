@@ -152,7 +152,7 @@ import { createRecordingSession } from './recording'
 import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
 import { createContentRunner } from './content'
-import { shouldClearHiddenText, modeAfterAsyncLoad, textHideApplies } from '../shared/layerReset'
+import { shouldClearHiddenText, modeAfterAsyncLoad, textHideBlocker, textHideNotice } from '../shared/layerReset'
 
 export { TABLET_PORT }
 
@@ -2724,12 +2724,13 @@ ipcMain.handle('wf:live:setOverlayTicker', (_e, track: TrackId, text: string | n
 
 ipcMain.handle('wf:live:setLayers', (_e, track: TrackId, flags: { textHidden?: boolean; bgHidden?: boolean }) => {
   assertTrackId(track)
-  if (flags?.textHidden === true && !textHideApplies(tracks[track].mode)) {
-    // Nothing to hide on a countdown or picture (B2-N11) — don't light
-    // "Lyrics off" for nothing or carry it into the next item.
-    notifyOperator(tracks[track].mode === 'countdown'
-      ? 'C hides lyrics — a countdown has none. Press B for black or L for the logo.'
-      : 'C hides lyrics — a picture or video has none. Press B for black or L for the logo.', 'info')
+  const liveType = activeServiceItems.find((it) => it.id === tracks[track].serviceItemId)?.type ?? null
+  const blocker = flags?.textHidden === true ? textHideBlocker(tracks[track].mode, liveType) : null
+  if (blocker) {
+    // Nothing to hide on a countdown, picture, sermon card or announcement
+    // (B2-N11, B3-N5) — don't light "Lyrics off" for nothing or carry it into
+    // the next item.
+    notifyOperator(textHideNotice(blocker), 'info')
   } else if (typeof flags?.textHidden === 'boolean') {
     tracks[track].textHidden = flags.textHidden
     if (flags.textHidden) tracks[track].textHiddenAtGeneration = tracks[track].loadGeneration
