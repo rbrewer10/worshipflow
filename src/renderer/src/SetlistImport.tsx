@@ -1,8 +1,16 @@
 import { useState } from 'react'
 import { ListMusic } from 'lucide-react'
-import { parseSetlist, matchSongTitle } from '../../shared/setlistImport'
+import { parseSetlist, matchSongTitle, type SetlistKind } from '../../shared/setlistImport'
+import { localDateString } from '../../shared/localDate'
 import { notifyLocal } from './NotifyToasts'
 import { useService } from './ServiceContext'
+
+const KIND_LABEL: Record<SetlistKind, string> = {
+  song: 'Song', scripture: 'Scripture', sermon: 'Sermon', placeholder: 'Placeholder', element: 'Header'
+}
+const KIND_CLASS: Record<SetlistKind, string> = {
+  song: 'text-blue-400', scripture: 'text-emerald-400', sermon: 'text-violet-400', placeholder: 'text-amber-400', element: 'text-content-tertiary'
+}
 
 function SetlistImport({ onImported }: { onImported: (serviceId: number) => void }): JSX.Element {
   const { activeServiceId, reloadActiveService } = useService()
@@ -18,7 +26,9 @@ function SetlistImport({ onImported }: { onImported: (serviceId: number) => void
       const songs = await window.wf.songsList('')
       let serviceId = activeServiceId
       if (serviceId == null) {
-        const today = new Date().toISOString().slice(0, 10)
+        // Local date — toISOString() is UTC, so after 8 PM EDT the new
+        // service was dated tomorrow (QA B2-N7).
+        const today = localDateString()
         serviceId = await window.wf.serviceCreate('Imported setlist', today)
       }
       const missing: string[] = []
@@ -82,9 +92,21 @@ function SetlistImport({ onImported }: { onImported: (serviceId: number) => void
         className="mb-1.5 w-full resize-y rounded-lg border border-border bg-panel px-2 py-1.5 font-mono text-xs outline-none focus:border-blue-500"
       />
       {entries.length > 0 && (
-        <p className="mb-1.5 text-[11px] text-content-secondary">
-          {entries.length} item{entries.length === 1 ? '' : 's'} · {entries.filter((e) => e.kind === 'song').length} songs · {entries.filter((e) => e.kind === 'scripture').length} scripture
-        </p>
+        <>
+          <p className="mb-1 text-[11px] text-content-secondary">
+            {entries.length} item{entries.length === 1 ? '' : 's'} · {entries.filter((e) => e.kind === 'song').length} songs · {entries.filter((e) => e.kind === 'scripture').length} scripture
+          </p>
+          {/* What each line will become, so a mistake ("Song: Prelude") is
+              caught before importing (QA B2-N6). */}
+          <ol data-testid="setlist-preview" aria-label="Setlist preview" className="mb-1.5 max-h-40 space-y-0.5 overflow-y-auto rounded-md border border-border bg-panel px-2 py-1 text-[11px]">
+            {entries.map((e, i) => (
+              <li key={i} className="flex gap-2">
+                <span className={`w-16 shrink-0 font-semibold ${KIND_CLASS[e.kind]}`}>{KIND_LABEL[e.kind]}</span>
+                <span className="min-w-0 truncate text-content-primary">{e.title}</span>
+              </li>
+            ))}
+          </ol>
+        </>
       )}
       <div className="flex gap-1.5">
         <button type="button" onClick={() => { setOpen(false); setText('') }} className="flex-1 rounded-lg border border-border px-2 py-1.5 text-[11px] font-semibold">Cancel</button>
