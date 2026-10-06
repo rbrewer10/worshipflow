@@ -4,6 +4,9 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { importMediaFile, importedMediaName, isInsideRoots, isRealMediaPath, mediaProblemFor, migrateOutsidePaths, type MediaRoots } from './mediaImport'
 
+// Real leading bytes: since QA A4-N1 the import checks content, not just the name.
+const JPG = (body: string): Buffer => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(body)])
+
 // QA B2-N1: a picture picked from outside the app folder must be copied into
 // imported-media (the only place, with backgrounds/generated, the projector may
 // load from) instead of being stored as its original path.
@@ -25,18 +28,18 @@ const servable = (p: string): boolean => isInsideRoots(p, roots.allowedRoots) &&
 describe('importMediaFile', () => {
   it('copies an outside picture into imported-media and returns the copy', async () => {
     const src = join(pictures, 'cross.jpg')
-    writeFileSync(src, 'JPEGDATA')
+    writeFileSync(src, JPG('JPEGDATA'))
     const dest = await importMediaFile(src, roots)
     expect(dest.startsWith(roots.mediaDir)).toBe(true)
     expect(dest.endsWith('.jpg')).toBe(true)
-    expect(readFileSync(dest, 'utf-8')).toBe('JPEGDATA')
+    expect(readFileSync(dest)).toEqual(JPG('JPEGDATA'))
     expect(servable(dest)).toBe(true)
     expect(servable(src)).toBe(false)
   })
 
   it('reuses the same copy when the same file is picked again', async () => {
     const src = join(pictures, 'cross.jpg')
-    writeFileSync(src, 'JPEGDATA')
+    writeFileSync(src, JPG('JPEGDATA'))
     const a = await importMediaFile(src, roots)
     const b = await importMediaFile(src, roots)
     expect(b).toBe(a)
@@ -45,13 +48,13 @@ describe('importMediaFile', () => {
 
   it('keeps two different files with the same name apart', async () => {
     mkdirSync(join(pictures, 'usb'))
-    writeFileSync(join(pictures, 'cross.jpg'), 'ONE')
-    writeFileSync(join(pictures, 'usb', 'cross.jpg'), 'TWO-LONGER')
+    writeFileSync(join(pictures, 'cross.jpg'), JPG('ONE'))
+    writeFileSync(join(pictures, 'usb', 'cross.jpg'), JPG('TWO-LONGER'))
     const a = await importMediaFile(join(pictures, 'cross.jpg'), roots)
     const b = await importMediaFile(join(pictures, 'usb', 'cross.jpg'), roots)
     expect(a).not.toBe(b)
-    expect(readFileSync(a, 'utf-8')).toBe('ONE')
-    expect(readFileSync(b, 'utf-8')).toBe('TWO-LONGER')
+    expect(readFileSync(a)).toEqual(JPG('ONE'))
+    expect(readFileSync(b)).toEqual(JPG('TWO-LONGER'))
   })
 
   it('leaves a file that is already in an allowed folder where it is', async () => {
@@ -105,7 +108,7 @@ describe('mediaProblemFor', () => {
 describe('migrateOutsidePaths (existing 0.20.2 items)', () => {
   it('copies outside files that exist, reports missing ones, skips servable ones', async () => {
     const outside = join(pictures, 'cross.jpg')
-    writeFileSync(outside, 'x')
+    writeFileSync(outside, JPG('x'))
     const inside = join(roots.mediaDir, 'slide1.png')
     mkdirSync(roots.mediaDir, { recursive: true })
     writeFileSync(inside, 'y')
