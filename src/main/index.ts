@@ -167,6 +167,7 @@ import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
 import { createContentRunner } from './content'
 import { ACTIVE_SERVICE_SETTING, activeServiceSettingValue, parseActiveServiceSetting } from '../shared/activeService'
+import { shouldClearHiddenText } from '../shared/layerReset'
 
 export { TABLET_PORT }
 
@@ -357,6 +358,9 @@ interface LiveTrackState {
   // that something else has since loaded onto this track — so it can bail out
   // instead of clobbering newer live content. See doLoadScripture.
   loadGeneration: number
+  // loadGeneration at the moment "Clear lyrics" (C) was last turned on — so a
+  // slow load that started before it doesn't undo it (QA A-N4, shared/layerReset.ts).
+  textHiddenAtGeneration: number
   // Set true by every load* function the first time real content (a service
   // item OR an ad-hoc Quick Scripture/Quick Countdown lookup) is loaded onto
   // this track — distinguishes "genuinely nothing loaded yet, still on the
@@ -423,6 +427,7 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     autoAdvanceDuration: 0,
     autoAdvanceLoop: false,
     loadGeneration: 0,
+    textHiddenAtGeneration: -1,
     hasLiveContent: false,
     deckSlides: null,
     deckIsGenerated: false,
@@ -1432,9 +1437,12 @@ function processIntent(track: TrackId, type: Intent): void {
 //    CURRENT preview looked normal. Like ProPresenter, a new item brings the
 //    lyrics back; bgHidden (G) stays sticky by design.
 //  - isTicker: only doLoadTickerAnnouncement sets it.
-function resetPerItemLayers(track: TrackId): void {
+//    An async loader passes the generation its load started at, so a C pressed
+//    after Go Live (while e.g. an online verse is still being fetched) sticks
+//    (QA A-N4).
+function resetPerItemLayers(track: TrackId, loadStartGeneration?: number): void {
   const t = tracks[track]
-  t.textHidden = false
+  if (loadStartGeneration === undefined || shouldClearHiddenText(t.textHiddenAtGeneration, loadStartGeneration)) t.textHidden = false
   t.isTicker = false
 }
 
@@ -1734,7 +1742,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   }
   const t = tracks[track]
   t.hasLiveContent = true
-  resetPerItemLayers(track)
+  resetPerItemLayers(track, generation)
   clearCountdown(track)
   clearAutoAdvance(track)
   t.songId = null
@@ -1789,7 +1797,7 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
     return
   }
   t.hasLiveContent = true
-  resetPerItemLayers(track)
+  resetPerItemLayers(track, generation)
   t.songId = id
   t.scriptureRef = null
   t.bgFit = 'cover'
@@ -2917,7 +2925,10 @@ ipcMain.handle('wf:live:setOverlayTicker', (_e, track: TrackId, text: string | n
 
 ipcMain.handle('wf:live:setLayers', (_e, track: TrackId, flags: { textHidden?: boolean; bgHidden?: boolean }) => {
   assertTrackId(track)
-  if (typeof flags?.textHidden === 'boolean') tracks[track].textHidden = flags.textHidden
+  if (typeof flags?.textHidden === 'boolean') {
+    tracks[track].textHidden = flags.textHidden
+    if (flags.textHidden) tracks[track].textHiddenAtGeneration = tracks[track].loadGeneration
+  }
   if (typeof flags?.bgHidden === 'boolean') tracks[track].bgHidden = flags.bgHidden
   broadcast()
 })
