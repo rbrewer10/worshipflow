@@ -49,4 +49,9 @@ describe('Stage Monitor fit (QA A-H1)', () => {
     const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('<\/script>'))
     expect(() => new Function(script)).not.toThrow()
   })
+  it('QA A2-N4: the sermon card fits its content box and flags a clipped speaker line', () => {
+    expect(html).toContain('var sAvailH=current.clientHeight-parseFloat(scs.paddingTop)-parseFloat(scs.paddingBottom)')
+    expect(html).toContain('fitText(sWrap.firstChild,7,3,Math.min(sAvailW,current.clientWidth-window.innerWidth*0.10),sAvailH-subH)')
+    expect(html).toContain('if(sWrap.scrollHeight>sAvailH+1) window.__wfOverflow=true')
+  })
 })
