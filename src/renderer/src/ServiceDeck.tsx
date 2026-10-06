@@ -3,6 +3,7 @@ import type { ComponentType } from 'react'
 import { Music, BookOpen, Type, Timer, Image as ImageIcon, Hand, ScrollText, Megaphone, GripVertical, Play, X, Plus, ListMusic, Mic, FileQuestion, Minus, HelpCircle, Copy, Video, Search } from 'lucide-react'
 import type { ServiceFull, ServiceItem, SongSummary, AnnouncementSummary, TrackId } from '../../shared/types'
 import { NON_LIVE_TYPES } from '../../shared/types'
+import { splitLiveFromDeletion } from '../../shared/deckAdjacent'
 import type { SceneConfig } from '../../shared/zoneScenes'
 import { effectiveRouting, matchScene } from '../../shared/zoneScenes'
 import ZoneStripBadge from './ZoneStripBadge'
@@ -135,9 +136,12 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
     onSelect(it.id)
   }
 
+  // The live row's own Delete is hidden; multi-select delete must not be a
+  // way around that (QA B10) — deleting what's on the projector left Next stuck.
+  const selectedItems = items.filter((it) => multiSelected.has(it.id))
+  const { deletable, skippedLive } = splitLiveFromDeletion(selectedItems, liveItemId)
   const batchDelete = (): void => {
-    const toDelete = items.filter((it) => multiSelected.has(it.id))
-    if (toDelete.length) onBatchDelete(toDelete)
+    if (deletable.length) onBatchDelete(deletable)
     setMultiSelected(new Set())
   }
 
@@ -152,9 +156,12 @@ function ServiceDeck({ service, track, onTrackChange, trackAssignment, onTrackAs
 
       {multiSelected.size > 0 && (
         <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-3 py-1.5">
-          <span className="text-xs font-semibold text-indigo-300">{multiSelected.size} selected</span>
+          <span className="text-xs font-semibold text-indigo-300">
+            {multiSelected.size} selected
+            {skippedLive && <span className="ml-2 font-medium text-amber-300">· live item &ldquo;{skippedLive.title}&rdquo; won&rsquo;t be deleted</span>}
+          </span>
           <div className="flex items-center gap-2">
-            <button onClick={batchDelete} className="text-xs font-semibold text-red-600 hover:underline">Delete</button>
+            <button onClick={batchDelete} disabled={deletable.length === 0} title={deletable.length === 0 ? 'The live item can’t be deleted while it’s on screen' : undefined} className="text-xs font-semibold text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline">Delete{skippedLive && deletable.length > 0 ? ` ${deletable.length}` : ''}</button>
             <button onClick={() => setMultiSelected(new Set())} className="text-xs font-medium text-indigo-400 hover:underline">Clear</button>
           </div>
         </div>
