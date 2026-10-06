@@ -40,6 +40,7 @@ import { applyAudienceLayers } from '../shared/layers'
 import { detectNdiRuntime } from '../shared/ndiRuntime'
 import { seedSampleSunday } from './sampleSunday'
 import { importSongSelectFile, openSongSelectWindow } from './songSelect'
+import { showErrorAsync } from './errorDialog'
 import { setRoomFeedActive } from './roomFeedPrecedence'
 import { markZoneConnected, markZoneDisconnected, getConnectedZoneIds } from './zoneConnections'
 import { assertTrackId, assertZoneId, isIntent, isPositiveInt, assertIsoDateOrNull } from './ipcValidate'
@@ -3649,13 +3650,13 @@ ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serv
       items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
     }
   } catch (err) {
-    await dialog.showErrorBox('Import Failed', `Invalid service file: ${err instanceof Error ? err.message : String(err)}`)
+    await showErrorAsync(operatorWin, 'Import Failed', `Invalid service file: ${err instanceof Error ? err.message : String(err)}`)
     return { canceled: false, serviceId: null }
   }
 
   // Validate structure
   if (!bundle.version || !Array.isArray(bundle.items)) {
-    await dialog.showErrorBox('Import Failed', 'Invalid service file: missing version or items array')
+    await showErrorAsync(operatorWin, 'Import Failed', 'Invalid service file: missing version or items array')
     return { canceled: false, serviceId: null }
   }
 
@@ -3711,11 +3712,11 @@ ipcMain.handle(
     try {
       plan = JSON.parse(readFileSync(filePaths[0], 'utf-8'))
     } catch (err) {
-      await dialog.showErrorBox('Import Failed', `Invalid plan file: ${err instanceof Error ? err.message : String(err)}`)
+      await showErrorAsync(operatorWin, 'Import Failed', `Invalid plan file: ${err instanceof Error ? err.message : String(err)}`)
       return { canceled: false, serviceId: null, matched: 0, missing: [] }
     }
     if (plan.kind !== 'service-plan' || !Array.isArray(plan.items)) {
-      await dialog.showErrorBox('Import Failed', 'That file is not a WorshipFlow service plan.')
+      await showErrorAsync(operatorWin, 'Import Failed', 'That file is not a WorshipFlow service plan.')
       return { canceled: false, serviceId: null, matched: 0, missing: [] }
     }
 

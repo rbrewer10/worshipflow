@@ -1,4 +1,5 @@
 import { app, safeStorage } from 'electron'
+import { normalizeCcli, titleMatchIsSameSong } from '../shared/songMatch'
 import { join, dirname } from 'path'
 import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, statSync } from 'fs'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
@@ -688,13 +689,13 @@ export function getSong(id: number): SongFull | null {
 }
 
 export function findExistingSong(input: { ccli?: string | null; title: string; author?: string | null }): { id: number; title: string } | null {
-  const digits = (input.ccli ?? '').replace(/\D/g, '')
-  if (digits) {
-    const stmt = db.prepare('SELECT id, title, ccli FROM song WHERE ccli IS NOT NULL AND TRIM(ccli) != ""')
+  const ccli = normalizeCcli(input.ccli)
+  if (ccli) {
+    const stmt = db.prepare("SELECT id, title, ccli FROM song WHERE ccli IS NOT NULL AND TRIM(ccli) != ''")
     let hit: { id: number; title: string } | null = null
     while (stmt.step()) {
       const row = stmt.getAsObject() as { id: number; title: string; ccli: string }
-      if (String(row.ccli).replace(/\D/g, '') === digits) {
+      if (normalizeCcli(String(row.ccli)) === ccli) {
         hit = { id: row.id, title: row.title }
         break
       }
@@ -705,18 +706,22 @@ export function findExistingSong(input: { ccli?: string | null; title: string; a
 
   const title = normalizeTitleText(input.title)
   if (!title) return null
-  const stmt = db.prepare('SELECT id, title, author FROM song WHERE title = ? COLLATE NOCASE')
+  const stmt = db.prepare('SELECT id, title, author, ccli FROM song WHERE title = ? COLLATE NOCASE')
   stmt.bind([title])
-  const matches: { id: number; title: string; author: string | null }[] = []
-  while (stmt.step()) matches.push(stmt.getAsObject() as { id: number; title: string; author: string | null })
+  const matches: { id: number; title: string; author: string | null; ccli: string | null }[] = []
+  while (stmt.step()) matches.push(stmt.getAsObject() as { id: number; title: string; author: string | null; ccli: string | null })
   stmt.free()
-  if (matches.length === 0) return null
+  // QA A-H5: a title match is only a duplicate when it can be the same song —
+  // a different CCLI number (or a completely different author) is a different
+  // song that happens to share a title.
+  const same = matches.filter((m) => titleMatchIsSameSong({ ccli: input.ccli, author: input.author }, { ccli: m.ccli, author: m.author }))
+  if (same.length === 0) return null
   const author = input.author ? normalizeTitleText(input.author).toLowerCase() : ''
   if (author) {
-    const byAuthor = matches.find((m) => (m.author ?? '').trim().toLowerCase() === author)
+    const byAuthor = same.find((m) => (m.author ?? '').trim().toLowerCase() === author)
     if (byAuthor) return { id: byAuthor.id, title: byAuthor.title }
   }
-  return { id: matches[0].id, title: matches[0].title }
+  return { id: same[0].id, title: same[0].title }
 }
 
 export function createSong(input: SongInput): number {
