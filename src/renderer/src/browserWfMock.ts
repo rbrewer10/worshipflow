@@ -561,7 +561,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       room: 'room-feed',
     }),
     roomFeedNotifyCapturing: noop,
-    restoreRecovery: async (): Promise<{ ok: boolean; restored: boolean; fallback: boolean; stale: boolean; serviceName: string | null }> =>
+    restoreRecovery: async (): Promise<{ ok: boolean; restored: boolean; fallback: boolean; stale: boolean; serviceName: string | null; blanked?: 'black' | 'logo' | null }> =>
       ({ ok: true, restored: false, fallback: false, stale: false, serviceName: null }),
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),
