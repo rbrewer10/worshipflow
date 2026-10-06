@@ -50,14 +50,16 @@ function LaunchSetup({ onDone }: { onDone: () => void }): JSX.Element {
         {step === 1 && (
           <>
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Church size={16} /> Church</div>
-            <label className="mb-1 block text-[11px] text-content-tertiary">Name on the logo screen</label>
+            <label htmlFor="launch-setup-church" className="mb-1 block text-[11px] text-content-tertiary">Name on the logo screen</label>
             <input
+              id="launch-setup-church"
               value={church}
               onChange={(e) => setChurch(e.target.value)}
               className="mb-3 w-full rounded-lg border border-border bg-panel-raised px-3 py-2 text-sm outline-none focus:border-blue-500"
             />
-            <label className="mb-1 block text-[11px] text-content-tertiary">CCLI license # (footer on song slides)</label>
+            <label htmlFor="launch-setup-ccli" className="mb-1 block text-[11px] text-content-tertiary">CCLI license # (footer on song slides)</label>
             <input
+              id="launch-setup-ccli"
               value={ccli}
               onChange={(e) => setCcli(e.target.value)}
               placeholder="e.g. 1234567"
