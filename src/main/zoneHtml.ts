@@ -35,6 +35,14 @@ const SHARED_JS = `
     if(t && state.mode!=='black' && state.mode!=='logo' && state.mode!=='off'){
       el.textContent=t;
       el.style.display='block';
+      // QA A-N5: a long lower third wrapped to as many lines as it needed and
+      // squeezed the stage lyrics until they clipped. Cap the band at 10vh and
+      // shrink its text to fit (floor 0.9vw; anything beyond is cut off).
+      el.style.maxHeight='10vh';el.style.overflow='hidden';
+      var ocs=getComputedStyle(el);
+      var oH=window.innerHeight*0.10-parseFloat(ocs.paddingTop)-parseFloat(ocs.paddingBottom);
+      var oSize=1.8;el.style.fontSize=oSize+'vw';
+      while(el.scrollHeight-parseFloat(ocs.paddingTop)-parseFloat(ocs.paddingBottom)>oH+1 && oSize>0.9){ oSize=Math.max(0.9,oSize-0.1);el.style.fontSize=oSize+'vw'; }
     } else {
       el.style.display='none';
     }
@@ -741,9 +749,12 @@ const STAGE_CSS = `
 #topbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:1.5vh 3vw;border-bottom:1px solid rgba(255,255,255,0.08)}
 #songtitle{font-size:2vw;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.05em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #clock{font-size:2.5vw;font-weight:700;color:rgba(255,255,255,0.35);font-variant-numeric:tabular-nums;flex-shrink:0;margin-left:2vw}
-#stagemsg{display:none;flex:0 0 auto;padding:1.5vh 3vw;background:#7c2d00;border-bottom:2px solid #f97316}
-#stagemsg span{font-size:2.2vw;font-weight:800;color:#fed7aa}
-#current{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:2vh 5vw;text-align:center}
+#stagemsg{display:none;flex:0 0 auto;max-height:20vh;overflow:hidden;padding:1.5vh 3vw;background:#7c2d00;border-bottom:2px solid #f97316}
+#stagemsg span{display:block;font-size:2.2vw;font-weight:800;color:#fed7aa;line-height:1.2}
+/* flex-basis 0 (not auto): #current's size must not depend on its own content,
+   or measuring it at full font size and then shrinking the text shrinks the box
+   too — the verse "fits" a box that no longer exists (QA A-H1). */
+#current{flex:1 1 0;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:2vh 5vw;text-align:center}
 #current > div{max-width:100%;max-height:100%;overflow:hidden}
 #divider{flex:0 0 auto;height:1px;background:rgba(255,255,255,0.08);margin:0 3vw}
 #nextsection{flex:0 1 22vh;max-height:24vh;min-height:0;overflow:hidden;padding:1.5vh 3vw 1vh;display:flex;flex-direction:column;justify-content:center}
@@ -771,17 +782,35 @@ const STAGE_SCRIPT = `
     clockEl.textContent=h+':'+(m<10?'0':'')+m+' '+ap;
   }
   tick();setInterval(tick,1000);
+  function showNext(on){
+    nextSection.style.display=on?'':'none';
+    document.getElementById('divider').style.display=on?'':'none';
+  }
+  // Re-fit when the screen changes size (a Pi that boots before the TV, a
+  // resolution switch) — previously the old fit stayed until the next slide.
+  var resizeTimer=null;
+  window.addEventListener('resize',function(){ clearTimeout(resizeTimer); resizeTimer=setTimeout(render,120); });
   function render(){
     window.__wfOverflow=false;
     var m=state.mode;
-    wrapEl.style.paddingBottom=(state.overlayTicker&&m!=='black'&&m!=='logo'&&m!=='off')?'5.5vh':'0';
+    // Reserve the overlay ticker's REAL height (it wraps when long) instead of
+    // a fixed 5.5vh that a long lower third overflowed, covering Next (QA A-H1).
+    var ov=document.getElementById('wf-overlay');
+    wrapEl.style.paddingBottom=(ov&&ov.style.display!=='none')?ov.offsetHeight+'px':'0';
     if(state.stageMessage){
       stageMsg.style.display='block';
-      stageMsg.querySelector('span').textContent=state.stageMessage;
+      var msgSpan=stageMsg.querySelector('span');
+      msgSpan.textContent=state.stageMessage;
+      // Capped at 20vh in CSS; shrink a long message to fit rather than let it
+      // squeeze the lyrics to nothing.
+      var mcs=getComputedStyle(stageMsg);
+      fitText(msgSpan,2.2,1.2,stageMsg.clientWidth-parseFloat(mcs.paddingLeft)-parseFloat(mcs.paddingRight),window.innerHeight*0.20-parseFloat(mcs.paddingTop)-parseFloat(mcs.paddingBottom));
     } else {
       stageMsg.style.display='none';
     }
     songTitle.textContent=state.title||'';
+    showNext(false);
+    nextLabel.textContent='Next';
     if(m==='off'){
       current.innerHTML='<div style="font-size:3vw;font-weight:700;color:rgba(255,255,255,0.1)">Standby</div>';
       nextLine.textContent='';slideCounter.textContent='';return;
@@ -798,7 +827,7 @@ const STAGE_SCRIPT = `
     }
     if(m==='countdown'){
       var mins=Math.floor(state.secondsLeft/60),secs=state.secondsLeft%60;
-      current.innerHTML='<div style="font-size:18vw;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-0.03em">'+mins+':'+(secs<10?'0':'')+secs+'</div>';
+      current.innerHTML='<div style="font-size:min(18vw,60vh);line-height:1.1;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-0.03em">'+mins+':'+(secs<10?'0':'')+secs+'</div>';
       nextLine.textContent='';slideCounter.textContent='';return;
     }
     if(m==='sermon'){
@@ -812,26 +841,69 @@ const STAGE_SCRIPT = `
         +(sub?'<div style="margin-top:2vh;font-size:2.4vw;font-weight:700;letter-spacing:0.06em;color:rgba(255,255,255,0.45)">'+esc(sub)+'</div>':'')
         +'</div>';
       var sWrap=current.firstChild;
-      var subH=sWrap.children.length>1?sWrap.children[1].getBoundingClientRect().height+window.innerHeight*0.02:0;
-      fitText(sWrap.firstChild,7,3,current.clientWidth-window.innerWidth*0.10,current.clientHeight-subH);
+      // QA A2-N4: fit into the CONTENT box (clientHeight includes padding),
+      // then make sure the speaker/passage line fits too — with a stage
+      // message and a lower third up it was cut in half behind the ticker
+      // band, and nothing flagged it.
+      var scs=getComputedStyle(current);
+      var sAvailW=current.clientWidth-parseFloat(scs.paddingLeft)-parseFloat(scs.paddingRight);
+      var sAvailH=current.clientHeight-parseFloat(scs.paddingTop)-parseFloat(scs.paddingBottom);
+      var subEl=sWrap.children.length>1?sWrap.children[1]:null;
+      var subH=subEl?subEl.getBoundingClientRect().height+window.innerHeight*0.02:0;
+      fitText(sWrap.firstChild,7,3,Math.min(sAvailW,current.clientWidth-window.innerWidth*0.10),sAvailH-subH);
+      if(subEl&&sWrap.scrollHeight>sAvailH+1){
+        fitText(subEl,2.4,1.2,sAvailW,Math.max(window.innerHeight*0.03,sAvailH-sWrap.firstChild.offsetHeight-window.innerHeight*0.02));
+      }
+      if(sWrap.scrollHeight>sAvailH+1) window.__wfOverflow=true;
       nextLine.textContent='';slideCounter.textContent='';return;
     }
     var fs=Math.max(5,Math.min(state.fontScale||6,12));
     var lineChanged=state.line!==prevLine;prevLine=state.line;
-    current.innerHTML='<div class="'+(lineChanged?'fade-in':'')+'" style="font-size:'+fs+'vw;font-weight:900;line-height:1.2;color:#fff;white-space:pre-line">'+esc(state.line||'\\u2014')+'</div>';
+    // Lay out everything AROUND #current first (Next preview, counter), so the
+    // box the verse is fitted into is the box it ends up with (QA A-H1).
+    slideCounter.textContent=state.total>1?'Slide '+(state.index+1)+' of '+state.total:'';
+    var nextText=state.next||'';
+    if(!nextText&&state.nextItemTitle){
+      // Last slide of the item: Next goes to the next service item, so say so
+      // instead of an empty "NEXT" box.
+      nextLabel.textContent='Up next';
+      nextText=state.nextItemTitle;
+    }
+    nextLine.textContent=nextText;
+    showNext(!!nextText);
+    if(nextText){
+      var ncs=getComputedStyle(nextSection);
+      var nextHead=(nextLabel&&nextLabel.offsetHeight)||0;
+      // clientWidth/Height include padding — subtract it, or the preview "fits"
+      // a box bigger than the one it's drawn in.
+      var nextW=nextSection.clientWidth-parseFloat(ncs.paddingLeft)-parseFloat(ncs.paddingRight);
+      var nextH=Math.max(nextSection.clientHeight-parseFloat(ncs.paddingTop)-parseFloat(ncs.paddingBottom)-nextHead-window.innerHeight*0.006, window.innerHeight*0.04);
+      fitText(nextLine,2.4,1.1,nextW,nextH);
+      // QA A-N5: with a stage message and a lower third up too, the Next preview
+      // can leave the verse too little room. The verse wins: drop Next when the
+      // lyric box would fall below 40% of the screen.
+      if(current.clientHeight<window.innerHeight*0.4) showNext(false);
+    }
+    current.innerHTML='<div class="'+(lineChanged?'fade-in':'')+'" style="font-size:'+fs+'vw;font-weight:900;line-height:1.2;color:#fff;white-space:pre-line;overflow-wrap:anywhere">'+esc(state.line||'\\u2014')+'</div>';
     // min-height:0 on #current makes this a real remaining-space box; without
     // it flex would not shrink below the unsized verse and #wrap clipped Next.
     var cs=getComputedStyle(current);
     var availW=current.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
     var availH=current.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
-    fitText(current.firstChild,fs,3,availW,availH);
-    nextLine.textContent=state.next||'';
-    if(state.next){
-      var nextHead=(nextLabel&&nextLabel.offsetHeight)||0;
-      var nextH=Math.max(nextSection.clientHeight-nextHead-window.innerHeight*0.01, window.innerHeight*0.08);
-      fitText(nextLine,2.4,1.1,nextSection.clientWidth,nextH);
+    // The 3vw floor is sized for 16:9. On a wider screen (e.g. 3840x1080) vw
+    // grows while the height doesn't, so scale the floor by the aspect ratio.
+    var minFs=3*Math.min(1,(window.innerHeight/window.innerWidth)/(9/16));
+    var flaggedBefore=window.__wfOverflow;
+    window.__wfOverflow=false;
+    fitText(current.firstChild,fs,minFs,availW,availH);
+    if(window.__wfOverflow){
+      // Still too much text at the normal floor: shrink further rather than
+      // cut lines off the band's screen, but keep the overflow flag so the
+      // multiview badges this screen for the operator.
+      fitText(current.firstChild,minFs,minFs*0.6,availW,availH);
+      window.__wfOverflow=true;
     }
-    slideCounter.textContent=state.total>1?'Slide '+(state.index+1)+' of '+state.total:'';
+    if(flaggedBefore) window.__wfOverflow=true;
   }
   render();
 `
