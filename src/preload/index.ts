@@ -54,7 +54,9 @@ const wf = {
   },
   getInfo: (): Promise<AppInfo> => ipcRenderer.invoke('wf:getInfo'),
   getState: (track?: TrackId): Promise<LiveState> => ipcRenderer.invoke('wf:getState', track),
-  updateInstallNow: (): void => ipcRenderer.send('wf:update:installNow'),
+  // Asks main to install a downloaded update. Main refuses while anything is
+  // live and always confirms first (QA A-H6) — resolves with what happened.
+  updateInstallNow: (): Promise<'installing' | 'blocked' | 'later' | 'none'> => ipcRenderer.invoke('wf:update:installNow'),
   onUpdateReady: (cb: () => void): (() => void) => {
     const handler = (): void => cb()
     ipcRenderer.on('wf:update:ready', handler)
@@ -284,7 +286,7 @@ const wf = {
   logsOpenFolder: (): Promise<void> => ipcRenderer.invoke('wf:logs:openFolder'),
 
   // Database backups (one automatic snapshot per launch — see createTimestampedBackup)
-  backupsList: (): Promise<{ filename: string; timestamp: number }[]> =>
+  backupsList: (): Promise<{ filename: string; timestamp: number; kind?: 'launch' | 'pre-restore' }[]> =>
     ipcRenderer.invoke('wf:backups:list'),
   backupsRestore: (filename: string): Promise<void> =>
     ipcRenderer.invoke('wf:backups:restore', filename),

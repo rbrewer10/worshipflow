@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FileText, FolderOpen } from 'lucide-react'
 import type { AppInfo } from '../../../shared/types'
+import { isShowingContent, restoreConfirmText, type BackupKind } from '../../../shared/backupNames'
 
 function fmtBackupTime(ts: number): string {
   const d = new Date(ts)
@@ -12,19 +13,17 @@ function fmtBackupTime(ts: number): string {
 // "backups silently exist" and "an operator can actually use one" without
 // touching the filesystem by hand.
 function BackupsPanel(): JSX.Element {
-  const [backups, setBackups] = useState<{ filename: string; timestamp: number }[]>([])
+  const [backups, setBackups] = useState<{ filename: string; timestamp: number; kind?: BackupKind }[]>([])
   const [restoring, setRestoring] = useState<string | null>(null)
 
   useEffect(() => { window.wf.backupsList().then(setBackups) }, [])
 
-  const restore = (filename: string, timestamp: number): void => {
+  const restore = async (filename: string, timestamp: number, kind: BackupKind = 'launch'): Promise<void> => {
     const when = fmtBackupTime(timestamp)
-    if (!confirm(
-      `Restore the database to how it was on ${when}?\n\n` +
-      'Everything added or changed since then will be gone. The app will ' +
-      'restart automatically — your current database is also backed up first, ' +
-      'just in case.'
-    )) return
+    // QA A-M3: the restart blanks every screen — say so, louder if something is live.
+    const states = await Promise.all([window.wf.getState('main'), window.wf.getState('second')]).catch(() => [])
+    const liveNow = states.some((st) => isShowingContent(st?.mode))
+    if (!confirm(restoreConfirmText(when, kind, liveNow))) return
     setRestoring(filename)
     window.wf.backupsRestore(filename).catch((err) => {
       setRestoring(null)
@@ -46,9 +45,12 @@ function BackupsPanel(): JSX.Element {
         <ul className="max-h-48 space-y-1 overflow-auto">
           {backups.map((b) => (
             <li key={b.filename} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-panel-raised">
-              <span className="text-content-primary">{fmtBackupTime(b.timestamp)}</span>
+              <span className="text-content-primary">
+                {fmtBackupTime(b.timestamp)}
+                {b.kind === 'pre-restore' && <span className="ml-2 text-content-secondary">(before a restore — undo)</span>}
+              </span>
               <button
-                onClick={() => restore(b.filename, b.timestamp)}
+                onClick={() => void restore(b.filename, b.timestamp, b.kind)}
                 disabled={restoring != null}
                 className="rounded-md border border-border bg-panel-raised px-2.5 py-1 font-semibold text-content-secondary hover:bg-border-strong disabled:opacity-50"
               >
@@ -58,6 +60,41 @@ function BackupsPanel(): JSX.Element {
           ))}
         </ul>
       )}
+    </div>
+  )
+}
+
+// QA A-H6: a way to turn the startup update check off entirely (e.g. on the
+// week of a big service). Downloads never install by themselves either way.
+function UpdatesPanel(): JSX.Element {
+  const [mode, setMode] = useState<'download' | 'off' | null>(null)
+  useEffect(() => {
+    void window.wf.settingGet('auto_update_mode').then((v) => setMode(v === 'off' ? 'off' : 'download'))
+  }, [])
+  const toggle = (on: boolean): void => {
+    const next = on ? 'download' : 'off'
+    setMode(next)
+    void window.wf.settingSet('auto_update_mode', next)
+  }
+  return (
+    <div className="rounded-xl border border-border bg-panel p-5">
+      <h2 className="font-semibold text-content-primary">Updates</h2>
+      <label className="mt-2 flex items-start gap-2 text-sm text-content-secondary">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={mode !== 'off'}
+          disabled={mode == null}
+          onChange={(e) => toggle(e.target.checked)}
+        />
+        <span>
+          Check for and download new versions when WorshipFlow starts.
+          <span className="mt-0.5 block text-xs text-content-tertiary">
+            A downloaded update is never installed by itself — not on quit, not during a service. You choose when, from the
+            “Update ready” button, and only while nothing is live. Takes effect next launch.
+          </span>
+        </span>
+      </label>
     </div>
   )
 }
@@ -118,6 +155,7 @@ function DiagnosticsTab(): JSX.Element {
         </div>
 
         <BackupsPanel />
+        <UpdatesPanel />
       </div>
     </div>
   )
