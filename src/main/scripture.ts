@@ -35,7 +35,33 @@ function data(): Book[] {
 // ("The LORD {is} my shepherd"). Notes go entirely; supplied words are part of
 // the verse and stay (only the braces go). Dropping both used to put
 // "The LORD my shepherd" on screen.
-const NOTE = /:|\b(?:Heb|Gr|Chald|Syr|Arab)\.|(?:^|[;\s])or,|^(?:Written|The (?:first|second)\b|It was written|many ancient copies|this verse is not)/i
+//
+// Case-sensitive and anchored to the real margin-note markup: with /i,
+// "^The first" also caught the italic {the first} in Ex 28:17, Ex 39:10 and
+// 1 Chr 24:23 and dropped it from the verse (QA B5-N6). The capitalised
+// subscriptions it was written for ("{The first epistle}", "{The second
+// epistle}", "{The first to Timothy was written…}") are all that match now.
+const NOTE_MARKER = /\b(?:Heb|Gr|Chald|Syr|Arab)\.|(?:^|[;\s])or,|^(?:Written|The (?:first|second) (?:epistle|to)\b|It was written|many ancient copies|this verse is not)/
+
+// A colon on its own ("{Babel: that is, Confusion}") marks a margin note only
+// where notes sit, after the verse text. Mid-verse, a colon is the KJV's own
+// punctuation inside italic words: "{tarry: for} I have learned",
+// "{therein: it shall be} a statute", "{them: even} unto the LORD" — the
+// re-run of the whole-Bible comparison for B5-N6 found seven verses that had
+// lost those words (Gen 30:27, Gen 42:34, Lev 23:21, Job 36:5, Ps 18:41,
+// Isa 6:13, Jer 22:16).
+function onlyNotesAfter(rest: string): boolean {
+  let r = rest
+  for (let prev = ''; prev !== r; ) {
+    prev = r
+    r = r.replace(/\{[^{}]*\}/g, '')
+  }
+  return !/[A-Za-z0-9]/.test(r)
+}
+
+function isNote(inner: string, rest: string): boolean {
+  return NOTE_MARKER.test(inner) || (inner.includes(':') && onlyNotesAfter(rest))
+}
 
 export function cleanVerse(t: string): string {
   // «…» is an epistle's postscript ("Written from Rome…"), not verse text.
@@ -45,7 +71,9 @@ export function cleanVerse(t: string): string {
   // Innermost first, so "{{and from} the cities: or, …}" reads as one note.
   for (let prev = ''; prev !== out; ) {
     prev = out
-    out = out.replace(/\{([^{}]*)\}/g, (_m, inner: string) => (NOTE.test(inner) ? '' : inner))
+    out = out.replace(/\{([^{}]*)\}/g, (m: string, inner: string, offset: number, whole: string) =>
+      isNote(inner, whole.slice(offset + m.length)) ? '' : inner
+    )
   }
   // QA A5-N3: the Psalm titles are in square brackets in this text
   // ("[A Psalm of David.] The LORD is my shepherd"). Like the italic supplied

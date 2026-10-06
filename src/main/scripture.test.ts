@@ -148,3 +148,31 @@ describe('QA A5-N3: Psalm titles without the brackets', () => {
     expect(lookupScripture('Psalm 3:1').verses![0].text).toMatch(/^A Psalm of David, when he fled from Absalom his son\. LORD, how are they increased/)
   })
 })
+
+describe('QA B5-N6: italic supplied words are not mistaken for margin notes', () => {
+  it('"{the first}" stays in Exodus 28:17, Exodus 39:10 and 1 Chronicles 24:23', () => {
+    expect(lookupScripture('Exodus 28:17').verses![0].text).toMatch(/: this shall be the first row\.$/)
+    expect(lookupScripture('Exodus 39:10').verses![0].text).toMatch(/: this was the first row\.$/)
+    expect(lookupScripture('1 Chronicles 24:23').verses![0].text).toMatch(/^And the sons of Hebron; Jeriah the first, Amariah the second/)
+  })
+  it('mid-verse italic words with the KJV\'s own colon stay (found re-running the whole-Bible comparison)', () => {
+    const t = (r: string): string => lookupScripture(r).verses![0].text
+    expect(t('Genesis 30:27')).toMatch(/in thine eyes, tarry: for I have learned/)
+    expect(t('Genesis 42:34')).toMatch(/ye are true men: so will I deliver you/)
+    expect(t('Leviticus 23:21')).toMatch(/servile work therein: it shall be a statute/)
+    expect(t('Job 36:5')).toBe('Behold, God is mighty, and despiseth not any: he is mighty in strength and wisdom.')
+    expect(t('Psalm 18:41')).toBe('They cried, but there was none to save them: even unto the LORD, but he answered them not.')
+    expect(t('Isaiah 6:13')).toMatch(/when they cast their leaves: so the holy seed shall be the substance thereof\.$/)
+    expect(t('Jeremiah 22:16')).toMatch(/then it was well with him: was not this to know me\?/)
+  })
+  it('the margin notes those rules were for still go', async () => {
+    const { cleanVerse } = await import('./scripture')
+    expect(cleanVerse('a word {sickle; or, scythe}')).toBe('a word')
+    expect(cleanVerse('Babel; because the LORD did there confound. {Babel: that is, Confusion}')).toBe('Babel; because the LORD did there confound.')
+    expect(cleanVerse('Grace be with you. Amen. {The first epistle}')).toBe('Grace be with you. Amen.')
+    expect(cleanVerse('Amen. {The first to Timothy was written from Laodicea}')).toBe('Amen.')
+    expect(cleanVerse('The LORD {is} my shepherd')).toBe('The LORD is my shepherd')
+    expect(lookupScripture('1 Corinthians 16:24').verses![0].text).toBe('My love be with you all in Christ Jesus. Amen.')
+    expect(lookupScripture('2 Timothy 4:22').verses![0].text).toBe('The Lord Jesus Christ be with thy spirit. Grace be with you. Amen.')
+  })
+})

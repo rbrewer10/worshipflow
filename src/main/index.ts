@@ -26,7 +26,7 @@ import { parseServiceControlModeMapping, validateServiceControlModeMapping } fro
 import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText, wasOnRemovedDisplay, trackShowing, closePromptText } from '../shared/windowPolicy'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
-import { parseReferenceList, formatReferenceList, rangeReference, verseLines } from '../shared/scriptureRefs'
+import { parseReferenceList, formatReferenceList, rangeReference, verseLines, deckVerseText } from '../shared/scriptureRefs'
 import { normalizeReference } from '../shared/scriptureParse'
 import { reflowSlideTexts } from '../shared/reflowText'
 import { chunkVerses } from '../shared/chunkText'
@@ -1605,7 +1605,8 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
       // The await may have let something newer load onto this track.
       if (tracks[track].loadGeneration !== generation) return true
       if (result.ok && result.verses) {
-        tracks[track].deckScripture.set(`${i}:${zoneId}`, result.verses.map((v) => v.text).join(' '))
+        // Numbered, with chapter marks (QA B5-N5); a one-slide, one-verse reading stays plain.
+        tracks[track].deckScripture.set(`${i}:${zoneId}`, deckVerseText(result.verses, { alone: slides.length === 1 }))
       } else {
         logWarn(`[deck] scripture lookup failed for "${slot.reference}" on slide ${i + 1} zone ${zoneId}`)
       }

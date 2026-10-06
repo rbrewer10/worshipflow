@@ -72,3 +72,32 @@ describe('parseScriptureReference (QA B4-N1, A4-N2)', () => {
     expect(BIBLE_BOOKS).toHaveLength(66)
   })
 })
+
+describe('QA B5-N3: verse bounds from the KJV verse counts', () => {
+  it('the verse-count table matches the bundled KJV, chapter by chapter', async () => {
+    const { VERSE_COUNTS } = await import('./scriptureParse')
+    const raw = readFileSync(join(__dirname, '..', '..', 'resources', 'kjv.json'), 'utf8')
+    const data = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw) as { chapters: unknown[][] }[]
+    expect(VERSE_COUNTS.map((b) => [...b])).toEqual(data.map((b) => b.chapters.map((c) => c.length)))
+    expect(VERSE_COUNTS.flat().reduce((a, b) => a + b, 0)).toBe(31102)
+  })
+  it('a verse past the end of its chapter is a problem, worded like the Go Live toast', () => {
+    expect(referenceProblem('John 3:99')).toBe('John 3 has no verse 99.')
+    expect(referenceProblem('John 3:37')).toBe('John 3 has no verse 37.')
+    expect(referenceProblem('John 3:36')).toBeNull()
+    expect(referenceProblem('Psalm 117:3')).toBe('Psalms 117 has no verse 3.')
+    expect(referenceProblem('Jude 26')).toBe('Jude 1 has no verse 26.')
+    expect(referenceProblem('Jude 25')).toBeNull()
+    expect(referenceProblem('John 3:40-42')).toMatch(/no verse 40/)
+    expect(referenceProblem('John 3:99-4:3')).toMatch(/no verse 99/)
+    expect(referenceProblem('John 3:16, 99')).toMatch(/no verse 99/)
+  })
+  it('a range that runs past the end resolves (shortened) but warns', async () => {
+    const { referenceWarning } = await import('./scriptureParse')
+    expect(referenceProblem('John 3:16-40')).toBeNull()
+    expect(referenceWarning('John 3:16-40')).toBe('John 3 ends at verse 36, so only 3:16-36 will show.')
+    expect(referenceWarning('John 3:16-18')).toBeNull()
+    expect(referenceWarning('John 3:35-4:3')).toBeNull()
+    expect(referenceWarning('Psalm 23-24')).toBeNull()
+  })
+})
