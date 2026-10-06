@@ -31,7 +31,7 @@ function SongSelectPanel({ onImported }: { onImported: (id: number) => void }): 
         </button>
         <button
           type="button"
-          onClick={() => void window.wf.songSelectImportFile()}
+          onClick={() => { window.wf.songSelectImportFile().catch((err: unknown) => notifyLocal(`Couldn’t import that file: ${err instanceof Error ? err.message : String(err)}`, 'error')) }}
           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-panel px-3 py-2 text-xs font-semibold text-content-secondary hover:bg-panel-raised"
           title="Import a .usr or .txt you already downloaded"
         >

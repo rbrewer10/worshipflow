@@ -1,9 +1,11 @@
 import { BrowserWindow, dialog, session } from 'electron'
-import { mkdtempSync, readFileSync, unlinkSync } from 'fs'
+import { mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { createSong, findExistingSong } from './db'
 import { decodeSongFileBytes, importLyrics } from '../shared/lyricImport'
+import { showErrorAsync } from './errorDialog'
+import { songFileProblem } from '../shared/songFileCheck'
 
 const SONGSELECT_URL = 'https://songselect.ccli.com/'
 const PARTITION = 'persist:songselect'
@@ -28,9 +30,16 @@ function wasJustImported(key: string): boolean {
   return prev != null && now - prev < 12_000
 }
 
-function importFromText(raw: string): SongSelectImportResult {
+function parseSongFile(raw: string): NonNullable<ReturnType<typeof importLyrics>> {
   const song = importLyrics(raw)
-  if (!song) throw new Error('That file did not look like SongSelect lyrics.')
+  const problem = songFileProblem(song)
+  if (problem === 'empty') throw new Error('That file is empty.')
+  if (problem === 'no-lyrics') throw new Error('That file has no lyrics in it.')
+  return song!
+}
+
+function importFromText(raw: string, parsed?: NonNullable<ReturnType<typeof importLyrics>>): SongSelectImportResult {
+  const song = parsed ?? parseSongFile(raw)
   const key = importKey(song)
   const existing = findExistingSong({ ccli: song.ccli, title: song.title, author: song.author })
   if (existing) return { id: existing.id, title: existing.title, created: false, ccli: song.ccli }
@@ -72,7 +81,11 @@ function announce(result: SongSelectImportResult): void {
 }
 
 function finishImport(raw: string): void {
-  const imported = importFromText(raw)
+  const song = parseSongFile(raw)
+  // A SongSelect download that isn't a lyrics file (receipt, license page…)
+  // must not become a "song" in the library (QA M4).
+  if (song.source === 'plain') throw new Error('That download was not a SongSelect lyrics file. In SongSelect choose Lyrics → Download → Text File.')
+  const imported = importFromText(raw, song)
   const key = importKey({ title: imported.title, ccli: imported.ccli })
   const quiet = wasJustImported(key)
   importSink?.(imported)
@@ -93,14 +106,21 @@ function hookDownloads(): void {
     const dest = join(dir, name)
     item.setSavePath(dest)
     item.once('done', (_ev, state) => {
-      if (state !== 'completed') return
+      const parent = songSelectWin && !songSelectWin.isDestroyed() ? songSelectWin : null
       try {
+        if (state === 'interrupted') {
+          void showErrorAsync(parent, 'SongSelect import failed', 'The download was interrupted. Check the internet connection and download the song again.')
+          return
+        }
+        if (state !== 'completed') return // cancelled by the user
         const raw = decodeSongFileBytes(readFileSync(dest))
         finishImport(raw)
       } catch (err) {
-        dialog.showErrorBox('SongSelect import failed', err instanceof Error ? err.message : String(err))
+        // QA A-H4: never showErrorBox — it blocks the main process (and live
+        // control with it) until someone finds and clicks OK.
+        void showErrorAsync(parent, 'SongSelect import failed', err instanceof Error ? err.message : String(err))
       } finally {
-        try { unlinkSync(dest) } catch { /* ignore */ }
+        try { rmSync(dir, { recursive: true, force: true }) } catch { /* ignore */ }
       }
     })
   })
@@ -151,8 +171,31 @@ export async function importSongSelectFile(parent: BrowserWindow | null): Promis
     ? await dialog.showOpenDialog(parent, opts)
     : await dialog.showOpenDialog(opts)
   if (picked.canceled || !picked.filePaths[0]) return null
-  const raw = decodeSongFileBytes(readFileSync(picked.filePaths[0]))
-  const imported = importFromText(raw)
-  announce(imported)
-  return imported
+  // QA M4: failures used to reject into a fire-and-forget call in the renderer — no
+  // message at all. Report them here, without blocking the main process.
+  try {
+    const raw = decodeSongFileBytes(readFileSync(picked.filePaths[0]))
+    const song = parseSongFile(raw)
+    if (song.source === 'plain') {
+      const win = parent && !parent.isDestroyed() ? parent : null
+      const confirmOpts = {
+        type: 'question' as const,
+        title: 'Import this file?',
+        message: 'This file doesn\u2019t look like a SongSelect or lyrics file.',
+        detail: `It will be added as a song called \u201c${song.title}\u201d. Import it anyway?`,
+        buttons: ['Cancel', 'Import anyway'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      }
+      const { response } = win ? await dialog.showMessageBox(win, confirmOpts) : await dialog.showMessageBox(confirmOpts)
+      if (response !== 1) return null
+    }
+    // No native "Added …" popup here: the operator window already shows a
+    // toast for wf:songselect:imported (QA M4: it used to show both).
+    return importFromText(raw, song)
+  } catch (err) {
+    await showErrorAsync(parent, 'Couldn\u2019t import that file', err instanceof Error ? err.message : String(err))
+    return null
+  }
 }
