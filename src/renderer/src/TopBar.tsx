@@ -193,7 +193,7 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
           >
             <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-red-500" />
             <span className="text-xs font-bold uppercase tracking-wide text-red-400">
-              Live armed · {screenCount} screen{screenCount !== 1 ? 's' : ''}
+              <span className="max-[1439px]:hidden">Live armed · </span>{screenCount} screen{screenCount !== 1 ? 's' : ''}
             </span>
           </div>
         ) : (
@@ -239,7 +239,8 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
           }`}
         >
           <User size={15} className="flex-shrink-0" />
-          Volunteer mode
+          {/* Icon-only on narrow windows (QA B17); the name stays for screen readers. */}
+          <span className="max-[1439px]:sr-only">Volunteer mode</span>
         </button>
         <IconButton
           icon={HelpCircle}

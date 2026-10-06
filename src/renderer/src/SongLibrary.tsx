@@ -11,6 +11,7 @@ import { useAutosave } from './useAutosave'
 import { notifyLocal, notifyLocalAction } from './NotifyToasts'
 import { findDuplicateSongTitles } from './songDuplicates'
 import { useService } from './ServiceContext'
+import { songToolsOpen } from '../../shared/layoutLimits'
 
 // Surfaces titles that are already duplicated in the library (left over from
 // before the New Song draft-gate warned about this going forward) — the
@@ -58,12 +59,24 @@ function DuplicateSongsPanel({ onEdit, onDelete }: { onEdit: (id: number) => voi
   )
 }
 
+// Module-level so switching tabs (which remounts this view) keeps it (B2-N5).
+let songToolsLatched = false
+
 function SongLibrary(): JSX.Element {
   const { activeServiceId, activeService, reloadActiveService } = useService()
   const [songs, setSongs] = useState<SongSummary[]>([])
   const [search, setSearch] = useState('')
   const [editorId, setEditorId] = useState<number | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; title: string } | null>(null)
+  const [toolsPref, setToolsPrefState] = useState<string | null>(() => localStorage.getItem('wf-song-tools-open'))
+  const setToolsPref = (v: '0' | '1'): void => { localStorage.setItem('wf-song-tools-open', v); setToolsPrefState(v) }
+  const [songsLoaded, setSongsLoaded] = useState(false)
+  const toolsOpen = songToolsOpen(toolsPref, songs.length, search.trim() !== '', songToolsLatched)
+  // Once open by default on a (loaded) empty library, stay open for the
+  // session, so the second paste doesn't need a re-expand (B2-N5).
+  useEffect(() => {
+    if (songsLoaded && toolsOpen && toolsPref == null) songToolsLatched = true
+  }, [songsLoaded, toolsOpen, toolsPref])
   // "New Song" used to create a permanent "New Song" DB record on the first
   // click, before the operator had typed anything — abandoning it left a
   // placeholder in the real library (the audit found several). Naming it
@@ -82,7 +95,7 @@ function SongLibrary(): JSX.Element {
   const duplicateTitle = existingTitles.find((t) => t.trim().toLowerCase() === newTitle.trim().toLowerCase())
 
   const refresh = (q = search): void => {
-    window.wf.songsList(q).then(setSongs)
+    window.wf.songsList(q).then((list) => { setSongs(list); setSongsLoaded(true) })
   }
 
   useEffect(() => {
@@ -199,8 +212,21 @@ function SongLibrary(): JSX.Element {
       <h1 className="sr-only">Song Library</h1>
       {/* Library list */}
       <div className="flex w-96 flex-col rounded-xl border border-border bg-panel p-3">
-        <CcliPanel />
         <DuplicateSongsPanel onEdit={setEditorId} onDelete={remove} />
+        {/* Import & licensing tools collapse so the song list keeps its room (QA B18). */}
+        <button
+          type="button"
+          onClick={() => setToolsPref(toolsOpen ? '0' : '1')}
+          aria-expanded={toolsOpen}
+          aria-controls="song-library-tools"
+          className="mb-2 flex w-full shrink-0 items-center justify-between rounded-lg border border-border bg-panel-raised px-3 py-2 text-xs font-semibold uppercase tracking-wide text-content-secondary hover:text-content-primary"
+        >
+          Import songs &amp; CCLI
+          {toolsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {toolsOpen && (
+        <div id="song-library-tools" className="mb-2 max-h-[45vh] shrink-0 overflow-y-auto">
+        <CcliPanel />
         <SongSelectPanel onImported={() => refresh()} />
         <PptxImport onImported={() => refresh()} />
         <LyricImport onImported={() => refresh()} />
@@ -218,6 +244,8 @@ function SongLibrary(): JSX.Element {
         >
           <FileDown size={15} /> Export song list (for church app)
         </button>
+        </div>
+        )}
         {namingNew ? (
           <form
             onSubmit={(e) => { e.preventDefault(); void createSong() }}
@@ -277,7 +305,7 @@ function SongLibrary(): JSX.Element {
             <span className="truncate">Add songs directly to <span className="font-semibold text-content-primary">{activeService.name}</span></span>
           </div>
         )}
-        <div className="min-h-0 flex-1 space-y-1 overflow-auto">
+        <div className="min-h-[9rem] flex-1 space-y-1 overflow-auto">
           {songs.length === 0 && (
             <p className="px-1 py-6 text-center text-sm text-content-secondary">
               {search ? 'No matches.' : 'No songs yet — add your first one'}
