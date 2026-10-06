@@ -1,21 +1,46 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Church, Monitor, Music2, Play } from 'lucide-react'
 import { notifyLocal } from './NotifyToasts'
+import { planSetupFinish, DEFAULT_CHURCH_NAME } from '../../shared/firstRun'
 
 function LaunchSetup({ onDone }: { onDone: () => void }): JSX.Element {
   const [step, setStep] = useState(0)
-  const [church, setChurch] = useState('Snow Hill Church')
+  const [church, setChurch] = useState(DEFAULT_CHURCH_NAME)
   const [ccli, setCcli] = useState('')
+  const [saved, setSaved] = useState<{ church: string | null; ccli: string | null }>({ church: null, ccli: null })
   const [busy, setBusy] = useState(false)
 
-  const finish = async (seed: boolean): Promise<void> => {
+  // Pre-fill from what's already saved (QA B1): the fields used to start as
+  // hard-coded 'Snow Hill Church' / '' and Finish wrote them straight back,
+  // renaming the church and clearing its CCLI license on upgraded PCs.
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all([window.wf.settingGet('church_name'), window.wf.ccliGetLicense()]).then(([name, license]) => {
+      if (cancelled) return
+      setSaved({ church: name, ccli: license })
+      if (name && name.trim()) setChurch(name)
+      if (license && license.trim()) setCcli(license)
+    }).catch(() => { /* keep defaults */ })
+    return () => { cancelled = true }
+  }, [])
+
+  const finish = async (opts: { seed: boolean; skip?: boolean }): Promise<void> => {
     setBusy(true)
     try {
-      await window.wf.settingSet('church_name', church.trim() || 'Snow Hill Church')
-      await window.wf.ccliSetLicense(ccli.trim() || null)
-      if (seed) {
+      const plan = planSetupFinish({
+        savedChurchName: saved.church,
+        savedCcliLicense: saved.ccli,
+        enteredChurchName: church,
+        enteredCcliLicense: ccli,
+        skip: !!opts.skip,
+        seedSample: opts.seed,
+        hasActiveService: (await window.wf.getActiveServiceId()) != null
+      })
+      if (plan.churchName !== undefined) await window.wf.settingSet('church_name', plan.churchName)
+      if (plan.ccliLicense !== undefined) await window.wf.ccliSetLicense(plan.ccliLicense)
+      if (plan.seedSample) {
         const res = await window.wf.seedSampleSunday()
-        await window.wf.setActiveService(res.serviceId)
+        if (plan.activateSample) await window.wf.setActiveService(res.serviceId)
         notifyLocal(res.created ? 'Sample Sunday is in Build service' : 'Sample Sunday was already in the library', 'info')
       }
       await window.wf.settingSet('has_completed_setup', '1')
@@ -41,7 +66,7 @@ function LaunchSetup({ onDone }: { onDone: () => void }): JSX.Element {
             <button onClick={() => setStep(1)} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">
               Start
             </button>
-            <button onClick={() => void finish(false)} className="mt-2 w-full rounded-lg px-4 py-2 text-xs text-content-tertiary hover:text-content-secondary">
+            <button disabled={busy} onClick={() => void finish({ seed: false, skip: true })} className="mt-2 w-full rounded-lg px-4 py-2 text-xs text-content-tertiary hover:text-content-secondary">
               Skip — I already know this
             </button>
           </>
@@ -77,10 +102,10 @@ function LaunchSetup({ onDone }: { onDone: () => void }): JSX.Element {
             <p className="mb-4 text-sm text-content-secondary">
               Three public-domain hymns, a countdown, John 3:16, and a sermon card. Use it to learn Go Live, Space, C/G/X layers, and Volunteer mode. You can delete it later.
             </p>
-            <button disabled={busy} onClick={() => void finish(true)} className="mb-2 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-40">
+            <button disabled={busy} onClick={() => void finish({ seed: true })} className="mb-2 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-40">
               {busy ? 'Loading…' : 'Load sample Sunday'}
             </button>
-            <button disabled={busy} onClick={() => void finish(false)} className="w-full rounded-lg border border-border px-4 py-2 text-sm text-content-secondary hover:bg-panel-raised">
+            <button disabled={busy} onClick={() => void finish({ seed: false })} className="w-full rounded-lg border border-border px-4 py-2 text-sm text-content-secondary hover:bg-panel-raised">
               Skip sample
             </button>
           </>

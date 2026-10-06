@@ -60,6 +60,9 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
   const [now, setNow] = useState(() => Date.now())
   const [rehearsal, setRehearsal] = useState(false)
   const [updateReady, setUpdateReady] = useState(false)
+  // "Later" hides the pill for this session; the downloaded update is never
+  // installed on quit (QA A-H6), so it simply waits for the next launch.
+  const [updateDeferred, setUpdateDeferred] = useState(false)
   const [stageRehearsalActive, setStageRehearsalActive] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   useEffect(() => {
@@ -118,14 +121,24 @@ function TopBar({ view, setView }: { view: View; setView: (v: View) => void }): 
             {build && !build.isPackaged && (
               <span className="rounded bg-amber-500/20 px-1 font-bold text-amber-300">DEV</span>
             )}
-            {updateReady && (
-              <button
-                onClick={() => window.wf.updateInstallNow()}
-                title="A new version has finished downloading — click to restart and install it"
-                className="rounded bg-emerald-600 px-1.5 py-0.5 font-bold text-white hover:bg-emerald-700"
-              >
-                Restart to update
-              </button>
+            {updateReady && !updateDeferred && (
+              <span className="inline-flex items-center gap-0.5">
+                <button
+                  onClick={() => { void window.wf.updateInstallNow().then((r) => { if (r === 'later') setUpdateDeferred(true) }) }}
+                  title="A new version has downloaded. Installing closes WorshipFlow and turns the screens off, so do it after the service. You'll be asked to confirm."
+                  className="rounded bg-emerald-700/80 px-1.5 py-0.5 font-bold text-white hover:bg-emerald-700"
+                >
+                  Update ready…
+                </button>
+                <button
+                  onClick={() => setUpdateDeferred(true)}
+                  title="Hide until next launch. Nothing installs unless you choose to."
+                  aria-label="Install the update later"
+                  className="rounded px-1 py-0.5 text-content-tertiary hover:bg-panel-raised hover:text-content-secondary"
+                >
+                  Later
+                </button>
+              </span>
             )}
           </div>
         </div>

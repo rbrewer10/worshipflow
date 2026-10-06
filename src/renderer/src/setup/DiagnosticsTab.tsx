@@ -62,6 +62,41 @@ function BackupsPanel(): JSX.Element {
   )
 }
 
+// QA A-H6: a way to turn the startup update check off entirely (e.g. on the
+// week of a big service). Downloads never install by themselves either way.
+function UpdatesPanel(): JSX.Element {
+  const [mode, setMode] = useState<'download' | 'off' | null>(null)
+  useEffect(() => {
+    void window.wf.settingGet('auto_update_mode').then((v) => setMode(v === 'off' ? 'off' : 'download'))
+  }, [])
+  const toggle = (on: boolean): void => {
+    const next = on ? 'download' : 'off'
+    setMode(next)
+    void window.wf.settingSet('auto_update_mode', next)
+  }
+  return (
+    <div className="rounded-xl border border-border bg-panel p-5">
+      <h2 className="font-semibold text-content-primary">Updates</h2>
+      <label className="mt-2 flex items-start gap-2 text-sm text-content-secondary">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={mode !== 'off'}
+          disabled={mode == null}
+          onChange={(e) => toggle(e.target.checked)}
+        />
+        <span>
+          Check for and download new versions when WorshipFlow starts.
+          <span className="mt-0.5 block text-xs text-content-tertiary">
+            A downloaded update is never installed by itself — not on quit, not during a service. You choose when, from the
+            “Update ready” button, and only while nothing is live. Takes effect next launch.
+          </span>
+        </span>
+      </label>
+    </div>
+  )
+}
+
 function DiagnosticsTab(): JSX.Element {
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [serviceLog, setServiceLog] = useState<Array<{ ts: number; event: string }>>([])
@@ -118,6 +153,7 @@ function DiagnosticsTab(): JSX.Element {
         </div>
 
         <BackupsPanel />
+        <UpdatesPanel />
       </div>
     </div>
   )
