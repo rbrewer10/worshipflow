@@ -1,4 +1,6 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
+import { describeImport, parseServiceBundle, referencedMediaPaths, sameSong, songContentDiffers, songInputFrom, uniqueServiceName, type BundleItem, type ImportSummary } from '../shared/serviceBundle'
+import type { ServiceImportResult } from '../shared/types'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
@@ -3483,7 +3485,7 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
   return { ok: true, restored: restoredAny, fallback: fallbackAny, stale: false, serviceName }
 })
 
-ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {
+ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean; filePath?: string; error?: string }> => {
   const svc = getService(serviceId)
   if (!svc) return { canceled: true }
   const itemsWithSongs = await Promise.all(
@@ -3499,76 +3501,121 @@ ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ ca
     filters: [{ name: 'WorshipFlow Service', extensions: ['wfservice'] }]
   })
   if (canceled || !filePath) return { canceled: true }
-  writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8')
-  return { canceled: false }
+  try {
+    writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8')
+  } catch (err) {
+    // e.g. the USB stick was pulled or is read-only — tell the operator (QA B24).
+    return { canceled: false, error: `Couldn't save the service file: ${err instanceof Error ? err.message : String(err)}` }
+  }
+  return { canceled: false, filePath }
 })
 
-ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serviceId: number | null }> => {
+ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
   const { filePaths, canceled } = await dialog.showOpenDialog({
     title: 'Import Service',
     filters: [{ name: 'WorshipFlow Service', extensions: ['wfservice'] }],
     properties: ['openFile']
   })
   if (canceled || filePaths.length === 0) return { canceled: true, serviceId: null }
-
-  let bundle: {
-    version: number
-    name: string
-    service_date: string | null
-    published_at?: number | null
-    team?: import('../shared/types').ServiceTeam
-    theme: string | null
-    themeColors: ThemeColors | null
-    items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
-  }
+  // Errors come back to the renderer as a message (toast) — no native dialog,
+  // so live control never waits on a modal (QA A-H4) and a bad file is never
+  // silent (QA B12).
+  let text: string
   try {
-    bundle = JSON.parse(readFileSync(filePaths[0], 'utf-8')) as {
-      version: number
-      name: string
-      service_date: string | null
-      published_at?: number | null
-      team?: import('../shared/types').ServiceTeam
-      theme: string | null
-      themeColors: ThemeColors | null
-      items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
-    }
+    text = readFileSync(filePaths[0], 'utf-8')
   } catch (err) {
-    await dialog.showErrorBox('Import Failed', `Invalid service file: ${err instanceof Error ? err.message : String(err)}`)
-    return { canceled: false, serviceId: null }
+    return { canceled: false, serviceId: null, error: `Couldn't read that file: ${err instanceof Error ? err.message : String(err)}` }
   }
+  const parsed = parseServiceBundle(text)
+  if (!parsed.ok) return { canceled: false, serviceId: null, error: parsed.error }
+  const bundle = parsed.bundle
 
-  // Validate structure
-  if (!bundle.version || !Array.isArray(bundle.items)) {
-    await dialog.showErrorBox('Import Failed', 'Invalid service file: missing version or items array')
-    return { canceled: false, serviceId: null }
-  }
-
-  const serviceId = createService(bundle.name, bundle.service_date ?? undefined)
-  if (bundle.theme) setServiceTheme(serviceId, bundle.theme, bundle.themeColors ?? null)
-  if (bundle.team) setServiceTeam(serviceId, bundle.team)
-  if (bundle.published_at) setServicePublished(serviceId, bundle.published_at)
-  for (const item of bundle.items) {
-    let ref_id: number | null = null
-    if (item.type === 'song' && item.song) {
-      const existing = listSongs(item.song.title).find((s) => s.title === item.song!.title)
-      ref_id = existing ? existing.id : createSong({
-        title: item.song.title,
-        author: item.song.author ?? undefined,
-        ccli: item.song.ccli ?? undefined,
-        copyright: item.song.copyright ?? undefined,
-        publisher: item.song.publisher ?? undefined,
-        background: item.song.background,
-        sections: item.song.sections,
-        arrangement: item.song.arrangement ?? undefined,
-        fontScale: item.song.fontScale ?? undefined,
-        linesPerSlide: item.song.linesPerSlide ?? undefined,
-      })
+  // B11: a song already in the library whose words differ from the file's copy
+  // used to be silently replaced by the booth copy. Ask what to do instead.
+  type SongPlan = { item: BundleItem; localId: number | null; differs: boolean }
+  const plans: SongPlan[] = bundle.items.filter((it) => it.song).map((item) => {
+    const incoming = item.song!
+    const local = listSongs(incoming.title)
+      .map((s) => getSong(s.id))
+      .find((s): s is SongFull => !!s && sameSong(s, incoming))
+    return { item, localId: local?.id ?? null, differs: local ? songContentDiffers(local, incoming) : false }
+  })
+  const conflicts = [...new Map(plans.filter((p) => p.differs).map((p) => [p.localId, p])).values()]
+  let choice: 'keep' | 'replace' | 'copy' = 'keep'
+  if (conflicts.length) {
+    const names = conflicts.map((p) => `• ${p.item.song!.title}`).join('\n')
+    const opts = {
+      type: 'question' as const,
+      title: 'Songs differ from this computer',
+      message: `${conflicts.length === 1 ? 'This song is' : `${conflicts.length} songs are`} different in the file than in this computer’s library:`,
+      detail: `${names}\n\n“Use the file’s version” updates the library song (every service that uses it will show the new words).`,
+      buttons: ['Keep this computer’s version', 'Use the file’s version', 'Keep both (add as a copy)'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
     }
-    const itemId = addServiceItem(serviceId, { type: item.type, ref_id, payload: item.payload })
-    if (item.notes) updateServiceItemNotes(itemId, item.notes)
-    if (item.style) setServiceItemStyle(itemId, item.style)
+    const parent = operatorWin && !operatorWin.isDestroyed() ? operatorWin : null
+    const res = parent ? await dialog.showMessageBox(parent, opts) : await dialog.showMessageBox(opts)
+    choice = res.response === 1 ? 'replace' : res.response === 2 ? 'copy' : 'keep'
   }
-  return { canceled: false, serviceId }
+
+  const renamedName = uniqueServiceName(bundle.name, listServices().map((sv) => sv.name))
+  const summary: ImportSummary = {
+    serviceName: renamedName, renamedFrom: renamedName !== bundle.name ? bundle.name : null,
+    items: 0, skipped: parsed.skipped, songsAdded: 0, songsMatched: 0,
+    songsUpdated: [], songsKept: [], songsCopied: [],
+    missingMedia: referencedMediaPaths(bundle).filter((p) => !existsSync(p))
+  }
+  const createdSongs: number[] = []
+  let serviceId: number | null = null
+  const copyIds = new Map<number, number>()  // local song id → its "(from file)" copy
+  try {
+    serviceId = createService(renamedName, bundle.service_date ?? undefined)
+    if (bundle.theme) setServiceTheme(serviceId, bundle.theme, bundle.themeColors ?? null)
+    if (bundle.team) setServiceTeam(serviceId, bundle.team as import('../shared/types').ServiceTeam)
+    for (const item of bundle.items) {
+      let ref_id: number | null = null
+      if (item.song) {
+        const plan = plans.find((p) => p.item === item)!
+        if (plan.localId == null) {
+          ref_id = createSong(songInputFrom(item.song))
+          createdSongs.push(ref_id)
+          summary.songsAdded++
+        } else if (plan.differs && choice === 'copy') {
+          ref_id = copyIds.get(plan.localId) ?? createSong(songInputFrom(item.song, `${item.song.title} (from file)`))
+          if (!copyIds.has(plan.localId)) { copyIds.set(plan.localId, ref_id); createdSongs.push(ref_id); summary.songsCopied.push(item.song.title) }
+        } else {
+          ref_id = plan.localId
+          summary.songsMatched++
+          if (plan.differs && choice === 'keep' && !summary.songsKept.includes(item.song.title)) summary.songsKept.push(item.song.title)
+        }
+      }
+      const itemId = addServiceItem(serviceId, { type: item.type, ref_id, payload: item.payload, track: item.track })
+      if (item.notes) updateServiceItemNotes(itemId, item.notes)
+      if (item.style) setServiceItemStyle(itemId, item.style)
+      if (item.zoneRouting) setItemZoneRouting(itemId, JSON.stringify(item.zoneRouting))
+      summary.items++
+    }
+    // Keep the published flag the file carried (zone routing above clears it).
+    if (bundle.published_at) setServicePublished(serviceId, bundle.published_at)
+  } catch (err) {
+    // Undo the half-made import rather than leave a partial service behind.
+    logError(`[import] .wfservice import failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
+    try { if (serviceId != null) deleteService(serviceId) } catch { /* best effort */ }
+    for (const id of createdSongs) { try { deleteSong(id) } catch { /* best effort */ } }
+    return { canceled: false, serviceId: null, error: `The service couldn't be imported (${err instanceof Error ? err.message : String(err)}). Nothing was changed.` }
+  }
+  // Library updates last, once the service itself imported cleanly.
+  if (choice === 'replace') {
+    for (const p of conflicts) {
+      try { updateSong(p.localId!, songInputFrom(p.item.song!, getSong(p.localId!)?.title ?? p.item.song!.title)); summary.songsUpdated.push(p.item.song!.title) } catch (err) {
+        logError(`[import] couldn't update song ${p.localId}: ${err instanceof Error ? err.message : String(err)}`)
+        summary.songsKept.push(p.item.song!.title)
+      }
+    }
+  }
+  logInfo(`[import] ${describeImport(summary)}`)
+  return { canceled: false, serviceId, summary: describeImport(summary), warn: summary.skipped.length > 0 || summary.missingMedia.length > 0 }
 })
 
 // Import a service plan exported from the Snow Hill Church app (.wfplan / .json).

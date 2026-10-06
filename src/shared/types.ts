@@ -447,3 +447,13 @@ export interface RecordingSidecar {
   recording: { startedAt: number; durationMs: number; file: string }
   markers: Array<{ kind: RecordingMarkerKind; label: string; offsetMs: number }>
 }
+
+// Result of File → Import service (.wfservice). `error` and `summary` are
+// plain sentences for an operator toast (QA B12 / B24).
+export interface ServiceImportResult {
+  canceled: boolean
+  serviceId: number | null
+  error?: string
+  summary?: string
+  warn?: boolean
+}
