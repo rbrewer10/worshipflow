@@ -98,7 +98,7 @@ function SetlistImport({ onImported }: { onImported: (serviceId: number) => void
           </p>
           {/* What each line will become, so a mistake ("Song: Prelude") is
               caught before importing (QA B2-N6). */}
-          <ol data-testid="setlist-preview" aria-label="Setlist preview" className="mb-1.5 max-h-40 space-y-0.5 overflow-y-auto rounded-md border border-border bg-panel px-2 py-1 text-[11px]">
+          <ol data-testid="setlist-preview" aria-label="Setlist preview" className="mb-1.5 max-h-24 space-y-0.5 overflow-y-auto rounded-md [@media(min-height:860px)]:max-h-40 border border-border bg-panel px-2 py-1 text-[11px]">
             {entries.map((e, i) => (
               <li key={i} className="flex gap-2">
                 <span className={`w-16 shrink-0 font-semibold ${KIND_CLASS[e.kind]}`}>{KIND_LABEL[e.kind]}</span>
@@ -108,7 +108,9 @@ function SetlistImport({ onImported }: { onImported: (serviceId: number) => void
           </ol>
         </>
       )}
-      <div className="flex gap-1.5">
+      {/* Pinned to the bottom of the scrolling import panel so the commit
+          button is never pushed off-screen by a long preview (QA B3-N1). */}
+      <div data-testid="setlist-actions" className="sticky bottom-0 -mx-2 -mb-2 flex gap-1.5 rounded-b-lg border-t border-blue-500/20 bg-panel-raised p-2">
         <button type="button" onClick={() => { setOpen(false); setText('') }} className="flex-1 rounded-lg border border-border px-2 py-1.5 text-[11px] font-semibold">Cancel</button>
         <button type="button" disabled={entries.length === 0 || busy} onClick={() => void importNow()} className="flex-1 rounded-lg bg-blue-600 px-2 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40">
           {busy ? 'Importing…' : activeServiceId ? 'Add to this service' : 'Create service'}
