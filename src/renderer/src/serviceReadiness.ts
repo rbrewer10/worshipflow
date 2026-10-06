@@ -1,6 +1,6 @@
 import type { ServiceFull, ServiceItem, ServicePerson, SongSummary } from '../../shared/types'
 import { parseReferenceList } from '../../shared/scriptureRefs'
-import { referenceProblem } from '../../shared/scriptureParse'
+import { referenceProblem, referenceWarning } from '../../shared/scriptureParse'
 
 export type ServiceIssueLevel = 'blocking' | 'warning'
 
@@ -48,8 +48,11 @@ export function computeServiceReadiness(service: ServiceFull, songs: SongSummary
       // then do nothing at Go Live. Same grammar as the lookup itself.
       for (const ref of parseReferenceList(item.payload.reference as string)) {
         const problem = referenceProblem(ref)
+        const warning = problem ? null : referenceWarning(ref)
         if (problem) {
           issues.push({ id: `scripture-ref-${item.id}-${ref}`, level: 'blocking', label: `Fix the reference “${ref}”`, detail: `${problem} It won't go live as written.`, itemId: item.id })
+        } else if (warning) {
+          issues.push({ id: `scripture-ref-${item.id}-${ref}`, level: 'warning', label: `Check the reference “${ref}”`, detail: warning, itemId: item.id })
         }
       }
     }

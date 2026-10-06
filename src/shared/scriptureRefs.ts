@@ -125,3 +125,27 @@ export function verseLines(verses: Array<{ n: number; c?: number; text: string }
   const multiChapter = new Set(verses.map((v) => v.c ?? 0)).size > 1
   return verses.map((v) => `${multiChapter && v.c != null ? `${v.c}:` : ''}${v.n}  ${v.text}`)
 }
+
+/**
+ * One deck slide's verses as the projector, stage and zones show them (QA B5-N5).
+ *
+ * Deck slides used to join the verse texts with no numbers at all, so a
+ * reading showed "35  He that believeth…" on slide 1 only (the flat verse list
+ * that is live for a moment before the deck loads) and nothing after it, and
+ * nothing marked Psalm 24:1 or John 4:1. Now every verse carries its number,
+ * and chapter:verse marks where each slide starts and wherever the chapter
+ * changes: "3:35 The Father loveth… 36 He that believeth… 4:1 When therefore…".
+ * A reading that is a single verse on a single slide ("John 3:16") stays plain,
+ * as verseLines has it.
+ */
+export function deckVerseText(verses: Array<{ n: number; c?: number; text: string }>, opts: { alone?: boolean } = {}): string {
+  if (opts.alone && verses.length === 1) return verses[0].text
+  let prevChapter: number | undefined
+  return verses
+    .map((v, i) => {
+      const markChapter = v.c != null && (i === 0 || v.c !== prevChapter)
+      prevChapter = v.c
+      return `${markChapter ? `${v.c}:` : ''}${v.n} ${v.text}`
+    })
+    .join(' ')
+}

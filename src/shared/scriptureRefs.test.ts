@@ -153,3 +153,33 @@ describe('parseReferenceList — a passage with no book continues the previous o
     expect(parseReferenceList('Hezekiah 4:1; 5:2')).toEqual(['Hezekiah 4:1', '5:2'])
   })
 })
+
+describe('QA B5-N5: deck slides number every verse and mark chapter changes', () => {
+  it('numbers every verse, chapter:verse on the first and where the chapter changes', async () => {
+    const { deckVerseText } = await import('./scriptureRefs')
+    const v = [
+      { c: 3, n: 35, text: 'The Father loveth the Son.' },
+      { c: 3, n: 36, text: 'He that believeth.' },
+      { c: 4, n: 1, text: 'When therefore the Lord knew.' },
+    ]
+    expect(deckVerseText(v)).toBe('3:35 The Father loveth the Son. 36 He that believeth. 4:1 When therefore the Lord knew.')
+    expect(deckVerseText(v.slice(2))).toBe('4:1 When therefore the Lord knew.')
+    expect(deckVerseText([{ c: 23, n: 5, text: 'Thou preparest.' }, { c: 23, n: 6, text: 'Surely.' }])).toBe('23:5 Thou preparest. 6 Surely.')
+  })
+  it('a lone single-verse reading stays plain; a single verse within a longer deck is numbered', async () => {
+    const { deckVerseText } = await import('./scriptureRefs')
+    expect(deckVerseText([{ c: 3, n: 16, text: 'For God so loved.' }], { alone: true })).toBe('For God so loved.')
+    expect(deckVerseText([{ c: 3, n: 16, text: 'For God so loved.' }])).toBe('3:16 For God so loved.')
+  })
+  it('verses without a chapter (online translations) still get their numbers', async () => {
+    const { deckVerseText } = await import('./scriptureRefs')
+    expect(deckVerseText([{ n: 1, text: 'A.' }, { n: 2, text: 'B.' }])).toBe('1 A. 2 B.')
+  })
+  it('loadDeckOnto renders deck scripture through it', async () => {
+    const { readFileSync } = await import('fs')
+    const { join } = await import('path')
+    const main = readFileSync(join(__dirname, '..', 'main', 'index.ts'), 'utf8')
+    expect(main).toMatch(/deckScripture\.set\(`\$\{i\}:\$\{zoneId\}`, deckVerseText\(result\.verses, \{ alone: slides\.length === 1 \}\)\)/)
+    expect(main).not.toMatch(/deckScripture\.set\([^\n]*\.map\(\(v\) => v\.text\)\.join\(' '\)/)
+  })
+})

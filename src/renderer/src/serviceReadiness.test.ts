@@ -63,3 +63,23 @@ describe('QA B4-N1: a reference that won\'t resolve blocks publishing', () => {
     expect(r.warnings.map((i) => i.id)).toContain('sermon-ref-9')
   })
 })
+
+describe('QA B5-N3: a verse past the end of its chapter blocks publishing', () => {
+  const scripture = (reference: string): ServiceFull['items'][number] => ({ id: 8, ordinal: 2, type: 'scripture', ref_id: null, payload: { reference }, title: reference, notes: null, style: null, zoneRouting: null, track: 'main' })
+  const team = { people: [{ id: 'p1', name: 'Jordan', role: 'Worship leader', status: 'confirmed' as const }], assignments: {} }
+  it.each(['John 3:99', 'Psalm 117:3', 'John 3:16; Romans 8:40'])('%s is blocking', (ref) => {
+    const r = computeServiceReadiness(service({ team, items: [scripture(ref)] }), songs)
+    expect(r.ready).toBe(false)
+    expect(r.blocking[0].detail).toMatch(/has no verse \d+\. It won't go live as written\./)
+  })
+  it('a range that runs past the end is a warning, not a block', () => {
+    const r = computeServiceReadiness(service({ team, items: [scripture('John 3:16-40')] }), songs)
+    expect(r.ready).toBe(true)
+    expect(r.warnings.map((i) => i.label)).toContain('Check the reference “John 3:16-40”')
+  })
+  it('a sermon passage past the end of the chapter warns', () => {
+    const sermon = { id: 9, ordinal: 3, type: 'sermon' as const, ref_id: null, payload: { title: 'Born again', passage: 'John 3:99' }, title: 'Sermon', notes: null, style: null, zoneRouting: null, track: 'main' as const }
+    const r = computeServiceReadiness(service({ team, items: [sermon] }), songs)
+    expect(r.warnings.map((i) => i.id)).toContain('sermon-ref-9')
+  })
+})
