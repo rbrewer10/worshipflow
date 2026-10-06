@@ -14,7 +14,7 @@ import ScheduledAnnouncements from './ScheduledAnnouncements'
 import Modal from './Modal'
 import QuickSearchOverlay from './QuickSearchOverlay'
 import { useOptionalService } from './ServiceContext'
-import { estimateServiceDuration, formatDurationEstimate } from '../../shared/serviceDuration'
+import { durationLabel, estimateServiceDuration, formatDurationEstimate } from '../../shared/serviceDuration'
 import { notifyLocal, notifyLocalAction } from './NotifyToasts'
 import ServiceReviewPanel from './ServiceReviewPanel'
 import ServiceTeamPanel from './ServiceTeamPanel'
@@ -349,7 +349,7 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
         <span className="h-4 w-px shrink-0 bg-border" />
         <div className="inline-flex shrink-0 items-center gap-1.5 text-xs text-content-secondary"><Music2 size={13} /> {songCount} song{songCount === 1 ? '' : 's'}</div>
         {duration && duration.knownItemCount > 0 && (
-          <div className="inline-flex shrink-0 items-center gap-1.5 text-xs text-content-secondary" title={`${duration.knownItemCount} of ${duration.totalItemCount} items have a known duration`}><Clock3 size={13} /> {formatDurationEstimate(duration.totalSeconds)}</div>
+          <div className="inline-flex shrink-0 items-center gap-1.5 text-xs text-content-secondary" title={`${duration.knownItemCount} of ${duration.totalItemCount} items have a known duration`}><Clock3 size={13} /> {service ? durationLabel(service.items) : formatDurationEstimate(duration.totalSeconds)}</div>
         )}
         {placeholderCount > 0 && <div className="inline-flex shrink-0 items-center gap-1.5 text-xs text-amber-400"><FileWarning size={13} /> {placeholderCount} to fill</div>}
         <span className={`ml-auto shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
