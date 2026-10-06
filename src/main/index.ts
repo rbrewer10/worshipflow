@@ -152,7 +152,7 @@ import { createRecordingSession } from './recording'
 import ffmpegStatic from 'ffmpeg-static'
 import { createRenderer } from './render'
 import { createContentRunner } from './content'
-import { shouldClearHiddenText } from '../shared/layerReset'
+import { shouldClearHiddenText, modeAfterAsyncLoad } from '../shared/layerReset'
 
 export { TABLET_PORT }
 
@@ -305,6 +305,9 @@ interface LiveTrackState {
   // loadGeneration at the moment "Clear lyrics" (C) was last turned on — so a
   // slow load that started before it doesn't undo it (QA A-N4, shared/layerReset.ts).
   textHiddenAtGeneration: number
+  // loadGeneration when Black or Logo was last pressed — an async load that
+  // started before then keeps the operator's blank (QA A2-N2, shared/layerReset.ts).
+  blankedAtGeneration: number
   // Set true by every load* function the first time real content (a service
   // item OR an ad-hoc Quick Scripture/Quick Countdown lookup) is loaded onto
   // this track — distinguishes "genuinely nothing loaded yet, still on the
@@ -372,6 +375,7 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     autoAdvanceLoop: false,
     loadGeneration: 0,
     textHiddenAtGeneration: -1,
+    blankedAtGeneration: -1,
     hasLiveContent: false,
     deckSlides: null,
     deckIsGenerated: false,
@@ -1341,8 +1345,8 @@ function processIntent(track: TrackId, type: Intent): void {
       t.index += action.delta
       logServiceEvent(`${type}: ${t.index}/${last}`)
     }
-  } else if (type === 'black') { clearCountdown(track); t.mode = 'black'; logServiceEvent('black') }
-  else if (type === 'logo') { clearCountdown(track); t.mode = 'logo'; logServiceEvent('logo') }
+  } else if (type === 'black') { clearCountdown(track); t.mode = 'black'; t.blankedAtGeneration = t.loadGeneration; logServiceEvent('black') }
+  else if (type === 'logo') { clearCountdown(track); t.mode = 'logo'; t.blankedAtGeneration = t.loadGeneration; logServiceEvent('logo') }
   else if (type === 'lyrics') {
     clearCountdown(track)
     t.mode = 'lyrics'
@@ -1682,7 +1686,8 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   t.songTextColor = null; t.songFont = null
   t.blurBehindText = blurBehindText ?? false
   if (fontScale != null) t.fontScale = fontScale
-  t.mode = 'lyrics'
+  // Keep a Black/Logo pressed while this verse was loading (QA A2-N2).
+  t.mode = modeAfterAsyncLoad(t.mode, t.blankedAtGeneration, generation)
   t.index = 0
   // Same as doLoadText/doLoadSermon: an ad-hoc Quick Scripture passes no item
   // and keeps the flat verse list, but a real scripture SERVICE item gets its
@@ -1734,7 +1739,7 @@ async function doLoadSong(track: TrackId, id: number): Promise<void> {
   t.songMeta = { author: full.author, copyright: full.copyright, ccli: full.ccli }
   t.hmsLoadedAt = Date.now()  // Start hymn timer
   t.verseNumber = 1
-  t.mode = 'lyrics'
+  t.mode = modeAfterAsyncLoad(t.mode, t.blankedAtGeneration, generation)  // A2-N2
   t.index = 0
   logServiceEvent(`load-song: ${full.title}`)
   // Record CCLI usage once per service (reset when the active service changes).
