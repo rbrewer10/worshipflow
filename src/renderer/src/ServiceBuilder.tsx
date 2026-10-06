@@ -257,7 +257,7 @@ function ServiceBuilder({ onOpenLive }: { onOpenLive?: () => void }): JSX.Elemen
       <div className="wf-service-builder-shell flex h-full min-h-0 flex-1 gap-3 p-3">
         <h1 className="sr-only">Build Service</h1>
         {/* Services list */}
-        <div className="wf-service-list flex w-64 shrink-0 flex-col rounded-xl border border-border bg-panel p-3">
+        <div className="wf-service-list flex min-h-0 w-64 shrink-0 flex-col rounded-xl border border-border bg-panel p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-content-tertiary">Your services</div>
@@ -290,7 +290,10 @@ function ServiceBuilder({ onOpenLive }: { onOpenLive?: () => void }): JSX.Elemen
             </div>
           </div>
           {showImportTools && (
-            <div className="mb-3 grid grid-cols-2 gap-1.5 rounded-lg border border-border bg-panel-raised p-1.5">
+            // Scrolls on its own and may shrink, so a tall Paste-setlist preview
+            // can't push its "Add to this service" button under the Live drawer
+            // at 1600x760 (QA B3-N1); the services list keeps a small floor.
+            <div data-testid="service-import-tools" className="mb-3 grid min-h-0 shrink grid-cols-2 content-start gap-1.5 overflow-y-auto overscroll-contain rounded-lg border border-border bg-panel-raised p-1.5">
               <button onClick={importImages} disabled={importing}
                 aria-label="Import slides as images (export PowerPoint as PNG first)"
                 className="btn-secondary min-h-9 px-2 text-[11px] leading-tight disabled:opacity-50"
@@ -319,7 +322,7 @@ function ServiceBuilder({ onOpenLive }: { onOpenLive?: () => void }): JSX.Elemen
               {importing && <p className="col-span-2 text-center text-[11px] text-content-secondary" role="status" aria-live="polite">Importing…</p>}
             </div>
           )}
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+          <div className="min-h-[4.5rem] flex-1 space-y-1 overflow-y-auto">
             {services.length === 0 && <p className="px-1 py-6 text-center text-sm text-content-secondary">No saved services yet.</p>}
             {services.map((s) => (
               <div key={s.id} onClick={() => open(s.id)}

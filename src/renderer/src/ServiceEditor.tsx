@@ -383,7 +383,10 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
               (QA B2-N4). */}
           <div className="wf-service-flow-row flex min-h-[20rem] min-w-0 flex-1 gap-3">
           {/* Center: run of show (moved from the left column) */}
-          <div className="wf-service-flow flex min-w-0 flex-1 flex-col min-h-0">
+          {/* Scrolls as one when banner + toolbar + add panel + the list's
+              160px floor outgrow the row, instead of spilling out and being
+              painted under the zone strip where it can't be clicked (QA B3-N2). */}
+          <div data-testid="service-flow" className="wf-service-flow flex min-w-0 flex-1 flex-col min-h-0 overflow-y-auto overscroll-contain">
             <ScheduledAnnouncements
               serviceDate={service.service_date}
               addedRefIds={new Set(service.items.filter((it) => it.type === 'announcement' && it.ref_id != null).map((it) => it.ref_id as number))}
