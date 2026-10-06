@@ -280,3 +280,15 @@ describe('autoDeckFor — whole-chapter readings', () => {
       .toEqual(['Psalms 100:1', 'Psalms 100:2', 'Psalms 100:3', 'Psalms 100:4', 'Psalms 100:5'])
   })
 })
+
+describe('autoDeckFor — a reading across chapters (QA B4-N1)', () => {
+  it('each slide is addressed by chapter:verse, never the whole range', async () => {
+    const deck = await autoDeckFor(item({ type: 'scripture', payload: { reference: 'Psalm 23-24' } }), deps({
+      lookupScripture: async () => ({
+        ok: true, reference: 'Psalms 23-24', book: 'Psalms',
+        verses: [{ n: 6, c: 23, text: 'x'.repeat(15) }, { n: 1, c: 24, text: 'y'.repeat(15) }, { n: 2, c: 24, text: 'z'.repeat(15) }],
+      }),
+    }))
+    expect(deck!.map((s) => (s.zones[2] as { reference: string }).reference)).toEqual(['Psalms 23:6', 'Psalms 24:1', 'Psalms 24:2'])
+  })
+})
