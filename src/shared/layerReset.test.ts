@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { shouldClearHiddenText, modeAfterAsyncLoad, textHideApplies } from './layerReset'
+import { shouldClearHiddenText, modeAfterAsyncLoad, textHideApplies, textHideBlocker, textHideNotice } from './layerReset'
 
 describe('shouldClearHiddenText (QA B2 / A-N4)', () => {
   it('C pressed before Go Live is cleared by the new item (B2)', () => {
@@ -67,8 +67,25 @@ describe('textHideApplies (QA B2-N11)', () => {
     expect(textHideApplies('lyrics')).toBe(true)
     expect(textHideApplies('black')).toBe(true) // pre-arming C while blanked still works
   })
-  it('setLayers checks it before hiding text', () => {
+  it('QA B3-N5: decided by the live item too — pictures (mode lyrics), the sermon card (mode logo) and announcements', () => {
+    expect(textHideApplies('lyrics', 'image')).toBe(false)
+    expect(textHideApplies('logo', 'sermon')).toBe(false)
+    expect(textHideApplies('announcement', 'announcement')).toBe(false)
+    expect(textHideApplies('lyrics', 'announcement')).toBe(false) // ticker-style announcement
+    expect(textHideApplies('livecall', 'livecall')).toBe(false)
+    expect(textHideApplies('lyrics', 'song')).toBe(true)
+    expect(textHideApplies('lyrics', 'scripture')).toBe(true)
+    expect(textHideApplies('lyrics', 'text')).toBe(true)
+    expect(textHideApplies('black', 'song')).toBe(true)
+    expect(textHideApplies('lyrics', null)).toBe(true) // ad-hoc Quick Text
+  })
+  it('each refusal says why', () => {
+    expect(textHideNotice(textHideBlocker('logo', 'sermon')!)).toMatch(/sermon card/)
+    expect(textHideNotice(textHideBlocker('lyrics', 'image')!)).toMatch(/picture/)
+    expect(textHideNotice(textHideBlocker('announcement', 'announcement')!)).toMatch(/announcement/)
+  })
+  it('setLayers checks it (with the live item type) before hiding text', () => {
     const main = readFileSync(join(__dirname, '..', 'main', 'index.ts'), 'utf8')
-    expect(main).toMatch(/flags\?\.textHidden === true && !textHideApplies\(tracks\[track\]\.mode\)/)
+    expect(main).toMatch(/flags\?\.textHidden === true \? textHideBlocker\(tracks\[track\]\.mode, liveType\) : null/)
   })
 })

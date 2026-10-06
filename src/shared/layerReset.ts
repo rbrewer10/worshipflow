@@ -29,6 +29,33 @@ export function modeAfterAsyncLoad<M extends string>(currentMode: M | 'black' | 
 // nothing on screen (the countdown/picture has no lyric layer), then the hidden
 // state silently carried into the next lyric item. C now only applies where
 // there are words to hide; elsewhere it's ignored with a short notice.
-export function textHideApplies(mode: string): boolean {
-  return mode !== 'countdown' && mode !== 'image'
+//
+// QA B3-N5: deciding by mode alone missed pictures (they run in mode 'lyrics'),
+// the sermon card (mode 'logo') and announcements (their own card, which the
+// output never hides) — so it is decided by the live item's type too.
+export type TextHideBlocker = 'countdown' | 'picture' | 'sermon' | 'announcement' | 'call'
+
+export function textHideBlocker(mode: string, itemType?: string | null): TextHideBlocker | null {
+  if (mode === 'countdown' || itemType === 'countdown' || itemType === 'welcome') return 'countdown'
+  if (mode === 'image' || itemType === 'image' || itemType === 'video') return 'picture'
+  if (itemType === 'sermon') return 'sermon'
+  if (mode === 'announcement' || itemType === 'announcement') return 'announcement'
+  if (mode === 'livecall' || itemType === 'livecall') return 'call'
+  return null
+}
+
+export function textHideApplies(mode: string, itemType?: string | null): boolean {
+  return textHideBlocker(mode, itemType) === null
+}
+
+const BLOCKER_TEXT: Record<TextHideBlocker, string> = {
+  countdown: 'a countdown has none',
+  picture: 'a picture or video has none',
+  sermon: 'the sermon card has none',
+  announcement: 'an announcement is shown as its own card',
+  call: 'a live call has none',
+}
+
+export function textHideNotice(blocker: TextHideBlocker): string {
+  return `C hides lyrics — ${BLOCKER_TEXT[blocker]}. Press B for black or L for the logo.`
 }

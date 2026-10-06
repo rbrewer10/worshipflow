@@ -16,6 +16,10 @@ describe('planNav', () => {
     expect(planNav(1, { ...base, mode: 'livecall' })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'logo' })
     expect(planNav(-1, { ...base, mode: 'livecall' })).toEqual({ kind: 'adjacent', dir: -1, fallback: 'logo' })
   })
+  it('QA B3-N8: Space on an announcement card moves on — never redraws it as a lyric slide; at the end it stays put', () => {
+    expect(planNav(1, { ...base, mode: 'announcement' })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'none' })
+    expect(planNav(-1, { ...base, mode: 'announcement' })).toEqual({ kind: 'adjacent', dir: -1, fallback: 'none' })
+  })
   it('black / logo un-blank back to the slide', () => {
     expect(planNav(1, { ...base, mode: 'black' })).toEqual({ kind: 'unblank' })
     expect(planNav(-1, { ...base, mode: 'logo' })).toEqual({ kind: 'unblank' })
