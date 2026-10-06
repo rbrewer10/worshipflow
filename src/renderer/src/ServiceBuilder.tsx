@@ -9,13 +9,11 @@ import StartSundayModal, { type SundayTemplateChoice } from './StartSundayModal'
 import { DEFAULT_SERVICE_TEMPLATES } from './defaultServiceTemplates'
 import { notifyLocal, notifyLocalAction } from './NotifyToasts'
 import SetlistImport from './SetlistImport'
-import { localDateString } from '../../shared/localDate'
+import { upcomingSundayLocal } from '../../shared/localDate'
 
+// Today on a Sunday, otherwise the coming Sunday (QA B3-N7).
 function nextSundayISO(): string {
-  const date = new Date()
-  const daysUntilSunday = (7 - date.getDay()) % 7 || 7
-  date.setDate(date.getDate() + daysUntilSunday)
-  return localDateString(date)
+  return upcomingSundayLocal(new Date())
 }
 
 function serviceDateLabel(value: string | null): string {

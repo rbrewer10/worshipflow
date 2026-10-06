@@ -6,18 +6,36 @@ export interface SetlistEntry {
 }
 
 // "John 3:16", "Psalm 23", "1 Corinthians 13:4-7", "Romans 8"
-const SCRIPTURE = /^(?:(?:[1-3]|I{1,3})\s+)?[A-Za-z][A-Za-z]+\s+\d+(?::\d+(?:\s*[–-]\s*\d+)?)?(?:\s*[;,&].*)?$/
+const SCRIPTURE = /^(?:(?:[1-3]|I{1,3})\s+)?[A-Za-z][A-Za-z]+\.?\s+\d+(?::\d+(?:\s*[–-]\s*\d+)?)?(?:\s*[;,&].*)?$/
+
+// "John 3:16 (KJV)" / "John 3:16 NIV" — the translation is not part of the
+// reference the lookup reads (QA B3-N6).
+const TRANSLATION = /\s*[([]?\s*(?:KJV|NKJV|NIV|ESV|NASB|NLT|CSB|HCSB|RSV|NRSV|NRSVUE|CEB|MSG|AMP|CEV|GNT|NET|WEB|ASV|NIrV)\s*[)\]]?$/
+
+// "Scripture Reading: …", "Old Testament Lesson – …" (B3-N6: lesson wording).
+const LESSON = '(?:(?:scripture|old testament|new testament|gospel|epistle|first|second) )?lessons?'
+const READING_LABEL = `scripture readings?|scripture|readings?|bible|(?:old|new) testament reading|gospel reading|epistle reading|${LESSON}`
+const READING_LABEL_PREFIX = new RegExp(`^(?:${READING_LABEL})\\s*[:.\\-–—~]\\s*`, 'i')
+
+function stripTranslation(ref: string): string {
+  return ref.replace(TRANSLATION, '').trim()
+}
 
 function isScripture(line: string): boolean {
-  const t = line.replace(/^(scripture reading|scripture|reading|bible)\s*[:.\-–—]\s*/i, '').trim()
+  const t = stripTranslation(line.replace(READING_LABEL_PREFIX, '').trim())
   return SCRIPTURE.test(t)
 }
+
+// A chapter:verse reference anywhere in the line ("Responsive Psalm 95:1-7").
+// QA B3-N6: at minimum, a line holding one must never become a song
+// placeholder (a placeholder blocks readiness).
+const EMBEDDED_REFERENCE = /((?:(?:[1-3]|I{1,3})\s+)?[A-Z][A-Za-z]+\.?(?:\s+of\s+[A-Z][a-z]+)?\s+\d+:\d+(?:\s*[–-]\s*\d+(?::\d+)?)?)/
 
 // QA B16: a bare word prefix made "Word of God Speak" and "Message of the
 // Cross" (songs) into sermon cards. A sermon line now needs a separator
 // ("Sermon: The Cross", "Message - Hope") or to be the bare word on its own.
-const SERMON_PREFIX = /^(sermon|message|homily|word)\s*[:.\-–—]\s*/i
-const SERMON_ALONE = /^(sermon|message|homily|the word|teaching)$/i
+const SERMON_PREFIX = /^(sermon series|sermon|message|homily|word|(?:today'?s|pastor'?s|the) (?:message|sermon))\s*[:.\-–—]\s*/i
+const SERMON_ALONE = /^(sermon|message|homily|the word|teaching|(?:today'?s|pastor'?s|the|morning) (?:message|sermon)|message from (?:the )?pastor)$/i
 
 function isSermon(line: string): boolean {
   return SERMON_PREFIX.test(line) || SERMON_ALONE.test(line)
@@ -38,6 +56,10 @@ const ELEMENT_WORDS = [
   'special music', '(?:choir |choral )?anthem', 'affirmation of faith', "(?:the )?apostles'? creed", '(?:the )?nicene creed',
   'responsive reading', '(?:old|new) testament reading', 'gospel reading', 'epistle reading', 'readings?', 'invocation',
   'confession(?: of sin)?', 'assurance of pardon', 'words of institution', 'sending', 'charge(?: (?:and|&) benediction)?',
+  // QA B3-N6: more wordings from real bulletins.
+  LESSON, 'holy communion', '(?:gathering|unison|morning|intercessory|offering|dedication) prayer', 'prayer of (?:dedication|illumination|confession|thanksgiving)',
+  'moment for missions?', 'missions? moment', 'sharing of (?:our )?joys(?: (?:and|&) concerns)?', 'praise (?:and|&) worship', 'musical offering',
+  "children'?s (?:church|sermon|moment|time) (?:dismissal|dismissed)", "children'?s dismissal", 'greeting (?:and|&) announcements',
 ]
 const ELEMENT = new RegExp(`^(?:${ELEMENT_WORDS.join('|')})$`, 'i')
 
@@ -52,7 +74,7 @@ function isServiceElement(line: string): boolean {
 
 // "(Responsive)", "(Unison)", "(please stand)" after an element name — a
 // stage direction, not a song's artist: "Offering (Paul Baloche)" stays a song.
-const QUALIFIER = /^(?:responsive(?:ly)?|read responsively|unison|in unison|congregational|congregation|all|standing|all standing|please stand|optional|spoken|sung|together|seated|kneeling|choir|led by .+|pastor .+|rev\.? .+)$/i
+const QUALIFIER = /^(?:responsive(?:ly)?|read responsively|unison|in unison|congregational|congregation|all|standing|all standing|please stand|optional|spoken|sung|together|seated|kneeling|choir|led by .+|pastor .+|rev\.? .+|debts|trespasses|sins|see (?:insert|back|bulletin|page \d+|screen|over)|insert|on screen|in (?:the )?bulletin|p(?:age|g)?\.? ?\d+|(?:no\.?|#) ?\d+[a-z]?)$/i
 
 // Element words that are also well-known song titles ("Offering", "Response"…).
 const SONG_TITLE_TOO = /^(?:the )?(?:offerings?|response|invitation|reflection|meditation|giving|communion|benediction|the peace|baptism|video|welcome|prelude|anthem)$/i
@@ -61,11 +83,16 @@ const ROLE = /^(?:(?:the )?(?:pastor|rev(?:erend)?\.?|elder|deacon|deaconess|bis
 
 // "Scripture Reading – John 3:16", "Old Testament Reading: Isaiah 40",
 // "Scripture Reading (Romans 8)". (B2-N6: – and — were not accepted.)
-const READING_PREFIX = /^(scripture readings?|scripture|readings?|bible|(?:old|new) testament reading|gospel reading|epistle reading)\s*(?:[:.\-–—]\s*(.*)|\(\s*(.+?)\s*\))$/i
+const READING_PREFIX = new RegExp(`^(${READING_LABEL})\\s*(?:[:.\\-–—~]\\s*(.*)|\\(\\s*(.+?)\\s*\\))$`, 'i')
 
 // "Opening Hymn: Holy, Holy, Holy" / "Hymn of Invitation – Just As I Am" →
 // the song is the part after the label, so it can match the library.
-const HYMN_LABEL = /^(?:(?:opening|closing|gathering|sending|offertory|communion|response|responsive|final)\s+)?(?:hymn|song)(?:\s+of\s+(?:invitation|response|praise|preparation|sending|the day))?\s*(?:[:\-–—]\s*|\s+[-–—]\s+)(.+)$/i
+const HYMN_LABEL_WORDS = '(?:(?:opening|closing|gathering|sending|offertory|communion|response|responsive|final)\\s+)?(?:hymn|song)(?:\\s+of\\s+(?:invitation|response|praise|preparation|sending|the day))?'
+// B3-N6: "Opening Hymn #89 – Joyful, Joyful" — a hymnal number may sit between the label and the title.
+const HYMN_LABEL = new RegExp(`^${HYMN_LABEL_WORDS}(?:\\s*(?:no\\.?|#)\\s*\\d+[a-z]?)?\\s*(?:[:\\-–—]\\s*|\\s+[-–—]\\s+)(.+)$`, 'i')
+// "Hymn of Praise<TAB>No. 89<TAB>Joyful, Joyful…" — the bare label, title in the leader columns.
+const HYMN_LABEL_ALONE = new RegExp(`^${HYMN_LABEL_WORDS}(?:\\s*(?:no\\.?|#)\\s*\\d+[a-z]?)?$`, 'i')
+const HYMNAL_NUMBER_COLUMN = /^(?:(?:no\.?|#|umh|hymn)\s*)?\d+[a-z]?$/i
 // "Hymn 301" / "Hymn #301" / "UMH 301" is a hymnal number, not a Bible book.
 const HYMN_NUMBER = /^(?:hymn|song|umh|no\.?)\s*#?\s*\d+[a-z]?$/i
 
@@ -76,8 +103,13 @@ const DATE_LINE = new RegExp(
 )
 
 /** Bulletin noise that isn't an item: headings, the church/date lines. */
+// "Worship Service – 10:30 AM", "Sunday Morning Worship", "Traditional Service 9:00" (B3-N6).
+const SERVICE_TITLE = /^(?:(?:sunday|morning|evening|traditional|contemporary|blended|early|late|main)\s+)*(?:worship service|worship|service)(?:\s*[-–—:,@|]?\s*(?:\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?|sunday|morning|evening))*$/i
+
 function isHeadingLine(line: string): boolean {
-  return /setlist|^(order|service|songs?|worship)$|order of (worship|service)/i.test(line) || DATE_LINE.test(line)
+  if (/setlist|^(order|service|songs?|worship)$|order of (worship|service)/i.test(line) || DATE_LINE.test(line)) return true
+  // Needs a qualifier or a time, so a bare "Worship" song set label stays as before.
+  return SERVICE_TITLE.test(line) && /\d|sunday|morning|evening|traditional|contemporary|blended|early|late|main|service/i.test(line)
 }
 
 /**
@@ -92,12 +124,16 @@ export function cleanLine(raw: string): string {
     .replace(/[\u2018\u2019\u02BC\u2032]/g, "'").replace(/[\u201C\u201D]/g, '"')
     .trim()
   for (let i = 0; i < 2; i++) {
-    if (/^[-*=#•·▪►]/.test(line)) line = line.replace(/^[-*=#•·▪►]+\s*/, '')
+    if (/^[-*=#•·▪►+†‡]/.test(line)) line = line.replace(/^[-*=#•·▪►+†‡]+\s*/, '')
     line = line
       .replace(/^(?:\d+|[a-z]|[ivx]+)[.)]\s+/i, '')
+      .replace(/^\((?:\d+|[a-z]|[ivx]+)\)\s+/i, '') // "(1) Call to Worship" (B3-N6)
       .replace(/^\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?\s+(?=\D)/i, '')
       .trim()
   }
+  // Bulletin markup at the end: "Call to Worship*" (* = please stand),
+  // "Welcome!", "Call to Worship;" (B3-N6).
+  line = line.replace(/\s*[*;!†‡]+$/, '').trim()
   return line
 }
 
@@ -112,12 +148,18 @@ const stripColon = (s: string): string => s.replace(/\s*:\s*$/, '').trim()
 
 function classify(line: string): SetlistEntry {
   if (HYMN_NUMBER.test(line)) return { kind: 'song', title: line }
+  // "Lord's Prayer (debts)", "Announcements (see insert)": a note, not part of the name.
+  const note = /^(.*?)\s*\(([^)]*)\)$/.exec(line)
+  const hymnalNumber = note ? /^(?:no\.?|#) ?\d+[a-z]?$/i.test(note[2].trim()) : false
+  if (note && note[1] && isServiceElement(note[1]) && QUALIFIER.test(note[2].trim()) && !(hymnalNumber && SONG_TITLE_TOO.test(note[1].trim()))) {
+    return { kind: 'element', title: line }
+  }
   const hymn = HYMN_LABEL.exec(line)
   if (hymn && hymn[1].trim()) return { kind: 'song', title: hymn[1].trim() }
   if (isSermon(line)) return { kind: 'sermon', title: line.replace(SERMON_PREFIX, '').trim() || line }
   const reading = READING_PREFIX.exec(line)
   if (reading) {
-    const ref = (reading[2] ?? reading[3] ?? '').trim()
+    const ref = stripTranslation((reading[2] ?? reading[3] ?? '').trim())
     // "Scripture Reading:" with nothing after it is a header, not an empty scripture card.
     return ref ? { kind: 'scripture', title: ref } : { kind: 'element', title: reading[1] }
   }
@@ -137,7 +179,9 @@ function classify(line: string): SetlistEntry {
       return { kind: 'element', title: line }
     }
   }
-  if (isScripture(line)) return { kind: 'scripture', title: line.replace(/^(scripture reading|scripture|reading|bible)\s*[:.\-–—]\s*/i, '').trim() }
+  if (isScripture(line)) return { kind: 'scripture', title: stripTranslation(line.replace(READING_LABEL_PREFIX, '').trim()) }
+  const embedded = EMBEDDED_REFERENCE.exec(line)
+  if (embedded) return { kind: 'scripture', title: embedded[1].trim() }
   return { kind: 'song', title: line }
 }
 
@@ -149,6 +193,12 @@ export function parseSetlist(raw: string): SetlistEntry[] {
     const [rawHead, tail] = splitLeader(line)
     const head = stripColon(rawHead)
     if (!head) continue
+    // "Hymn of Praise<TAB>No. 89<TAB>Joyful, Joyful…": the title is the last
+    // column that isn't a hymnal number (B3-N6).
+    if (tail && HYMN_LABEL_ALONE.test(head)) {
+      const cols = tail.split(/\t+|\s*(?:\.\s*){3,}|\s*…+\s*|\s{3,}/).map((c) => c.trim()).filter((c) => c && !HYMNAL_NUMBER_COLUMN.test(c))
+      if (cols.length) { out.push({ kind: 'song', title: cols[cols.length - 1] }); continue }
+    }
     const entry = classify(head)
     if (tail) {
       // A reading label with the reference after the leader.
