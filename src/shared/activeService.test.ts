@@ -15,6 +15,18 @@ describe('pickInitialService (QA B-N1)', () => {
     expect(pickInitialService(list, 77)).toEqual({ id: 9, tellMain: true })
   })
   it('selects nothing with no services', () => expect(pickInitialService([], null)).toBeNull())
+  it('QA B2-N8: with nothing remembered, opens the nearest upcoming service, not the newest-created draft', () => {
+    const list = [
+      { id: 12, service_date: '2026-10-18' }, // newest: next week's draft
+      { id: 11, service_date: '2026-10-11' }, // this Sunday
+      { id: 10, service_date: '2026-10-04' }, // last week
+      { id: 9, service_date: null },
+    ]
+    expect(pickInitialService(list, null, '2026-10-06')).toEqual({ id: 11, tellMain: true })
+    expect(pickInitialService(list, 77, '2026-10-11')).toEqual({ id: 11, tellMain: true }) // today counts
+    expect(pickInitialService(list, null, '2026-11-01')).toEqual({ id: 12, tellMain: true }) // nothing upcoming → newest
+    expect(pickInitialService(list, 10, '2026-10-06')).toEqual({ id: 10, tellMain: false }) // a remembered choice still wins
+  })
 })
 
 describe('active service setting round-trip', () => {
