@@ -121,6 +121,10 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
     setTrack('main')
   }, [serviceId])
 
+  // The main process copied outside pictures/videos into the media folder
+  // (QA B2-N1 migration) — re-read so the warnings and paths are current.
+  useEffect(() => window.wf.onMediaRelinked(() => { void reload() }), [serviceId])
+
   // Re-fetch this component's own copy of the service whenever something
   // outside it (e.g. the Live Drawer applying a background to the selected
   // item) calls the shared context's reloadActiveService(). ServiceEditor
@@ -179,9 +183,12 @@ function ServiceEditor({ serviceId, headerActions, onServiceChanged, onOpenLive 
 
   const addCard = async (type: ServiceItem['type']): Promise<void> => {
     if (type === 'image') {
-      const result = await window.wf.dialogOpenFile()
-      if (result.canceled || !result.filePaths[0]) return
-      const id = await window.wf.serviceAddItem(serviceId, { type: 'image', payload: { path: result.filePaths[0] }, track })
+      // Copied into WorshipFlow's media folder — the original path (Pictures,
+      // a USB stick) is outside what the projector may load (QA B2-N1).
+      const result = await window.wf.mediaPick()
+      if (result.error) { notifyLocal(result.error, 'error'); return }
+      if (result.canceled || !result.path) return
+      const id = await window.wf.serviceAddItem(serviceId, { type: 'image', payload: { path: result.path }, track })
       await reload()
       setSelectedId(id)
       markRecentlyAdded(id)

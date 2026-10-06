@@ -229,6 +229,12 @@ export interface ServiceItem {
   style: ItemStyle | null
   zoneRouting: ZoneRouting | null
   track: TrackId
+  /** Set by wf:services:get when the projector can't load this image item's
+   *  file: 'missing' (not on this computer) or 'outside' (not in WorshipFlow's
+   *  media folders). QA B2-N1. Never stored. */
+  mediaProblem?: 'missing' | 'outside'
+  /** Same, for the item's own `payload.background`. */
+  backgroundProblem?: 'missing' | 'outside'
 }
 
 export interface ServiceFull extends ServiceSummary {

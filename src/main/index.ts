@@ -122,8 +122,11 @@ import {
   closeDanglingRecordings,
   getRecording,
   setRecordingRender,
-  setRecordingAi
+  setRecordingAi,
+  listStoredMediaPaths,
+  rewriteStoredMediaPaths,
 } from './db'
+import { importMediaFile, mediaProblemFor, migrateOutsidePaths, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
 import {
   listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder,
   listBackgroundFolders, createBackgroundFolder, renameBackgroundFolder, moveBackground, deleteBackgroundFolder
@@ -219,12 +222,17 @@ const iconFile = join(app.getAppPath(), 'build', 'icon.ico')
 const APP_ICON = existsSync(iconFile) ? iconFile : undefined
 
 // Helper to safely resolve a path and ensure it's within allowed media roots
+// The only folders the projector (wf-asset://) and the LAN tablet /file route
+// may load from. Anything an operator picks from elsewhere is copied into
+// imported-media first (QA B2-N1, see mediaImport.ts).
+function mediaRoots(): MediaRoots {
+  const ud = app.getPath('userData')
+  const mediaDir = join(ud, 'imported-media')
+  return { mediaDir, allowedRoots: [join(ud, 'backgrounds'), mediaDir, join(ud, 'generated')] }
+}
+
 function validateMediaPath(requestedPath: string): string | null {
-  const allowedRoots = [
-    join(app.getPath('userData'), 'backgrounds'),
-    join(app.getPath('userData'), 'imported-media'),
-    join(app.getPath('userData'), 'generated'),
-  ]
+  const allowedRoots = mediaRoots().allowedRoots
 
   try {
     const resolved = resolve(requestedPath)
@@ -2032,6 +2040,15 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   } else if (item.type === 'image') {
     const p = item.payload.path as string
     if (!p) return
+    // QA B2-N1: never fail silently — a file the projector can't load used to
+    // be a blank screen with a 403 only in the log.
+    const problem = mediaProblemFor(p, (x) => validateMediaPath(x) !== null)
+    if (problem) {
+      const name = basename(p)
+      notifyOperator(problem === 'missing'
+        ? `Can't show “${name}” — the file isn't on this computer any more. Re-link it in Build service.`
+        : `Can't show “${name}” — it isn't in WorshipFlow's media folder. Re-link it in Build service.`, 'warn')
+    }
     doLoadMedia(track, p, item.title)
   } else if (item.type === 'welcome') {
     const secs = item.payload.seconds as number
@@ -3099,6 +3116,9 @@ ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
     return
   }
   refreshActiveServiceItems(serviceId)
+  // A just-imported .wfservice (or a service from an older version) may point
+  // at pictures on a USB stick or in Pictures — copy them in now (B2-N1).
+  void migrateOutsideMedia('service opened')
 })
 ipcMain.handle('wf:getActiveServiceId', () => activeServiceId)
 
@@ -3338,6 +3358,22 @@ ipcMain.handle('wf:songs:setBlurBehindText', (_e: unknown, id: number, value: bo
 // (ServiceEditor.tsx's reload()), so a second edit surface calling these
 // IPCs directly would silently reproduce "newly added/edited item can't go
 // live" with nothing to catch it.
+// QA B2-N1: mark items whose picture/video (or background) the projector
+// can't load, so Build service can show a warning + Re-link and Review plan
+// counts it. Computed on read; nothing is stored.
+function withMediaProblems(svc: ServiceFull | null): ServiceFull | null {
+  if (!svc) return svc
+  const servable = (p: string): boolean => validateMediaPath(p) !== null
+  return {
+    ...svc,
+    items: svc.items.map((it) => {
+      const problem = mediaProblemFor(it.type === 'image' ? it.payload.path : undefined, servable)
+      const bgProblem = mediaProblemFor(it.payload.background, servable)
+      return problem || bgProblem ? { ...it, mediaProblem: problem ?? undefined, backgroundProblem: bgProblem ?? undefined } : it
+    })
+  }
+}
+
 function refreshIfActive(serviceId: number | null): void {
   if (serviceId != null && serviceId === activeServiceId) refreshActiveServiceItems(serviceId)
 }
@@ -3346,7 +3382,7 @@ function refreshIfActive(serviceId: number | null): void {
 ipcMain.handle('wf:services:list', () => listServices())
 ipcMain.handle('wf:services:create', (_e, name: string, date?: string) => createService(name, date))
 ipcMain.handle('wf:services:delete', (_e, id: number) => deleteService(id))
-ipcMain.handle('wf:services:get', (_e, id: number) => getService(id))
+ipcMain.handle('wf:services:get', (_e, id: number) => withMediaProblems(getService(id)))
 ipcMain.handle('wf:service:setPublished', (_e, id: number, publishedAt: number | null) => setServicePublished(id, publishedAt))
 ipcMain.handle('wf:service:getTeam', (_e, id: number) => getServiceTeam(id))
 ipcMain.handle('wf:service:setTeam', (_e, id: number, team: import('../shared/types').ServiceTeam) => setServiceTeam(id, team))
@@ -4195,6 +4231,64 @@ function readPreInitSnapshot(): Buffer | null {
   } catch { return null }
 }
 
+// QA B2-N1: pick a picture/video for the projector (image items, song and item
+// backgrounds) and copy it into WorshipFlow's imported-media folder, returning
+// the copy's path. Storing the original path (Pictures, Downloads, a USB
+// stick) used to give a blank projector, because wf-asset:// only serves files
+// inside the app's own folders. The logo pickers keep wf:dialog:openFile —
+// validateMediaPath explicitly allows the configured logo files.
+ipcMain.handle('wf:media:pick', async (): Promise<{ canceled: boolean; path?: string; error?: string }> => {
+  const opts = {
+    title: 'Choose a picture or video',
+    filters: [
+      { name: 'Pictures and videos', extensions: MEDIA_EXTENSIONS },
+      { name: 'Video', extensions: ['mp4', 'webm', 'mov', 'm4v'] },
+      { name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'] }
+    ],
+    properties: ['openFile'] as ['openFile']
+  }
+  const res = operatorWin
+    ? await dialog.showOpenDialog(operatorWin, opts)
+    : await dialog.showOpenDialog(opts)
+  if (res.canceled || !res.filePaths[0]) return { canceled: true }
+  try {
+    return { canceled: false, path: await importMediaFile(res.filePaths[0], mediaRoots()) }
+  } catch (err) {
+    const why = (err as NodeJS.ErrnoException)?.code === 'ENOSPC' ? 'the disk is full' : ((err as Error)?.message ?? String(err))
+    logWarn(`[media] couldn't copy ${res.filePaths[0]} into imported-media: ${why}`)
+    return { canceled: false, error: `Couldn't copy ${basename(res.filePaths[0])} into WorshipFlow's media folder (${why}).` }
+  }
+})
+
+// Startup (and after a .wfservice import): copy any stored picture/video path
+// that points outside the app's folders — items saved by 0.20.2 and earlier —
+// into imported-media and rewrite the database to the copy. Files that no
+// longer exist are left alone; Build service flags them with a Re-link button
+// and Go Live warns. Never throws; one run at a time.
+let mediaMigration: Promise<void> | null = null
+function migrateOutsideMedia(reason: string): Promise<void> {
+  if (mediaMigration) return mediaMigration
+  mediaMigration = (async () => {
+    try {
+      const { relinked, failed, missing } = await migrateOutsidePaths(listStoredMediaPaths(), mediaRoots(), (p) => validateMediaPath(p) !== null)
+      const rows = rewriteStoredMediaPaths(relinked)
+      if (relinked.size > 0) {
+        logInfo(`[media] ${reason}: copied ${relinked.size} outside picture/video file(s) into imported-media (${rows} row(s) updated)`)
+        refreshIfActive(activeServiceId)
+        operatorWin?.webContents.send('wf:media:relinked', { count: relinked.size })
+        notifyOperator(`Copied ${relinked.size} picture/video file${relinked.size === 1 ? '' : 's'} into WorshipFlow's media folder so ${relinked.size === 1 ? 'it shows' : 'they show'} on the projector.`, 'info')
+      }
+      for (const f of failed) logWarn(`[media] ${reason}: couldn't copy ${f.path}: ${f.error}`)
+      if (missing.length > 0) logWarn(`[media] ${reason}: ${missing.length} stored picture/video path(s) no longer exist (Build service shows Re-link)`)
+    } catch (err) {
+      logWarn(`[media] ${reason}: migration failed: ${(err as Error)?.message ?? err}`)
+    } finally {
+      mediaMigration = null
+    }
+  })()
+  return mediaMigration
+}
+
 // Create a timestamped backup of the database on app launch
 function createTimestampedBackup(snapshot: Buffer | null): void {
   const bakDir = join(app.getPath('userData'), 'backups')
@@ -4350,8 +4444,19 @@ ipcMain.handle('wf:service:importImages', async (): Promise<{ id: number; name: 
   if (result.canceled || result.filePaths.length === 0) return null
   const files = [...result.filePaths].sort(naturalCompare)
   const name = basename(dirname(files[0])) || 'Imported Service'
+  // Copy each slide into imported-media first (QA B2-N1) — the original
+  // export folder is outside what the projector may load.
+  const copies: string[] = []
+  for (const f of files) {
+    try {
+      copies.push(await importMediaFile(f, mediaRoots()))
+    } catch (err) {
+      logWarn(`[media] importImages: couldn't copy ${f}: ${(err as Error)?.message ?? err}`)
+      copies.push(f) // keep the slide; Build service flags it with Re-link
+    }
+  }
   const id = createService(name)
-  for (const f of files) addServiceItem(id, { type: 'image', payload: { path: f } })
+  for (const f of copies) addServiceItem(id, { type: 'image', payload: { path: f } })
   return { id, name, count: files.length }
 })
 
@@ -4650,6 +4755,8 @@ app.whenReady().then(async () => {
   // attached this opens the zone multiview instead of a stray output window.
   layoutOutputs()
   broadcast()
+  // Copy pictures/videos older versions stored outside the app folder (B2-N1).
+  void migrateOutsideMedia('startup')
   // Reconnect to OBS in the background if the operator connected before (non-blocking).
   void initObsAutoConnect()
   // Startup-only update check (never repeats while the app stays open) — see
