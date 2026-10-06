@@ -21,7 +21,9 @@ describe('Sunday-morning safety guards', () => {
   })
 
   it('a clean quit does not auto-restore onto the projectors', () => {
-    expect(main).toMatch(/if \(wasCleanExit\(\)\)/)
+    // A2-N1: the clean-exit flag as captured at startup, before this session's first recovery write.
+    expect(main).toMatch(/if \(startup\?\.cleanExit\)/)
+    expect(main).toMatch(/new StartupRecovery<RecoverySnapshot>\(readRecovery, wasCleanExit\)/)
     expect(main).toMatch(/markCleanExit\(true\)/)
     expect(recovery).toMatch(/store\.set\('cleanExit', false\)/)
   })
