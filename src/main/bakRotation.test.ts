@@ -59,6 +59,7 @@ describe('.bak generations survive a burst of saves (QA A-M1 repro)', () => {
     // Pretend the last hourly generation was taken over an hour ago.
     const old = new Date(Date.now() - 2 * BAK_INTERVAL_MS)
     if (existsSync(`${bak}.1`)) utimesSync(`${bak}.1`, old, old)
+    if (existsSync(`${bak}.rotated`)) utimesSync(`${bak}.rotated`, old, old)
 
     const id = db.listSongs('Amazing Grace')[0].id
     db.deleteSong(id)
@@ -94,5 +95,35 @@ describe('.bak generations survive a burst of saves (QA A-M1 repro)', () => {
     for (let i = 0; i < 5; i++) db.createSong({ title: `Song ${i}`, sections: [{ kind: 'verse', label: 'V1', ordinal: 0, lyrics: 'x' }] } as never)
     const titles = await songTitlesIn(join(userData, 'worshipflow.db.bak'))
     expect(titles).toEqual(['Song 0', 'Song 1', 'Song 2', 'Song 3'])
+  })
+})
+
+describe('rotation clock lives beside the generations (QA A2-N3)', () => {
+  it('.bak.1 keeps the age of the save it holds, so recovery never ranks it above a newer launch backup', async () => {
+    const db0 = await freshDb()
+    await db0.initDb()
+    db0.setSetting('church_name', 'gen1')
+    const bak = join(userData, 'worshipflow.db.bak')
+    // Make the existing .bak (content "gen1"-ish) look 2 h old, and the clock too.
+    const twoHoursAgo = new Date(Date.now() - 2 * BAK_INTERVAL_MS)
+    utimesSync(bak, twoHoursAgo, twoHoursAgo)
+    if (existsSync(`${bak}.rotated`)) utimesSync(`${bak}.rotated`, twoHoursAgo, twoHoursAgo)
+    const db = await freshDb()
+    await db.initDb()
+    db.setSetting('church_name', 'gen2') // rotates: old .bak → .bak.1
+    expect(existsSync(`${bak}.1`)).toBe(true)
+    // .bak.1 still carries its content's age (≈2 h), NOT "now".
+    expect(Date.now() - statSync(`${bak}.1`).mtimeMs).toBeGreaterThan(BAK_INTERVAL_MS)
+    // ...and the clock was moved instead.
+    expect(Date.now() - statSync(`${bak}.rotated`).mtimeMs).toBeLessThan(60_000)
+  })
+  it('lastRotationMs falls back to .bak.1 for profiles from before the sidecar', async () => {
+    const { lastRotationMs } = await import('./bakRotation')
+    const bak = join(userData, 'worshipflow.db.bak')
+    expect(lastRotationMs(bak)).toBeNull()
+    writeFileDurable(`${bak}.1`, new Uint8Array([1]))
+    const t = new Date(1_700_000_000_000)
+    utimesSync(`${bak}.1`, t, t)
+    expect(lastRotationMs(bak)).toBe(t.getTime())
   })
 })

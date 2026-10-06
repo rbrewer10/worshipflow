@@ -27,7 +27,7 @@ import type {
   ServicePerson
 } from '../shared/types'
 import { announcementMatchesDate, announcementExpired } from '../shared/announcementSchedule'
-import { bakMtime, copyToBak, shouldRotateBak, stampNow, writeFileDurable } from './bakRotation'
+import { copyToBak, lastRotationMs, markRotated, shouldRotateBak, writeFileDurable } from './bakRotation'
 import { relocateStoredPath } from '../shared/pathRelocation'
 import { splitLyricLines } from '../shared/lyrics'
 import type { ZoneSlide } from '../shared/zoneSlides'
@@ -542,10 +542,11 @@ function persist(): void {
     // and .bak.2 only move on at most once an hour (see bakRotation.ts) —
     // otherwise three quick setting changes wiped every copy of a mistake.
     if (existsSync(dbPath)) {
-      const gen1 = `${bakPath}.1`
-      if (existsSync(bakPath) && shouldRotateBak(bakMtime(gen1), Date.now())) {
+      // The hourly clock is a sidecar, so .bak.1/.bak.2 keep the mtime of
+      // the save they hold and recovery ranks them correctly (QA A2-N3).
+      if (existsSync(bakPath) && shouldRotateBak(lastRotationMs(bakPath), Date.now())) {
         rotateBackupGenerations(bakPath)
-        stampNow(gen1)
+        markRotated(bakPath)
       }
       copyToBak(dbPath, bakPath)
     }
