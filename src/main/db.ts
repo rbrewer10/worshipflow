@@ -297,6 +297,69 @@ function relocateMovedDataPaths(): void {
   }
 }
 
+// QA B2-N1: every media path the database stores (song/announcement
+// backgrounds, announcement icon files, image items' `path`, any item
+// `background`). Used by the "copy outside pictures into imported-media"
+// migration in index.ts. Non-file markers (theme:/icon:) are left out.
+export function listStoredMediaPaths(): string[] {
+  const out = new Set<string>()
+  const add = (v: unknown): void => {
+    if (typeof v === 'string' && v.trim() && !v.startsWith('theme:') && !v.startsWith('icon:')) out.add(v)
+  }
+  const songStmt = db.prepare("SELECT background FROM song WHERE background IS NOT NULL AND background != ''")
+  while (songStmt.step()) add(songStmt.getAsObject().background)
+  songStmt.free()
+  const annStmt = db.prepare('SELECT background, icon FROM announcement')
+  while (annStmt.step()) { const r = annStmt.getAsObject(); add(r.background); add(r.icon) }
+  annStmt.free()
+  const itemStmt = db.prepare("SELECT payload_json FROM service_item WHERE payload_json LIKE '%background%' OR payload_json LIKE '%\"path\"%'")
+  while (itemStmt.step()) {
+    const raw = itemStmt.getAsObject().payload_json
+    if (typeof raw !== 'string') continue
+    try {
+      const payload = JSON.parse(raw) as Record<string, unknown>
+      add(payload.background)
+      add(payload.path)
+    } catch { /* malformed payload — skip */ }
+  }
+  itemStmt.free()
+  return [...out]
+}
+
+// Swap stored media paths old → new everywhere listStoredMediaPaths() looks,
+// then persist once. Exact-string matches only, so nothing else is touched.
+// Returns how many rows changed.
+export function rewriteStoredMediaPaths(map: Map<string, string>): number {
+  if (map.size === 0) return 0
+  let changed = 0
+  const swap = (v: unknown): unknown => (typeof v === 'string' && map.has(v) ? map.get(v) : v)
+  for (const [from, to] of map) {
+    db.run('UPDATE song SET background = ? WHERE background = ?', [to, from])
+    changed += db.getRowsModified()
+    db.run('UPDATE announcement SET background = ? WHERE background = ?', [to, from])
+    changed += db.getRowsModified()
+    db.run('UPDATE announcement SET icon = ? WHERE icon = ?', [to, from])
+    changed += db.getRowsModified()
+  }
+  const rows: { id: number; payload_json: string }[] = []
+  const stmt = db.prepare("SELECT id, payload_json FROM service_item WHERE payload_json LIKE '%background%' OR payload_json LIKE '%\"path\"%'")
+  while (stmt.step()) rows.push(stmt.getAsObject() as unknown as { id: number; payload_json: string })
+  stmt.free()
+  for (const row of rows) {
+    let payload: Record<string, unknown>
+    try { payload = JSON.parse(row.payload_json) } catch { continue }
+    const nextBg = swap(payload.background)
+    const nextPath = swap(payload.path)
+    if (nextBg === payload.background && nextPath === payload.path) continue
+    if (payload.background !== undefined) payload.background = nextBg
+    if (payload.path !== undefined) payload.path = nextPath
+    db.run('UPDATE service_item SET payload_json = ? WHERE id = ?', [JSON.stringify(payload), row.id])
+    changed++
+  }
+  if (changed > 0) persist()
+  return changed
+}
+
 // Pure so it's unit-testable without a DB — trims and collapses internal
 // whitespace, never touches actual wording/spelling (which needs a human
 // read-through the audit itself couldn't safely automate either).
