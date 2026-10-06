@@ -57,9 +57,9 @@ export const StageMessagePanel = memo(function StageMessagePanel({
       </h2>
       <div className="flex gap-2">
         <input type="text" value={inputValue} onChange={(e) => onInputChange(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && onSendMessage()} placeholder="Message to worship leader / pastor..." />
-        <button onClick={() => onSendMessage()} className="btn-warning">Send</button>
-        <button onClick={onClearMessage} className="btn">Clear</button>
+          onKeyDown={(e) => e.key === 'Enter' && onSendMessage()} placeholder="Message to worship leader / pastor..." className="min-w-0 flex-1" />
+        <button onClick={() => onSendMessage()} className="btn-warning shrink-0">Send</button>
+        <button onClick={onClearMessage} className="btn shrink-0">Clear</button>
       </div>
 
       <div className="mt-3 flex items-center justify-between">

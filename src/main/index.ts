@@ -3,6 +3,7 @@ import { isRestorableBackupName, parseBackupFilename, type BackupKind } from '..
 import { nextOrderSnapshot, pickAdjacentItem } from '../shared/deckAdjacent'
 import { describeImport, parseServiceBundle, referencedMediaPaths, sameSong, songContentDiffers, songInputFrom, uniqueServiceName, type BundleItem, type ImportSummary } from '../shared/serviceBundle'
 import type { ServiceImportResult } from '../shared/types'
+import { OPERATOR_MIN_WIDTH } from '../shared/layoutLimits'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
@@ -2515,11 +2516,10 @@ function createOperator(): void {
     y: oy,
     width: 1600,
     height: 760,
-    // TopBar's 8 flat nav tabs + brand + live-output/OBS status cluster need
-    // real horizontal room (measured: needs ~1440px with zero margin just for
-    // the idle-status state, more once OBS on-air badges are showing) — keep
-    // the default and the floor comfortably above that.
-    minWidth: 1300,
+    // Floor below a 1280-px laptop screen (QA B17: 1300 pushed the right edge
+    // — help, Volunteer mode — off-screen on 1280x720). TopBar collapses its
+    // wordier labels under 1440px so the bar still fits at this width.
+    minWidth: OPERATOR_MIN_WIDTH,
     show: !app.isPackaged,
     title: 'WorshipFlow Pro — Operator',
     icon: APP_ICON,
