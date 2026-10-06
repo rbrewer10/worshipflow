@@ -35,6 +35,10 @@ function SetlistImport({ onImported }: { onImported: (serviceId: number) => void
           await window.wf.serviceAddItem(serviceId, { type: 'scripture', payload: { reference: entry.title } })
         } else if (entry.kind === 'sermon') {
           await window.wf.serviceAddItem(serviceId, { type: 'sermon', payload: { title: entry.title } })
+        } else if (entry.kind === 'element') {
+          // Welcome / Communion / Offering / Prayer…: a run-sheet header, not a
+          // "Song: …" placeholder that blocks the readiness check (QA B16).
+          await window.wf.serviceAddItem(serviceId, { type: 'header', payload: { label: entry.title } })
         }
       }
       await reloadActiveService()
@@ -68,7 +72,7 @@ function SetlistImport({ onImported }: { onImported: (serviceId: number) => void
   return (
     <div className="col-span-2 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-2">
       <p className="mb-1 text-[11px] text-content-secondary">
-        One item per line. Songs match your library by title. Scripture like “John 3:16”. Lines starting with Sermon become a sermon card.
+        One item per line. Songs match your library by title. Scripture like “John 3:16”. “Sermon: The Cross” becomes a sermon card. Welcome, Offering, Prayer and similar become section headers.
       </p>
       <textarea
         value={text}
