@@ -130,3 +130,26 @@ describe('rangeReference / verseLines (QA B4-N1: readings across chapters)', () 
     expect(verseLines([{ n: 16, text: 'only' }])).toEqual(['only'])
   })
 })
+
+describe('parseReferenceList — a passage with no book continues the previous one (QA A5-N2)', () => {
+  it.each([
+    ['John 3:16-18; 5:24', ['John 3:16-18', 'John 5:24']],
+    ['John 3:16-18; 5:24; Romans 8:1', ['John 3:16-18', 'John 5:24', 'Romans 8:1']],
+    ['Matthew 5:3-10; 6:9-13', ['Matthew 5:3-10', 'Matthew 6:9-13']],
+    ['John 3:16; 18', ['John 3:16', 'John 3:18']], // a bare number after chapter:verse is a verse
+    ['John 3:16-18; 20-21', ['John 3:16-18', 'John 3:20-21']],
+    ['Psalm 23; 24', ['Psalm 23', 'Psalms 24']], // after a whole chapter, a chapter
+    ['1 John 1:9; 2:1-2', ['1 John 1:9', '1 John 2:1-2']],
+    ['Jude 3; 20-21', ['Jude 3', 'Jude 1:20-21']],
+    ['Isa 9:6; 53:5', ['Isa 9:6', 'Isaiah 53:5']],
+    ['John 3:16\n5:24', ['John 3:16', 'John 5:24']],
+  ])('%s', (input, want) => {
+    expect(parseReferenceList(input)).toEqual(want)
+  })
+  it('a bookless passage with nothing before it is left alone (the readiness check flags it)', () => {
+    expect(parseReferenceList('5:24; John 3:16')).toEqual(['5:24', 'John 3:16'])
+  })
+  it('an unreadable passage does not lend its "book" to the next one', () => {
+    expect(parseReferenceList('Hezekiah 4:1; 5:2')).toEqual(['Hezekiah 4:1', '5:2'])
+  })
+})

@@ -47,8 +47,12 @@ export function cleanVerse(t: string): string {
     prev = out
     out = out.replace(/\{([^{}]*)\}/g, (_m, inner: string) => (NOTE.test(inner) ? '' : inner))
   }
+  // QA A5-N3: the Psalm titles are in square brackets in this text
+  // ("[A Psalm of David.] The LORD is my shepherd"). Like the italic supplied
+  // words, the title stays and only the brackets go.
+  out = out.replace(/\[([^\]]*)\]/g, '$1')
   return out
-    .replace(/[{}]/g, '')
+    .replace(/[{}[\]]/g, '')
     .replace(/\s+([,.;:?!])/g, '$1')
     .replace(/\s+/g, ' ')
     .trim()
