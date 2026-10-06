@@ -35,6 +35,16 @@ describe('Stage Monitor fit (QA A-H1)', () => {
     expect(html).toContain("nextLabel.textContent='Up next'")
     expect(html).toContain('showNext(!!nextText)')
   })
+  it('QA A-N5: the lower-third band is capped at 10vh and its text shrinks to fit', () => {
+    expect(html).toContain("el.style.maxHeight='10vh'")
+    expect(html).toMatch(/oSize>0\.9/)
+  })
+  it('QA A-N5: Next is dropped when the verse would get less than 40% of the screen', () => {
+    const next = html.indexOf('fitText(nextLine,')
+    const drop = html.indexOf('if(current.clientHeight<window.innerHeight*0.4) showNext(false)')
+    expect(drop).toBeGreaterThan(next)
+    expect(html.indexOf('fitText(current.firstChild,fs,minFs,')).toBeGreaterThan(drop)
+  })
   it('the page script still parses', () => {
     const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('<\/script>'))
     expect(() => new Function(script)).not.toThrow()
