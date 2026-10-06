@@ -1,3 +1,6 @@
+import { parseScriptureReference } from './scriptureParse'
+import { parseReferenceList } from './scriptureRefs'
+
 export type SetlistKind = 'song' | 'scripture' | 'sermon' | 'placeholder' | 'element'
 
 export interface SetlistEntry {
@@ -5,8 +8,26 @@ export interface SetlistEntry {
   title: string
 }
 
-// "John 3:16", "Psalm 23", "1 Corinthians 13:4-7", "Romans 8"
-const SCRIPTURE = /^(?:(?:[1-3]|I{1,3})\s+)?[A-Za-z][A-Za-z]+\.?\s+\d+(?::\d+(?:\s*[–-]\s*\d+)?)?(?:\s*[;,&].*)?$/
+// QA B5-N4: references are read by the app's one reference grammar
+// (shared/scriptureParse, the same one the lookup and Review & publish use).
+// The importer's own regex knew neither the em dash nor chapter ranges, so a
+// bare "Mark 4:35—41" came in as "Mark 4:35" (one verse went live, silently)
+// and "Psalm 23-24" / "Psalm 23–24" / "Psalms 23-24" became song placeholders.
+//
+// A reference only has to be well formed with a real book here: "John 99:1"
+// is still a scripture item (Review & publish says what's wrong with it)
+// rather than a "Song: John 99:1" placeholder.
+const UNREADABLE = /^(?:Could not read|Unknown book|Add a chapter|Enter a reference)/
+
+function readsAsReference(ref: string): boolean {
+  // A number is required: a bare "Jude" or "Job" on its own line is more likely a song than a reading.
+  if (!/\d/.test(ref)) return false
+  const parts = parseReferenceList(ref.replace(/\s+(?:&|and)\s+(?=(?:[1-3]\s*)?[A-Za-z])/g, '; '))
+  return parts.length > 0 && parts.every((part) => {
+    const parsed = parseScriptureReference(part)
+    return parsed.ok || !UNREADABLE.test(parsed.error)
+  })
+}
 
 // "John 3:16 (KJV)" / "John 3:16 NIV" — the translation is not part of the
 // reference the lookup reads (QA B3-N6).
@@ -19,28 +40,60 @@ const PSALTER_LABEL = '(?:responsive|responsorial|the|unison) psalm|psalm readin
 const READING_LABEL = `scripture readings?|scripture|readings?|bible|(?:old|new) testament reading|gospel reading|epistle reading|${LESSON}|${PSALTER_LABEL}`
 const READING_LABEL_PREFIX = new RegExp(`^(?:${READING_LABEL})\\s*[:.\\-–—~]\\s*`, 'i')
 
+// "Psalm 103:1-5 (UMH 824)", "Psalm 46 (Responsive)": a hymnal number or a
+// stage direction after the reference isn't part of what the lookup reads.
 function stripTranslation(ref: string): string {
-  return ref.replace(TRANSLATION, '').trim()
+  let out = ref.replace(TRANSLATION, '').trim()
+  const note = /^(.*?)\s*\(([^()]*)\)$/.exec(out)
+  if (note && note[1] && QUALIFIER.test(note[2].trim())) out = note[1].trim()
+  return out.replace(/\s+(?:&|and)\s+(?=(?:[1-3]\s*)?[A-Za-z]+\.?\s*\d)/g, '; ')
+}
+
+// "Responsorial Psalm 98", "Responsive Psalm 46" — the label runs straight
+// into the reading with no separator (B5-N7).
+const PSALM_LEAD_IN = /^(?:responsive|responsorial|unison|the)\s+(?=psalms?\s+\d)/i
+
+function referenceText(line: string): string {
+  return stripTranslation(line.replace(READING_LABEL_PREFIX, '').replace(PSALM_LEAD_IN, '').trim())
 }
 
 function isScripture(line: string): boolean {
-  const t = stripTranslation(line.replace(READING_LABEL_PREFIX, '').trim())
-  return SCRIPTURE.test(t)
+  return readsAsReference(referenceText(line))
 }
 
 // A chapter:verse reference anywhere in the line ("Responsive Psalm 95:1-7").
 // QA B3-N6: at minimum, a line holding one must never become a song
 // placeholder (a placeholder blocks readiness).
-const EMBEDDED_REFERENCE = /((?:(?:[1-3]|I{1,3})\s+)?[A-Z][A-Za-z]+\.?(?:\s+of\s+[A-Z][a-z]+)?\s+\d+:\d+(?:\s*[–-]\s*\d+(?::\d+)?)?)/
+// B5-N4: em dash and cross-chapter ranges too, and the book has to be a book.
+const EMBEDDED_REFERENCE = /((?:(?:[1-3]|I{1,3})\s+)?[A-Z][A-Za-z]+\.?(?:\s+of\s+[A-Z][a-z]+)?\s+\d+:\d+(?:\s*[–—-]\s*\d+(?::\d+)?)?)/g
+
+function embeddedReference(line: string): string | null {
+  for (const m of line.matchAll(EMBEDDED_REFERENCE)) {
+    if (readsAsReference(m[1])) return m[1].trim()
+  }
+  return null
+}
 
 // QA B16: a bare word prefix made "Word of God Speak" and "Message of the
 // Cross" (songs) into sermon cards. A sermon line now needs a separator
 // ("Sermon: The Cross", "Message - Hope") or to be the bare word on its own.
-const SERMON_PREFIX = /^(sermon series|sermon|message|homily|word|(?:today'?s|pastor'?s|the) (?:message|sermon))\s*[:.\-–—]\s*/i
-const SERMON_ALONE = /^(sermon|message|homily|the word|teaching|(?:today'?s|pastor'?s|the|morning) (?:message|sermon)|message from (?:the )?pastor|(?:the )?word (?:proclaimed|preached)|(?:the )?(?:proclamation|preaching) of (?:the|god'?s) word)$/i
+// B5-N7: "Sermon Title: …", "Message from God's Word: …", "Proclaiming the Word".
+const SERMON_PREFIX = /^(sermon series|sermon title|message title|sermon|message|homily|word|(?:today'?s|pastor'?s|the) (?:message|sermon)|message from (?:god'?s|the) word)\s*[:.\-–—]\s*/i
+const SERMON_ALONE = /^(sermon|message|homily|the word|teaching|(?:today'?s|pastor'?s|the|morning) (?:message|sermon)|message from (?:the )?pastor|(?:the )?word (?:proclaimed|preached)|(?:the )?(?:proclamation|preaching) of (?:the|god'?s) word|proclaiming (?:the|god'?s) word)$/i
+// "Sermon (Luke 15:11-32) "The Waiting Father"": the passage in brackets, then the title.
+const SERMON_WITH_PASSAGE = /^(?:sermon|message|homily)\s*\(([^)]*)\)\s*[:\-–—]?\s*(.+)$/i
 
 function isSermon(line: string): boolean {
-  return SERMON_PREFIX.test(line) || SERMON_ALONE.test(line)
+  return SERMON_PREFIX.test(line) || SERMON_ALONE.test(line) || SERMON_WITH_PASSAGE.test(line)
+}
+
+const unquote = (s: string): string => s.replace(/^"(.*)"$/, '$1').trim()
+
+function sermonTitle(line: string): string {
+  const withPassage = SERMON_WITH_PASSAGE.exec(line)
+  if (withPassage) return unquote(withPassage[2].trim())
+  const title = line.replace(SERMON_PREFIX, '').trim()
+  return title ? unquote(title) : line
 }
 
 // Common non-song service elements. These become section headers (labels in
@@ -67,6 +120,12 @@ const ELEMENT_WORDS = [
   '(?:greeting|exchange|passing|sharing|sign) of (?:the )?peace', 'silent meditation', '(?:the )?sacrament of (?:holy communion|the lord\'?s supper|baptism)',
   '(?:the )?celebration of (?:holy )?communion', 'recognition of (?:visitors|guests|visitors (?:and|&) guests)', 'birthdays?', 'anniversaries',
   'sending forth', '(?:the )?invitation to (?:christian )?(?:discipleship|membership)',
+  // QA B5-N7: more Methodist / liturgical wording.
+  'words of assurance', 'concerns (?:and|&) celebrations', 'celebrations (?:and|&) concerns', '(?:a |the )?(?:modern )?affirmation(?: of faith)?',
+  '(?:the )?great thanksgiving', '(?:the )?invitation to the table', 'presentation of (?:our |the )?(?:tithes (?:and|&) offerings|offerings?|gifts|tithes)',
+  'time with (?:young disciples|(?:the )?children|kids)', '(?:choral |choir )?introit', '(?:the )?chiming of the hour', '(?:the )?ringing of the bells?',
+  '(?:the )?extinguishing of the (?:candles?|christ candle|light)', 'commissioning', 'litany(?: (?:of|for) [a-z\' ]+)?', '(?:the )?collect(?: (?:for|of) [a-z ]+)?',
+  "(?:sharing|passing|exchange|greeting) (?:of )?christ'?s peace", 'gospel acclamation',
 ]
 const ELEMENT = new RegExp(`^(?:${ELEMENT_WORDS.join('|')})$`, 'i')
 
@@ -157,7 +216,17 @@ function splitLeader(line: string): [string, string] {
   return [m[1].trim(), m[2].trim()]
 }
 
-const RUBRIC = /^(?:[*†‡]+|\(\s*[*†‡]\s*\))\s*(?:please\b|indicates?\b|denotes?\b|means\b|(?:all |those |the congregation )?(?:who are able,? )?(?:may |will |please )?(?:stand|standing|rise|be seated)\b|congregation(?:al)? (?:stands?|standing|response|participation)\b|as (?:you are|we are) able\b|if able\b)/i
+const RUBRIC = /^(?:[*†‡+]+|\(\s*[*†‡+]\s*\))\s*(?:please\b|indicates?\b|denotes?\b|means\b|(?:all |those |the congregation )?(?:who are able,? )?(?:may |will |please )?(?:stand|standing|rise|be seated)\b|congregation(?:al)? (?:stands?|standing|response|participation)\b|as (?:you are|we are) able\b|if able\b)/i
+
+// B5-N7: the rest of a bulletin's small print, and the spoken parts of a
+// litany ("Leader: The Lord be with you." / "People: And also with you.").
+const SMALL_PRINT = [
+  /^\(\s*please\b[^)]*\)$/i,
+  /^(?:(?:bold(?:ed)?|italic(?:s|ized)?|large|underlined)\s+)?(?:print|type|text|words?|lines?|items?)\s+(?:in (?:bold|italics?)\s+)?(?:indicates?|denotes?|means|marks?)\b/i,
+  /\b(?:large[- ]print|braille|hearing (?:assistance|assist|devices?|loops?))\b.*\b(?:available|ask|provided)\b/i,
+  /^(?:leader|people|all|congregation|one|many|minister|celebrant|reader|l|p|c)\s*:\s+.*[.!?]$/i,
+]
+const isSmallPrint = (line: string): boolean => SMALL_PRINT.some((re) => re.test(line))
 
 const stripColon = (s: string): string => s.replace(/\s*:\s*$/, '').trim()
 
@@ -171,7 +240,7 @@ function classify(line: string): SetlistEntry {
   }
   const hymn = HYMN_LABEL.exec(line)
   if (hymn && hymn[1].trim()) return { kind: 'song', title: hymn[1].trim() }
-  if (isSermon(line)) return { kind: 'sermon', title: line.replace(SERMON_PREFIX, '').trim() || line }
+  if (isSermon(line)) return { kind: 'sermon', title: sermonTitle(line) }
   const reading = READING_PREFIX.exec(line)
   if (reading) {
     const ref = stripTranslation((reading[2] ?? reading[3] ?? '').trim())
@@ -195,13 +264,13 @@ function classify(line: string): SetlistEntry {
     }
   }
   // "Psalm 23 — Responsive" / "Psalm 46 (Responsive)": the reading with a stage direction (B4-N3).
-  const direction = /^(.+?)(?:\s*[-–—:]\s*|\s*\(\s*)([^()]+?)\)?$/.exec(line)
+  const direction = /^(.+?)(?:\s*[-–—:,]\s*|\s*\(\s*)([^()]+?)\)?$/.exec(line)
   if (direction && QUALIFIER.test(direction[2].trim()) && isScripture(direction[1])) {
-    return { kind: 'scripture', title: stripTranslation(direction[1].replace(READING_LABEL_PREFIX, '').trim()) }
+    return { kind: 'scripture', title: referenceText(direction[1]) }
   }
-  if (isScripture(line)) return { kind: 'scripture', title: stripTranslation(line.replace(READING_LABEL_PREFIX, '').trim()) }
-  const embedded = EMBEDDED_REFERENCE.exec(line)
-  if (embedded) return { kind: 'scripture', title: embedded[1].trim() }
+  if (isScripture(line)) return { kind: 'scripture', title: referenceText(line) }
+  const embedded = embeddedReference(line)
+  if (embedded) return { kind: 'scripture', title: embedded }
   return { kind: 'song', title: line }
 }
 
@@ -213,7 +282,7 @@ export function parseSetlist(raw: string): SetlistEntry[] {
     // ("*Hymn: Amazing Grace") is still just a stand mark.
     if (RUBRIC.test(rawLine.trim())) continue
     const line = cleanLine(rawLine)
-    if (!line || isHeadingLine(line)) continue
+    if (!line || isHeadingLine(line) || isSmallPrint(line)) continue
     const [rawHead, tail] = splitLeader(line)
     const head = stripColon(rawHead)
     if (!head) continue
@@ -227,7 +296,7 @@ export function parseSetlist(raw: string): SetlistEntry[] {
     if (tail) {
       // A reading label with the reference after the leader.
       if (entry.kind === 'element' && READING_PREFIX.test(`${head}:`) && isScripture(tail)) {
-        out.push({ kind: 'scripture', title: tail })
+        out.push({ kind: 'scripture', title: referenceText(tail) })
         continue
       }
       // Keep who/what for a header ("Call to Worship — Pastor Jim"); for a
