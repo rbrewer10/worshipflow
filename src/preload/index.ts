@@ -29,7 +29,8 @@ import type {
   ScriptureRefCheck,
   LivecallConfig,
   ServiceTeam,
-  ServiceItemType
+  ServiceItemType,
+  ServiceImportResult
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { NdiRuntimeStatus } from '../shared/ndiRuntime'
@@ -414,9 +415,9 @@ const wf = {
     ipcRenderer.invoke('wf:multiview:open'),
 
   // Service export/import
-  serviceExport: (serviceId: number): Promise<{ canceled: boolean }> =>
+  serviceExport: (serviceId: number): Promise<{ canceled: boolean; filePath?: string; error?: string }> =>
     ipcRenderer.invoke('wf:services:export', serviceId),
-  serviceImportFile: (): Promise<{ canceled: boolean; serviceId: number | null }> =>
+  serviceImportFile: (): Promise<ServiceImportResult> =>
     ipcRenderer.invoke('wf:services:import'),
   serviceImportPlan: (): Promise<{
     canceled: boolean
