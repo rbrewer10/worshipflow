@@ -2,9 +2,14 @@
 // can be unit-tested without Electron (QA A-C2, A-H3, A-H7).
 
 export interface OperatorCloseInput {
-  /** before-quit has fired (app.quit(), OS shutdown, test harness close). */
+  /**
+   * We're already quitting: before-quit fired (app.quit(), the test harness
+   * close), or the OS is ending the session. Note that on Windows before-quit
+   * is NOT emitted for shutdown/logoff — index.ts's session-end handler sets
+   * the flag there (QA A-L3; retest note N8).
+   */
   isQuitting: boolean
-  /** Any live track has real content loaded (projector/zones are showing something). */
+  /** A track is actually showing service content (trackShowing) — not merely "something was live once". */
   anyLiveContent: boolean
   obsStreaming: boolean
   obsRecording: boolean
@@ -26,6 +31,30 @@ export function operatorCloseDecision(i: OperatorCloseInput): 'allow' | 'confirm
   return 'quit'
 }
 
+/** Modes where the projectors show service content (black / logo are holds). */
+const SHOWING_MODES = new Set(['lyrics', 'countdown', 'announcement', 'livecall'])
+
+/**
+ * Is this track showing something the room would lose if WorshipFlow closed?
+ * QA A-N6: the close prompt used `hasLiveContent`, which never clears, so after
+ * Black or Logo it still said "the projectors are live". Decks and
+ * verses-sermons deliberately sit at mode 'logo' while their slides show, so
+ * they count unless the operator went to Black.
+ */
+export function trackShowing(t: { hasLiveContent: boolean; mode: string; hasSlides?: boolean }): boolean {
+  if (!t.hasLiveContent) return false
+  return SHOWING_MODES.has(t.mode) || (!!t.hasSlides && t.mode === 'logo')
+}
+
+/** Wording for the operator close confirm — says what is actually going on. */
+export function closePromptText(i: { showing: boolean; obsStreaming: boolean; obsRecording: boolean }): { message: string; detail: string } {
+  const detail = 'Closing WorshipFlow turns off every projector, stage screen and zone display.'
+  if (i.showing) return { message: 'The projectors are showing the service. Close WorshipFlow?', detail }
+  if (i.obsStreaming) return { message: 'OBS is streaming. Close WorshipFlow?', detail: `${detail} The stream keeps running in OBS, but WorshipFlow's overlay stops.` }
+  if (i.obsRecording) return { message: 'OBS is recording. Close WorshipFlow?', detail: `${detail} The recording keeps running in OBS, but its service markers stop.` }
+  return { message: 'Close WorshipFlow?', detail }
+}
+
 /**
  * Audience output windows are frameless/fullscreen, so the only way they close
  * is Alt+F4 (or a stray OS gesture) after focus lands on the projector. Block
@@ -43,17 +72,40 @@ export function outputCloseAllowed(i: { isQuitting: boolean; windowedFallback: b
  * dies on every load (e.g. a video background that OOMs the GPU process) can't
  * spin forever.
  */
+/**
+ * QA A-N3: once the cap was hit the window used to stay dead for good (a black
+ * or sad-face projector until someone restarted the app). Now a capped window
+ * is retried later with back-off; a crash after that window has passed goes
+ * back to normal immediate reloads.
+ */
+export const CRASH_RETRY_BACKOFF_MS = [30_000, 120_000, 300_000]
+
 export class RendererRecovery {
   private hits = new Map<string, number[]>()
-  constructor(private max = 3, private windowMs = 60_000) {}
+  private giveUps = new Map<string, number>()
+  constructor(private max = 3, private windowMs = 60_000, private backoff: readonly number[] = CRASH_RETRY_BACKOFF_MS) {}
 
-  /** Record a crash; true = reload it, false = give up (cap reached). */
+  /** Record a crash; true = reload it now, false = cap reached (use retryAfterMs). */
   allowReload(key: string, now: number): boolean {
     const recent = (this.hits.get(key) ?? []).filter((t) => now - t < this.windowMs)
     if (recent.length >= this.max) { this.hits.set(key, recent); return false }
     recent.push(now)
     this.hits.set(key, recent)
+    this.giveUps.delete(key)
     return true
+  }
+
+  /** After allowReload() said no: wait this long, then try one more reload. Grows each time. */
+  retryAfterMs(key: string): number {
+    const n = this.giveUps.get(key) ?? 0
+    this.giveUps.set(key, n + 1)
+    return this.backoff[Math.min(n, this.backoff.length - 1)]
+  }
+
+  /** A deliberate revive (second launch of the app) starts the count fresh. */
+  reset(key: string): void {
+    this.hits.delete(key)
+    this.giveUps.delete(key)
   }
 }
 

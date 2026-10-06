@@ -16,7 +16,7 @@ import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor, generatedDeckYieldsTo } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
-import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText, wasOnRemovedDisplay } from '../shared/windowPolicy'
+import { operatorCloseDecision, outputCloseAllowed, RendererRecovery, crashReasonText, wasOnRemovedDisplay, trackShowing, closePromptText } from '../shared/windowPolicy'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseReferenceList, formatReferenceList, subReference } from '../shared/scriptureRefs'
@@ -292,6 +292,10 @@ if (!gotSingleInstanceLock) {
       createOperator()
       return
     }
+    // QA A-N3: a crashed renderer leaves the window neither null nor destroyed,
+    // so this used to just focus a dead operator. Launching the app again is
+    // what a volunteer does — revive every crashed window, ignoring the cap.
+    reviveCrashedWindows()
     if (operatorWin.isMinimized()) operatorWin.restore()
     operatorWin.show()
     operatorWin.focus()
@@ -1313,10 +1317,24 @@ function adjacentLiveItem(track: TrackId, dir: 1 | -1): ServiceItem | undefined 
 }
 
 // Send a transient banner to the operator window (non-technical-friendly toast).
+// QA A-N3: notices raised while the operator renderer is crashed or reloading
+// (e.g. "the operator screen keeps crashing") used to go to the dead renderer.
+// They're held and delivered on the operator's next did-finish-load.
+const pendingOperatorNotices: { message: string; level: 'info' | 'warn' | 'error' }[] = []
+
 function notifyOperator(message: string, level: 'info' | 'warn' | 'error' = 'info'): void {
-  if (operatorWin && !operatorWin.isDestroyed()) {
-    operatorWin.webContents.send('wf:notify', { message, level })
+  if (!operatorWin || operatorWin.isDestroyed()) return
+  if (operatorWin.webContents.isCrashed() || operatorWin.webContents.isLoading()) {
+    pendingOperatorNotices.push({ message, level })
+    if (pendingOperatorNotices.length > 10) pendingOperatorNotices.shift()
+    return
   }
+  operatorWin.webContents.send('wf:notify', { message, level })
+}
+
+function flushOperatorNotices(): void {
+  if (!operatorWin || operatorWin.isDestroyed()) return
+  for (const n of pendingOperatorNotices.splice(0)) operatorWin.webContents.send('wf:notify', n)
 }
 
 // --- Extracted intent processing (used by both IPC and WebSocket) ---
@@ -2506,9 +2524,10 @@ function createOperator(): void {
   })
   operatorWin.on('close', (e) => {
     const win = operatorWin
+    const showing = anyTrackShowing()
     const decision = operatorCloseDecision({
       isQuitting,
-      anyLiveContent: anyTrackLive(),
+      anyLiveContent: showing,
       obsStreaming: getObsStatus().streaming,
       obsRecording: getObsStatus().recording
     })
@@ -2518,11 +2537,12 @@ function createOperator(): void {
     if (decision === 'quit') { app.quit(); return }
     if (operatorCloseConfirmOpen || !win || win.isDestroyed()) return
     operatorCloseConfirmOpen = true
+    const text = closePromptText({ showing, obsStreaming: getObsStatus().streaming, obsRecording: getObsStatus().recording })
     void dialog.showMessageBox(win, {
       type: 'warning',
       title: 'Close WorshipFlow?',
-      message: 'The projectors are live. Close WorshipFlow?',
-      detail: 'Closing WorshipFlow turns off every projector, stage screen and zone display.',
+      message: text.message,
+      detail: text.detail,
       buttons: ['Keep WorshipFlow open', 'Close WorshipFlow'],
       defaultId: 0,
       cancelId: 0,
@@ -2536,6 +2556,8 @@ function createOperator(): void {
   watchRenderer(operatorWin, 'operator', 'The operator screen')
   watchSessionEnd(operatorWin)
   operatorWin.webContents.on('did-finish-load', () => {
+    // Give React a moment to subscribe to wf:notify before replaying held notices.
+    if (pendingOperatorNotices.length) setTimeout(flushOperatorNotices, 1500)
     // A renderer reload discards the JS realm without running React's
     // unmount cleanup, so useRoomFeed's roomFeedNotifyCapturing(false) call
     // never fires. The reload itself already tore down any real capture
@@ -2556,8 +2578,27 @@ interface OutputOpts {
 
 let operatorCloseConfirmOpen = false
 
-function anyTrackLive(): boolean {
-  return (['main', 'second'] as TrackId[]).some((id) => tracks[id].hasLiveContent)
+function anyTrackShowing(): boolean {
+  return (['main', 'second'] as TrackId[]).some((id) => {
+    const t = tracks[id]
+    return trackShowing({ hasLiveContent: t.hasLiveContent, mode: t.mode, hasSlides: !!(t.deckSlides || t.sermonSlides) })
+  })
+}
+
+// Every window watchRenderer() looks after, by key, so a second launch can
+// revive any that crashed past the cap (QA A-N3).
+const watchedWindows = new Map<string, BrowserWindow>()
+const crashRetryTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function reviveCrashedWindows(): void {
+  for (const [key, w] of watchedWindows) {
+    if (w.isDestroyed() || !w.webContents.isCrashed()) continue
+    logWarn(`[window] reviving crashed ${key} renderer (app launched again)`)
+    rendererRecovery.reset(key)
+    const t = crashRetryTimers.get(key)
+    if (t) { clearTimeout(t); crashRetryTimers.delete(key) }
+    w.webContents.reload()
+  }
 }
 
 // QA A-H3: a renderer that dies (GPU/OOM crash, e.g. a heavy video background)
@@ -2565,6 +2606,12 @@ function anyTrackLive(): boolean {
 // was restarted. Reload it automatically — outputs/stage re-sync their state in
 // did-finish-load — with a crash-loop cap, and tell the operator.
 function watchRenderer(win: BrowserWindow, key: string, label: string): void {
+  watchedWindows.set(key, win)
+  win.on('closed', () => {
+    if (watchedWindows.get(key) === win) watchedWindows.delete(key)
+    const t = crashRetryTimers.get(key)
+    if (t) { clearTimeout(t); crashRetryTimers.delete(key) }
+  })
   win.webContents.on('render-process-gone', (_e, details) => {
     if (details.reason === 'clean-exit' || isQuitting || win.isDestroyed()) return
     const what = crashReasonText(details.reason)
@@ -2572,8 +2619,17 @@ function watchRenderer(win: BrowserWindow, key: string, label: string): void {
     if (rendererRecovery.allowReload(key, Date.now())) {
       setTimeout(() => { if (!win.isDestroyed() && !isQuitting) win.webContents.reload() }, 300)
       notifyOperator(`${label} ${what} and was reloaded automatically.`, 'warn')
-    } else {
-      notifyOperator(`${label} keeps crashing (${what}). Try a simpler background, or restart WorshipFlow after the service.`, 'error')
+    } else if (!crashRetryTimers.has(key)) {
+      // QA A-N3: don't give up for good — try again later, backing off.
+      const delay = rendererRecovery.retryAfterMs(key)
+      crashRetryTimers.set(key, setTimeout(() => {
+        crashRetryTimers.delete(key)
+        if (!win.isDestroyed() && !isQuitting && win.webContents.isCrashed()) {
+          logWarn(`[window] retrying crashed ${key} renderer`)
+          win.webContents.reload()
+        }
+      }, delay))
+      notifyOperator(`${label} keeps crashing (${what}). Trying again in ${Math.round(delay / 1000)} s — or try a simpler background.`, 'error')
     }
     broadcast()
   })
