@@ -23,11 +23,20 @@ function importKey(song: { ccli?: string; title: string }): string {
   return ccli ? `ccli:${ccli}` : `title:${song.title.trim().toLowerCase()}`
 }
 
-function wasJustImported(key: string): boolean {
+const RECENT_WINDOW_MS = 12_000
+
+export function wasJustImported(key: string): boolean {
   const now = Date.now()
+  // QA A-L7: forget old entries so the map can't grow for the whole session.
+  for (const [k, t] of recentKeys) if (now - t >= RECENT_WINDOW_MS) recentKeys.delete(k)
   const prev = recentKeys.get(key)
   recentKeys.set(key, now)
-  return prev != null && now - prev < 12_000
+  return prev != null && now - prev < RECENT_WINDOW_MS
+}
+
+/** Test hook: how many recent-import keys are being remembered. */
+export function recentImportKeyCount(): number {
+  return recentKeys.size
 }
 
 function parseSongFile(raw: string): NonNullable<ReturnType<typeof importLyrics>> {
