@@ -10,12 +10,13 @@ import { DEFAULT_SERVICE_TEMPLATES } from './defaultServiceTemplates'
 import { notifyLocal, notifyLocalAction } from './NotifyToasts'
 import SetlistImport from './SetlistImport'
 import { exportServiceToFile, importServiceFromFile } from './serviceFileActions'
+import { localDateString } from '../../shared/localDate'
 
 function nextSundayISO(): string {
   const date = new Date()
   const daysUntilSunday = (7 - date.getDay()) % 7 || 7
   date.setDate(date.getDate() + daysUntilSunday)
-  return date.toISOString().slice(0, 10)
+  return localDateString(date)
 }
 
 function serviceDateLabel(value: string | null): string {

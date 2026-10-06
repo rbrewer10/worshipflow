@@ -25,6 +25,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import type { Intent, LiveState, ServiceFull, ServiceItem, ServiceSummary } from '../../shared/types'
+import { localDateString } from '../../shared/localDate'
 
 const ICON: Record<ServiceItem['type'], JSX.Element> = {
   song: <Music size={14} />,
@@ -157,7 +158,7 @@ function VolunteerView({ onExit }: { onExit?: () => void }): JSX.Element {
 
   const chooseDefaultService = (list: ServiceSummary[], activeId: number | null): number | null => {
     if (activeId != null && list.some((item) => item.id === activeId)) return activeId
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateString()
     const upcoming = list.filter((item) => item.service_date && item.service_date >= today).sort((a, b) => (a.service_date ?? '').localeCompare(b.service_date ?? ''))
     return upcoming[0]?.id ?? list[0]?.id ?? null
   }

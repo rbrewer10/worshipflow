@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BarChart3, Download } from 'lucide-react'
 import type { SongUsage } from '../../shared/types'
 import Modal from './Modal'
+import { localDateString } from '../../shared/localDate'
 
 function fmtDate(ts: number): string {
   const d = new Date(ts)
@@ -47,7 +48,7 @@ function CcliPanel(): JSX.Element {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `ccli-usage-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `ccli-usage-${localDateString()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

@@ -9,7 +9,7 @@ export interface SetlistEntry {
 const SCRIPTURE = /^(?:(?:[1-3]|I{1,3})\s+)?[A-Za-z][A-Za-z]+\s+\d+(?::\d+(?:\s*[–-]\s*\d+)?)?(?:\s*[;,&].*)?$/
 
 function isScripture(line: string): boolean {
-  const t = line.replace(/^(scripture reading|scripture|reading|bible)\s*[:.-]\s*/i, '').trim()
+  const t = line.replace(/^(scripture reading|scripture|reading|bible)\s*[:.\-–—]\s*/i, '').trim()
   return SCRIPTURE.test(t)
 }
 
@@ -25,13 +25,19 @@ function isSermon(line: string): boolean {
 
 // Common non-song service elements. These become section headers (labels in
 // the run sheet) instead of "Song: Communion" placeholders that block the
-// readiness check (QA B16).
+// readiness check (QA B16). Matched against a line already normalised by
+// cleanLine (straight quotes, "&amp;" decoded, no trailing ":").
 const ELEMENT_WORDS = [
   'welcome', 'announcements?', 'greeting', 'meet (?:and|&) greet', 'communion', "the lord'?s supper", "lord'?s supper",
-  'offerings?', 'offertory', 'tithes?(?: (?:and|&) offerings?)?', 'giving', 'call to worship', 'scripture reading',
-  '(?:opening |closing |pastoral |congregational |offertory )?prayer(?: (?:of|for) [a-z ]+)?', 'prayer time',
-  'benediction', 'dismissal', 'baptism', 'teaching moment', "children'?s (?:moment|time|sermon)", 'kids (?:moment|dismissal)',
-  'altar call', 'invitation', 'response', 'reflection', 'video', 'meditation', 'moment of silence', 'passing of the peace', 'the peace',
+  'offerings?', 'offertory', 'tithes?(?: (?:and|&) offerings?)?', 'giving', 'call to worship', 'scripture readings?',
+  '(?:opening |closing |pastoral |congregational |offertory |silent )?prayer(?: (?:of|for) [a-z ]+)?', 'prayer time',
+  'benediction', 'dismissal', 'baptism', 'teaching moment', "children'?s (?:moment|time|sermon|message|church)", 'kids (?:moment|dismissal)',
+  'altar call', 'invitation', 'response', 'reflection', 'video', 'meditation', 'moment of silence', 'passing (?:of )?the peace', 'the peace',
+  // QA B2-N6: the rest of a typical printed bulletin.
+  'prelude', 'postlude', "(?:the )?lord'?s prayer", 'prayer requests?', 'prayers of the people', 'joys? (?:and|&) concerns',
+  'special music', '(?:choir |choral )?anthem', 'affirmation of faith', "(?:the )?apostles'? creed", '(?:the )?nicene creed',
+  'responsive reading', '(?:old|new) testament reading', 'gospel reading', 'epistle reading', 'readings?', 'invocation',
+  'confession(?: of sin)?', 'assurance of pardon', 'words of institution', 'sending', 'charge(?: (?:and|&) benediction)?',
 ]
 const ELEMENT = new RegExp(`^(?:${ELEMENT_WORDS.join('|')})$`, 'i')
 
@@ -44,30 +50,117 @@ function isServiceElement(line: string): boolean {
   return parts.length > 0 && parts.every((p) => ELEMENT.test(p))
 }
 
+// "(Responsive)", "(Unison)", "(please stand)" after an element name — a
+// stage direction, not a song's artist: "Offering (Paul Baloche)" stays a song.
+const QUALIFIER = /^(?:responsive(?:ly)?|read responsively|unison|in unison|congregational|congregation|all|standing|all standing|please stand|optional|spoken|sung|together|seated|kneeling|choir|led by .+|pastor .+|rev\.? .+)$/i
+
+// Element words that are also well-known song titles ("Offering", "Response"…).
+const SONG_TITLE_TOO = /^(?:the )?(?:offerings?|response|invitation|reflection|meditation|giving|communion|benediction|the peace|baptism|video|welcome|prelude|anthem)$/i
+// Who leads it: "- Pastor Jim", "— Worship Team", "— Choir".
+const ROLE = /^(?:(?:the )?(?:pastor|rev(?:erend)?\.?|elder|deacon|deaconess|bishop|father|fr\.|minister|choir|praise team|worship team|youth|children|kids|congregation|liturgist|lay leader|leader|ushers?|all)\b.*|dr\.? .+|mr\.? .+|mrs\.? .+|ms\.? .+)$/i
+
+// "Scripture Reading – John 3:16", "Old Testament Reading: Isaiah 40",
+// "Scripture Reading (Romans 8)". (B2-N6: – and — were not accepted.)
+const READING_PREFIX = /^(scripture readings?|scripture|readings?|bible|(?:old|new) testament reading|gospel reading|epistle reading)\s*(?:[:.\-–—]\s*(.*)|\(\s*(.+?)\s*\))$/i
+
+// "Opening Hymn: Holy, Holy, Holy" / "Hymn of Invitation – Just As I Am" →
+// the song is the part after the label, so it can match the library.
+const HYMN_LABEL = /^(?:(?:opening|closing|gathering|sending|offertory|communion|response|responsive|final)\s+)?(?:hymn|song)(?:\s+of\s+(?:invitation|response|praise|preparation|sending|the day))?\s*(?:[:\-–—]\s*|\s+[-–—]\s+)(.+)$/i
+// "Hymn 301" / "Hymn #301" / "UMH 301" is a hymnal number, not a Bible book.
+const HYMN_NUMBER = /^(?:hymn|song|umh|no\.?)\s*#?\s*\d+[a-z]?$/i
+
+const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?'
+const DATE_LINE = new RegExp(
+  `^(?:(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*\\.?,?\\s+)?(?:${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}-\\d{2}-\\d{2})$`,
+  'i'
+)
+
+/** Bulletin noise that isn't an item: headings, the church/date lines. */
+function isHeadingLine(line: string): boolean {
+  return /setlist|^(order|service|songs?|worship)$|order of (worship|service)/i.test(line) || DATE_LINE.test(line)
+}
+
+/**
+ * QA B2-N6: normalise a pasted bulletin line before classifying it —
+ * "&amp;" and curly quotes from web/Word pastes, non-breaking spaces,
+ * bullets / "1." / "a." numbering, and leading service times ("10:30 Welcome").
+ */
+export function cleanLine(raw: string): string {
+  let line = raw
+    .replace(/&amp;/gi, '&').replace(/&nbsp;/gi, ' ').replace(/&#0*39;|&apos;|&rsquo;|&lsquo;/gi, "'").replace(/&quot;|&ldquo;|&rdquo;/gi, '"')
+    .replace(/[\u00A0\u2007\u202F]/g, ' ')
+    .replace(/[\u2018\u2019\u02BC\u2032]/g, "'").replace(/[\u201C\u201D]/g, '"')
+    .trim()
+  for (let i = 0; i < 2; i++) {
+    if (/^[-*=#•·▪►]/.test(line)) line = line.replace(/^[-*=#•·▪►]+\s*/, '')
+    line = line
+      .replace(/^(?:\d+|[a-z]|[ivx]+)[.)]\s+/i, '')
+      .replace(/^\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?\s+(?=\D)/i, '')
+      .trim()
+  }
+  return line
+}
+
+/** "Call to Worship ......... Pastor Jim" / "Call to Worship<TAB>Pastor Jim" → [head, trailer]. */
+function splitLeader(line: string): [string, string] {
+  const m = /^(.*?)(?:\t+|\s*(?:\.\s*){3,}|\s*…+\s*|\s{3,})(.*)$/.exec(line)
+  if (!m || !m[1].trim()) return [line, '']
+  return [m[1].trim(), m[2].trim()]
+}
+
+const stripColon = (s: string): string => s.replace(/\s*:\s*$/, '').trim()
+
+function classify(line: string): SetlistEntry {
+  if (HYMN_NUMBER.test(line)) return { kind: 'song', title: line }
+  const hymn = HYMN_LABEL.exec(line)
+  if (hymn && hymn[1].trim()) return { kind: 'song', title: hymn[1].trim() }
+  if (isSermon(line)) return { kind: 'sermon', title: line.replace(SERMON_PREFIX, '').trim() || line }
+  const reading = READING_PREFIX.exec(line)
+  if (reading) {
+    const ref = (reading[2] ?? reading[3] ?? '').trim()
+    // "Scripture Reading:" with nothing after it is a header, not an empty scripture card.
+    return ref ? { kind: 'scripture', title: ref } : { kind: 'element', title: reading[1] }
+  }
+  if (isServiceElement(line)) return { kind: 'element', title: line }
+  // "Call to Worship (Responsive)"
+  const paren = /^(.*?)\s*\(([^)]*)\)$/.exec(line)
+  if (paren && paren[1] && isServiceElement(paren[1]) && (QUALIFIER.test(paren[2].trim()) || isServiceElement(paren[2]))) {
+    return { kind: 'element', title: line }
+  }
+  // "Call to Worship - Pastor Jim", "Call to Worship: Psalm 95:1-7"
+  // ("Offering - Paul Baloche" is a song by an artist: an element word that
+  // is also a common song title needs a role/scripture/stage-direction trailer.)
+  const trailer = /^(.+?)(?:\s+[-–—]\s+|\s*[–—]\s*|:\s+)(.+)$/.exec(line)
+  if (trailer && isServiceElement(trailer[1])) {
+    const tail = trailer[2].trim()
+    if (!SONG_TITLE_TOO.test(trailer[1].trim()) || ROLE.test(tail) || QUALIFIER.test(tail) || isScripture(tail)) {
+      return { kind: 'element', title: line }
+    }
+  }
+  if (isScripture(line)) return { kind: 'scripture', title: line.replace(/^(scripture reading|scripture|reading|bible)\s*[:.\-–—]\s*/i, '').trim() }
+  return { kind: 'song', title: line }
+}
+
 export function parseSetlist(raw: string): SetlistEntry[] {
   const out: SetlistEntry[] = []
   for (const rawLine of raw.split(/\r?\n/)) {
-    let line = rawLine.trim()
-    if (!line) continue
-    if (/^[-*=#]/.test(line)) line = line.replace(/^[-*=#]+\s*/, '')
-    line = line.replace(/^\d+[.)]\s+/, '').replace(/^[-•]\s+/, '').trim()
-    if (!line || /setlist|^(order|service|songs?|worship)$|^order of (worship|service)$/i.test(line)) continue
-
-    if (isSermon(line)) {
-      const title = line.replace(SERMON_PREFIX, '').trim() || line
-      out.push({ kind: 'sermon', title })
-      continue
+    const line = cleanLine(rawLine)
+    if (!line || isHeadingLine(line)) continue
+    const [rawHead, tail] = splitLeader(line)
+    const head = stripColon(rawHead)
+    if (!head) continue
+    const entry = classify(head)
+    if (tail) {
+      // A reading label with the reference after the leader.
+      if (entry.kind === 'element' && READING_PREFIX.test(`${head}:`) && isScripture(tail)) {
+        out.push({ kind: 'scripture', title: tail })
+        continue
+      }
+      // Keep who/what for a header ("Call to Worship — Pastor Jim"); for a
+      // song the trailer is a credit/leader and would spoil the library match.
+      if (entry.kind === 'element') entry.title = `${entry.title} — ${tail}`
     }
-    if (isServiceElement(line)) {
-      out.push({ kind: 'element', title: line })
-      continue
-    }
-    if (isScripture(line) || /^(scripture reading|scripture|reading|bible)\s*[:.-]/i.test(line)) {
-      const title = line.replace(/^(scripture reading|scripture|reading|bible)\s*[:.-]\s*/i, '').trim()
-      out.push({ kind: 'scripture', title })
-      continue
-    }
-    out.push({ kind: 'song', title: line })
+    out.push(entry)
   }
   return out
 }
@@ -77,5 +170,8 @@ export function matchSongTitle(title: string, library: { id: number; title: stri
   const exact = library.find((s) => s.title.trim().toLowerCase() === want)
   if (exact) return exact.id
   const stripped = library.find((s) => s.title.trim().toLowerCase().replace(/[^\w\s]/g, '') === want.replace(/[^\w\s]/g, ''))
-  return stripped ? stripped.id : null
+  if (stripped) return stripped.id
+  // "Offering - Paul Baloche": try the title without an artist/credit trailer.
+  const head = title.split(/\s+[-–—]\s+/)[0]
+  return head !== title && head.trim() ? matchSongTitle(head, library) : null
 }
