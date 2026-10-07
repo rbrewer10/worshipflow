@@ -12,8 +12,9 @@ import { join } from 'path'
 // deck; the outer broadcast then carried on and delivered its older pre-deck
 // payload last, so the projector, the Stage window and the tablet showed
 // '35 And the same day…' while state.line was '4:35 …'.
-const main = readFileSync(join(__dirname, 'index.ts'), 'utf8')
-const preload = readFileSync(join(__dirname, '..', 'preload', 'index.ts'), 'utf8')
+// CRLF on a Windows checkout (CI): compare with \n line ends.
+const main = readFileSync(join(__dirname, 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
+const preload = readFileSync(join(__dirname, '..', 'preload', 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
 
 function fn(sig: string): string {
   const i = main.indexOf(sig)
