@@ -26,14 +26,14 @@ describe('QA B7-N1: a deck goes on screen once, with its verses already looked u
     expect(code.match(/broadcast\(\)/g)).toHaveLength(1)
   })
   it('looks the verses up before the deck or its lines are applied', () => {
-    const lookup = code.indexOf('await resolveDeckScripture(slides)')
+    const lookup = code.search(/await resolveDeckScripture\(slides[,)]/)
     expect(lookup).toBeGreaterThan(-1)
     expect(lookup).toBeLessThan(code.indexOf('t.deckSlides = slides'))
     expect(lookup).toBeLessThan(code.indexOf('t.song = '))
     expect(lookup).toBeLessThan(code.indexOf('broadcast()'))
   })
   it('re-checks the load generation after the lookup await, before touching the track', () => {
-    const after = code.slice(code.indexOf('await resolveDeckScripture(slides)'))
+    const after = code.slice(code.search(/await resolveDeckScripture\(slides[,)]/))
     expect(after.indexOf('if (tracks[track].loadGeneration !== generation) return true')).toBeLessThan(after.indexOf('t.deckSlides = slides'))
   })
   it('no slide line is a bare reference summary when its verse resolved', () => {
