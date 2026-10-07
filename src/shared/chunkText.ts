@@ -10,6 +10,10 @@ import type { ScriptureVerse } from './types'
 export interface VerseRange {
   from: number
   to: number
+  // Chapters of the first/last verse, when the verses carry them (a reading
+  // that spans chapters — QA B4-N1).
+  fromC?: number
+  toC?: number
 }
 
 /** Group whole verses into ranges that fit `budget` characters. */
@@ -20,7 +24,11 @@ export function chunkVerses(verses: ScriptureVerse[], budget: number): VerseRang
   let length = 0
 
   const flush = (): void => {
-    if (start && end) out.push({ from: start.n, to: end.n })
+    if (start && end) {
+      const s0: ScriptureVerse = start
+      const e0: ScriptureVerse = end
+      out.push(s0.c != null && e0.c != null ? { from: s0.n, to: e0.n, fromC: s0.c, toC: e0.c } : { from: s0.n, to: e0.n })
+    }
     start = null
     end = null
     length = 0
