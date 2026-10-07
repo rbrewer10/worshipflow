@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ListMusic } from 'lucide-react'
-import { parseSetlist, matchSongTitle, type SetlistKind } from '../../shared/setlistImport'
+import { parseSetlistDetailed, matchSongTitle, type SetlistKind, type SkipReason } from '../../shared/setlistImport'
 import { localDateString } from '../../shared/localDate'
 import { notifyLocal } from './NotifyToasts'
 import { useService } from './ServiceContext'
 
 const KIND_LABEL: Record<SetlistKind, string> = {
   song: 'Song', scripture: 'Scripture', sermon: 'Sermon', placeholder: 'Placeholder', element: 'Header'
+}
+const SKIP_LABEL: Record<SkipReason, string> = {
+  heading: 'heading', date: 'date / time', notice: 'notice', serving: 'who’s serving', rubric: 'bulletin key'
 }
 const KIND_CLASS: Record<SetlistKind, string> = {
   song: 'text-blue-400', scripture: 'text-emerald-400', sermon: 'text-violet-400', placeholder: 'text-amber-400', element: 'text-content-tertiary'
@@ -17,7 +20,17 @@ function SetlistImport({ onImported }: { onImported: (serviceId: number) => void
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const entries = text.trim() ? parseSetlist(text) : []
+  // The library, so a line that looks like a who's-serving or notice line but
+  // names a song you have ("Promise Keeper – <artist>") still comes in as that
+  // song (QA B8-N1).
+  const [library, setLibrary] = useState<{ id: number; title: string }[]>([])
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    void window.wf.songsList('').then((songs) => { if (live) setLibrary(songs) }).catch(() => {})
+    return () => { live = false }
+  }, [open])
+  const { entries, skipped } = text.trim() ? parseSetlistDetailed(text, { library }) : { entries: [], skipped: [] }
 
   const importNow = async (): Promise<void> => {
     if (entries.length === 0) return
@@ -107,6 +120,22 @@ function SetlistImport({ onImported }: { onImported: (serviceId: number) => void
             ))}
           </ol>
         </>
+      )}
+      {/* Lines left out are listed, never dropped silently (QA B8-N1). */}
+      {skipped.length > 0 && (
+        <details data-testid="setlist-skipped" className="mb-1.5 text-[11px] text-content-secondary">
+          <summary className="cursor-pointer select-none">
+            {skipped.length} line{skipped.length === 1 ? '' : 's'} skipped (not service items) — show
+          </summary>
+          <ul aria-label="Skipped lines" className="mt-0.5 max-h-24 space-y-0.5 overflow-y-auto rounded-md border border-border bg-panel px-2 py-1">
+            {skipped.map((s, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="w-24 shrink-0 text-content-tertiary">{SKIP_LABEL[s.reason]}</span>
+                <span className="min-w-0 truncate text-content-primary">{s.line}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       {/* Pinned to the bottom of the scrolling import panel so the commit
           button is never pushed off-screen by a long preview (QA B3-N1). */}
