@@ -183,16 +183,21 @@ const HYMNAL_NUMBER_COLUMN = /^(?:(?:no\.?|#|umh|hymn)\s*)?\d+[a-z]?$/i
 const HYMN_NUMBER = /^(?:hymn|song|umh|no\.?)\s*#?\s*\d+[a-z]?$/i
 
 const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?'
-// B7-N2: the day's name in the church year ahead of the date — "Third Sunday
-// of Advent —", "Reformation Sunday •", "All Saints Day,". Only with a date.
-const CHURCH_DAY = "(?:[a-z'’]+\\s+){0,4}(?:sunday|day|eve)(?:\\s+(?:after|of|in|before)\\s+(?:the\\s+)?[a-z'’]+(?:\\s+[a-z'’]+)?)?\\s*[•·|,:–—-]\\s*"
+// B7-N2: the day's name in the church year ahead of the date — "Second
+// Sunday of Lent —", "Reformation Sunday •", "All Saints Day,". Only with a
+// date. B8: or the service's own name ("Easter Sunrise Service —").
+const CHURCH_DAY = "(?:[a-z'’]+\\s+){0,4}(?:sunday|day|eve|service|worship|celebration|vigil)(?:\\s+(?:after|of|in|before)\\s+(?:the\\s+)?[a-z'’]+(?:\\s+[a-z'’]+)?)?\\s*[•·|,:–—-]\\s*"
 // One service time or several ("9:30 & 11:00 AM"); the last carries the am/pm.
 const SERVICE_TIMES = '(?:\\d{1,2}(?::\\d{2})?\\s*(?:[ap]\\.?m\\.?)?\\s*(?:&|and|,|/)\\s*)*\\d{1,2}(?::\\d{2})?\\s*[ap]\\.?m\\.?'
 const DATE_LINE = new RegExp(
   // B6-N2: "Sunday, Oct. 4 • 9:00 AM" — a service time after the date.
-  `^(?:${CHURCH_DAY})?(?:(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*\\.?(?:\\s+(?:morning|evening|night))?,?\\s+)?(?:${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}-\\d{2}-\\d{2})(?:\\s*[•·|,@–—-]?\\s*(?:at\\s+)?${SERVICE_TIMES})?$`,
+  `^(?:${CHURCH_DAY})?(?:(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*\\.?(?:\\s+(?:morning|evening|night))?,?\\s+)?(?:${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{1,2}\\.\\d{1,2}\\.\\d{4}|\\d{4}-\\d{2}-\\d{2})(?:\\s*[•·|,@–—-]?\\s*(?:at\\s+)?${SERVICE_TIMES})?$`,
   'i'
 )
+
+// B8: the week's schedule — "Church School 9:30 AM • Worship 10:45 AM",
+// "Worship at 8:30 and 10:30 a.m.".
+const SCHEDULE = new RegExp(`^(?:(?:sunday school|church school|bible study|(?:morning |evening |early |late )?(?:worship|service)|fellowship(?: time)?|coffee(?: hour)?|prayer(?: meeting)?|youth(?: group)?)\\s*(?:at\\s+)?${SERVICE_TIMES}\\s*(?:[•·|,;&]\\s*|and\\s+)?)+$`, 'i')
 
 /** Bulletin noise that isn't an item: headings, the church/date lines. */
 // "Worship Service – 10:30 AM", "Sunday Morning Worship", "Traditional Service 9:00" (B3-N6).
@@ -205,7 +210,7 @@ const CHURCH_NAME = new RegExp(`^(?:[A-Z][\\w.'&-]*\\s+)*?(?:${DENOMINATION}\\s+
 
 function isHeadingLine(line: string): boolean {
   if (CHURCH_NAME.test(line)) return true
-  if (/setlist|^(order|service|songs?|worship)$|order of (worship|service)/i.test(line) || DATE_LINE.test(line)) return true
+  if (/setlist|^(order|service|songs?|worship)$|order of (worship|service)/i.test(line) || DATE_LINE.test(line) || SCHEDULE.test(line)) return true
   // B7-N2: the heading over the bulletin's who's-serving block.
   if (/^(?:(?:those )?serving (?:today|this (?:morning|sunday|week))|those serving|serving|today'?s (?:servants|volunteers|worship leaders)|(?:our )?worship participants|in (?:our )?service today)\s*:?$/i.test(line)) return true
   // Needs a qualifier or a time, so a bare "Worship" song set label stays as before.
@@ -261,6 +266,10 @@ const SMALL_PRINT = [
   /^[\w-]+(?:\.[\w-]+)*\.(?:org|com|net|church|us|info|edu)(?:\/\S*)?$/i,
   // B7-N2: notices — the nursery is open, lunch follows the service.
   /^(?:(?:a |the |our )?(?:staffed )?(?:nursery|child ?care|children'?s church)(?: care)?)\b.*\b(?:available|provided|open)\b/i,
+  // B8: credits, the flowers dedication written as a sentence, phones.
+  /^(?:please )?(?:silence|turn off|switch off|mute)\s+(?:all\s+|your\s+)?(?:cell\s*|mobile\s*)?(?:phones?|devices?)\b/i,
+  /^(?:(?:this |today'?s )?(?:bulletin|order of worship|slides?|music|flowers?))\b.*\b(?:prepared|printed|compiled|designed|arranged) by\b/i,
+  /^(?:the )?(?:altar |chancel |sanctuary )?flowers\b.*\b(?:given|placed|presented|provided|donated|are in (?:honor|memory))\b/i,
   /^(?:[\w'&-]+\s+){0,5}(?:lunch(?:eon)?|dinner|brunch|breakfast|pot-?luck|covered[- ]dish(?: meal)?|refreshments|reception|fellowship|coffee(?: hour)?|meal|picnic|cookout|snacks)\s+(?:will\s+)?(?:to\s+)?follows?\b.*$/i,
 ]
 const isSmallPrint = (line: string): boolean => SMALL_PRINT.some((re) => re.test(line))
@@ -269,17 +278,48 @@ const isSmallPrint = (line: string): boolean => SMALL_PRINT.some((re) => re.test
 // an item (B6-N2; these became blocking song placeholders). "Reader: Ruth 1:16"
 // still reads as the scripture it names.
 //
-// B7-N2: also any role that ends in a serving noun ("Usher", "Head Usher",
+// B7-N2: also the serving roles a bulletin lists ("Usher", "Head Usher",
 // "Sound Tech", "Scripture Reader", "Communion Stewards", "Counters"), a
 // "… of the Month" duty, the altar flowers dedication, and a one-line
-// "Serving Today: Ushers – …; Greeters – …". The label must be one of these:
-// "Scripture: …" and "Sermon: …" are not roles, and a reading after any of
-// them ("Reader: Ruth 1:16") still reads as the scripture.
-const SERVING_NOUN = '(?:usher|greeter|reader|tech|technician|operator|steward|counter|teller|attendant|volunteer|host|hostess|server|director|coordinator|assistant|leader|keeper|bearer)s?'
-const PERSONNEL = new RegExp(`^(?:(?:the )?(?:liturgist|preacher|organist|pianist|accompanist|keyboardist|worship leader|song leader|lay (?:reader|leader|liturgist)|lector|acolytes?|crucifers?|cantor|music director|director of music|choir director|sound|media|projection|nursery(?: attendants?)?|ushers|greeters|ministers|(?:[a-z]+\\s+){0,2}${SERVING_NOUN}|(?:[a-z]+\\s+)?(?:deacon|elder|famil(?:y|ie)|volunteer|steward|usher|greeter|acolyte|servant|helper|host|reader)s?\\s+of the (?:month|week|day)|(?:altar|chancel|sanctuary) (?:flowers|guild)|flowers|(?:those )?serving (?:today|this (?:morning|sunday|week))))\\s*(?::|\\s[-–—])\\s*(.+)$`, 'i')
+// "Serving Today: Ushers – …; Greeters – …". "Scripture: …" and "Sermon: …"
+// are not roles, and a reading after any of them ("Reader: Ruth 1:16") still
+// reads as the scripture.
+//
+// B8-N1: the WHOLE label must be a known role. B7-N2 accepted any one to three
+// words ending in a serving noun, and that swallowed song–artist lines whose
+// title ends in one (Promise Keeper, Lord of Hosts, Burden Bearer, each
+// followed by " – " and the artist): they vanished from the paste.
+const KNOWN_ROLES = [
+  'liturgist', 'preacher', 'organist', 'pianist', 'accompanist', 'keyboardist', 'worship leader', 'song leader',
+  'lay (?:reader|leader|liturgist)', 'lector', 'acolytes?', 'crucifers?', 'cantor', 'music director', 'director of music',
+  'choir director', 'sound', 'media', 'projection', 'nursery(?: attendants?)?', 'ministers',
+  '(?:head |chief |lead )?ushers?', 'greeters?',
+  '(?:scripture |gospel |epistle |lay |bible |lesson |guest |first |second )?readers?',
+  '(?:sound|audio|video|media|av|a/v|livestream|live ?stream|camera|slides?|projection|computer|lighting|lights|sound ?board|power ?point|screen|tech) (?:techs?|technicians?|operators?|team|crew|volunteers?)',
+  '(?:communion|eucharistic|chalice) (?:stewards?|servers?|assistants?|ministers?)',
+  '(?:offering |money )?(?:counters|tellers)',
+  "(?:nursery|children'?s church|kids'? church|toddler) (?:attendants?|workers?|volunteers?|teachers?|staff)",
+  '(?:welcome|hospitality|coffee|greeting|fellowship) (?:hosts?|hostess(?:es)?|team|volunteers?)',
+  '(?:deacon|elder|pastor|minister)s? on (?:duty|call)',
+  '(?:[a-z]+ )?(?:deacon|elder|famil(?:y|ie)|volunteer|steward|usher|greeter|acolyte|servant|helper|host|reader)s? of the (?:month|week|day)',
+  '(?:altar|chancel|sanctuary) (?:flowers|guild)', 'flowers', '(?:those )?serving (?:today|this (?:morning|sunday|week))',
+  // B8: more of the same — always the whole label.
+  '(?:ushers?|greeters?|acolytes?) this (?:morning|sunday|week)', 'prayer (?:team|partners?)',
+  '(?:hospitality|kitchen|setup|set-up|clean-?up|parking|safety|security|welcome) (?:team|crew|volunteers?)', 'security',
+  'live ?stream(?:ing)?', 'slides', 'power ?point', '(?:van|bus|shuttle) drivers?',
+]
+const PERSONNEL = new RegExp(`^(?:the )?(?:${KNOWN_ROLES.join('|')})\\s*(?::|\\s[-–—])\\s*(.+)$`, 'i')
+// "Pastor: Rev. Jane Doe" — a bare "Pastor" label only with a title after it.
+const PASTOR_LINE = /^(?:(?:the |senior |associate |lead |guest |visiting )?pastor)\s*(?::|\s[-–—])\s*(?:the )?(?:rev(?:erend)?\.?|dr\.?|pastor|elder|bishop|fr\.?)\s/i
 const isPersonnelLine = (line: string): boolean => {
+  if (PASTOR_LINE.test(line)) return true
   const m = PERSONNEL.exec(line)
   return !!m && !isScripture(m[1]) && !/\d+:\d+/.test(m[1])
+}
+// "Liturgist: Psalm 23": the reading the role names.
+function personnelReading(line: string): string | null {
+  const m = PERSONNEL.exec(line)
+  return m && isScripture(m[1].trim()) ? referenceText(m[1].trim()) : null
 }
 
 const stripColon = (s: string): string => s.replace(/\s*:\s*$/, '').trim()
@@ -328,15 +368,48 @@ function classify(line: string): SetlistEntry {
   return { kind: 'song', title: line }
 }
 
-export function parseSetlist(raw: string): SetlistEntry[] {
+export type SkipReason = 'heading' | 'date' | 'notice' | 'serving' | 'rubric'
+export interface SkippedLine { line: string; reason: SkipReason }
+export interface SetlistParse { entries: SetlistEntry[]; skipped: SkippedLine[] }
+type Library = { id: number; title: string }[]
+
+function skipReason(rawLine: string, line: string): SkipReason | null {
+  // "* Please stand as you are able", "† indicates standing": the bulletin's
+  // key to its own marks, not an item (B4-N3). A "*" in front of an item
+  // ("*Hymn: Amazing Grace") is still just a stand mark.
+  if (RUBRIC.test(rawLine.trim())) return 'rubric'
+  if (DATE_LINE.test(line)) return 'date'
+  if (isHeadingLine(line)) return 'heading'
+  if (isSmallPrint(line)) return 'notice'
+  if (isPersonnelLine(line)) return 'serving'
+  return null
+}
+
+// B8-N1: a line about to be skipped whose song part is in the library is a
+// song after all (Promise Keeper by its artist, with Promise Keeper in the
+// library). Returns the title to import it under, or null.
+function librarySong(line: string, library: Library): string | null {
+  if (matchSongTitle(line, library) != null) return line
+  const left = /^(.+?)(?:\s+[-–—]\s+|\s*[–—]\s*|\s*:\s+)/.exec(line)?.[1]?.trim()
+  return left && matchSongTitle(left, library) != null ? left : null
+}
+
+/** Each line as an item, plus the lines left out and why (QA B8-N1: the paste preview lists them). */
+export function parseSetlistDetailed(raw: string, opts: { library?: Library } = {}): SetlistParse {
   const out: SetlistEntry[] = []
+  const skipped: SkippedLine[] = []
   for (const rawLine of raw.split(/\r?\n/)) {
-    // "* Please stand as you are able", "† indicates standing": the bulletin's
-    // key to its own marks, not an item (B4-N3). A "*" in front of an item
-    // ("*Hymn: Amazing Grace") is still just a stand mark.
-    if (RUBRIC.test(rawLine.trim())) continue
     const line = cleanLine(rawLine)
-    if (!line || isHeadingLine(line) || isSmallPrint(line) || isPersonnelLine(line)) continue
+    if (!line) continue
+    const reason = skipReason(rawLine, line)
+    if (reason) {
+      const song = reason !== 'rubric' && opts.library?.length ? librarySong(line, opts.library) : null
+      if (song) out.push({ kind: 'song', title: bulletinSongTitle(song) })
+      else skipped.push({ line, reason })
+      continue
+    }
+    const reading = personnelReading(line)
+    if (reading) { out.push({ kind: 'scripture', title: reading }); continue }
     const [rawHead, tail] = splitLeader(line)
     const head = stripColon(rawHead)
     if (!head) continue
@@ -366,7 +439,11 @@ export function parseSetlist(raw: string): SetlistEntry[] {
     if (entry.kind === 'song') entry.title = bulletinSongTitle(entry.title)
     out.push(entry)
   }
-  return out
+  return { entries: out, skipped }
+}
+
+export function parseSetlist(raw: string, opts: { library?: Library } = {}): SetlistEntry[] {
+  return parseSetlistDetailed(raw, opts).entries
 }
 
 // B7-N2: the song's own name from a bulletin line — '"Holy, Holy, Holy" (UMH 64)'
@@ -374,13 +451,20 @@ export function parseSetlist(raw: string): SetlistEntry[] {
 // Drops the hymn label, a hymnal number ("#89", "No. 1", "(UMH 64)") and the
 // quotes. A bare number ("Hymn 301") is left as it is.
 const HYMNAL_REF = '(?:(?:no\\.?|#|umh|tfws|elw|lbw|bcp|glh|bh|w&p|hymn|page|p\\.?|pg\\.?)\\s*#?\\s*\\d+[a-z]?)'
+// …but trailing and unbracketed, "No. 5" can belong to the title ("Symphony
+// No. 5"): there only a hymnal's own abbreviation or "#" is a number, unless a
+// comma or dash sets it off ("Be Thou My Vision, No. 4") or it follows a quoted title.
+const HYMNAL_TAIL = '(?:(?:#|umh|tfws|elw|lbw|bcp|glh|bh|w&p)\\s*#?\\s*\\d+[a-z]?)'
+// "(Leader: Jim Price)", "(Worship Leader – Ann)", "(led by the Choir)": who leads it, not its name.
+const LEADER_NOTE = /\s*\((?:(?:worship |song |music )?leaders?|led by|soloists?|solo|vocals?|cantor|choir|feat\.?|featuring)\b[^()]*\)$/i
 export function bulletinSongTitle(title: string): string {
   let t = title.trim()
   if (HYMN_NUMBER.test(t)) return t
   const labelled = HYMN_LABEL.exec(t)
   if (labelled && labelled[1].trim()) t = labelled[1].trim()
   t = t.replace(new RegExp(`^${HYMNAL_REF}\\s*[:\\-–—]?\\s+(?=["a-z])`, 'i'), '')
-  t = t.replace(new RegExp(`\\s*(?:\\(\\s*${HYMNAL_REF}\\s*\\)|[,\\-–—]?\\s*${HYMNAL_REF})$`, 'i'), '')
+  t = t.replace(LEADER_NOTE, '')
+  t = t.replace(new RegExp(`\\s*(?:\\(\\s*${HYMNAL_REF}\\s*\\)|\\s*[,\\-–—]\\s*${HYMNAL_REF}|\\s+${HYMNAL_TAIL}|(?<=")\\s*${HYMNAL_REF})$`, 'i'), '')
   t = t.replace(/^"([^"]+)"$/, '$1').replace(/^"([^"]+)"(?=\s*[-–—(,]\s*)/, '$1').trim()
   // Nothing left but a label ("Hymn No. 301"): the number IS the song.
   return t && !HYMN_LABEL_ALONE.test(t) ? t : title.trim()
