@@ -337,7 +337,7 @@ const LYRICS_SCRIPT = `
   var titleEl=document.getElementById('title');
   var slideNum=document.getElementById('slidenum');
   var sermon=document.getElementById('sermon');
-  var prevBg=null,prevGradKey='',prevLine=null,kbIdx=0,sermonOn=false;
+  var prevBg=null,prevGradKey='',prevLine=null,prevTitle=null,kbIdx=0,sermonOn=false;
   var KB=['kb1 28s ease-in-out infinite alternate','kb2 32s ease-in-out infinite alternate','kb3 26s ease-in-out infinite alternate','kb4 30s ease-in-out infinite alternate'];
 
   function applyBg(bg){
@@ -402,7 +402,7 @@ const LYRICS_SCRIPT = `
       blob1.style.opacity='0';blob2.style.opacity='0';
       root.style.justifyContent='center';root.style.paddingTop='0';root.style.paddingBottom='0';
       lineEl.innerHTML='';titleEl.innerHTML='';slideNum.innerHTML='';
-      prevBg=null;prevGradKey='';prevLine=null;return;
+      prevBg=null;prevGradKey='';prevLine=null;prevTitle=null;return;
     }
     if(m==='logo'){
       // Mirrors the back screens' logo branch: honour the configured logo
@@ -463,7 +463,7 @@ const LYRICS_SCRIPT = `
     if(m==='sermon'){
       // Same designed backdrop as zones 1-2 (a pinned Lyrics TV can hold it).
       gradient.style.opacity='0';blob1.style.opacity='0';blob2.style.opacity='0';
-      lineEl.innerHTML='';titleEl.innerHTML='';slideNum.innerHTML='';prevLine=null;
+      lineEl.innerHTML='';titleEl.innerHTML='';slideNum.innerHTML='';prevLine=null;prevTitle=null;
       if(state.background){
         document.body.style.background='#000';
         applyBg(state.background);
@@ -509,13 +509,17 @@ const LYRICS_SCRIPT = `
     var align=state.textAlign||'center';
     var fs=Math.max(3,Math.min(state.fontScale||6,14));
     var lineChanged=state.line!==prevLine;prevLine=state.line;
+    // QA B7-N1: a new item's reference and slide counter fade up WITH its first
+    // line. They used to appear at once while the line was still fading in, so
+    // for the first ~100 ms this screen read just "Mark 4:35 1 / 7".
+    var titleIn=lineChanged&&state.title!==prevTitle?' class="fade-up"':'';prevTitle=state.title;
     var shadow='text-shadow:0 4px 32px rgba(0,0,0,0.9),0 1px 0 rgba(0,0,0,0.5);';
     lineEl.innerHTML='<div class="'+(lineChanged?'fade-up':'')+'" style="font-size:'+fs+'vw;font-weight:900;line-height:1.2;color:#fff;white-space:pre-line;text-align:'+align+';'+shadow+'">'+esc(state.line)+'</div>';
     // Shrink to fit: reserve vertical room for the bottom title and any top/bottom offset.
     var reservedFrac=(state.title?0.14:0.06)+(pos!=='center'?0.10:0);
     fitText(lineEl.firstChild,fs,2,window.innerWidth*0.84,window.innerHeight*(1-reservedFrac));
-    titleEl.innerHTML=state.title?'<span style="font-size:'+(fs*0.28)+'vw;color:#fff;opacity:0.5;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;display:block;text-align:'+align+'">'+esc(state.title)+'</span>':'';
-    slideNum.innerHTML=state.total>1?(state.index+1)+' / '+state.total:'';
+    titleEl.innerHTML=state.title?'<div'+titleIn+'><span style="font-size:'+(fs*0.28)+'vw;color:#fff;opacity:0.5;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;display:block;text-align:'+align+'">'+esc(state.title)+'</span></div>':'';
+    slideNum.innerHTML=state.total>1?'<div'+titleIn+'>'+(state.index+1)+' / '+state.total+'</div>':'';
   }
   render();
 `
@@ -552,7 +556,7 @@ const FLEX_SCRIPT = `
   var overlay=document.getElementById('overlay');
   var content=document.getElementById('content');
   var sermon=document.getElementById('sermon');
-  var prevBg=null,prevLine=null,kbIdx=0,sermonOn=false;
+  var prevBg=null,prevLine=null,prevTitle=null,kbIdx=0,sermonOn=false;
   var KB=['kb1 28s ease-in-out infinite alternate','kb2 32s ease-in-out infinite alternate','kb3 26s ease-in-out infinite alternate','kb4 30s ease-in-out infinite alternate'];
 
   function applyBg(bg,showOverlay){
@@ -595,7 +599,7 @@ const FLEX_SCRIPT = `
     if(m==='black'||m==='off'){
       root.style.background='#000';bgvid.style.opacity='0';bgimg.style.opacity='0';overlay.style.opacity='0';
       blob1.style.opacity='0';blob2.style.opacity='0';
-      content.innerHTML='';prevBg=null;prevLine=null;return;
+      content.innerHTML='';prevBg=null;prevLine=null;prevTitle=null;return;
     }
     if(m==='logo'){
       overlay.style.opacity='0';
@@ -634,7 +638,7 @@ const FLEX_SCRIPT = `
       // Designed sermon title card behind the pastor: the real background photo,
       // graded and drifting, under a dark left-heavy wash carrying the type.
       overlay.style.opacity='0';blob1.style.opacity='0';blob2.style.opacity='0';
-      content.innerHTML='';prevLine=null;
+      content.innerHTML='';prevLine=null;prevTitle=null;
       applyBg(state.background,false);
       if(state.background){
         root.style.background='#000';
@@ -675,6 +679,9 @@ const FLEX_SCRIPT = `
       // Safe for everything else: ordinary slides ask for 6 and min() holds them.
       var fs=Math.max(3,Math.min(state.fontScale||6,20));
       var lineChanged=state.line!==prevLine;prevLine=state.line;
+      // QA B7-N1: a new item's reference fades up WITH its first line rather
+      // than standing alone on screen while the line fades in.
+      var titleIn=lineChanged&&state.title!==prevTitle?'fade-up':'';prevTitle=state.title;
       // overflow-wrap/word-break: without this, a single long word at a large
       // fixed size (e.g. "condemnation") is wider than the screen and the
       // browser lets it run off the edge rather than break it — invisible,
@@ -685,7 +692,8 @@ const FLEX_SCRIPT = `
         // Capped: the reference is a FIXED size while the verse below is
         // shrink-to-fit, so on a long chunk the label ended up bigger than the
         // words it labels. It should never compete with the verse.
-        +(state.title?'<div style="margin-top:2vw;font-size:'+Math.min(fs*0.3,3)+'vw;color:'+textColor+';opacity:0.5;font-weight:600;letter-spacing:0.15em;text-transform:uppercase">'+esc(state.title)+'</div>':'');
+        // (Wrapped: the fade animates opacity, which would override the 0.5.)
+        +(state.title?'<div class="'+titleIn+'"><div style="margin-top:2vw;font-size:'+Math.min(fs*0.3,3)+'vw;color:'+textColor+';opacity:0.5;font-weight:600;letter-spacing:0.15em;text-transform:uppercase">'+esc(state.title)+'</div></div>':'');
       // Reserve the actual title block height (title + its 2vw top margin) so a long
       // titled slide shrinks to fit both, not just the line.
       var titleH=content.children.length>1?content.children[1].getBoundingClientRect().height+window.innerWidth*0.02:0;
