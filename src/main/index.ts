@@ -11,14 +11,14 @@ import { promisify } from 'util'
 const execFileAsync = promisify(execFile)
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ScriptureVerse, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor, generatedDeckYieldsTo } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
-import { parseReferenceList, formatReferenceList, rangeReference, verseLines, deckVerseText } from '../shared/scriptureRefs'
+import { parseReferenceList, formatReferenceList, rangeReference, verseLines, deckVerseText, numberedVerseLines } from '../shared/scriptureRefs'
 import { normalizeReference } from '../shared/scriptureParse'
 import { reflowSlideTexts } from '../shared/reflowText'
 import { chunkVerses } from '../shared/chunkText'
@@ -1660,7 +1660,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   const refs = parseReferenceList(reference)
   if (!refs.length) return false
 
-  const lines: string[] = []
+  const verses: ScriptureVerse[] = []
   let resolvedTitle: string | null = null
   let sawFallback = false
   const missed: string[] = []
@@ -1675,8 +1675,14 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
     }
     if (result.usedFallback) sawFallback = true
     if (!resolvedTitle) resolvedTitle = result.reference ?? ref
-    lines.push(...verseLines(result.verses))
+    verses.push(...result.verses)
   }
+  // QA B8-N2: one line per verse, numbered exactly as the deck numbers them
+  // ("4:35 And the same day…"). This list is what the screens show until a
+  // service item's deck lands; it used to be un-numbered ("35 And the same
+  // day…"), so leaving countdown/black/logo for a reading put that on the
+  // projector for ~¼ s before the deck crossfaded over it.
+  const lines = numberedVerseLines(verses)
   // Only a reading where NOTHING resolved is a failure; one bad reference among
   // several still shows the passages either side of it.
   if (!lines.length) {
