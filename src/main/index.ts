@@ -1288,16 +1288,28 @@ function maybeAutoSwitchScene(): void {
   }
 }
 
+// Bumped by every broadcast and stamped on its payload (QA B6-N1).
+// webContents.send can drain the microtask queue, so a loader awaiting an
+// already-settled promise can finish INSIDE this function's send loop — after
+// a clicked Go live, loadDeckOnto swapped in the numbered deck and broadcast
+// it from under wf:live:setItemId's broadcast, and the rest of that outer loop
+// (and its tablet send) then delivered the older, pre-deck payload LAST: the
+// projector, the Stage window and the tablet kept '35 And the same day…' while
+// state.line said '4:35 …', until Space/←. A broadcast that finds a newer one
+// ran under it stops (the newer one already reached every screen), and each
+// window drops a payload older than one it has drawn (preload stateOrderGuard).
+let broadcastSeq = 0
+
 // Single source of truth for the { main, second } wf:state payload — used by
 // broadcast() and by every window's did-finish-load initial paint, so the
 // "is Second active" rule can never drift out of sync between call sites
 // (that drift is exactly what caused the stale-shape bug this helper fixes).
-function buildStatePayload(): { main: LiveState; second: LiveState | null; stageRehearsal: StageRehearsalState } {
+function buildStatePayload(): { main: LiveState; second: LiveState | null; stageRehearsal: StageRehearsalState; seq: number } {
   // Stage Rehearsal loads songs onto Second ad-hoc (no service item), so the
   // old "does the service have any track:'second' items" check alone would
   // miss it and ship second:null while a song is genuinely live there.
   const secondActive = stageRehearsal.active || activeServiceItems.some((it) => it.track === 'second')
-  return { main: renderState('main'), second: secondActive ? renderState('second') : null, stageRehearsal }
+  return { main: renderState('main'), second: secondActive ? renderState('second') : null, stageRehearsal, seq: broadcastSeq }
 }
 
 // While crash recovery reloads the last item it must not paint an
@@ -1308,10 +1320,13 @@ let recoveryHoldTimer: ReturnType<typeof setTimeout> | null = null
 
 function broadcast(): void {
   if (suppressBroadcast) return
+  const seq = ++broadcastSeq
   const payload = buildStatePayload()
   for (const w of [operatorWin, stageWin, ...outputWins.values()]) {
+    if (seq !== broadcastSeq) return  // superseded mid-send — see broadcastSeq
     if (w && !w.isDestroyed()) w.webContents.send('wf:state', payload)
   }
+  if (seq !== broadcastSeq) return
   const snapOf = (t: LiveTrackState): TrackSnapshot => ({ liveServiceItemId: t.serviceItemId, slideIndex: t.index, mode: t.mode, textHidden: t.textHidden, bgHidden: t.bgHidden })
   const recoveryMain: TrackSnapshot = snapOf(tracks.main)
   const recoverySecond: TrackSnapshot | null = payload.second ? snapOf(tracks.second) : null
@@ -1335,6 +1350,7 @@ function broadcast(): void {
       pins: recoveryPins
     })
   }
+  if (seq !== broadcastSeq) return
   tabletBroadcast(payload.main)
   zoneBroadcast()
   maybeAutoSwitchScene()
