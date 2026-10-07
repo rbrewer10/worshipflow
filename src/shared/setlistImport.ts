@@ -78,7 +78,9 @@ function embeddedReference(line: string): string | null {
 // Cross" (songs) into sermon cards. A sermon line now needs a separator
 // ("Sermon: The Cross", "Message - Hope") or to be the bare word on its own.
 // B5-N7: "Sermon Title: …", "Message from God's Word: …", "Proclaiming the Word".
-const SERMON_PREFIX = /^(sermon series|sermon title|message title|sermon|message|homily|word|(?:today'?s|pastor'?s|the) (?:message|sermon)|message from (?:god'?s|the) word)\s*[:.\-–—]\s*/i
+// B6-N2: "Preaching: …", and a quoted title straight after the word with no
+// separator ('Sermon Series "Ordinary Saints" — Part 3: Ruth').
+const SERMON_PREFIX = /^(sermon series|sermon title|message title|sermon|message|homily|preaching|proclamation|word|(?:today'?s|pastor'?s|the) (?:message|sermon)|message from (?:god'?s|the) word)\s*(?:[:.\-–—]\s*|\s(?=\s*"))\s*/i
 const SERMON_ALONE = /^(sermon|message|homily|the word|teaching|(?:today'?s|pastor'?s|the|morning) (?:message|sermon)|message from (?:the )?pastor|(?:the )?word (?:proclaimed|preached)|(?:the )?(?:proclamation|preaching) of (?:the|god'?s) word|proclaiming (?:the|god'?s) word)$/i
 // "Sermon (Luke 15:11-32) "The Waiting Father"": the passage in brackets, then the title.
 const SERMON_WITH_PASSAGE = /^(?:sermon|message|homily)\s*\(([^)]*)\)\s*[:\-–—]?\s*(.+)$/i
@@ -88,12 +90,14 @@ function isSermon(line: string): boolean {
 }
 
 const unquote = (s: string): string => s.replace(/^"(.*)"$/, '$1').trim()
+// '"Ordinary Saints" — Part 3: Ruth' → 'Ordinary Saints — Part 3: Ruth' (B6-N2).
+const unquoteLead = (s: string): string => s.replace(/^"([^"]+)"(?=\s*[-–—:,(]|\s*$)/, '$1').trim()
 
 function sermonTitle(line: string): string {
   const withPassage = SERMON_WITH_PASSAGE.exec(line)
   if (withPassage) return unquote(withPassage[2].trim())
   const title = line.replace(SERMON_PREFIX, '').trim()
-  return title ? unquote(title) : line
+  return title ? unquoteLead(unquote(title)) : line
 }
 
 // Common non-song service elements. These become section headers (labels in
@@ -126,6 +130,14 @@ const ELEMENT_WORDS = [
   'time with (?:young disciples|(?:the )?children|kids)', '(?:choral |choir )?introit', '(?:the )?chiming of the hour', '(?:the )?ringing of the bells?',
   '(?:the )?extinguishing of the (?:candles?|christ candle|light)', 'commissioning', 'litany(?: (?:of|for) [a-z\' ]+)?', '(?:the )?collect(?: (?:for|of) [a-z ]+)?',
   "(?:sharing|passing|exchange|greeting) (?:of )?christ'?s peace", 'gospel acclamation',
+  // QA B6-N2: retest6 bulletin wording.
+  'acts? of (?:praise|worship|adoration|confession|contrition|dedication|commitment|remembrance|thanksgiving|reconciliation|preparation)',
+  '(?:silent|quiet|personal|time (?:of|for)) (?:reflection|meditation|confession|prayer)',
+  '(?:the )?(?:sacrament of )?(?:holy )?baptisms? of (?:an? )?(?:infants?|children|child|adults?|believers?|youth|candidates?)', '(?:infant|adult|believers?\'?) baptisms?',
+  '(?:the )?(?:reception|receiving|welcom(?:e|ing)|recognition) (?:of )?(?:our )?new (?:members|disciples|friends)', 'new members?(?: (?:reception|recognition|welcome))?',
+  '(?:the )?breaking of (?:the )?bread', '(?:the )?fraction', '(?:the )?(?:prayer|blessing) (?:after|before|following) (?:holy )?communion', '(?:the )?post-?communion prayer',
+  '(?:the )?(?:declaration|assurance|words) of (?:forgiveness|pardon|grace)',
+  '(?:ministry|missions?|stewardship|giving|outreach) (?:minute|moment|spotlight|update)',
 ]
 const ELEMENT = new RegExp(`^(?:${ELEMENT_WORDS.join('|')})$`, 'i')
 
@@ -144,6 +156,13 @@ const QUALIFIER = /^(?:responsive(?:ly)?|read responsively|unison|in unison|cong
 
 // Element words that are also well-known song titles ("Offering", "Response"…).
 const SONG_TITLE_TOO = /^(?:the )?(?:offerings?|response|invitation|reflection|meditation|giving|communion|benediction|the peace|baptism|video|welcome|prelude|anthem)$/i
+// 'Prelude — "Jesu, Joy of Man's Desiring" (J.S. Bach)': instrumental/choir
+// music named after its label is the element, not a song to project (B6-N2).
+// "Offering - Paul Baloche" stays a song.
+const MUSIC_ONLY = /^(?:the )?(?:prelude|postlude|anthem)$/i
+function namedPiece(head: string, tail: string): boolean {
+  return MUSIC_ONLY.test(head.trim()) && /^"[^"]+"(?:\s*\([^()]+\))?$/.test(tail.trim())
+}
 // Who leads it: "- Pastor Jim", "— Worship Team", "— Choir".
 const ROLE = /^(?:(?:the )?(?:pastor|rev(?:erend)?\.?|elder|deacon|deaconess|bishop|father|fr\.|minister|choir|praise team|worship team|youth|children|kids|congregation|liturgist|lay leader|leader|ushers?|all)\b.*|dr\.? .+|mr\.? .+|mrs\.? .+|ms\.? .+)$/i
 
@@ -164,7 +183,8 @@ const HYMN_NUMBER = /^(?:hymn|song|umh|no\.?)\s*#?\s*\d+[a-z]?$/i
 
 const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?'
 const DATE_LINE = new RegExp(
-  `^(?:(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*\\.?,?\\s+)?(?:${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}-\\d{2}-\\d{2})$`,
+  // B6-N2: "Sunday, Oct. 4 • 9:00 AM" — a service time after the date.
+  `^(?:(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*\\.?,?\\s+)?(?:${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}-\\d{2}-\\d{2})(?:\\s*[•·|,@–—-]?\\s*(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*[ap]\\.?m\\.?)?$`,
   'i'
 )
 
@@ -225,8 +245,23 @@ const SMALL_PRINT = [
   /^(?:(?:bold(?:ed)?|italic(?:s|ized)?|large|underlined)\s+)?(?:print|type|text|words?|lines?|items?)\s+(?:in (?:bold|italics?)\s+)?(?:indicates?|denotes?|means|marks?)\b/i,
   /\b(?:large[- ]print|braille|hearing (?:assistance|assist|devices?|loops?))\b.*\b(?:available|ask|provided)\b/i,
   /^(?:leader|people|all|congregation|one|many|minister|celebrant|reader|l|p|c)\s*:\s+.*[.!?]$/i,
+  // B6-N2: house-keeping sentences, and the church's web/e-mail address.
+  /^(?:ushers?|greeters?|latecomers?|those (?:arriving|who arrive) late)\b.*\b(?:will|may|are|please)\b/i,
+  /\b(?:will|may|are (?:invited|welcome) to|please)\b.*\bat this time\.?$/i,
+  /^(?:https?:\/\/|www\.)\S+$/i,
+  /^[\w.+-]+@[\w-]+(?:\.[\w-]+)+$/,
+  /^[\w-]+(?:\.[\w-]+)*\.(?:org|com|net|church|us|info|edu)(?:\/\S*)?$/i,
 ]
 const isSmallPrint = (line: string): boolean => SMALL_PRINT.some((re) => re.test(line))
+
+// "Liturgist: Rev. Ann Lee", "Organist — Tom Hart": who is serving today, not
+// an item (B6-N2; these became blocking song placeholders). "Reader: Ruth 1:16"
+// still reads as the scripture it names.
+const PERSONNEL = /^(?:(?:the )?(?:liturgist|preacher|organist|pianist|accompanist|keyboardist|worship leader|song leader|lay (?:reader|leader|liturgist)|lector|acolytes?|crucifers?|cantor|music director|director of music|choir director|sound|media|projection|nursery(?: attendants?)?|ushers|greeters|ministers))\s*(?::|\s[-–—])\s*(.+)$/i
+const isPersonnelLine = (line: string): boolean => {
+  const m = PERSONNEL.exec(line)
+  return !!m && !isScripture(m[1]) && !/\d+:\d+/.test(m[1])
+}
 
 const stripColon = (s: string): string => s.replace(/\s*:\s*$/, '').trim()
 
@@ -250,7 +285,7 @@ function classify(line: string): SetlistEntry {
   if (isServiceElement(line)) return { kind: 'element', title: line }
   // "Call to Worship (Responsive)"
   const paren = /^(.*?)\s*\(([^)]*)\)$/.exec(line)
-  if (paren && paren[1] && isServiceElement(paren[1]) && (QUALIFIER.test(paren[2].trim()) || isServiceElement(paren[2]))) {
+  if (paren && paren[1] && isServiceElement(paren[1]) && (QUALIFIER.test(paren[2].trim()) || isServiceElement(paren[2]) || isScripture(paren[2]))) {
     return { kind: 'element', title: line }
   }
   // "Call to Worship - Pastor Jim", "Call to Worship: Psalm 95:1-7"
@@ -259,7 +294,7 @@ function classify(line: string): SetlistEntry {
   const trailer = /^(.+?)(?:\s+[-–—]\s+|\s*[–—]\s*|:\s+)(.+)$/.exec(line)
   if (trailer && isServiceElement(trailer[1])) {
     const tail = trailer[2].trim()
-    if (!SONG_TITLE_TOO.test(trailer[1].trim()) || ROLE.test(tail) || QUALIFIER.test(tail) || isScripture(tail)) {
+    if (!SONG_TITLE_TOO.test(trailer[1].trim()) || ROLE.test(tail) || QUALIFIER.test(tail) || isScripture(tail) || namedPiece(trailer[1], tail)) {
       return { kind: 'element', title: line }
     }
   }
@@ -282,7 +317,7 @@ export function parseSetlist(raw: string): SetlistEntry[] {
     // ("*Hymn: Amazing Grace") is still just a stand mark.
     if (RUBRIC.test(rawLine.trim())) continue
     const line = cleanLine(rawLine)
-    if (!line || isHeadingLine(line) || isSmallPrint(line)) continue
+    if (!line || isHeadingLine(line) || isSmallPrint(line) || isPersonnelLine(line)) continue
     const [rawHead, tail] = splitLeader(line)
     const head = stripColon(rawHead)
     if (!head) continue
@@ -302,6 +337,12 @@ export function parseSetlist(raw: string): SetlistEntry[] {
       // Keep who/what for a header ("Call to Worship — Pastor Jim"); for a
       // song the trailer is a credit/leader and would spoil the library match.
       if (entry.kind === 'element') entry.title = `${entry.title} — ${tail}`
+      // 'Sermon ........ "A Lamp Unto My Feet" ........ Rev. Kim': the title is
+      // in the leader columns, the preacher after it (B6-N2).
+      if (entry.kind === 'sermon' && SERMON_ALONE.test(head)) {
+        const title = tail.split(/\t+|\s*(?:\.\s*){3,}|\s*…+\s*|\s{3,}/).map((c) => c.trim()).find((c) => c && !ROLE.test(c) && !QUALIFIER.test(c))
+        if (title) entry.title = unquoteLead(unquote(title))
+      }
     }
     out.push(entry)
   }
