@@ -1491,74 +1491,86 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
   const isGenerated = authored == null
   const source = await computeItemSourceSlides(item)
   if (tracks[track].loadGeneration !== generation) return true
+
+  // QA B7-N1: look the verses up BEFORE the deck goes on screen. The deck used
+  // to be broadcast first with every scripture slide summarised as its bare
+  // reference, then again once the verses arrived, so after a clicked Go live
+  // the projector showed just "Mark 4:35" for about a quarter of a second
+  // (and Zone 3 "Mark 4:35 1 / 7") before "4:35 And the same day…". Until
+  // the lookups finish, the screens keep what the loader already put up (for
+  // a reading: the same verses, from doLoadScripture).
+  const deckScripture = await resolveDeckScripture(slides)
+  // The await may have let something newer load onto this track.
+  if (tracks[track].loadGeneration !== generation) return true
+
   const t = tracks[track]
   t.deckSlides = slides
   t.deckIsGenerated = isGenerated
   t.deckSource = source
-  t.deckScripture = new Map()
-  t.song = { ...t.song, lines: slides.map((s) => slideSummary(s, source)) }
+  t.deckScripture = deckScripture
+  t.song = { ...t.song, lines: deckLines(slides, deckScripture, source) }
   t.index = 0
   // Every caller fires this async and broadcasts immediately — BEFORE the deck
   // exists (the awaits above land on a later turn). Without a broadcast here
   // the zones keep rendering the pre-deck state and are never told about the
   // deck at all: screens sat on logo/black while the operator saw nothing.
+  // One broadcast, with the verse text already in it.
   broadcast()
+  return true
+}
 
-  // Memoized by reference, not by slide index: resolveSlot walks a 'same'
-  // chain back to its nearest real slot, so every slide in that chain resolves
-  // to the SAME scripture slot and would otherwise trigger the identical
-  // network lookup once per slide. One fetch per distinct reference is enough;
-  // the cache below is still populated per resolved slide index, so the
-  // render-time read (keyed by the live t.index) always has a matching entry.
-  const lookedUp = new Map<string, ScriptureResult>()
+// Every scripture slot's verse text, keyed `${slideIndex}:${zoneId}` (what
+// zoneStateFromSlot reads for the live t.index). Memoized by reference, not by
+// slide index: resolveSlot walks a 'same' chain back to its nearest real slot,
+// so every slide in that chain resolves to the SAME scripture slot and would
+// otherwise trigger the identical network lookup once per slide. One lookup
+// per distinct reference, all at once, so an online translation costs one
+// round trip rather than one per slide; KJV is synchronous.
+async function resolveDeckScripture(slides: ZoneSlide[]): Promise<Map<string, string>> {
+  const wanted: Array<{ key: string; i: number; zoneId: ZoneId; reference: string }> = []
   for (let i = 0; i < slides.length; i++) {
     for (const zoneId of [1, 2, 3, 4] as ZoneId[]) {
       const slot = resolveSlot(slides, i, zoneId)
-      if (slot.kind !== 'scripture' || !slot.reference) continue
-      let result = lookedUp.get(slot.reference)
-      if (!result) {
-        result = bibleTranslation === 'kjv'
-          ? lookupScripture(slot.reference)
-          : await fetchScripture(slot.reference, bibleTranslation)
-        lookedUp.set(slot.reference, result)
-      }
-      // The await may have let something newer load onto this track.
-      if (tracks[track].loadGeneration !== generation) return true
-      if (result.ok && result.verses) {
-        tracks[track].deckScripture.set(`${i}:${zoneId}`, result.verses.map((v) => v.text).join(' '))
-      } else {
-        logWarn(`[deck] scripture lookup failed for "${slot.reference}" on slide ${i + 1} zone ${zoneId}`)
-      }
+      if (slot.kind === 'scripture' && slot.reference) wanted.push({ key: `${i}:${zoneId}`, i, zoneId, reference: slot.reference })
     }
   }
-  if (tracks[track].loadGeneration !== generation) return true
-
-  // Re-summarise each slide now that the verse text exists.
-  //
-  // slideSummary prefers zone 3, which these decks hold on the logo, so it fell
-  // through to zone 1 — the title card — and EVERY slide summarised as the
-  // sermon title. That is what the tablet remote and the slide grid display, so
-  // the preacher's tablet read "He's Risen" on every slide instead of the words
-  // he is about to read. Prefer the screens that carry content, and use the
-  // resolved verse rather than the bare reference.
-  const CONTENT_ZONES: ZoneId[] = [2, 4, 3, 1]
-  tracks[track].song = {
-    ...tracks[track].song,
-    lines: slides.map((slide, i) => {
-      for (const zoneId of CONTENT_ZONES) {
-        const verse = tracks[track].deckScripture.get(`${i}:${zoneId}`)
-        if (verse) return verse
-        const slot = resolveSlot(slides, i, zoneId)
-        if (slot.kind === 'text' && slot.text) return slot.text
-      }
-      return slideSummary(slide, source)
-    }),
+  const references = [...new Set(wanted.map((w) => w.reference))]
+  const results = await Promise.all(references.map((reference) => bibleTranslation === 'kjv'
+    ? Promise.resolve(lookupScripture(reference))
+    : fetchScripture(reference, bibleTranslation)))
+  const lookedUp = new Map(references.map((reference, k) => [reference, results[k]] as const))
+  const deckScripture = new Map<string, string>()
+  for (const { key, i, zoneId, reference } of wanted) {
+    const result = lookedUp.get(reference)
+    if (result?.ok && result.verses) {
+      deckScripture.set(key, result.verses.map((v) => v.text).join(' '))
+    } else {
+      logWarn(`[deck] scripture lookup failed for "${reference}" on slide ${i + 1} zone ${zoneId}`)
+    }
   }
+  return deckScripture
+}
 
-  // Verse text arrived after the initial deck broadcast above — push it out,
-  // or scripture slots stay black until the next unrelated state change.
-  broadcast()
-  return true
+// One line per deck slide (what state.line, the tablet remote and the slide
+// grid show).
+//
+// slideSummary prefers zone 3, which these decks hold on the logo, so it fell
+// through to zone 1 — the title card — and EVERY slide summarised as the
+// sermon title. That is what the tablet remote and the slide grid display, so
+// the preacher's tablet read "He's Risen" on every slide instead of the words
+// he is about to read. Prefer the screens that carry content, and use the
+// resolved verse rather than the bare reference.
+function deckLines(slides: ZoneSlide[], deckScripture: Map<string, string>, source: string[]): string[] {
+  const CONTENT_ZONES: ZoneId[] = [2, 4, 3, 1]
+  return slides.map((slide, i) => {
+    for (const zoneId of CONTENT_ZONES) {
+      const verse = deckScripture.get(`${i}:${zoneId}`)
+      if (verse) return verse
+      const slot = resolveSlot(slides, i, zoneId)
+      if (slot.kind === 'text' && slot.text) return slot.text
+    }
+    return slideSummary(slide, source)
+  })
 }
 
 function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean, bgFit?: 'cover' | 'contain'): void {
