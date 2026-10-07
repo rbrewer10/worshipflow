@@ -40,15 +40,20 @@ import type { ZoneSlide } from '../shared/zoneSlides'
 import type { ZonePin, ZonePins } from '../shared/zonePins'
 import type { Look } from '../shared/zoneLooks'
 import type { StageRehearsalState } from '../shared/stageRehearsal'
+import { stateOrderGuard } from '../shared/stateOrder'
 
-type StatePayload = { main: LiveState; second: LiveState | null; stageRehearsal: StageRehearsalState }
+type StatePayload = { main: LiveState; second: LiveState | null; stageRehearsal: StageRehearsalState; seq?: number }
+
+// One per window: an out-of-order (older) wf:state is dropped for every
+// listener here, so nothing redraws a stale slide over a newer one (QA B6-N1).
+const acceptState = stateOrderGuard()
 
 const wf = {
   // The real build version comes from the main process via getInfo() — don't
   // hardcode it here (it silently went stale at 0.6.3).
   sendIntent: (track: TrackId, type: Intent): void => ipcRenderer.send('wf:intent', track, type),
   onState: (cb: (s: StatePayload) => void): (() => void) => {
-    const handler = (_e: unknown, s: StatePayload): void => cb(s)
+    const handler = (_e: unknown, s: StatePayload): void => { if (acceptState(s.seq)) cb(s) }
     ipcRenderer.on('wf:state', handler)
     return () => ipcRenderer.removeListener('wf:state', handler)
   },
