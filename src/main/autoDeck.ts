@@ -94,8 +94,12 @@ async function scriptureDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<Zon
   if (!references.length) return null
 
   const slides: ZoneSlide[] = []
-  for (const reference of references) {
-    const result = await deps.lookupScripture(reference)
+  // Every passage at once: for an online translation each lookup is a round
+  // trip, and they used to run one after another (QA retest8).
+  const results = await Promise.all(references.map((reference) => deps.lookupScripture(reference)))
+  for (let k = 0; k < references.length; k++) {
+    const reference = references[k]
+    const result = results[k]
     // One bad reference in a reading must not lose the passages either side of
     // it — the same "a deleted announcement drops out, the rest still works"
     // contract announcementDeck uses.

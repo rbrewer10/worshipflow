@@ -129,6 +129,16 @@ describe('rangeReference / verseLines (QA B4-N1: readings across chapters)', () 
     expect(verseLines([{ n: 6, c: 23, text: 'a' }, { n: 1, c: 24, text: 'b' }])).toEqual(['23:6  a', '24:1  b'])
     expect(verseLines([{ n: 16, text: 'only' }])).toEqual(['only'])
   })
+  it('numberedVerseLines: each verse as its deck slide shows it (QA B8-N2)', async () => {
+    const { numberedVerseLines, deckVerseText } = await import('./scriptureRefs')
+    const verses = [{ n: 35, c: 4, text: 'And the same day' }, { n: 36, c: 4, text: 'And when they had sent away' }]
+    expect(numberedVerseLines(verses)).toEqual(['4:35 And the same day', '4:36 And when they had sent away'])
+    // Identical to a one-verse-per-slide deck, so the deck landing changes nothing on screen.
+    expect(numberedVerseLines(verses)).toEqual(verses.map((v) => deckVerseText([v], { alone: false })))
+    expect(numberedVerseLines([{ n: 6, c: 23, text: 'a' }, { n: 1, c: 24, text: 'b' }])).toEqual(['23:6 a', '24:1 b'])
+    expect(numberedVerseLines([{ n: 16, c: 3, text: 'For God so loved' }])).toEqual(['For God so loved'])
+    expect(numberedVerseLines([{ n: 35, text: 'no chapter from the API' }, { n: 36, text: 'x' }])).toEqual(['35 no chapter from the API', '36 x'])
+  })
 })
 
 describe('parseReferenceList — a passage with no book continues the previous one (QA A5-N2)', () => {

@@ -25,7 +25,8 @@ describe('doLoadScripture tells the operator when a reference does not resolve (
     expect(fn).toMatch(/missed\.push\(ref\)/)
     expect(fn).toMatch(/if \(missed\.length\) \{\s*notifyOperator\(`Skipped/)
   })
-  it('multi-chapter readings number their lines by chapter', () => {
-    expect(fn).toMatch(/lines\.push\(\.\.\.verseLines\(result\.verses\)\)/)
+  it('the verse list is numbered the way the deck numbers it (QA B5-N5, B8-N2)', () => {
+    expect(fn).toMatch(/verses\.push\(\.\.\.result\.verses\)/)
+    expect(fn).toMatch(/const lines = numberedVerseLines\(verses\)/)
   })
 })

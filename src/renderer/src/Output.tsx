@@ -108,10 +108,16 @@ export function useLiveModel(): AudienceModel {
         setLayers({ front: 0, a: '', b: '' })
         setTickerText(s.line || '')
       } else if (kind === 'lyrics') {
+        // Crossfade only when the words change. Every broadcast used to start a
+        // new crossfade even to the same line, so the text dipped for half a
+        // second on an unrelated state change, or when a scripture deck
+        // replaced its identical first verse (QA B8-N2).
         setLayers((prev) =>
-          prev.front === 0
-            ? { front: 1, a: prev.a, b: s.line }
-            : { front: 0, a: s.line, b: prev.b }
+          (prev.front === 0 ? prev.a : prev.b) === s.line
+            ? prev
+            : prev.front === 0
+              ? { front: 1, a: prev.a, b: s.line }
+              : { front: 0, a: s.line, b: prev.b }
         )
         setTickerText('')
       } else if (kind === 'announcement') {

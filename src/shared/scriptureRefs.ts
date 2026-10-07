@@ -1,4 +1,5 @@
 import { normalizeReference, parseScriptureReference } from './scriptureParse'
+import type { ScriptureVerse } from './types'
 
 // Parsing for the multi-passage scripture field.
 //
@@ -148,4 +149,14 @@ export function deckVerseText(verses: Array<{ n: number; c?: number; text: strin
       return `${markChapter ? `${v.c}:` : ''}${v.n} ${v.text}`
     })
     .join(' ')
+}
+
+/**
+ * A reading as one line per verse, each numbered the way deckVerseText numbers
+ * a deck slide that starts on it ("4:35 And the same day…") — so when a
+ * one-verse-per-slide deck replaces this list, nothing on screen changes (QA
+ * B8-N2). A reading that is a single verse stays plain, as on its deck.
+ */
+export function numberedVerseLines(verses: ScriptureVerse[]): string[] {
+  return verses.map((v) => deckVerseText([v], { alone: verses.length === 1 }))
 }
