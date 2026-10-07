@@ -174,7 +174,8 @@ const READING_PREFIX = new RegExp(`^(${READING_LABEL})\\s*(?:[:.\\-–—~]\\s*(
 // the song is the part after the label, so it can match the library.
 const HYMN_LABEL_WORDS = '(?:(?:opening|closing|gathering|sending|offertory|communion|response|responsive|final)\\s+)?(?:hymn|song)(?:\\s+of\\s+(?:invitation|response|praise|preparation|sending|the day))?'
 // B3-N6: "Opening Hymn #89 – Joyful, Joyful" — a hymnal number may sit between the label and the title.
-const HYMN_LABEL = new RegExp(`^${HYMN_LABEL_WORDS}(?:\\s*(?:no\\.?|#)\\s*\\d+[a-z]?)?\\s*(?:[:\\-–—]\\s*|\\s+[-–—]\\s+)(.+)$`, 'i')
+// B7-N2: or straight into a quoted title, with no separator.
+const HYMN_LABEL = new RegExp(`^${HYMN_LABEL_WORDS}(?:\\s*(?:no\\.?|#)\\s*\\d+[a-z]?)?\\s*(?:[:\\-–—]\\s*|\\s+[-–—]\\s+|\\s+(?="))(.+)$`, 'i')
 // "Hymn of Praise<TAB>No. 89<TAB>Joyful, Joyful…" — the bare label, title in the leader columns.
 const HYMN_LABEL_ALONE = new RegExp(`^${HYMN_LABEL_WORDS}(?:\\s*(?:no\\.?|#)\\s*\\d+[a-z]?)?$`, 'i')
 const HYMNAL_NUMBER_COLUMN = /^(?:(?:no\.?|#|umh|hymn)\s*)?\d+[a-z]?$/i
@@ -182,9 +183,14 @@ const HYMNAL_NUMBER_COLUMN = /^(?:(?:no\.?|#|umh|hymn)\s*)?\d+[a-z]?$/i
 const HYMN_NUMBER = /^(?:hymn|song|umh|no\.?)\s*#?\s*\d+[a-z]?$/i
 
 const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?'
+// B7-N2: the day's name in the church year ahead of the date — "Third Sunday
+// of Advent —", "Reformation Sunday •", "All Saints Day,". Only with a date.
+const CHURCH_DAY = "(?:[a-z'’]+\\s+){0,4}(?:sunday|day|eve)(?:\\s+(?:after|of|in|before)\\s+(?:the\\s+)?[a-z'’]+(?:\\s+[a-z'’]+)?)?\\s*[•·|,:–—-]\\s*"
+// One service time or several ("9:30 & 11:00 AM"); the last carries the am/pm.
+const SERVICE_TIMES = '(?:\\d{1,2}(?::\\d{2})?\\s*(?:[ap]\\.?m\\.?)?\\s*(?:&|and|,|/)\\s*)*\\d{1,2}(?::\\d{2})?\\s*[ap]\\.?m\\.?'
 const DATE_LINE = new RegExp(
   // B6-N2: "Sunday, Oct. 4 • 9:00 AM" — a service time after the date.
-  `^(?:(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*\\.?,?\\s+)?(?:${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}-\\d{2}-\\d{2})(?:\\s*[•·|,@–—-]?\\s*(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*[ap]\\.?m\\.?)?$`,
+  `^(?:${CHURCH_DAY})?(?:(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*\\.?(?:\\s+(?:morning|evening|night))?,?\\s+)?(?:${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}-\\d{2}-\\d{2})(?:\\s*[•·|,@–—-]?\\s*(?:at\\s+)?${SERVICE_TIMES})?$`,
   'i'
 )
 
@@ -200,6 +206,8 @@ const CHURCH_NAME = new RegExp(`^(?:[A-Z][\\w.'&-]*\\s+)*?(?:${DENOMINATION}\\s+
 function isHeadingLine(line: string): boolean {
   if (CHURCH_NAME.test(line)) return true
   if (/setlist|^(order|service|songs?|worship)$|order of (worship|service)/i.test(line) || DATE_LINE.test(line)) return true
+  // B7-N2: the heading over the bulletin's who's-serving block.
+  if (/^(?:(?:those )?serving (?:today|this (?:morning|sunday|week))|those serving|serving|today'?s (?:servants|volunteers|worship leaders)|(?:our )?worship participants|in (?:our )?service today)\s*:?$/i.test(line)) return true
   // Needs a qualifier or a time, so a bare "Worship" song set label stays as before.
   return SERVICE_TITLE.test(line) && /\d|sunday|morning|evening|traditional|contemporary|blended|early|late|main|service/i.test(line)
 }
@@ -251,13 +259,24 @@ const SMALL_PRINT = [
   /^(?:https?:\/\/|www\.)\S+$/i,
   /^[\w.+-]+@[\w-]+(?:\.[\w-]+)+$/,
   /^[\w-]+(?:\.[\w-]+)*\.(?:org|com|net|church|us|info|edu)(?:\/\S*)?$/i,
+  // B7-N2: notices — the nursery is open, lunch follows the service.
+  /^(?:(?:a |the |our )?(?:staffed )?(?:nursery|child ?care|children'?s church)(?: care)?)\b.*\b(?:available|provided|open)\b/i,
+  /^(?:[\w'&-]+\s+){0,5}(?:lunch(?:eon)?|dinner|brunch|breakfast|pot-?luck|covered[- ]dish(?: meal)?|refreshments|reception|fellowship|coffee(?: hour)?|meal|picnic|cookout|snacks)\s+(?:will\s+)?(?:to\s+)?follows?\b.*$/i,
 ]
 const isSmallPrint = (line: string): boolean => SMALL_PRINT.some((re) => re.test(line))
 
 // "Liturgist: Rev. Ann Lee", "Organist — Tom Hart": who is serving today, not
 // an item (B6-N2; these became blocking song placeholders). "Reader: Ruth 1:16"
 // still reads as the scripture it names.
-const PERSONNEL = /^(?:(?:the )?(?:liturgist|preacher|organist|pianist|accompanist|keyboardist|worship leader|song leader|lay (?:reader|leader|liturgist)|lector|acolytes?|crucifers?|cantor|music director|director of music|choir director|sound|media|projection|nursery(?: attendants?)?|ushers|greeters|ministers))\s*(?::|\s[-–—])\s*(.+)$/i
+//
+// B7-N2: also any role that ends in a serving noun ("Usher", "Head Usher",
+// "Sound Tech", "Scripture Reader", "Communion Stewards", "Counters"), a
+// "… of the Month" duty, the altar flowers dedication, and a one-line
+// "Serving Today: Ushers – …; Greeters – …". The label must be one of these:
+// "Scripture: …" and "Sermon: …" are not roles, and a reading after any of
+// them ("Reader: Ruth 1:16") still reads as the scripture.
+const SERVING_NOUN = '(?:usher|greeter|reader|tech|technician|operator|steward|counter|teller|attendant|volunteer|host|hostess|server|director|coordinator|assistant|leader|keeper|bearer)s?'
+const PERSONNEL = new RegExp(`^(?:(?:the )?(?:liturgist|preacher|organist|pianist|accompanist|keyboardist|worship leader|song leader|lay (?:reader|leader|liturgist)|lector|acolytes?|crucifers?|cantor|music director|director of music|choir director|sound|media|projection|nursery(?: attendants?)?|ushers|greeters|ministers|(?:[a-z]+\\s+){0,2}${SERVING_NOUN}|(?:[a-z]+\\s+)?(?:deacon|elder|famil(?:y|ie)|volunteer|steward|usher|greeter|acolyte|servant|helper|host|reader)s?\\s+of the (?:month|week|day)|(?:altar|chancel|sanctuary) (?:flowers|guild)|flowers|(?:those )?serving (?:today|this (?:morning|sunday|week))))\\s*(?::|\\s[-–—])\\s*(.+)$`, 'i')
 const isPersonnelLine = (line: string): boolean => {
   const m = PERSONNEL.exec(line)
   return !!m && !isScripture(m[1]) && !/\d+:\d+/.test(m[1])
@@ -325,7 +344,7 @@ export function parseSetlist(raw: string): SetlistEntry[] {
     // column that isn't a hymnal number (B3-N6).
     if (tail && HYMN_LABEL_ALONE.test(head)) {
       const cols = tail.split(/\t+|\s*(?:\.\s*){3,}|\s*…+\s*|\s{3,}/).map((c) => c.trim()).filter((c) => c && !HYMNAL_NUMBER_COLUMN.test(c))
-      if (cols.length) { out.push({ kind: 'song', title: cols[cols.length - 1] }); continue }
+      if (cols.length) { out.push({ kind: 'song', title: bulletinSongTitle(cols[cols.length - 1]) }); continue }
     }
     const entry = classify(head)
     if (tail) {
@@ -344,12 +363,35 @@ export function parseSetlist(raw: string): SetlistEntry[] {
         if (title) entry.title = unquoteLead(unquote(title))
       }
     }
+    if (entry.kind === 'song') entry.title = bulletinSongTitle(entry.title)
     out.push(entry)
   }
   return out
 }
 
+// B7-N2: the song's own name from a bulletin line — '"Holy, Holy, Holy" (UMH 64)'
+// → Holy, Holy, Holy; 'Hymn of Praise #89 "Joyful, Joyful…"' → Joyful, Joyful…
+// Drops the hymn label, a hymnal number ("#89", "No. 1", "(UMH 64)") and the
+// quotes. A bare number ("Hymn 301") is left as it is.
+const HYMNAL_REF = '(?:(?:no\\.?|#|umh|tfws|elw|lbw|bcp|glh|bh|w&p|hymn|page|p\\.?|pg\\.?)\\s*#?\\s*\\d+[a-z]?)'
+export function bulletinSongTitle(title: string): string {
+  let t = title.trim()
+  if (HYMN_NUMBER.test(t)) return t
+  const labelled = HYMN_LABEL.exec(t)
+  if (labelled && labelled[1].trim()) t = labelled[1].trim()
+  t = t.replace(new RegExp(`^${HYMNAL_REF}\\s*[:\\-–—]?\\s+(?=["a-z])`, 'i'), '')
+  t = t.replace(new RegExp(`\\s*(?:\\(\\s*${HYMNAL_REF}\\s*\\)|[,\\-–—]?\\s*${HYMNAL_REF})$`, 'i'), '')
+  t = t.replace(/^"([^"]+)"$/, '$1').replace(/^"([^"]+)"(?=\s*[-–—(,]\s*)/, '$1').trim()
+  // Nothing left but a label ("Hymn No. 301"): the number IS the song.
+  return t && !HYMN_LABEL_ALONE.test(t) ? t : title.trim()
+}
+
 export function matchSongTitle(title: string, library: { id: number; title: string }[]): number | null {
+  const name = bulletinSongTitle(title)
+  if (name !== title.trim()) {
+    const found = matchSongTitle(name, library)
+    if (found != null) return found
+  }
   const want = title.trim().toLowerCase()
   const exact = library.find((s) => s.title.trim().toLowerCase() === want)
   if (exact) return exact.id
