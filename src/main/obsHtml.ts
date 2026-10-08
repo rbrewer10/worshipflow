@@ -35,6 +35,9 @@ html,body{width:100%;height:100%;background:transparent;overflow:hidden;font-fam
   white-space:nowrap;overflow:hidden
 }
 #ticker.on{display:block}
+/* Long lower-thirds scroll instead of being cut off (QA B-15). */
+#ticker .track{display:inline-block;padding-left:100%;animation:wfObsTicker linear infinite}
+@keyframes wfObsTicker{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 </style>
 </head>
 <body>
@@ -48,14 +51,37 @@ var elTitle = document.getElementById('title')
 var elTicker = document.getElementById('ticker')
 var ws = null
 
+function setTicker(text) {
+  if (elTicker.getAttribute('data-text') === text) return
+  elTicker.setAttribute('data-text', text)
+  elTicker.textContent = text
+  elTicker.className = 'on'
+  if (elTicker.scrollWidth > elTicker.clientWidth + 1) {
+    var span = document.createElement('span')
+    span.className = 'track'
+    span.textContent = text
+    span.style.animationDuration = Math.max(12, text.length * 0.25) + 's'
+    elTicker.textContent = ''
+    elTicker.appendChild(span)
+  }
+}
+
 function apply(msg) {
   if (msg.type !== 'state') return
   var s = msg.state
-  var show = (s.mode === 'lyrics') && s.line && s.line.trim() !== '' && !s.textHidden
+  // Rehearsal mode means "real outputs show nothing" — the stream is a real
+  // output too, and is often already live before the service (QA B5).
+  if (s.rehearsal) {
+    elBox.className = ''
+    elTicker.className = ''
+    elTicker.removeAttribute('data-text')
+    return
+  }
+  var show = (s.mode === 'lyrics') && !s.isTicker && s.line && s.line.trim() !== '' && !s.textHidden
   if (show) {
     elText.textContent = stripChords(s.line)
     var title = s.songTitle || ''
-    if (title && title !== 'Announcement') {
+    if (title) {
       elTitle.textContent = title
       elTitle.className = 'on'
     } else {
@@ -66,11 +92,13 @@ function apply(msg) {
     elBox.className = ''
   }
   var overlay = (s.overlayTicker || '').trim()
+  // A ticker-display announcement shows on the stream's ticker strip too.
+  if (!overlay && s.isTicker && s.mode === 'lyrics' && !s.textHidden) overlay = (s.line || '').trim()
   if (overlay && s.mode !== 'black' && s.mode !== 'logo') {
-    elTicker.textContent = overlay
-    elTicker.className = 'on'
+    setTicker(overlay)
   } else {
     elTicker.className = ''
+    elTicker.removeAttribute('data-text')
   }
 }
 
