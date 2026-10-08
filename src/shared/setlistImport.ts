@@ -226,6 +226,10 @@ export function cleanLine(raw: string): string {
   let line = raw
     .replace(/&amp;/gi, '&').replace(/&nbsp;/gi, ' ').replace(/&#0*39;|&apos;|&rsquo;|&lsquo;/gi, "'").replace(/&quot;|&ldquo;|&rdquo;/gi, '"')
     .replace(/[\u00A0\u2007\u202F]/g, ' ')
+    // B11-N1: a double space inside a line ('Amazing  Grace', 'Head  Usher: …')
+    // is one space. A tab or three or more spaces stay: they are the
+    // bulletin's column breaks (splitLeader); see flattenColumns.
+    .replace(/(?<![ \t]) {2}(?![ \t])/g, ' ')
     .replace(/[\u2018\u2019\u02BC\u2032]/g, "'").replace(/[\u201C\u201D]/g, '"')
     .trim()
   for (let i = 0; i < 2; i++) {
@@ -241,6 +245,9 @@ export function cleanLine(raw: string): string {
   line = line.replace(/\s*[*;!†‡]+$/, '').trim()
   return line
 }
+
+/** B11-N1: the line with every run of spaces and tabs as one space. */
+export const flattenColumns = (line: string): string => line.replace(/[ \t]+/g, ' ')
 
 /** "Call to Worship ......... Pastor Jim" / "Call to Worship<TAB>Pastor Jim" → [head, trailer]. */
 function splitLeader(line: string): [string, string] {
@@ -479,10 +486,24 @@ export function parseSetlistDetailed(raw: string, opts: { library?: Library } = 
   for (const rawLine of raw.split(/\r?\n/)) {
     const line = cleanLine(rawLine)
     if (!line) continue
-    const reason = skipReason(rawLine, line)
+    let reason = skipReason(rawLine, line)
+    let text = line
+    // B11-N1: a tab or a wide gap is a column break ("Call to Worship<TAB>
+    // Pastor Jim"), but inside a title it is just a space: 'Amazing<TAB>Grace'
+    // with Amazing Grace in the library, 'Head<TAB>Usher: Carl Mims'. Only
+    // when the columns would make a song of the first word or two.
+    const flat = flattenColumns(line)
+    if (!reason && flat !== line && columnsMakeASong(line)) {
+      if (opts.library?.length && matchSongTitle(flat, opts.library, { exact: true }) != null) {
+        out.push({ kind: 'song', title: bulletinSongTitle(flat) })
+        continue
+      }
+      const flatReason = skipReason(rawLine, flat)
+      if (flatReason) { reason = flatReason; text = flat }
+    }
     if (reason) {
-      const song = opts.library?.length ? librarySong(line, reason, opts.library) : null
-      if (song) out.push({ kind: 'song', title: bulletinSongTitle(song) })
+      const song = opts.library?.length ? librarySong(text, reason, opts.library) : null
+      if (song) out.push({ kind: 'song', title: bulletinSongTitle(flattenColumns(song)) })
       else skipped.push({ line, reason })
       continue
     }
@@ -518,6 +539,16 @@ export function parseSetlistDetailed(raw: string, opts: { library?: Library } = 
     out.push(entry)
   }
   return { entries: out, skipped }
+}
+
+// What the column parse below makes of a line is a song (not a header, a
+// reading, a sermon or a hymn-number row).
+function columnsMakeASong(line: string): boolean {
+  if (personnelReading(line)) return false
+  const [rawHead, tail] = splitLeader(line)
+  const head = stripColon(rawHead)
+  if (!head || (tail && HYMN_LABEL_ALONE.test(head))) return false
+  return classify(head).kind === 'song'
 }
 
 export function parseSetlist(raw: string, opts: { library?: Library } = {}): SetlistEntry[] {
@@ -578,10 +609,14 @@ function matchSongTitleExact(title: string, library: { id: number; title: string
     const found = matchSongTitleExact(name, library)
     if (found != null) return found
   }
-  const want = title.trim().toLowerCase()
-  const exact = library.find((s) => s.title.trim().toLowerCase() === want)
+  // B11-N1: spaces, tabs and non-breaking spaces count as one space on both
+  // sides, so a library title saved with a double space still matches.
+  const norm = (t: string): string => t.replace(/[\s\u00A0\u2007\u202F]+/g, ' ').trim().toLowerCase()
+  const want = norm(title)
+  const exact = library.find((s) => norm(s.title) === want)
   if (exact) return exact.id
-  const stripped = library.find((s) => s.title.trim().toLowerCase().replace(/[^\w\s]/g, '') === want.replace(/[^\w\s]/g, ''))
+  const bare = (t: string): string => t.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim()
+  const stripped = library.find((s) => bare(norm(s.title)) === bare(want))
   if (stripped) return stripped.id
   // "Offering - Paul Baloche": try the title without an artist/credit trailer.
   const head = title.split(/\s+[-–—]\s+/)[0]
