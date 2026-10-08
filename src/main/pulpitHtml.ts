@@ -73,6 +73,9 @@ button.nav:active{background:#2a3238}
 </div>
 
 <script>
+// QA B5-N1: the next announcement in a block is named in NEXT (mirrors shared/liveDisplay nextPreview).
+function nextPreview(s){var n=s.next||'';if(!n)return '';var t=s.nextTitle||'';return (t&&t!==s.songTitle)?(t+' \u2014 '+n):n}
+
 var ws = null
 var authed = false
 var cachedPin = localStorage.getItem('wf_pulpit_pin') || ''
@@ -139,7 +142,7 @@ function apply(msg) {
     document.getElementById('progress').textContent = s.total > 1 ? (s.index + 1) + ' of ' + s.total : ''
   } else {
     document.getElementById('stageLine').textContent = s.line || ''
-    document.getElementById('stageNext').textContent = s.next || ''
+    document.getElementById('stageNext').textContent = nextPreview(s)
     document.getElementById('progress').textContent = ''
   }
 }
