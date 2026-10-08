@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp, closeApp, operatorWindow, outputWindow, completeFirstRun, visibleText } from './electronApp'
-import { liveState, goToLiveControl, goLive, pressKey } from './qaHelpers'
+import { liveState, goToLiveControl, goLive, pressKey, crashApp, relaunchAfterCrash } from './qaHelpers'
 
 // Regression specs for the QA retest2 findings (retest2-a.md / retest2-b.md)
 // that need the real app: B2-N1, A2-N1, A2-N2, B2-N2, B2-N3, B2-N11.
@@ -99,10 +99,9 @@ test('A2-N1: after a crash (SIGKILL) mid-service, relaunching puts the live item
     const liveId = (await liveState(op)).liveServiceItemId
     expect(liveId).not.toBeNull()
     await op.waitForTimeout(1500) // let the recovery snapshot land
-    first.app.process().kill('SIGKILL')
-    await new Promise((r) => setTimeout(r, 1000))
+    await crashApp(first.app)
 
-    const again = await launchApp({ root })
+    const again = await relaunchAfterCrash(root)
     try {
       const op2 = await operatorWindow(again.app)
       const out2 = await outputWindow(again.app)
