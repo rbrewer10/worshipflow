@@ -300,7 +300,7 @@ const KNOWN_ROLES = [
   '(?:offering |money )?(?:counters|tellers)',
   "(?:nursery|children'?s church|kids'? church|toddler) (?:attendants?|workers?|volunteers?|teachers?|staff)",
   '(?:welcome|hospitality|coffee|greeting|fellowship) (?:hosts?|hostess(?:es)?|team|volunteers?)',
-  '(?:deacon|elder|pastor|minister)s? on (?:duty|call)',
+  '(?:deacon|elder|pastor|minister|trustee|usher)s? on (?:duty|call)',
   '(?:[a-z]+ )?(?:deacon|elder|famil(?:y|ie)|volunteer|steward|usher|greeter|acolyte|servant|helper|host|reader)s? of the (?:month|week|day)',
   '(?:altar|chancel|sanctuary) (?:flowers|guild)', 'flowers', '(?:those )?serving (?:today|this (?:morning|sunday|week))',
   // B8: more of the same — always the whole label.
@@ -308,11 +308,54 @@ const KNOWN_ROLES = [
   '(?:hospitality|kitchen|setup|set-up|clean-?up|parking|safety|security|welcome) (?:team|crew|volunteers?)', 'security',
   'live ?stream(?:ing)?', 'slides', 'power ?point', '(?:van|bus|shuttle) drivers?',
 ]
+// B9-N1: B8-N1's whole-label list left out the long tail of jobs a bulletin
+// names ("Choir Leader:", "Sunday School Director:", "Counter:", "Door
+// Keeper:", "Hostess:", "Volunteers:"). Up to two qualifier words before a
+// serving noun, at the start of the line, then ':' or a dash. The nouns that
+// are also song-title endings (Promise Keeper, Burden Bearer, Lord of Hosts —
+// B8-N1) only with the qualifiers that make them a job.
+const ROLE_QUALIFIER = "(?:(?!(?:of|the|my|our|your|his|her|their|a|an|and|or|is|be|me|you|we|us|to|in|on|for|with|by|from|lord|god|jesus|christ|king|holy|great|amazing)\\b)[a-z][\\w'’.-]*\\s+)"
+const ROLE_NOUN = '(?:leaders?|directors?|counters?|tellers?|attendants?|operators?|coordinators?|assistants?|volunteers?|servers?|captains?|ringers?|lighters?|speakers?|soloists?|musicians?|teachers?|trustees?|deacons?|elders?|teams?|crews?)'
+const ROLE_TITLE_NOUN = "(?:(?:cross|banner|flag|torch|candle|bible|book|gift|offering|mace|processional|candle ?light) bearers?|door ?keepers?|hosts?|hostess(?:es)?)"
+const ROLE_LABEL = `(?:${KNOWN_ROLES.join('|')}|${ROLE_QUALIFIER}{0,2}${ROLE_NOUN}|${ROLE_TITLE_NOUN})(?:\\(s\\))?`
+// "Ushers & Greeters:", "Ushers/Greeters:", "Usher(s):", "Greeters (Front Door):".
 const PERSONNEL = new RegExp(`^(?:the )?(?:${KNOWN_ROLES.join('|')})\\s*(?::|\\s[-–—])\\s*(.+)$`, 'i')
-// "Pastor: Rev. Jane Doe" — a bare "Pastor" label only with a title after it.
-const PASTOR_LINE = /^(?:(?:the |senior |associate |lead |guest |visiting )?pastor)\s*(?::|\s[-–—])\s*(?:the )?(?:rev(?:erend)?\.?|dr\.?|pastor|elder|bishop|fr\.?)\s/i
+// The wider label (qualifiers, "&", "(s)", "(Front Door)") only with a name
+// on the right, so a title ending in one of the nouns stays a song.
+const PERSONNEL_WIDE = new RegExp(`^(?:the )?${ROLE_LABEL}(?:\\s*(?:&|/|and)\\s*${ROLE_LABEL})?(?:\\s*\\([^()]*\\))?\\s*(?::|\\s[-–—])\\s*(.+)$`, 'i')
+// "Music: Ida Ross", "Organ: Ida Ross", "Sound & Video: Al Fry": an area
+// of the service, a colon and someone's name.
+const SERVICE_AREA = /^(?:music|organ|piano|keyboard|guitar|drums|bass|audio|video|sound|media|lights?|lighting|camera|coffee|nursery|hospitality)(?:\s*(?:&|\/|and)\s*(?:music|organ|piano|audio|video|sound|media|lights?|lighting|camera))?\s*:\s*(.+)$/i
+
+// "Ida Ross", "The Frys", "Mrs. Ross", "Officer Ed Hale", "Al, Ida & Bo":
+// a person's or family's name, not a title.
+const NAME_PREFIX = /^(?:(?:the|mr|mrs|ms|miss|dr|rev|reverend|fr|officer|deacon|elder|pastor|brother|sister|bro|sis)\.?\s+)+/i
+const NAME_WORD = "[A-Z][a-z'’-]*\\.?|[A-Z]\\."
+const PERSON_NAMES = new RegExp(`^(?:${NAME_WORD})(?:\\s+(?:${NAME_WORD}))*(?:\\s*(?:,|&|\\band\\b|/|\\+)\\s*(?:(?:the|mr|mrs|ms|dr|rev)\\.?\\s+)?(?:${NAME_WORD})(?:\\s+(?:${NAME_WORD}))*)*$`)
+// Words that make a capitalised phrase a title or a group rather than a name.
+const NOT_A_NAME = /\b(?:the|my|our|your|his|her|are|is|was|be|of|to|in|on|at|for|with|you|me|we|us|he|she|it|i|o|oh|all|this|that|how|what|when|who|come|grace|holy|lord'?s?|god|jesus|christ|king|glory|praise|amazing|love|spirit|prayer|hymn|song|psalm|prelude|postlude|anthem|hallelujah|alleluia|gloria|doxology|kyrie|heaven|cross|blessed|blessing|worship|choir|band|singers|ensemble|orchestra|quartet|trio|youth|children|kids|team|crew|culture|music|sunday|service|offering|communion|welcome)\b/i
+export function isPersonLike(text: string): boolean {
+  const t = text.trim().replace(NAME_PREFIX, '').replace(/\s+family$/i, '').trim()
+  if (!t || t.split(/\s+/).length > 8 || NOT_A_NAME.test(t)) return false
+  return PERSON_NAMES.test(t)
+}
+// "Officer Ed", "Rev. Jo Park", "Mrs. Ross": a name that says it's a person.
+const TITLED_PERSON = /^(?:the\s+)?(?:mr|mrs|ms|miss|dr|rev|reverend|fr|officer|deacon|elder|pastor|brother|sister|bro|sis)\.?\s+[A-Z]/i
+// A date or a service time on the right of a label ("— April 5, 2026", "10:30 AM").
+const DATE_OR_TIME = new RegExp(`(?:\\b${MONTH}\\s+\\d{1,2}\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b|${SERVICE_TIMES})`, 'i')
+
+// "Pastor: Rev. Jane Doe" — a bare "Pastor" label with a title after it, or
+// (B9-N1) a name: "Pastor: Jo Park".
+const PASTOR_LABEL = /^(?:(?:the |senior |associate |lead |guest |visiting |youth |executive )?pastor)\s*(?::|\s[-–—])\s*(.+)$/i
+const PASTOR_LINE = /^(?:(?:the |senior |associate |lead |guest |visiting |youth |executive )?pastor)\s*(?::|\s[-–—])\s*(?:the )?(?:rev(?:erend)?\.?|dr\.?|pastor|elder|bishop|fr\.?)\s/i
 const isPersonnelLine = (line: string): boolean => {
   if (PASTOR_LINE.test(line)) return true
+  const pastor = PASTOR_LABEL.exec(line)
+  if (pastor && isPersonLike(pastor[1])) return true
+  const area = SERVICE_AREA.exec(line)
+  if (area && isPersonLike(area[1])) return true
+  const wide = PERSONNEL_WIDE.exec(line)
+  if (wide && isPersonLike(wide[1])) return true
   const m = PERSONNEL.exec(line)
   return !!m && !isScripture(m[1]) && !/\d+:\d+/.test(m[1])
 }
@@ -388,9 +431,21 @@ function skipReason(rawLine: string, line: string): SkipReason | null {
 // B8-N1: a line about to be skipped whose song part is in the library is a
 // song after all (Promise Keeper by its artist, with Promise Keeper in the
 // library). Returns the title to import it under, or null.
-function librarySong(line: string, library: Library): string | null {
-  if (matchSongTitle(line, library) != null) return line
-  const left = /^(.+?)(?:\s+[-–—]\s+|\s*[–—]\s*|\s*:\s+)/.exec(line)?.[1]?.trim()
+//
+// B9-N4: only for a who's-serving or notice line, and only the song–artist
+// form (a dash): a date or heading line is never a song ("Easter Sunday —
+// April 5, 2026" with a song called Easter Sunday), and "Security: Officer
+// Ed Hale" names who is serving even when the library has a song called Security.
+// On the dash form the role still wins when the right side is a date, a time
+// or a titled name ("Worship Leader — Rev. Jo Park"); a plain name stays the
+// artist ("<song> – <artist>").
+function librarySong(line: string, reason: SkipReason, library: Library): string | null {
+  if (reason !== 'serving' && reason !== 'notice') return null
+  const dash = /^(.+?)(?:\s+[-–—]\s+|\s*[–—]\s*)(.+)$/.exec(line)
+  if (dash && (DATE_OR_TIME.test(dash[2]) || TITLED_PERSON.test(dash[2].trim()))) return null
+  if (matchSongTitle(line, library, { exact: true }) != null) return line
+  if (!dash) return null
+  const left = dash[1].trim()
   return left && matchSongTitle(left, library) != null ? left : null
 }
 
@@ -403,7 +458,7 @@ export function parseSetlistDetailed(raw: string, opts: { library?: Library } = 
     if (!line) continue
     const reason = skipReason(rawLine, line)
     if (reason) {
-      const song = reason !== 'rubric' && opts.library?.length ? librarySong(line, opts.library) : null
+      const song = opts.library?.length ? librarySong(line, reason, opts.library) : null
       if (song) out.push({ kind: 'song', title: bulletinSongTitle(song) })
       else skipped.push({ line, reason })
       continue
@@ -470,10 +525,34 @@ export function bulletinSongTitle(title: string): string {
   return t && !HYMN_LABEL_ALONE.test(t) ? t : title.trim()
 }
 
-export function matchSongTitle(title: string, library: { id: number; title: string }[]): number | null {
+// B9-N2: "<title> No. 12", "… p. 12", "… pg. 12", "… Hymn 12", "… (12)": a
+// hymnal number after the title. bulletinSongTitle leaves these
+// unbracketed forms alone ("Symphony No. 9" is a name); here they are
+// dropped when what's left is a song in the library.
+const NUMBER_TAIL = /\s*(?:\s(?:no\.?|p\.?|pg\.?|page|hymn|song)\s*#?\s*\d+[a-z]?|\(\s*\d+[a-z]?\s*\))$/i
+// B9-N3: "<title>: <artist>" — a colon before who sings or arranged it.
+const COLON_CREDIT = /^(.+?)\s*:\s+(.+)$/
+const isCredit = (text: string): boolean =>
+  /^(?:arr\.?|arranged|feat\.?|featuring|by|words|music)\b/i.test(text.trim()) || isPersonLike(text) ||
+  /^(?:the\s+)?(?:[A-Z][\w'’.-]*\s+){0,3}(?:choir|band|singers|ensemble|orchestra|quartet|trio|team)$/i.test(text.trim())
+
+export function matchSongTitle(title: string, library: { id: number; title: string }[], opts: { exact?: boolean } = {}): number | null {
+  const found = matchSongTitleExact(title, library)
+  if (found != null || opts.exact) return found
+  const tail = title.trim().replace(NUMBER_TAIL, '')
+  if (tail && tail !== title.trim()) {
+    const id = matchSongTitleExact(tail, library)
+    if (id != null) return id
+  }
+  const colon = COLON_CREDIT.exec(title.trim())
+  if (colon && isCredit(colon[2])) return matchSongTitleExact(colon[1], library)
+  return null
+}
+
+function matchSongTitleExact(title: string, library: { id: number; title: string }[]): number | null {
   const name = bulletinSongTitle(title)
   if (name !== title.trim()) {
-    const found = matchSongTitle(name, library)
+    const found = matchSongTitleExact(name, library)
     if (found != null) return found
   }
   const want = title.trim().toLowerCase()
@@ -483,5 +562,5 @@ export function matchSongTitle(title: string, library: { id: number; title: stri
   if (stripped) return stripped.id
   // "Offering - Paul Baloche": try the title without an artist/credit trailer.
   const head = title.split(/\s+[-–—]\s+/)[0]
-  return head !== title && head.trim() ? matchSongTitle(head, library) : null
+  return head !== title && head.trim() ? matchSongTitleExact(head, library) : null
 }
