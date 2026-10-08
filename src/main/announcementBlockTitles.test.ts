@@ -7,7 +7,8 @@ import { join } from 'path'
 // liveDisplay.test.ts and the e2e qa-retest4 "B5-N1" spec.
 // B5-N1: in an announcement block the projector and Volunteer mode kept the
 // FIRST announcement's title over every later announcement's body.
-const main = readFileSync(join(__dirname, 'index.ts'), 'utf8')
+// CRLF on a Windows checkout (CI): compare with \n line ends (QA B10-N2).
+const main = readFileSync(join(__dirname, 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
 const fn = (sig: string): string => {
   const i = main.indexOf(sig)
   expect(i, sig).toBeGreaterThan(-1)
@@ -34,7 +35,7 @@ describe('QA B5-N1: announcement block slides carry their own title', () => {
     expect(load).not.toMatch(/const firstId = refIds\[0\]/)
   })
   it('every NEXT preview uses nextPreview', () => {
-    for (const f of ['tabletHtml.ts', 'pulpitHtml.ts']) expect(readFileSync(join(__dirname, f), 'utf8'), f).toMatch(/textContent = nextPreview\(s\)/)
-    for (const f of ['Stage.tsx', 'VolunteerView.tsx']) expect(readFileSync(join(__dirname, '..', 'renderer', 'src', f), 'utf8'), f).toMatch(/nextPreview\(live\)/)
+    for (const f of ['tabletHtml.ts', 'pulpitHtml.ts']) expect(readFileSync(join(__dirname, f), 'utf8').replace(/\r\n/g, '\n'), f).toMatch(/textContent = nextPreview\(s\)/)
+    for (const f of ['Stage.tsx', 'VolunteerView.tsx']) expect(readFileSync(join(__dirname, '..', 'renderer', 'src', f), 'utf8').replace(/\r\n/g, '\n'), f).toMatch(/nextPreview\(live\)/)
   })
 })
