@@ -12,7 +12,7 @@
 import type { ScriptureResult, ServiceItem, ZoneId } from '../shared/types'
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
 import { chunkProse, chunkVerses } from '../shared/chunkText'
-import { parseReferenceList, subReference } from '../shared/scriptureRefs'
+import { parseReferenceList, rangeReference } from '../shared/scriptureRefs'
 
 export interface AutoDeckAnnouncement {
   id: number
@@ -50,7 +50,7 @@ async function sermonDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSl
   const intro = slide(introCard, introCard, LOGO, introCard)
 
   const reading = ranges.map((range) => {
-    const reference = subReference(result.reference ?? passage, range.from, range.to)
+    const reference = rangeReference(result, passage, range)
     const verse: ZoneSlot = { kind: 'scripture', reference }
     // Back Left keeps the designed card up and moves its reference along with
     // the reading; the stage monitor carries the same words the pastor reads.
@@ -101,7 +101,7 @@ async function scriptureDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<Zon
     if (!result.ok || !result.verses?.length) continue
 
     for (const range of chunkVerses(result.verses, deps.budget)) {
-      const ref = subReference(result.reference ?? reference, range.from, range.to)
+      const ref = rangeReference(result, reference, range)
       const verse: ZoneSlot = { kind: 'scripture', reference: ref }
       // Back Left carries the reference on its own, so the room can always see
       // where the reading is even once the text has scrolled on. Unlike the
