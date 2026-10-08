@@ -30,7 +30,8 @@ import type {
   LivecallConfig,
   ServiceTeam,
   ServiceItemType,
-  ServiceImportResult
+  ServiceImportResult,
+  ServiceExportResult
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { NdiRuntimeStatus } from '../shared/ndiRuntime'
@@ -434,7 +435,7 @@ const wf = {
     ipcRenderer.invoke('wf:multiview:open'),
 
   // Service export/import
-  serviceExport: (serviceId: number): Promise<{ canceled: boolean; filePath?: string; error?: string }> =>
+  serviceExport: (serviceId: number): Promise<ServiceExportResult> =>
     ipcRenderer.invoke('wf:services:export', serviceId),
   serviceImportFile: (): Promise<ServiceImportResult> =>
     ipcRenderer.invoke('wf:services:import'),

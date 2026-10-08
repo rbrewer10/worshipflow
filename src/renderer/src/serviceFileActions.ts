@@ -22,8 +22,17 @@ export async function exportServiceToFile(serviceId: number): Promise<void> {
   try {
     const res = await window.wf.serviceExport(serviceId)
     if (res.canceled) return
-    if (res.error) notifyLocal(res.error, 'error')
-    else notifyLocal(`Saved ${res.filePath?.split(/[\\/]/).pop() ?? 'the service file'}.`, 'info')
+    if (res.error) { notifyLocal(res.error, 'error'); return }
+    const name = res.filePath?.split(/[\\/]/).pop() ?? 'the service file'
+    const carried = res.mediaCount ? ` with ${res.mediaCount} picture/video file${res.mediaCount === 1 ? '' : 's'}` : ''
+    const missing = res.missingMedia ?? []
+    // Ryan's decision (Oct 2026): the file carries the service's media; say
+    // plainly when something it uses couldn't be found and isn't in the file.
+    if (missing.length) {
+      notifyLocal(`Saved ${name}${carried}, but ${missing.length} file${missing.length === 1 ? ' it uses wasn’t' : 's it uses weren’t'} found on this computer and ${missing.length === 1 ? 'isn’t' : 'aren’t'} in it: ${missing.join(', ')}.`, 'warn')
+    } else {
+      notifyLocal(`Saved ${name}${carried}.`, 'info')
+    }
   } catch (err) {
     notifyLocal(`The service couldn’t be saved: ${err instanceof Error ? err.message : String(err)}`, 'error')
   }

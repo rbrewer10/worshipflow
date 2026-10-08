@@ -472,6 +472,16 @@ export interface RecordingSidecar {
 
 // Result of File → Import service (.wfservice). `error` and `summary` are
 // plain sentences for an operator toast (QA B12 / B24).
+export interface ServiceExportResult {
+  canceled: boolean
+  filePath?: string
+  error?: string
+  /** Pictures/videos carried in the file (Ryan's decision, Oct 2026). */
+  mediaCount?: number
+  /** Base names of referenced media that couldn't be carried (not found, too big, on a network share). */
+  missingMedia?: string[]
+}
+
 export interface ServiceImportResult {
   canceled: boolean
   serviceId: number | null
