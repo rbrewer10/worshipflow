@@ -1,5 +1,6 @@
 import type { SongSection } from './types'
-import { parseReflowText } from './reflowText'
+import { parseReflowText, isSectionLabel } from './reflowText'
+import { isChordLine, stripChordOnlyLines } from './chordLines'
 
 export interface ImportedSong {
   title: string
@@ -17,7 +18,9 @@ function metaKey(name: string): 'title' | 'author' | 'ccli' | 'copyright' | null
   if (n === 'title' || n === 't') return 'title'
   if (n === 'artist' || n === 'author' || n === 'subtitle' || n === 'st' || n === 'composer') return 'author'
   if (n === 'ccli' || n === 'ccli_song' || n === 'song_number') return 'ccli'
-  if (n === 'copyright' || n === 'c') return 'copyright'
+  // QA B9: {c:} is ChordPro shorthand for {comment:} (e.g. "Repeat chorus
+  // twice"), NOT copyright — it used to land in the audience CCLI footer.
+  if (n === 'copyright') return 'copyright'
   return null
 }
 
@@ -76,39 +79,50 @@ function parseChordPro(raw: string): ImportedSong {
   }
 }
 
+function isCcliFooterLine(line: string): boolean {
+  return /CCLI\s+Song\s*#/i.test(line)
+    || /^CCLI\s+(Song|License)/i.test(line)
+    || /^©/.test(line) || /^Copyright/i.test(line)
+    || /^For use solely/i.test(line) || /^www\.ccli/i.test(line)
+}
+
 function parseCcli(raw: string): ImportedSong {
   const lines = raw.split(/\r?\n/)
-  let title = ''
-  let author: string | undefined
   let ccli: string | undefined
   let copyright: string | undefined
-  const body: string[] = []
-  let startedLyrics = false
-
   for (const rawLine of lines) {
     const line = rawLine.trim()
-    if (!line) {
-      if (startedLyrics) body.push('')
-      continue
-    }
     const ccliMatch = line.match(/CCLI\s+Song\s*#\s*([\d]+)/i)
-    if (ccliMatch) { ccli = ccliMatch[1]; continue }
-    if (/^CCLI\s+(Song|License)/i.test(line)) continue
-    if (/^©/.test(line) || /^Copyright/i.test(line)) { copyright = line.replace(/^©\s*/, ''); continue }
-    if (/^For use solely/i.test(line) || /^www\.ccli/i.test(line)) continue
-    if (!startedLyrics) {
-      if (!title) { title = line; continue }
-      if (!author && !/^(verse|chorus|bridge|tag|intro|ending|pre-?chorus)\b/i.test(line)) {
-        author = line.replace(/\s*\|\s*/g, ' | ')
-        continue
-      }
-      startedLyrics = true
+    if (ccliMatch) ccli = ccliMatch[1]
+    else if (/^©/.test(line) || /^Copyright/i.test(line)) copyright = line.replace(/^©\s*/, '')
+  }
+  const content = lines.filter((l) => !isCcliFooterLine(l.trim()))
+
+  // SongSelect's text export opens with a header block — title, then the
+  // author line — before the first section. Only consume opening lines as
+  // title/author when the paste really is a SongSelect export (it has the
+  // "CCLI Song #" footer) and those lines aren't section labels or chords.
+  // A plain paste that merely has a © footer keeps every line as lyrics
+  // (QA B6: "Verse 1" became the title and the first lyric line the author —
+  // and vanished from the slides).
+  let i = 0
+  while (i < content.length && content[i].trim() === '') i++
+  let title = ''
+  let author: string | undefined
+  let bodyStart = i
+  if (ccli) {
+    const header: string[] = []
+    let j = i
+    while (j < content.length && content[j].trim() !== '' && !isSectionLabel(content[j]) && header.length < 3) { header.push(content[j].trim()); j++ }
+    const terminated = j >= content.length || content[j].trim() === '' || isSectionLabel(content[j])
+    if (header.length >= 1 && header.length <= 2 && terminated && !header.some(isChordLine)) {
+      title = header[0]
+      if (header[1]) author = header[1].replace(/\s*\|\s*/g, ' | ')
+      bodyStart = j
     }
-    body.push(rawLine)
-    startedLyrics = true
   }
 
-  const text = body.join('\n').trim()
+  const text = content.slice(bodyStart).join('\n').trim()
   return {
     title: title || firstLyricTitle(text) || 'Untitled',
     author,
@@ -121,6 +135,7 @@ function parseCcli(raw: string): ImportedSong {
 
 function firstLyricTitle(text: string): string | null {
   for (const line of text.split('\n')) {
+    if (isSectionLabel(line) || isChordLine(line)) continue
     const t = line.replace(/\[[^\]]+\]/g, '').trim()
     if (t && !/^(verse|chorus|bridge|tag|intro|ending)\b/i.test(t)) return t.slice(0, 80)
   }
@@ -210,9 +225,12 @@ function parseUsr(raw: string): ImportedSong {
 }
 
 export function importLyrics(raw: string): ImportedSong | null {
-  const text = raw.replace(/^\uFEFF/, '').trim()
+  const original = raw.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+  if (!original.trim()) return null
+  if (looksUsr(original.trim())) return parseUsr(original.trim())
+  // QA B7: drop chord-only lines from chord-over-lyric sheets before parsing.
+  const text = stripChordOnlyLines(original).trim()
   if (!text) return null
-  if (looksUsr(text)) return parseUsr(text)
   if (looksChordPro(text)) return parseChordPro(text)
   if (looksCcli(text)) return parseCcli(text)
   const sections = parseReflowText(text)

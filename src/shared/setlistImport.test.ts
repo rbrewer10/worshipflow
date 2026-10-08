@@ -20,3 +20,17 @@ Sermon: The Cross
     expect(matchSongTitle('Unknown Hymn', lib)).toBeNull()
   })
 })
+
+describe('QA B-N3: more service elements become headers, not "Song:" placeholders', () => {
+  for (const line of ['Tithes & Offerings', 'Tithes and Offerings', 'Offerings', 'Call to Worship', 'Scripture Reading']) {
+    it(line, () => expect(parseSetlist(line)).toEqual([{ kind: 'element', title: line }]))
+  }
+  it('a reading with a reference is still scripture', () => {
+    expect(parseSetlist('Scripture Reading: John 3:16')[0].kind).toBe('scripture')
+    expect(parseSetlist('Reading: John 3:16')[0]).toEqual({ kind: 'scripture', title: 'John 3:16' })
+  })
+  it('songs with those words in the title stay songs', () => {
+    expect(parseSetlist('Doxology')[0].kind).toBe('song') // sung — matched against the library
+    expect(parseSetlist('Offering (Paul Baloche)')[0].kind).toBe('song')
+  })
+})
