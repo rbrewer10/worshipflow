@@ -11,9 +11,13 @@ import { PAYLOAD_BACKGROUND_TYPES } from '../../shared/types'
 // arm/cancel independently, and arming a new target always clears a still-
 // pending one first — otherwise both timers would fire independently and send
 // two different things live back-to-back.
+//
+// QA B9-N6: onArm runs when a target is armed (not when it fires) — for a Go
+// live, telling main that a newer click is coming, so a reading still being
+// looked up for an older one doesn't land during the 1.5 s.
 export function usePendingConfirm(delayMs = 1500): {
   pendingKey: string | null
-  trigger: (key: string, run: () => void) => void
+  trigger: (key: string, run: () => void, onArm?: () => void) => void
   cancel: () => void
 } {
   const [pendingKey, setPendingKey] = useState<string | null>(null)
@@ -26,11 +30,12 @@ export function usePendingConfirm(delayMs = 1500): {
     setPendingKey(null)
   }, [])
 
-  const trigger = useCallback((key: string, run: () => void) => {
+  const trigger = useCallback((key: string, run: () => void, onArm?: () => void) => {
     if (pendingKeyRef.current === key) { cancel(); return } // second tap on the same target cancels it
     cancel() // arming a different target always clears any still-pending one first
     pendingKeyRef.current = key
     setPendingKey(key)
+    onArm?.()
     timer.current = setTimeout(() => {
       pendingKeyRef.current = null
       timer.current = null

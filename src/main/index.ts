@@ -337,6 +337,14 @@ interface LiveTrackState {
   // this track (what the screens show until the item's deck lands), so
   // loadDeckOnto knows t.index is a verse index it can carry onto the deck.
   verseListGeneration: number
+  // QA B9-N5: a deck slide asked for before the deck exists (Play slide N on a
+  // reading): loadDeckOnto lands on it instead of mapping t.index.
+  deckIntent: { generation: number; index: number } | null
+  // The item deck doLoadScripture started (so Play slide N can wait for it).
+  deckLoad: { generation: number; promise: Promise<boolean> } | null
+  // QA B9-N6/N7: a reading being looked up online. advance = Next/Prev presses
+  // made meanwhile, carried onto the reading when it lands.
+  pendingScripture: { generation: number; advance: number } | null
   overlayTicker: string | null
   textHidden: boolean
   bgHidden: boolean
@@ -375,6 +383,9 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     deckScripture: new Map(),
     sermonSlides: null,
     verseListGeneration: -1,
+    deckIntent: null,
+    deckLoad: null,
+    pendingScripture: null,
     overlayTicker: null,
     textHidden: false,
     bgHidden: false
@@ -1334,6 +1345,35 @@ function notifyOperator(message: string, level: 'info' | 'warn' | 'error' = 'inf
 }
 
 // --- Extracted intent processing (used by both IPC and WebSocket) ---
+// QA B9-N7: Next/Prev from the operator or the tablet while a reading is still
+// being looked up. The press used to move the item still on screen (and was
+// lost to the reading); it is now kept for the reading. A blanked screen
+// (Black/Logo) still un-blanks as before.
+function carryPressIntoPendingLookup(track: TrackId, type: Intent): boolean {
+  if (type !== 'next' && type !== 'prev') return false
+  const t = tracks[track]
+  const p = t.pendingScripture
+  if (!p || p.generation !== t.loadGeneration) return false
+  if (t.mode !== 'lyrics' && !t.deckSlides) return false
+  p.advance = Math.max(0, p.advance + (type === 'next' ? 1 : -1))
+  logServiceEvent(`${type}: kept for the reading being looked up (${p.advance})`)
+  return true
+}
+
+// QA B9-N6: a newer Go live was armed (the 1.5 s tap-to-arm in the renderer).
+// A reading still being looked up for an older click must not land meanwhile —
+// on a slow network it showed for ~3 s until the armed item replaced it.
+// Bumping the generation makes doLoadScripture discard it, as the armed click
+// would when it fires; nothing that has already landed is touched.
+function supersedePendingLookup(track: TrackId): void {
+  const t = tracks[track]
+  const p = t.pendingScripture
+  if (!p || p.generation !== t.loadGeneration) return
+  ++t.loadGeneration
+  t.pendingScripture = null
+  logServiceEvent('go live armed: dropped the reading still being looked up')
+}
+
 function processIntent(track: TrackId, type: Intent): void {
   const t = tracks[track]
   // Only clear auto-advance for mode-changing intents (black/logo/lyrics), not for navigation (next/prev)
@@ -1558,11 +1598,18 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
   // already have pressed Space through the verse list doLoadScripture put up;
   // resetting to slide 1 here threw those presses away. A deck already landed
   // for this same load (t.deckSlides set) means t.index is a deck index.
-  const index = t.deckSlides
-    ? Math.min(t.index, slides.length - 1)
-    : t.verseListGeneration === generation
-      ? deckIndexForVerse(versesPerSlide, t.index)
-      : 0
+  // QA B9-N5: a slide picked on the deck itself (Play slide N) is already a
+  // deck index — mapping it as a verse landed one slide early on readings
+  // whose slides combine verses.
+  const intent = t.deckIntent?.generation === generation ? t.deckIntent.index : null
+  if (intent != null) t.deckIntent = null
+  const index = intent != null
+    ? Math.max(0, Math.min(intent, slides.length - 1))
+    : t.deckSlides
+      ? Math.min(t.index, slides.length - 1)
+      : t.verseListGeneration === generation
+        ? deckIndexForVerse(versesPerSlide, t.index)
+        : 0
   t.deckSlides = slides
   t.deckIsGenerated = isGenerated
   t.deckSource = source
@@ -1795,6 +1842,8 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   // returned false, and went live as nothing at all with no error shown.
   const refs = parseReferenceList(reference)
   if (!refs.length) return false
+  const pending = { generation, advance: 0 }
+  tracks[track].pendingScripture = pending
 
   const verses: ScriptureVerse[] = []
   let resolvedTitle: string | null = null
@@ -1805,6 +1854,7 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   const results = bibleTranslation === 'kjv'
     ? refs.map((ref) => lookupScripture(ref))
     : await Promise.all(refs.map(scriptureFor))
+  if (tracks[track].pendingScripture === pending) tracks[track].pendingScripture = null
   for (let k = 0; k < refs.length; k++) {
     const ref = refs[k]
     const result = results[k]
@@ -1862,13 +1912,22 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   t.blurBehindText = blurBehindText ?? false
   if (fontScale != null) t.fontScale = fontScale
   t.mode = 'lyrics'
-  t.index = 0
+  // QA B9-N7: Next/Prev pressed while this was being looked up were meant for
+  // it — land that many verses in; loadDeckOnto carries a verse index onto
+  // the deck (retest8).
+  t.index = Math.min(pending.advance, lines.length - 1)
   t.verseListGeneration = generation
   // Same as doLoadText/doLoadSermon: an ad-hoc Quick Scripture passes no item
   // and keeps the flat verse list, but a real scripture SERVICE item gets its
   // generated deck (reference on Back Left, verse on the rest). Without this
   // the deck autoDeckFor builds was never applied to anything.
-  if (item) void loadDeckOnto(track, item, generation)
+  if (item) {
+    const promise = loadDeckOnto(track, item, generation).catch((err) => {
+      logWarn(`[deck] ${String(err)}`)
+      return false
+    })
+    t.deckLoad = { generation, promise }
+  }
   return true
 }
 
@@ -2090,7 +2149,8 @@ function doLoadMedia(track: TrackId, filePath: string, title: string): void {
 }
 
 // Load any service item to live (used by tablet loadItem messages and the goLiveAt IPC).
-async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<void> {
+async function handleTabletLoadItem(track: TrackId, itemId: number, deckIndex?: number): Promise<void> {
+  let deckBroadcasts = false
   const item = activeServiceItems.find((it) => it.id === itemId && it.track === track)
   if (!item) return
   if (item.type === 'song' && item.ref_id != null) {
@@ -2100,7 +2160,15 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
     if (!ref) return
     if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.payload.fontScale as number | undefined, item.payload.bgFit as 'cover' | 'contain' | undefined, item))) return  // lookup failed → don't mark it live
     // B9-N9: zone 1 waits for the deck doLoadScripture just started — unless it has already landed.
-    if (!tracks[track].deckSlides) holdZoneOneForDeck(track, tracks[track].loadGeneration)
+    if (!tracks[track].deckSlides) {
+      holdZoneOneForDeck(track, tracks[track].loadGeneration)
+      // B9-N5: Play slide N — the deck lands on that slide and broadcasts it;
+      // broadcasting the verse list first flashed verse 1.
+      if (deckIndex != null) {
+        tracks[track].deckIntent = { generation: tracks[track].loadGeneration, index: deckIndex }
+        deckBroadcasts = true
+      }
+    }
   } else if (item.type === 'text') {
     doLoadText(
       track,
@@ -2150,7 +2218,7 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
   t.serviceItemId = item.id
   t.itemNotes = item.notes ?? null
   applyItemTheme(track, item)
-  broadcast()
+  if (!deckBroadcasts) broadcast()
   // Mirrors wf:live:setItemId's recording hook (main-track only) — this is the
   // path Next/Prev, the tablet remote, and slide-thumbnail clicks actually run
   // through during a live service, so it must stamp markers too, not just the
@@ -2468,7 +2536,7 @@ function startTabletServer(): void {
           return
         }
         if (msg.type === 'intent' && isIntent(msg.intent)) {
-          processIntent('main', msg.intent)
+          if (!carryPressIntoPendingLookup('main', msg.intent)) processIntent('main', msg.intent)
         } else if (msg.type === 'loadItem' && isPositiveInt(msg.itemId)) {
           void handleTabletLoadItem('main', msg.itemId)
         } else if (msg.type === 'clearStageMessage') {
@@ -2739,7 +2807,11 @@ function layoutOutputs(windowedFallback = false): void {
 }
 
 // --- IPC: intents ---
-ipcMain.on('wf:intent', (_e, track: TrackId, type: Intent) => { assertTrackId(track); processIntent(track, type) })
+ipcMain.on('wf:intent', (_e, track: TrackId, type: Intent) => {
+  assertTrackId(track)
+  if (!carryPressIntoPendingLookup(track, type)) processIntent(track, type)
+})
+ipcMain.handle('wf:live:goLiveArmed', (_e, track: TrackId) => { assertTrackId(track); supersedePendingLookup(track) })
 
 ipcMain.handle('wf:getInfo', (): AppInfo => ({
   song: tracks.main.song,
@@ -3812,8 +3884,17 @@ ipcMain.handle('wf:service:slides', async (_e, serviceId: number): Promise<{ id:
 })
 ipcMain.handle('wf:live:goLiveAt', async (_e, track: TrackId, itemId: number, slideIndex: number) => {
   assertTrackId(track)
-  await handleTabletLoadItem(track, itemId)  // loads the item live (index 0) + broadcasts + resolves theme
+  // loads the item live (index 0) + broadcasts + resolves theme. For a reading
+  // whose deck is still on its way it records slideIndex as the deck slide
+  // (QA B9-N5) and leaves the broadcast to the deck.
+  await handleTabletLoadItem(track, itemId, slideIndex)
   const t = tracks[track]
+  const deck = t.deckLoad
+  if (deck && deck.generation === t.loadGeneration && t.deckIntent?.generation === deck.generation) {
+    const landed = await deck.promise
+    if (landed || t.loadGeneration !== deck.generation) return
+    t.deckIntent = null  // no deck after all: the verse list, at that line
+  }
   const last = t.song.lines.length - 1
   t.index = Math.max(0, Math.min(slideIndex, last < 0 ? 0 : last))
   broadcast()

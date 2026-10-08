@@ -34,7 +34,7 @@ describe('QA B9-N9: zone 1 waits for the deck instead of flashing the verse', ()
   it('a reading Go live sets it (operator and tablet paths); the deck releases it before its one broadcast', () => {
     const ipc = main.slice(main.indexOf("ipcMain.handle('wf:live:loadScripture'"))
     expect(ipc.slice(0, ipc.indexOf('\n})\n'))).toMatch(/if \(ok && typeof itemId === 'number'\) holdZoneOneForDeck\(track, tracks\[track\]\.loadGeneration\)\n\s+if \(ok\) broadcast\(\)/)
-    expect(code(fn('async function handleTabletLoadItem('))).toMatch(/if \(!tracks\[track\]\.deckSlides\) holdZoneOneForDeck\(track, tracks\[track\]\.loadGeneration\)/)
+    expect(code(fn('async function handleTabletLoadItem('))).toMatch(/if \(!tracks\[track\]\.deckSlides\) \{?\s*holdZoneOneForDeck\(track, tracks\[track\]\.loadGeneration\)/)
     const deck = code(fn('async function loadDeckOnto('))
     const release = deck.indexOf('releaseZoneOneHold(track, generation)')
     expect(release).toBeGreaterThan(deck.indexOf('t.deckSlides = slides'))

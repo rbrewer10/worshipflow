@@ -160,6 +160,8 @@ const wf = {
     return () => ipcRenderer.removeListener('wf:recordings:aiProgress', handler)
   },
   liveSetItemId: (track: TrackId, id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', track, id),
+  // QA B9-N6: a Go live was armed — main drops a reading still being looked up for an older click.
+  liveGoLiveArmed: (track: TrackId): Promise<void> => ipcRenderer.invoke('wf:live:goLiveArmed', track),
   liveGoLiveAt: (track: TrackId, itemId: number, slideIndex: number): Promise<void> =>
     ipcRenderer.invoke('wf:live:goLiveAt', track, itemId, slideIndex),
   liveSetFontScale: (track: TrackId, scale: number): Promise<void> => ipcRenderer.invoke('wf:live:setFontScale', track, scale),
