@@ -348,17 +348,29 @@ const DATE_OR_TIME = new RegExp(`(?:\\b${MONTH}\\s+\\d{1,2}\\b|\\b\\d{1,2}/\\d{1
 // (B9-N1) a name: "Pastor: Jo Park".
 const PASTOR_LABEL = /^(?:(?:the |senior |associate |lead |guest |visiting |youth |executive )?pastor)\s*(?::|\s[-–—])\s*(.+)$/i
 const PASTOR_LINE = /^(?:(?:the |senior |associate |lead |guest |visiting |youth |executive )?pastor)\s*(?::|\s[-–—])\s*(?:the )?(?:rev(?:erend)?\.?|dr\.?|pastor|elder|bishop|fr\.?)\s/i
-const isPersonnelLine = (line: string): boolean => {
-  if (PASTOR_LINE.test(line)) return true
+// B10-N1: the same wide label made of known roles only ("Ushers & Greeters:",
+// "Greeters (Front Door):"). A line that is personnel only through the generic
+// qualifier + noun label ("<word> Speaker: <name>") may be a song title with
+// its credit, so the library gets a say first (librarySong).
+const KNOWN_LABEL = `(?:${KNOWN_ROLES.join('|')})(?:\\(s\\))?`
+const PERSONNEL_KNOWN_WIDE = new RegExp(`^(?:the )?${KNOWN_LABEL}(?:\\s*(?:&|/|and)\\s*${KNOWN_LABEL})?(?:\\s*\\([^()]*\\))?\\s*(?::|\\s[-–—])\\s*(.+)$`, 'i')
+type PersonnelKind = 'known' | 'generic'
+function personnelKind(line: string): PersonnelKind | null {
+  if (PASTOR_LINE.test(line)) return 'known'
   const pastor = PASTOR_LABEL.exec(line)
-  if (pastor && isPersonLike(pastor[1])) return true
+  if (pastor && isPersonLike(pastor[1])) return 'known'
   const area = SERVICE_AREA.exec(line)
-  if (area && isPersonLike(area[1])) return true
-  const wide = PERSONNEL_WIDE.exec(line)
-  if (wide && isPersonLike(wide[1])) return true
+  if (area && isPersonLike(area[1])) return 'known'
   const m = PERSONNEL.exec(line)
-  return !!m && !isScripture(m[1]) && !/\d+:\d+/.test(m[1])
+  if (m && !isScripture(m[1]) && !/\d+:\d+/.test(m[1])) return 'known'
+  const wide = PERSONNEL_WIDE.exec(line)
+  if (wide && isPersonLike(wide[1])) {
+    const known = PERSONNEL_KNOWN_WIDE.exec(line)
+    return known && isPersonLike(known[1]) ? 'known' : 'generic'
+  }
+  return null
 }
+const isPersonnelLine = (line: string): boolean => personnelKind(line) != null
 // "Liturgist: Psalm 23": the reading the role names.
 function personnelReading(line: string): string | null {
   const m = PERSONNEL.exec(line)
@@ -439,8 +451,19 @@ function skipReason(rawLine: string, line: string): SkipReason | null {
 // On the dash form the role still wins when the right side is a date, a time
 // or a titled name ("Worship Leader — Rev. Jo Park"); a plain name stays the
 // artist ("<song> – <artist>").
+//
+// B10-N1: a line that is personnel only through the generic qualifier + noun
+// label ("Peace Speaker: <artist>", "Story Teller – Dr. <artist>") is a song
+// when its label is a library title, whatever the credit looks like (a colon,
+// a titled name). Known roles, pastor and service-area lines are unchanged.
 function librarySong(line: string, reason: SkipReason, library: Library): string | null {
   if (reason !== 'serving' && reason !== 'notice') return null
+  if (reason === 'serving' && personnelKind(line) === 'generic') {
+    const label = /^(.+?)\s*(?::|\s[-–—])\s*(.+)$/.exec(line)
+    if (label && !DATE_OR_TIME.test(label[2]) && matchSongTitle(label[1].trim(), library) != null) {
+      return matchSongTitle(line, library) != null ? line : label[1].trim()
+    }
+  }
   const dash = /^(.+?)(?:\s+[-–—]\s+|\s*[–—]\s*)(.+)$/.exec(line)
   if (dash && (DATE_OR_TIME.test(dash[2]) || TITLED_PERSON.test(dash[2].trim()))) return null
   if (matchSongTitle(line, library, { exact: true }) != null) return line
