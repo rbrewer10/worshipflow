@@ -45,6 +45,33 @@ describe('modeAfterAsyncLoad (QA A2-N2)', () => {
   })
 })
 
+// Ryan's decision #4 (Oct 2026): keep today's behaviour — Black (or Logo)
+// pressed during the 1.5 s tap-to-cancel Go Live wait does NOT cancel the
+// armed Go Live. The screen blacks at once; when the wait ends the armed item
+// goes live and takes the screen out of Black. (Church Tech open decision #6;
+// retest3-b spec 36, retest7 66-B, retest8 68e.)
+describe("Black during the 1.5 s Go Live wait (Ryan's decision #4: keep)", () => {
+  it('the armed item fires after Black and its load clears Black/Logo (load generation is newer than the press)', () => {
+    // B at generation 7 during the wait; the arm fires → load 8.
+    expect(modeAfterAsyncLoad('black', 7, 8)).toBe('lyrics')
+    expect(modeAfterAsyncLoad('logo', 7, 8)).toBe('lyrics')
+  })
+  it('the tap-to-cancel arm is only cancelled by a second tap, a newer arm or leaving the view — never by Black/Logo', () => {
+    const rd = (f: string): string => readFileSync(join(__dirname, '..', 'renderer', 'src', f), 'utf8').replace(/\r\n/g, '\n')
+    const hook = rd('liveActions.ts')
+    const fn = hook.slice(hook.indexOf('export function usePendingConfirm('), hook.indexOf('\n}\n', hook.indexOf('export function usePendingConfirm(')))
+    expect(fn).not.toMatch(/black|logo|onState/i)
+    for (const f of ['ServiceRail.tsx', 'SlideGrid.tsx']) {
+      const src = rd(f)
+      expect(src).toContain('usePendingConfirm()')
+      // cancel() is called from the unmount cleanup only.
+      const calls = src.match(/\bcancel\(\)/g) ?? []
+      expect(calls, f).toHaveLength(1)
+      expect(src, f).toMatch(/return \(\) => \{ off\(\); cancel\(\) \}/)
+    }
+  })
+})
+
 describe('A2-N2 wiring (source guard)', () => {
   const main = readFileSync(join(__dirname, '..', 'main', 'index.ts'), 'utf8')
   it('Black and Logo record the generation they were pressed at', () => {
