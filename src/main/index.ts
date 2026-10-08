@@ -996,6 +996,17 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     const live = renderState(zoneTrack)
     const t = tracks[zoneTrack]
 
+    // Black means every screen on this track goes dark, zone pages included
+    // (Ryan's decision, Oct 2026 — zone 3 used to keep showing the lyric line
+    // while OUT was black). It outranks pins, decks and routing: Black is the
+    // operator's "nothing on the screens" button. Zone 4 (stage monitor)
+    // renders 'black' as its dim "Screen Off" card. Clearing Black recomputes
+    // every zone from the routing/deck/pins below, so they come straight back.
+    if (t.mode === 'black') {
+      result[zoneId] = { ...emptyZoneState(live), mode: 'black' }
+      continue
+    }
+
     // A pin is the operator's most recent and most explicit instruction for
     // this one screen — it outranks everything below, including an authored
     // deck. A mode pin falls through to the shared mode-population code below
