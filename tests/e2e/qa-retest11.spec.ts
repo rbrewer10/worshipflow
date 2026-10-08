@@ -46,6 +46,9 @@ test('B11-N1: paste setlist — extra spaces, tabs and non-breaking spaces insid
       const wf = (window as any).wf
       return ((await wf.serviceGet(await wf.getActiveServiceId())).items as any[]).length
     }), { timeout: 10_000 }).toBeGreaterThan(0)
+    // The import adds items one at a time and closes the dialog when the last is in;
+    // reading the service before that raced the tail of the list (flaky on a repeat run).
+    await expect(op.getByPlaceholder(/Amazing Grace/)).toBeHidden({ timeout: 20_000 })
     const items: Array<{ type: string; title: string | null }> = await op.evaluate(async () => {
       const wf = (window as any).wf
       const svc = await wf.serviceGet(await wf.getActiveServiceId())

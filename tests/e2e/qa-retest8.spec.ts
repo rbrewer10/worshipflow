@@ -192,6 +192,9 @@ test('B8-N1: pasted "Title – Artist" lines stay service items and link to libr
       const wf = (window as any).wf
       return ((await wf.serviceGet(await wf.getActiveServiceId())).items as any[]).length
     }), { timeout: 10_000 }).toBeGreaterThan(0)
+    // The import adds items one at a time and closes the dialog when the last is in;
+    // reading the service before that raced the tail of the list (flaky on a repeat run).
+    await expect(op.getByPlaceholder(/Amazing Grace/)).toBeHidden({ timeout: 20_000 })
     const linked: Record<string, string | null> = await op.evaluate(async (want) => {
       const wf = (window as any).wf
       const svc = await wf.serviceGet(await wf.getActiveServiceId())
