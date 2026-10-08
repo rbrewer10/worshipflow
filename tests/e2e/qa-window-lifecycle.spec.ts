@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { rmSync } from 'node:fs'
 import { launchApp, closeApp, operatorWindow, outputWindow, completeFirstRun } from './electronApp'
-import { windowList, processExited, closeAppWithin, captureOutput, attachText } from './qaHelpers'
+import { windowList, processExited, closeAppWithin, captureOutput, attachText, crashRenderer } from './qaHelpers'
 
 // QA regressions: A-C2, A-H3, A-H7 (a-extra/close-operator.mjs, close-output.mjs, crash-renderer.mjs).
 
@@ -81,7 +81,7 @@ test('A-H3: crashed output and operator renderers reload by themselves', async (
     await completeFirstRun(op)
     await op.evaluate(() => (window as any).wf.liveLoadText('main', 'Welcome', 'Hello there'))
     await test.step('crash the output renderer; it reloads and shows what is live', async () => {
-      await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer() })
+      await crashRenderer(app, 'output')
       await expect.poll(async () => (await windowList(app)).every((w) => !w.crashed), { timeout: 10_000 }).toBe(true)
       // executeJavaScript on a renderer that is mid-crash/reload never settles, so race it.
       await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
@@ -90,7 +90,7 @@ test('A-H3: crashed output and operator renderers reload by themselves', async (
       }), { timeout: 15_000 }).toContain('Welcome')
     }, { timeout: 30_000 })
     await test.step('crash the operator renderer; it reloads', async () => {
-      await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer() })
+      await crashRenderer(app, 'operator')
       await expect.poll(async () => (await windowList(app)).every((w) => !w.crashed), { timeout: 10_000 }).toBe(true)
     }, { timeout: 30_000 })
   } finally {
@@ -132,9 +132,7 @@ test('A-N3: an operator that crashed past the cap comes back when the app is lau
     // Let first-run finish settling — crashing mid-navigation makes Playwright itself report "Target crashed".
     await op.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 20_000 })
     await op.waitForTimeout(500)
-    const crashOperator = (): Promise<void> => app.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer()
-    })
+    const crashOperator = (): Promise<void> => crashRenderer(app, 'operator')
     const operatorCrashed = (): Promise<boolean> => app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.isCrashed())
     for (let i = 0; i < 3; i++) {

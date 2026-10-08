@@ -170,3 +170,19 @@ export async function attachText(name: string, text: string): Promise<void> {
   writeFileSync(to, text)
   await test.info().attach(name, { path: to, contentType: 'text/plain' })
 }
+
+/**
+ * Crash a window's renderer the way a real crash does. On GitHub's Ubuntu
+ * runner webContents.forcefullyCrashRenderer() left the renderer hung instead
+ * of gone: no render-process-gone, isCrashed() false, executeJavaScript never
+ * answering (candidate CI, Oct 8). So on Linux the renderer's OS process is
+ * killed from main (what the OOM killer or a GPU fault does); elsewhere
+ * forcefullyCrashRenderer() is kept, as it works there.
+ */
+export async function crashRenderer(app: ElectronApplication, which: 'output' | 'operator'): Promise<void> {
+  await app.evaluate(({ BrowserWindow }, w) => {
+    const win = BrowserWindow.getAllWindows().find((b) => b.webContents.getURL().includes('#/output') === (w === 'output'))!
+    if (process.platform === 'linux') process.kill(win.webContents.getOSProcessId(), 'SIGKILL')
+    else win.webContents.forcefullyCrashRenderer()
+  }, which)
+}
