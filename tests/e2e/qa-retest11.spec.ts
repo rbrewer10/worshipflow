@@ -14,7 +14,7 @@ test('B11-N1: paste setlist — extra spaces, tabs and non-breaking spaces insid
     const op = await operatorWindow(app)
     await completeFirstRun(op, { sample: true })
     // One library title saved with a double space: it must match too.
-    const library = ['Amazing Grace', 'Great Is Thy Faithfulness', 'Holy,  Holy, Holy']
+    const library = ['Amazing Grace', 'Great Is Thy Faithfulness', 'Holy, Holy, Holy', 'Be Thou  My Vision']
     await op.evaluate(async (want) => {
       const wf = (window as any).wf
       const norm = (t: string): string => t.replace(/\s+/g, ' ').trim().toLowerCase()
@@ -32,13 +32,13 @@ test('B11-N1: paste setlist — extra spaces, tabs and non-breaking spaces insid
     await op.getByRole('button', { name: /Paste setlist/ }).click()
     const serving = ['Head  Usher: Carl Mims', 'Senior  Pastor: Ryan Brewer', 'Choir\tDirector: Gloria Lee']
     await op.getByPlaceholder(/Amazing Grace/).fill([
-      'Prelude', 'Amazing  Grace', serving[0], 'Great Is\tThy Faithfulness', serving[1], 'Hymn:\u00A0\u00A0Holy, Holy, Holy', serving[2], 'Benediction',
+      'Prelude', 'Amazing  Grace', serving[0], 'Great Is\tThy Faithfulness', serving[1], 'Hymn:\u00A0\u00A0Holy, Holy, Holy', serving[2], 'Be Thou My Vision', 'Benediction',
     ].join('\n'))
     // The preview shows exactly the titles that get imported.
     const preview = op.getByTestId('setlist-preview')
-    await expect(preview.locator('li')).toHaveCount(5)
+    await expect(preview.locator('li')).toHaveCount(6)
     const shown = (await preview.locator('li').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
-    expect(shown).toEqual(['Header Prelude', 'Song Amazing Grace', 'Song Great Is Thy Faithfulness', 'Song Holy, Holy, Holy', 'Header Benediction'])
+    expect(shown).toEqual(['Header Prelude', 'Song Amazing Grace', 'Song Great Is Thy Faithfulness', 'Song Holy, Holy, Holy', 'Song Be Thou My Vision', 'Header Benediction'])
     const skipped = op.getByTestId('setlist-skipped')
     await expect(skipped).toContainText(`${serving.length} lines skipped`)
     await op.getByRole('button', { name: /Add to this service|Create service/ }).click()
@@ -52,8 +52,8 @@ test('B11-N1: paste setlist — extra spaces, tabs and non-breaking spaces insid
       const songs = (await wf.songsList('')) as any[]
       return (svc.items as any[]).map((i) => ({ type: i.type, title: i.type === 'song' ? songs.find((s) => s.id === i.ref_id)?.title ?? null : i.title }))
     })
-    // All three linked (no "Song: …" placeholders), nothing from the role lines.
-    expect(items.filter((i) => i.type === 'song').map((i) => i.title?.replace(/\s+/g, ' '))).toEqual(['Amazing Grace', 'Great Is Thy Faithfulness', 'Holy, Holy, Holy'])
+    // All four linked (no "Song: …" placeholders), nothing from the role lines.
+    expect(items.filter((i) => i.type === 'song').map((i) => i.title?.replace(/\s+/g, ' '))).toEqual(['Amazing Grace', 'Great Is Thy Faithfulness', 'Holy, Holy, Holy', 'Be Thou My Vision'])
     expect(items.filter((i) => i.type === 'placeholder')).toEqual([])
   } finally {
     await closeApp(app, userDataDir)
