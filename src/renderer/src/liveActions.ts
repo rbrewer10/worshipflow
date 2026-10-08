@@ -80,7 +80,7 @@ export async function sendItemLive(item: ServiceItem, track: TrackId): Promise<b
     if (!ref) return false
     // A failed lookup must NOT mark the item live — that would leave the previous
     // content on screen re-themed as scripture while the deck says scripture is live.
-    const ok = await window.wf.liveLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
+    const ok = await window.wf.liveLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.id)
     if (!ok) return false
   } else if (item.type === 'text') {
     await window.wf.liveLoadText(
