@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test'
-import { writeFileSync } from 'node:fs'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, operatorWindow, completeFirstRun } from './electronApp'
+import { launchApp, operatorWindow, completeFirstRun } from './electronApp'
+import { crashApp } from './qaHelpers'
 
 // QA regression A-H4 (a-extra/errorbox-block.mjs): an import error dialog must
 // not freeze the main process (and with it Go Live / Next / Black).
@@ -38,8 +39,12 @@ for (const which of ['songselect', 'service'] as const) {
       ])
       expect(answered).toBe('black')
     } finally {
-      app.process().kill('SIGKILL') // an error dialog is still up
-      await closeApp(app, userDataDir)
+      // An error dialog is still up, so kill rather than close. crashApp takes
+      // the whole tree on Windows and waits for it: a bare SIGKILL left the
+      // renderers holding files in the profile, and removing it failed with
+      // EPERM (candidate Windows CI, Oct 8).
+      await crashApp(app)
+      rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
     }
   })
 }

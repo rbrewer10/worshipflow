@@ -151,7 +151,7 @@ export async function closeAppWithin(launched: LaunchedApp, ms = 20_000): Promis
       }
     }
   } catch { /* diagnostics only */ }
-  rmSync(userDataDir, { recursive: true, force: true })
+  rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
   return quit
 }
 
