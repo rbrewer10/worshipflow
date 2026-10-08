@@ -11,14 +11,15 @@ import { promisify } from 'util'
 const execFileAsync = promisify(execFile)
 import { WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
-import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
+import type { Intent, LiveState, DisplayInfo, AppInfo, Mode, SongInput, SongFull, NewServiceItem, ServiceItem, ServiceFull, Theme, SceneContext, BibleTranslation, ScriptureResult, ScriptureVerse, ParsedPptxSong, ThemeColors, ItemStyle, ZoneId, ZoneMode, ZoneState, ZoneRouting, TrackId, AnnouncementInput, LivecallConfig } from '../shared/types'
 import { DEFAULT_ZONE_TRACK } from '../shared/types'
 import { parseSceneConfig, validateSceneConfig, defaultRoutingFor, generatedDeckYieldsTo } from '../shared/zoneScenes'
 import type { SceneConfig } from '../shared/zoneScenes'
 import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
-import { parseReferenceList, formatReferenceList, subReference } from '../shared/scriptureRefs'
+import { parseReferenceList, formatReferenceList, rangeReference, verseLines, deckVerseText, numberedVerseLines } from '../shared/scriptureRefs'
+import { normalizeReference } from '../shared/scriptureParse'
 import { reflowSlideTexts } from '../shared/reflowText'
 import { chunkVerses } from '../shared/chunkText'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
@@ -870,9 +871,38 @@ function zonePinsRecord(): ZonePins {
 //     >  scene typeDefault  >  idleDefault
 // (A generated deck sits below explicit routing only for zones that routing
 // takes off content; for the rest it still supplies the per-zone layout.)
+// QA B9-N9: a reading goes up in two steps — its verses first (doLoadScripture,
+// for the screens that show them at once), then its deck. Zone 1's deck slot is
+// the reference card, but in between it rendered the routing default (the
+// numbered verse), so the first click showed one frame of the verse before the
+// card. Zone 1 now keeps what it was showing until the deck lands, at most
+// ZONE1_DECK_HOLD_MS. Zones 2–4 are not held.
+const ZONE1_DECK_HOLD_MS = 1000
+const zoneOneHold: Record<TrackId, { generation: number; timer: ReturnType<typeof setTimeout> } | null> = { main: null, second: null }
+const lastZoneOneState: Partial<Record<TrackId, ZoneState>> = {}
+function holdZoneOneForDeck(track: TrackId, generation: number): void {
+  const prev = zoneOneHold[track]
+  if (prev) clearTimeout(prev.timer)
+  const timer = setTimeout(() => {
+    if (zoneOneHold[track]?.timer !== timer) return
+    zoneOneHold[track] = null
+    zoneBroadcast()
+  }, ZONE1_DECK_HOLD_MS)
+  zoneOneHold[track] = { generation, timer }
+}
+// Returns true when a hold for this load was released (the caller broadcasts).
+function releaseZoneOneHold(track: TrackId, generation: number): boolean {
+  const hold = zoneOneHold[track]
+  if (!hold || hold.generation !== generation) return false
+  clearTimeout(hold.timer)
+  zoneOneHold[track] = null
+  return true
+}
+
 function computeZoneStates(): Record<ZoneId, ZoneState> {
   const result = {} as Record<ZoneId, ZoneState>
   const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
+  let zoneOneHeld = false
   // Zone- and track-agnostic — read once per broadcast rather than once per zone,
   // since this hits the DB and computeZoneStates can fire every 100ms during auto-advance.
   const sceneConfig = parseSceneConfig(getSetting('zone_scenes'))
@@ -907,6 +937,14 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       } else {
         pinnedMode = pin.mode
       }
+    }
+
+    // B9-N9: hold zone 1 while its deck is on the way (see zoneOneHold).
+    const heldZoneOne = zoneId === 1 && pinnedMode == null && zoneOneHold[zoneTrack] ? lastZoneOneState[zoneTrack] : undefined
+    if (heldZoneOne) {
+      result[zoneId] = { ...heldZoneOne }
+      zoneOneHeld = true
+      continue
     }
 
     // Get routing for the active item on this zone's track (or defaults: scene
@@ -1056,6 +1094,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     result[zoneId].background = cleared.background
     result[zoneId].overlayTicker = t.overlayTicker
   }
+  if (!zoneOneHeld) lastZoneOneState[zoneTrackFor(1, stageRehearsal, activeZoneTrackAssignment[1])] = { ...result[1] }
   return result
 }
 
@@ -1491,74 +1530,90 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
   const isGenerated = authored == null
   const source = await computeItemSourceSlides(item)
   if (tracks[track].loadGeneration !== generation) return true
+
+  // QA B7-N1: look the verses up BEFORE the deck goes on screen. The deck used
+  // to be broadcast first with every scripture slide summarised as its bare
+  // reference, then again once the verses arrived, so after a clicked Go live
+  // the projector showed just "Mark 4:35" for about a quarter of a second
+  // (and Zone 3 "Mark 4:35 1 / 7") before "4:35 And the same day…". Until
+  // the lookups finish, the screens keep what the loader already put up (for
+  // a reading: the same verses, from doLoadScripture).
+  const deckScripture = await resolveDeckScripture(slides)
+  // The await may have let something newer load onto this track.
+  if (tracks[track].loadGeneration !== generation) return true
+
   const t = tracks[track]
   t.deckSlides = slides
   t.deckIsGenerated = isGenerated
   t.deckSource = source
-  t.deckScripture = new Map()
-  t.song = { ...t.song, lines: slides.map((s) => slideSummary(s, source)) }
+  t.deckScripture = deckScripture
+  t.song = { ...t.song, lines: deckLines(slides, deckScripture, source) }
   t.index = 0
+  // B9-N9: zone 1 stops waiting — this broadcast carries its reference card.
+  // (No deck, or a newer load: the hold times out or is replaced.)
+  releaseZoneOneHold(track, generation)
   // Every caller fires this async and broadcasts immediately — BEFORE the deck
   // exists (the awaits above land on a later turn). Without a broadcast here
   // the zones keep rendering the pre-deck state and are never told about the
   // deck at all: screens sat on logo/black while the operator saw nothing.
+  // One broadcast, with the verse text already in it.
   broadcast()
+  return true
+}
 
-  // Memoized by reference, not by slide index: resolveSlot walks a 'same'
-  // chain back to its nearest real slot, so every slide in that chain resolves
-  // to the SAME scripture slot and would otherwise trigger the identical
-  // network lookup once per slide. One fetch per distinct reference is enough;
-  // the cache below is still populated per resolved slide index, so the
-  // render-time read (keyed by the live t.index) always has a matching entry.
-  const lookedUp = new Map<string, ScriptureResult>()
+// Every scripture slot's verse text, keyed `${slideIndex}:${zoneId}` (what
+// zoneStateFromSlot reads for the live t.index). Memoized by reference, not by
+// slide index: resolveSlot walks a 'same' chain back to its nearest real slot,
+// so every slide in that chain resolves to the SAME scripture slot and would
+// otherwise trigger the identical network lookup once per slide. One lookup
+// per distinct reference, all at once, so an online translation costs one
+// round trip rather than one per slide; KJV is synchronous.
+async function resolveDeckScripture(slides: ZoneSlide[]): Promise<Map<string, string>> {
+  const wanted: Array<{ i: number; zoneId: ZoneId; reference: string }> = []
   for (let i = 0; i < slides.length; i++) {
     for (const zoneId of [1, 2, 3, 4] as ZoneId[]) {
       const slot = resolveSlot(slides, i, zoneId)
-      if (slot.kind !== 'scripture' || !slot.reference) continue
-      let result = lookedUp.get(slot.reference)
-      if (!result) {
-        result = bibleTranslation === 'kjv'
-          ? lookupScripture(slot.reference)
-          : await fetchScripture(slot.reference, bibleTranslation)
-        lookedUp.set(slot.reference, result)
-      }
-      // The await may have let something newer load onto this track.
-      if (tracks[track].loadGeneration !== generation) return true
-      if (result.ok && result.verses) {
-        tracks[track].deckScripture.set(`${i}:${zoneId}`, result.verses.map((v) => v.text).join(' '))
-      } else {
-        logWarn(`[deck] scripture lookup failed for "${slot.reference}" on slide ${i + 1} zone ${zoneId}`)
-      }
+      if (slot.kind === 'scripture' && slot.reference) wanted.push({ i, zoneId, reference: slot.reference })
     }
   }
-  if (tracks[track].loadGeneration !== generation) return true
-
-  // Re-summarise each slide now that the verse text exists.
-  //
-  // slideSummary prefers zone 3, which these decks hold on the logo, so it fell
-  // through to zone 1 — the title card — and EVERY slide summarised as the
-  // sermon title. That is what the tablet remote and the slide grid display, so
-  // the preacher's tablet read "He's Risen" on every slide instead of the words
-  // he is about to read. Prefer the screens that carry content, and use the
-  // resolved verse rather than the bare reference.
-  const CONTENT_ZONES: ZoneId[] = [2, 4, 3, 1]
-  tracks[track].song = {
-    ...tracks[track].song,
-    lines: slides.map((slide, i) => {
-      for (const zoneId of CONTENT_ZONES) {
-        const verse = tracks[track].deckScripture.get(`${i}:${zoneId}`)
-        if (verse) return verse
-        const slot = resolveSlot(slides, i, zoneId)
-        if (slot.kind === 'text' && slot.text) return slot.text
-      }
-      return slideSummary(slide, source)
-    }),
+  const references = [...new Set(wanted.map((w) => w.reference))]
+  const results = await Promise.all(references.map((reference) => bibleTranslation === 'kjv'
+    ? Promise.resolve(lookupScripture(reference))
+    : fetchScripture(reference, bibleTranslation)))
+  const lookedUp = new Map(references.map((reference, k) => [reference, results[k]] as const))
+  const deckScripture = new Map<string, string>()
+  for (const { i, zoneId, reference } of wanted) {
+    const result = lookedUp.get(reference)
+    if (result?.ok && result.verses) {
+      // Numbered, with chapter marks (QA B5-N5); a one-slide, one-verse reading stays plain.
+      deckScripture.set(`${i}:${zoneId}`, deckVerseText(result.verses, { alone: slides.length === 1 }))
+    } else {
+      logWarn(`[deck] scripture lookup failed for "${reference}" on slide ${i + 1} zone ${zoneId}`)
+    }
   }
+  return deckScripture
+}
 
-  // Verse text arrived after the initial deck broadcast above — push it out,
-  // or scripture slots stay black until the next unrelated state change.
-  broadcast()
-  return true
+// One line per deck slide (what state.line, the tablet remote and the slide
+// grid show).
+//
+// slideSummary prefers zone 3, which these decks hold on the logo, so it fell
+// through to zone 1 — the title card — and EVERY slide summarised as the
+// sermon title. That is what the tablet remote and the slide grid display, so
+// the preacher's tablet read "He's Risen" on every slide instead of the words
+// he is about to read. Prefer the screens that carry content, and use the
+// resolved verse rather than the bare reference.
+function deckLines(slides: ZoneSlide[], deckScripture: Map<string, string>, source: string[]): string[] {
+  const CONTENT_ZONES: ZoneId[] = [2, 4, 3, 1]
+  return slides.map((slide, i) => {
+    for (const zoneId of CONTENT_ZONES) {
+      const verse = deckScripture.get(`${i}:${zoneId}`)
+      if (verse) return verse
+      const slot = resolveSlot(slides, i, zoneId)
+      if (slot.kind === 'text' && slot.text) return slot.text
+    }
+    return slideSummary(slide, source)
+  })
 }
 
 function doLoadCountdown(track: TrackId, seconds: number, background?: string | null, blurBehindText?: boolean, bgFit?: 'cover' | 'contain'): void {
@@ -1598,20 +1653,28 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
 // Fetch a non-KJV translation from the free bible-api.com (no key). Falls back
 // to bundled offline KJV if there's no internet or the lookup fails.
 async function fetchScripture(reference: string, translation: BibleTranslation): Promise<ScriptureResult> {
+  // Read the reference with the same grammar as KJV first (QA B4-N1): a
+  // reference KJV can't address fails the same way online, without a network
+  // round trip, and the API gets the canonical form ("Mark 4:35-41", never an
+  // en dash or "Psalm 23, 24").
+  const kjv = lookupScripture(reference)
+  if (!kjv.ok && !/^Internal error/.test(kjv.error ?? '')) return kjv
+  const query = kjv.ok ? (kjv.reference ?? reference) : normalizeReference(reference)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 4000)
   try {
-    const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${translation}`
+    const url = `https://bible-api.com/${encodeURIComponent(query)}?translation=${translation}`
     const res = await fetch(url, { signal: controller.signal })
     clearTimeout(timeout)
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = (await res.json()) as { reference?: string; verses?: { verse: number; text: string }[] }
+    const data = (await res.json()) as { reference?: string; verses?: { verse: number; chapter?: number; text: string }[] }
     if (!data.verses || data.verses.length === 0) throw new Error('no verses')
     return {
       ok: true,
-      reference: data.reference ?? reference,
-      verses: data.verses.map((v) => ({ n: v.verse, text: v.text.replace(/\s+/g, ' ').trim() }))
+      reference: data.reference ?? query,
+      book: kjv.ok ? kjv.book : undefined,
+      verses: data.verses.map((v) => ({ n: v.verse, ...(typeof v.chapter === 'number' ? { c: v.chapter } : {}), text: v.text.replace(/\s+/g, ' ').trim() }))
     }
   } catch (err) {
     clearTimeout(timeout)
@@ -1638,31 +1701,45 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   const refs = parseReferenceList(reference)
   if (!refs.length) return false
 
-  const lines: string[] = []
+  const verses: ScriptureVerse[] = []
   let resolvedTitle: string | null = null
   let sawFallback = false
+  const missed: string[] = []
   for (const ref of refs) {
     const result = bibleTranslation === 'kjv'
       ? lookupScripture(ref)
       : await fetchScripture(ref, bibleTranslation)
     if (!result.ok || !result.verses?.length) {
       logWarn(`[scripture] lookup failed for reference="${ref}" translation=${bibleTranslation}`)
+      missed.push(ref)
       continue
     }
     if (result.usedFallback) sawFallback = true
     if (!resolvedTitle) resolvedTitle = result.reference ?? ref
-    lines.push(
-      ...(result.verses.length === 1
-        ? [result.verses[0].text]
-        : result.verses.map((v) => `${v.n}  ${v.text}`))
-    )
+    verses.push(...result.verses)
   }
+  // QA B8-N2: one line per verse, numbered exactly as the deck numbers them
+  // ("4:35 And the same day…"). This list is what the screens show until a
+  // service item's deck lands; it used to be un-numbered ("35 And the same
+  // day…"), so leaving countdown/black/logo for a reading put that on the
+  // projector for ~¼ s before the deck crossfaded over it.
+  const lines = numberedVerseLines(verses)
   // Only a reading where NOTHING resolved is a failure; one bad reference among
   // several still shows the passages either side of it.
-  if (!lines.length) return false
+  if (!lines.length) {
+    // QA B4-N1: this used to return silently — Go Live did nothing, no toast.
+    // Not for a superseded load (the operator has already moved on).
+    if (tracks[track].loadGeneration === generation) {
+      notifyOperator(`Couldn't find “${reference}” — nothing went live. Fix the reference in Build service (e.g. "John 3:16-18").`, 'warn')
+    }
+    return false
+  }
   if (tracks[track].loadGeneration !== generation) {
     logWarn(`[scripture] discarding stale lookup for reference="${reference}" — track "${track}" moved on while fetching`)
     return false
+  }
+  if (missed.length) {
+    notifyOperator(`Skipped ${missed.map((r) => `“${r}”`).join(', ')} — couldn't find ${missed.length === 1 ? 'that passage' : 'those passages'}. The rest of the reading is live.`, 'warn')
   }
   if (sawFallback) {
     notifyOperator(`Online lookup failed — showing KJV for "${reference}"`, 'warn')
@@ -1846,11 +1923,7 @@ async function computeItemSourceSlides(item: ServiceItem): Promise<string[]> {
     for (const ref of refs) {
       const result = bibleTranslation === 'kjv' ? lookupScripture(ref) : await fetchScripture(ref, bibleTranslation)
       if (!result.ok || !result.verses?.length) continue
-      lines.push(
-        ...(result.verses.length === 1
-          ? [result.verses[0].text]
-          : result.verses.map((v) => `${v.n}  ${v.text}`))
-      )
+      lines.push(...verseLines(result.verses))
     }
     return lines
   }
@@ -1926,6 +1999,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
     const ref = item.payload.reference as string
     if (!ref) return
     if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.payload.fontScale as number | undefined, item.payload.bgFit as 'cover' | 'contain' | undefined, item))) return  // lookup failed → don't mark it live
+    // B9-N9: zone 1 waits for the deck doLoadScripture just started — unless it has already landed.
+    if (!tracks[track].deckSlides) holdZoneOneForDeck(track, tracks[track].loadGeneration)
   } else if (item.type === 'text') {
     doLoadText(
       track,
@@ -2596,9 +2671,12 @@ ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, ba
   doLoadCountdown(track, seconds, background, blurBehindText); broadcast()
 })
 
-ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> => {
+// itemId: the service item this reading is going live as (its deck follows via
+// wf:live:setItemId) — zone 1 waits for that deck (B9-N9).
+ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean, itemId?: number): Promise<boolean> => {
   assertTrackId(track)
   const ok = await doLoadScripture(track, reference, background, blurBehindText)
+  if (ok && typeof itemId === 'number') holdZoneOneForDeck(track, tracks[track].loadGeneration)
   if (ok) broadcast()
   return ok
 })
@@ -3660,9 +3738,7 @@ ipcMain.handle('wf:scripture:chunkRefs', (_e, reference: string): string[] => {
   if (!ref) return []
   const result = lookupScripture(ref)
   if (!result.ok || !result.verses?.length) return []
-  return chunkVerses(result.verses, zoneChunkBudget()).map((range) =>
-    subReference(result.reference ?? ref, range.from, range.to)
-  )
+  return chunkVerses(result.verses, zoneChunkBudget()).map((range) => rangeReference(result, ref, range))
 })
 
 ipcMain.handle('wf:scripture:validate', (_e, field: string) => {

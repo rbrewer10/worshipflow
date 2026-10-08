@@ -73,7 +73,13 @@ export function useLiveModel(): AudienceModel {
   }>({ author: null, copyright: null, ccli: null, license: null })
 
   useEffect(() => {
+    let lastBackground: string | null = null
     const apply = (s: LiveState): void => {
+      // QA B9-N8: a picture or video going live (no words, a new background)
+      // takes the words off at once, as before the crossfade below — they used
+      // to dissolve over the incoming image for half a second.
+      const toMedia = s.mode === 'lyrics' && !s.line && (s.background ?? null) !== lastBackground
+      lastBackground = s.background ?? null
       setMode(s.mode)
       setBgSrc(s.background ?? null)
       setBgFit(s.bgFit ?? 'cover')
@@ -104,10 +110,18 @@ export function useLiveModel(): AudienceModel {
         setLayers({ front: 0, a: '', b: '' })
         setTickerText(s.line || '')
       } else if (s.mode === 'lyrics') {
+        // Crossfade only when the words change. Every broadcast used to start a
+        // new crossfade even to the same line, so the text dipped for half a
+        // second on an unrelated state change, or when a scripture deck
+        // replaced its identical first verse (QA B8-N2).
         setLayers((prev) =>
-          prev.front === 0
-            ? { front: 1, a: prev.a, b: s.line }
-            : { front: 0, a: s.line, b: prev.b }
+          toMedia
+            ? (prev.a || prev.b ? { front: prev.front, a: '', b: '' } : prev)
+            : (prev.front === 0 ? prev.a : prev.b) === s.line
+            ? prev
+            : prev.front === 0
+              ? { front: 1, a: prev.a, b: s.line }
+              : { front: 0, a: s.line, b: prev.b }
         )
         setTickerText('')
       } else if (s.mode === 'announcement') {
