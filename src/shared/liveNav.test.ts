@@ -6,8 +6,11 @@ import { planNav } from './liveNav'
 const base = { hasDeck: false, hasSermonSlides: false, index: 0, lastIndex: 3 }
 
 describe('planNav', () => {
-  it('QA B3: Prev during a countdown goes to the previous item — never un-blanks it into a frozen lyric slide', () => {
-    expect(planNav(-1, { ...base, mode: 'countdown' })).toEqual({ kind: 'adjacent', dir: -1, fallback: 'none' })
+  it('Prev during a countdown does nothing — no item change, no restart, never a frozen lyric slide (Ryan\'s decision; QA B3)', () => {
+    expect(planNav(-1, { ...base, mode: 'countdown' })).toEqual({ kind: 'none' })
+    // whatever the hidden slide index / deck flags happen to be
+    expect(planNav(-1, { ...base, mode: 'countdown', index: 2 })).toEqual({ kind: 'none' })
+    expect(planNav(-1, { ...base, mode: 'countdown', hasDeck: true, index: 1 })).toEqual({ kind: 'none' })
   })
   it('Next during a countdown goes to the next item, else the logo', () => {
     expect(planNav(1, { ...base, mode: 'countdown' })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'logo-after-countdown' })
@@ -64,5 +67,19 @@ describe('B2-N3 wiring (source guard)', () => {
   it('processIntent passes pristine and starts on the first go-live item', () => {
     expect(main).toMatch(/pristine: !t\.hasLiveContent && t\.serviceItemId == null/)
     expect(main).toMatch(/action\.kind === 'start'\) \{[\s\S]{0,300}activeServiceItems\.find\(\(it\) => it\.track === track && itemCanGoLive\(it\)\)/)
+  })
+})
+
+describe('Countdown Prev wiring (source guard, Ryan\'s decision)', () => {
+  const main = readFileSync(join(__dirname, '..', 'main', 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
+  it("processIntent returns on 'none' before touching the track (no textHidden reset, no load, no countdown clear)", () => {
+    const at = main.indexOf('const action = planNav(dir,')
+    expect(at).toBeGreaterThan(-1)
+    const after = main.slice(at, at + 1200)
+    const none = after.indexOf("if (action.kind === 'none') return")
+    expect(none).toBeGreaterThan(-1)
+    expect(after.indexOf('t.textHidden = false')).toBeGreaterThan(none)
+    expect(after.indexOf('handleTabletLoadItem')).toBeGreaterThan(none)
+    expect(after.indexOf('clearCountdown')).toBeGreaterThan(none)
   })
 })

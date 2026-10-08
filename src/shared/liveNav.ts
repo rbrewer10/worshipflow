@@ -4,7 +4,7 @@
 // QA B3: Prev during a countdown matched the generic "un-blank" branch
 // (mode !== 'lyrics'), which cleared the timer and flipped the track to
 // 'lyrics' — freezing "4:57" on every screen. Next already had a countdown
-// branch; Prev now mirrors it.
+// branch. Prev during a countdown now does nothing at all (Ryan's decision).
 
 export interface NavInput {
   mode: string
@@ -36,9 +36,10 @@ export function planNav(dir: 1 | -1, s: NavInput): NavAction {
   if (s.pristine) return dir === 1 ? { kind: 'start' } : { kind: 'none' }
   // A countdown/welcome is one continuous view. Next moves on; with nothing
   // after it, go to the logo rather than strand the frozen timer value as a
-  // lyric slide. Prev moves back; with nothing before it, the press is ignored
-  // and the countdown keeps running.
-  if (s.mode === 'countdown') return { kind: 'adjacent', dir, fallback: dir === 1 ? 'logo-after-countdown' : 'none' }
+  // lyric slide. Prev does nothing (Ryan's decision, Oct 2026): no item change,
+  // no countdown restart — the timer keeps running. A stray Left/PgUp before
+  // the service must not pull the pre-service loop off the screens.
+  if (s.mode === 'countdown') return dir === 1 ? { kind: 'adjacent', dir, fallback: 'logo-after-countdown' } : { kind: 'none' }
   // A live call is one continuous view too (see processIntent's comment).
   if (s.mode === 'livecall') return { kind: 'adjacent', dir, fallback: 'logo' }
   // QA B3-N8: an announcement card is content, not a blank — the "un-blank"
