@@ -92,7 +92,7 @@ function SlideGrid({ track }: { track: TrackId }): JSX.Element {
                 // item switches what the congregation sees, so it gets the same
                 // tap-to-confirm gesture as the item rail, instead of firing on
                 // the first stray click the way this used to.
-                const handleClick = (): void => { isLiveItem ? goLive() : trigger(slideKey, goLive) }
+                const handleClick = (): void => { isLiveItem ? goLive() : trigger(slideKey, goLive, () => { void window.wf.liveGoLiveArmed(track) }) }
                 return (
                   <button
                     key={idx}

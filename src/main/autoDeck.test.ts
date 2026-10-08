@@ -252,7 +252,8 @@ describe('deck loading is actually wired up for every auto-decked type', () => {
     // Without the item parameter there is structurally no way for the tablet /
     // Next-Prev path to reach loadDeckOnto for a scripture item.
     expect(source).toMatch(/async function doLoadScripture\([^)]*item\?: ServiceItem \| null[^)]*\)/)
-    expect(source).toMatch(/if \(item\) void loadDeckOnto\(track, item, generation\)/)
+    // (B9-N5: the promise is kept so Play slide N can wait for the deck.)
+    expect(source).toMatch(/if \(item\) \{\n\s+const promise = loadDeckOnto\(track, item, generation\)/)
   })
 })
 
