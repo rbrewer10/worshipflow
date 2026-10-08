@@ -3914,6 +3914,24 @@ ipcMain.handle('wf:zone:safetyReset', (): void => {
   broadcast()
 })
 
+// Ryan's decision (Oct 2026): a manual "Reload projector" for when the
+// projector looks wrong (stuck frame, a display-driver hiccup) without
+// restarting the app mid-service. Reloads every output window (crashed ones
+// too). Each one repaints what's live NOW from createOutput's did-finish-load
+// push, and useLiveModel starts on black until that state arrives — so the
+// reload never flashes old content or the bare theme backdrop.
+function reloadProjectorWindows(): number {
+  let reloaded = 0
+  for (const w of outputWins.values()) {
+    if (w.isDestroyed()) continue
+    w.webContents.reloadIgnoringCache()
+    reloaded++
+  }
+  logInfo(`[window] operator reloaded ${reloaded} projector window(s)`)
+  return reloaded
+}
+ipcMain.handle('wf:output:reload', (): number => reloadProjectorWindows())
+
 ipcMain.handle('wf:zone:getStates', (): Record<ZoneId, ZoneState> => {
   return computeZoneStates()
 })

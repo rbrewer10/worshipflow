@@ -48,7 +48,11 @@ export interface AudienceModel {
 // Subscribes to the main-process live broadcast and returns the current render
 // model. Any window that shows the audience content uses this.
 export function useLiveModel(): AudienceModel {
-  const [mode, setMode] = useState<Mode>('lyrics')
+  // Black until the first live state arrives: a freshly (re)loaded output —
+  // app start, crash revive, or the operator's Reload projector — must not
+  // paint the default theme backdrop or anything stale before main tells it
+  // what's live (Ryan's decision, Oct 2026).
+  const [mode, setMode] = useState<Mode>('black')
   const [layers, setLayers] = useState<{ front: 0 | 1; a: string; b: string }>({ front: 0, a: '', b: '' })
   const [bgSrc, setBgSrc] = useState<string | null>(null)
   const [announcementTitle, setAnnouncementTitle] = useState('')

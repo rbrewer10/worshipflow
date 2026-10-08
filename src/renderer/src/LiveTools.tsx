@@ -13,6 +13,7 @@ import LooksModeBar from './LooksModeBar'
 import OverlayTickerPanel from './OverlayTickerPanel'
 import LayerStrip from './LayerStrip'
 import ServiceControlsDrawer from './live/ServiceControlsDrawer'
+import ReloadProjectorButton from './live/ReloadProjectorButton'
 
 function LiveToolsSection({ title, description, children }: { title: string; description: string; children: ReactNode }): JSX.Element {
   const [open, setOpen] = useState(false)
@@ -176,6 +177,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       {/* Lower-frequency output and routing controls stay available without
           pushing the operator's primary controls below the fold. */}
       <LiveToolsSection title="Outputs & looks" description="Zone status and saved screen presets">
+        <ReloadProjectorButton />
         <LiveZoneStatus />
         <LooksPanel />
       </LiveToolsSection>

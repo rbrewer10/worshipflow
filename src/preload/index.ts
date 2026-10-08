@@ -406,6 +406,8 @@ const wf = {
   looksDelete: (lookId: string): Promise<void> => ipcRenderer.invoke('wf:looks:delete', lookId),
   looksApply: (lookId: string): Promise<void> => ipcRenderer.invoke('wf:looks:apply', lookId),
   zoneSafetyReset: (): Promise<void> => ipcRenderer.invoke('wf:zone:safetyReset'),
+  /** Reload the projector output window(s); resolves to how many were reloaded. */
+  reloadProjector: (): Promise<number> => ipcRenderer.invoke('wf:output:reload'),
   zoneGetStates: (): Promise<Record<ZoneId, ZoneState>> =>
     ipcRenderer.invoke('wf:zone:getStates'),
   zoneGetIp: (): Promise<string> =>
