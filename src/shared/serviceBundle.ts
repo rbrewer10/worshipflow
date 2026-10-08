@@ -41,8 +41,23 @@ export interface BundleAnnouncement {
   active: boolean
 }
 
-/** Newest .wfservice layout this build writes and fully understands. */
-export const BUNDLE_VERSION = 2
+/**
+ * Newest .wfservice layout this build writes and fully understands.
+ * 3 (Ryan's decision, Oct 2026): `media` lists the pictures/videos carried in
+ * the file (a tar — see main/serviceArchive.ts). A v3 file without media is
+ * the same JSON as v2, so older builds still open it (with a "newer version"
+ * note).
+ */
+export const BUNDLE_VERSION = 3
+
+/** One picture/video carried inside a media .wfservice. */
+export interface BundleMedia {
+  /** The path the service used on the exporting PC (what payloads point at). */
+  path: string
+  /** Its entry inside the archive (`media/0001-cross.jpg`). */
+  file: string
+  size: number
+}
 
 export interface BundleItem {
   type: ServiceItemType
@@ -68,6 +83,8 @@ export interface ServiceBundle {
   items: BundleItem[]
   /** Exporting PC's announcement id (as a string key) → the record (B2-N2). */
   announcements: Record<string, BundleAnnouncement>
+  /** Files carried in the archive (v3); empty for a plain JSON file. */
+  media: BundleMedia[]
 }
 
 export type ParseResult =
@@ -218,6 +235,16 @@ export function parseServiceBundle(text: string): ParseResult {
       if (a && /^\d+$/.test(key)) announcements[key] = a
     }
   }
+  const media: BundleMedia[] = []
+  if (Array.isArray(raw.media)) {
+    for (const m of raw.media) {
+      if (!isObj(m)) continue
+      const path = str(m.path)
+      const file = str(m.file)
+      const size = num(m.size)
+      if (path && file && size != null && size >= 0) media.push({ path, file, size })
+    }
+  }
   return {
     ok: true,
     skipped,
@@ -232,7 +259,8 @@ export function parseServiceBundle(text: string): ParseResult {
       theme: str(raw.theme),
       themeColors: isObj(raw.themeColors) ? (raw.themeColors as unknown as ThemeColors) : null,
       items,
-      announcements
+      announcements,
+      media
     }
   }
 }
@@ -290,6 +318,50 @@ export function referencedMediaPaths(bundle: ServiceBundle): string[] {
   return [...out]
 }
 
+const ABSOLUTE_PATH = /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/
+
+/**
+ * Every absolute file path anywhere in the service that `isMedia` accepts —
+ * item payloads (backgrounds, pictures, videos, image decks), item styles,
+ * song backgrounds, announcement backgrounds/icons, the theme. A deep walk, so
+ * a media key added later is carried without touching this (Ryan's decision:
+ * the .wfservice carries every picture, background and video).
+ */
+export function bundleMediaPaths(bundle: Pick<ServiceBundle, 'items' | 'announcements' | 'theme'>, isMedia: (p: string) => boolean): string[] {
+  const out = new Set<string>()
+  const walk = (v: unknown, depth: number): void => {
+    if (depth > 12 || v == null) return
+    if (typeof v === 'string') { if (ABSOLUTE_PATH.test(v) && isMedia(v)) out.add(v); return }
+    if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return }
+    if (typeof v === 'object') for (const x of Object.values(v as Record<string, unknown>)) walk(x, depth + 1)
+  }
+  walk(bundle.items, 0)
+  walk(bundle.announcements, 0)
+  walk(bundle.theme, 0)
+  return [...out]
+}
+
+/** Archive entry name for the n-th carried file: `media/0001-cross.jpg`. */
+export function archiveEntryName(index: number, path: string): string {
+  const base = path.split(/[\\/]/).pop() ?? ''
+  const dot = base.lastIndexOf('.')
+  const ext = dot > 0 ? base.slice(dot).toLowerCase().replace(/[^.a-z0-9]/g, '') : ''
+  const stem = (dot > 0 ? base.slice(0, dot) : base).replace(/[^A-Za-z0-9 _.-]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 60) || 'media'
+  return `media/${String(index + 1).padStart(4, '0')}-${stem.replace(/^[^A-Za-z0-9]+/, '') || 'media'}${ext}`
+}
+
+/** A copy of `value` with every string that is a key of `map` replaced by its value. */
+export function rewriteMediaPaths<T>(value: T, map: ReadonlyMap<string, string>): T {
+  if (map.size === 0) return value
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') return map.get(v) ?? v
+    if (Array.isArray(v)) return v.map(walk)
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, walk(x)]))
+    return v
+  }
+  return walk(value) as T
+}
+
 /** A name that doesn't collide with an existing service ("Sunday" → "Sunday (2)"). */
 export function uniqueServiceName(name: string, existing: readonly string[]): string {
   const taken = new Set(existing.map(titleKey))
@@ -318,6 +390,10 @@ export interface ImportSummary {
   announcementsMissing?: string[]
   /** The file's version is newer than this build writes (B2-N9). */
   newerVersion?: boolean
+  /** Pictures/videos copied out of the file onto this PC (v3). */
+  mediaRestored?: number
+  /** Carried files left out because their bytes aren't a picture/video. */
+  mediaRefused?: string[]
 }
 
 /** One short paragraph for the operator. */
@@ -332,6 +408,8 @@ export function describeImport(s: ImportSummary): string {
   if (s.announcementsAdded) parts.push(`${s.announcementsAdded} announcement${s.announcementsAdded === 1 ? '' : 's'} added.`)
   if (s.announcementsMissing?.length) parts.push(`No announcement text in the file for ${s.announcementsMissing.map((t) => `“${t}”`).join(', ')} (saved by an older WorshipFlow) — pick the announcement again in Build service.`)
   if (s.skipped.length) parts.push(`Skipped ${s.skipped.length}: ${s.skipped.join('; ')}.`)
-  if (s.missingMedia.length) parts.push(`${s.missingMedia.length} background/image file${s.missingMedia.length === 1 ? ' isn’t' : 's aren’t'} on this computer: ${s.missingMedia.map((p) => p.split(/[\\/]/).pop()).join(', ')}.`)
+  if (s.mediaRestored) parts.push(`${s.mediaRestored} picture/video file${s.mediaRestored === 1 ? '' : 's'} copied onto this computer.`)
+  if (s.mediaRefused?.length) parts.push(`Left out ${s.mediaRefused.length} file${s.mediaRefused.length === 1 ? '' : 's'} that ${s.mediaRefused.length === 1 ? 'isn’t a real picture or video' : 'aren’t real pictures or videos'}: ${s.mediaRefused.join(', ')}.`)
+  if (s.missingMedia.length) parts.push(`${s.missingMedia.length} picture/video file${s.missingMedia.length === 1 ? ' isn’t' : 's aren’t'} on this computer or in the file: ${s.missingMedia.map((p) => p.split(/[\\/]/).pop()).join(', ')}.`)
   return parts.join(' ')
 }
