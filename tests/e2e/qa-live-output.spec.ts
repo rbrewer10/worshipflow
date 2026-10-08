@@ -60,14 +60,15 @@ test('B2 + B3 + B4: Clear lyrics resets on the next item, Prev on the countdown,
     expect((await liveState(op)).textHidden).toBe(false)
     await expect.poll(() => visibleText(out)).toMatch(/Come|fount/i)
 
-    // B3: Prev during the countdown never un-blanks to a frozen old slide.
+    // B3: Prev during the countdown never un-blanks to a frozen old slide —
+    // and (Ryan's decision) does nothing at all: same item, still a countdown.
     await goLive(op, 'Countdown 5:00')
     const before = await liveState(op)
     expect(before.mode).toBe('countdown')
     await pressKey(app, op, 'ArrowLeft')
     const after = await liveState(op)
-    if (after.liveServiceItemId === before.liveServiceItemId) expect(after.mode).toBe('countdown')
-    else expect(after.mode).not.toBe('countdown')
+    expect(after.liveServiceItemId).toBe(before.liveServiceItemId)
+    expect(after.mode).toBe('countdown')
   } finally { await closeApp(app, userDataDir) }
 })
 
