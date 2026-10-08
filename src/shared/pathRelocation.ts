@@ -36,14 +36,17 @@ export function relocateStoredPath(
   // machine — so there's nothing to relocate.
   if (exists(storedPath)) return storedPath
 
+  // Stored paths are normally Windows paths (`\`), but accept `/` too so a
+  // library copied from (or tested on) a POSIX machine relocates the same way.
+  // The rebuilt path uses the CURRENT root's own separator.
+  const sep = currentUserDataDir.includes('\\') ? '\\' : '/'
   for (const marker of KNOWN_DATA_SUBFOLDERS) {
-    const markerToken = `\\${marker}\\`
-    const idx = storedPath.indexOf(markerToken)
-    if (idx === -1) continue
+    const match = new RegExp(`[\\\\/]${marker}[\\\\/]`).exec(storedPath)
+    if (!match) continue
     // Keep the marker folder itself (`backgrounds\uploads\xyz.png`, not just
     // `uploads\xyz.png`) so it rejoins the current userData root correctly.
-    const relative = storedPath.slice(idx + 1)
-    const candidate = `${currentUserDataDir}\\${relative}`
+    const relative = storedPath.slice(match.index + 1).split(/[\\/]/).join(sep)
+    const candidate = `${currentUserDataDir}${sep}${relative}`
     if (exists(candidate)) return candidate
   }
   // Couldn't find it anywhere sensible — leave the original path alone
