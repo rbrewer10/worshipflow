@@ -877,9 +877,38 @@ function zonePinsRecord(): ZonePins {
 //     >  scene typeDefault  >  idleDefault
 // (A generated deck sits below explicit routing only for zones that routing
 // takes off content; for the rest it still supplies the per-zone layout.)
+// QA B9-N9: a reading goes up in two steps — its verses first (doLoadScripture,
+// for the screens that show them at once), then its deck. Zone 1's deck slot is
+// the reference card, but in between it rendered the routing default (the
+// numbered verse), so the first click showed one frame of the verse before the
+// card. Zone 1 now keeps what it was showing until the deck lands, at most
+// ZONE1_DECK_HOLD_MS. Zones 2–4 are not held.
+const ZONE1_DECK_HOLD_MS = 1000
+const zoneOneHold: Record<TrackId, { generation: number; timer: ReturnType<typeof setTimeout> } | null> = { main: null, second: null }
+const lastZoneOneState: Partial<Record<TrackId, ZoneState>> = {}
+function holdZoneOneForDeck(track: TrackId, generation: number): void {
+  const prev = zoneOneHold[track]
+  if (prev) clearTimeout(prev.timer)
+  const timer = setTimeout(() => {
+    if (zoneOneHold[track]?.timer !== timer) return
+    zoneOneHold[track] = null
+    zoneBroadcast()
+  }, ZONE1_DECK_HOLD_MS)
+  zoneOneHold[track] = { generation, timer }
+}
+// Returns true when a hold for this load was released (the caller broadcasts).
+function releaseZoneOneHold(track: TrackId, generation: number): boolean {
+  const hold = zoneOneHold[track]
+  if (!hold || hold.generation !== generation) return false
+  clearTimeout(hold.timer)
+  zoneOneHold[track] = null
+  return true
+}
+
 function computeZoneStates(): Record<ZoneId, ZoneState> {
   const result = {} as Record<ZoneId, ZoneState>
   const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]
+  let zoneOneHeld = false
   // Zone- and track-agnostic — read once per broadcast rather than once per zone,
   // since this hits the DB and computeZoneStates can fire every 100ms during auto-advance.
   const sceneConfig = parseSceneConfig(getSetting('zone_scenes'))
@@ -914,6 +943,14 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       } else {
         pinnedMode = pin.mode
       }
+    }
+
+    // B9-N9: hold zone 1 while its deck is on the way (see zoneOneHold).
+    const heldZoneOne = zoneId === 1 && pinnedMode == null && zoneOneHold[zoneTrack] ? lastZoneOneState[zoneTrack] : undefined
+    if (heldZoneOne) {
+      result[zoneId] = { ...heldZoneOne }
+      zoneOneHeld = true
+      continue
     }
 
     // Get routing for the active item on this zone's track (or defaults: scene
@@ -1063,6 +1100,7 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
     result[zoneId].background = cleared.background
     result[zoneId].overlayTicker = t.overlayTicker
   }
+  if (!zoneOneHeld) lastZoneOneState[zoneTrackFor(1, stageRehearsal, activeZoneTrackAssignment[1])] = { ...result[1] }
   return result
 }
 
@@ -1531,6 +1569,9 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
   t.deckScripture = deckScripture
   t.song = { ...t.song, lines: deckLines(slides, deckScripture, source) }
   t.index = index
+  // B9-N9: zone 1 stops waiting — this broadcast carries its reference card.
+  // (No deck, or a newer load: the hold times out or is replaced.)
+  releaseZoneOneHold(track, generation)
   // Every caller fires this async and broadcasts immediately — BEFORE the deck
   // exists (the awaits above land on a later turn). Without a broadcast here
   // the zones keep rendering the pre-deck state and are never told about the
@@ -2058,6 +2099,8 @@ async function handleTabletLoadItem(track: TrackId, itemId: number): Promise<voi
     const ref = item.payload.reference as string
     if (!ref) return
     if (!(await doLoadScripture(track, ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.payload.fontScale as number | undefined, item.payload.bgFit as 'cover' | 'contain' | undefined, item))) return  // lookup failed → don't mark it live
+    // B9-N9: zone 1 waits for the deck doLoadScripture just started — unless it has already landed.
+    if (!tracks[track].deckSlides) holdZoneOneForDeck(track, tracks[track].loadGeneration)
   } else if (item.type === 'text') {
     doLoadText(
       track,
@@ -2728,9 +2771,12 @@ ipcMain.handle('wf:live:loadCountdown', (_e, track: TrackId, seconds: number, ba
   doLoadCountdown(track, seconds, background, blurBehindText); broadcast()
 })
 
-ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> => {
+// itemId: the service item this reading is going live as (its deck follows via
+// wf:live:setItemId) — zone 1 waits for that deck (B9-N9).
+ipcMain.handle('wf:live:loadScripture', async (_e, track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean, itemId?: number): Promise<boolean> => {
   assertTrackId(track)
   const ok = await doLoadScripture(track, reference, background, blurBehindText)
+  if (ok && typeof itemId === 'number') holdZoneOneForDeck(track, tracks[track].loadGeneration)
   if (ok) broadcast()
   return ok
 })
