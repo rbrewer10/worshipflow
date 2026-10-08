@@ -160,6 +160,8 @@ const wf = {
     return () => ipcRenderer.removeListener('wf:recordings:aiProgress', handler)
   },
   liveSetItemId: (track: TrackId, id: number | null): Promise<void> => ipcRenderer.invoke('wf:live:setItemId', track, id),
+  // QA B9-N6: a Go live was armed — main drops a reading still being looked up for an older click.
+  liveGoLiveArmed: (track: TrackId): Promise<void> => ipcRenderer.invoke('wf:live:goLiveArmed', track),
   liveGoLiveAt: (track: TrackId, itemId: number, slideIndex: number): Promise<void> =>
     ipcRenderer.invoke('wf:live:goLiveAt', track, itemId, slideIndex),
   liveSetFontScale: (track: TrackId, scale: number): Promise<void> => ipcRenderer.invoke('wf:live:setFontScale', track, scale),
@@ -169,8 +171,8 @@ const wf = {
   liveSetLayers: (track: TrackId, flags: { textHidden?: boolean; bgHidden?: boolean }): Promise<void> =>
     ipcRenderer.invoke('wf:live:setLayers', track, flags),
   liveLoadSong: (track: TrackId, id: number): Promise<void> => ipcRenderer.invoke('wf:live:loadSong', track, id),
-  liveLoadScripture: (track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean): Promise<boolean> =>
-    ipcRenderer.invoke('wf:live:loadScripture', track, reference, background, blurBehindText),
+  liveLoadScripture: (track: TrackId, reference: string, background?: string | null, blurBehindText?: boolean, itemId?: number): Promise<boolean> =>
+    ipcRenderer.invoke('wf:live:loadScripture', track, reference, background, blurBehindText, itemId),
   liveLoadText: (track: TrackId, title: string, body: string, background?: string | null, fontScale?: number, blurBehindText?: boolean): Promise<void> =>
     ipcRenderer.invoke('wf:live:loadText', track, title, body, background ?? null, fontScale, blurBehindText),
   liveLoadSermon: (track: TrackId, title: string, speaker: string, passage: string, background?: string | null, blurBehindText?: boolean): Promise<void> =>

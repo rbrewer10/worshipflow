@@ -252,6 +252,44 @@ describe('deck loading is actually wired up for every auto-decked type', () => {
     // Without the item parameter there is structurally no way for the tablet /
     // Next-Prev path to reach loadDeckOnto for a scripture item.
     expect(source).toMatch(/async function doLoadScripture\([^)]*item\?: ServiceItem \| null[^)]*\)/)
-    expect(source).toMatch(/if \(item\) void loadDeckOnto\(track, item, generation\)/)
+    // (B9-N5: the promise is kept so Play slide N can wait for the deck.)
+    expect(source).toMatch(/if \(item\) \{\s*\n\s+const promise = loadDeckOnto\(track, item, generation\)/)
+  })
+})
+
+// QA B3-N3: a whole-chapter reading repeated the entire chapter on slides 2-5.
+describe('autoDeckFor — whole-chapter readings', () => {
+  const psalm100 = (over: Partial<AutoDeckDeps> = {}): AutoDeckDeps => deps({
+    lookupScripture: async () => ({
+      ok: true,
+      reference: 'Psalms 100',
+      verses: [1, 2, 3, 4, 5].map((n) => ({ n, text: 'x'.repeat(15) })),
+    }),
+    ...over,
+  })
+
+  it('scripture item "Psalm 100": every slide gets its own verses, not the whole chapter', async () => {
+    const deck = await autoDeckFor(item({ type: 'scripture', payload: { reference: 'Psalm 100' } }), psalm100())
+    const refs = deck!.map((s) => (s.zones[2] as { reference: string }).reference)
+    expect(refs).toEqual(['Psalms 100:1', 'Psalms 100:2', 'Psalms 100:3', 'Psalms 100:4', 'Psalms 100:5'])
+    expect(new Set(refs).size).toBe(refs.length)
+  })
+
+  it('sermon reading of a whole chapter narrows too', async () => {
+    const deck = await autoDeckFor(item({ type: 'sermon', payload: { title: 'Joy', passage: 'Psalm 100' } }), psalm100())
+    expect(deck!.slice(1).map((s) => (s.zones[2] as { reference: string }).reference))
+      .toEqual(['Psalms 100:1', 'Psalms 100:2', 'Psalms 100:3', 'Psalms 100:4', 'Psalms 100:5'])
+  })
+})
+
+describe('autoDeckFor — a reading across chapters (QA B4-N1)', () => {
+  it('each slide is addressed by chapter:verse, never the whole range', async () => {
+    const deck = await autoDeckFor(item({ type: 'scripture', payload: { reference: 'Psalm 23-24' } }), deps({
+      lookupScripture: async () => ({
+        ok: true, reference: 'Psalms 23-24', book: 'Psalms',
+        verses: [{ n: 6, c: 23, text: 'x'.repeat(15) }, { n: 1, c: 24, text: 'y'.repeat(15) }, { n: 2, c: 24, text: 'z'.repeat(15) }],
+      }),
+    }))
+    expect(deck!.map((s) => (s.zones[2] as { reference: string }).reference)).toEqual(['Psalms 23:6', 'Psalms 24:1', 'Psalms 24:2'])
   })
 })

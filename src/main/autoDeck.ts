@@ -12,7 +12,7 @@
 import type { ScriptureResult, ServiceItem, ZoneId } from '../shared/types'
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
 import { chunkProse, chunkVerses } from '../shared/chunkText'
-import { parseReferenceList, subReference } from '../shared/scriptureRefs'
+import { parseReferenceList, rangeReference } from '../shared/scriptureRefs'
 
 export interface AutoDeckAnnouncement {
   id: number
@@ -50,7 +50,7 @@ async function sermonDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<ZoneSl
   const intro = slide(introCard, introCard, LOGO, introCard)
 
   const reading = ranges.map((range) => {
-    const reference = subReference(result.reference ?? passage, range.from, range.to)
+    const reference = rangeReference(result, passage, range)
     const verse: ZoneSlot = { kind: 'scripture', reference }
     // Back Left keeps the designed card up and moves its reference along with
     // the reading; the stage monitor carries the same words the pastor reads.
@@ -93,15 +93,19 @@ async function scriptureDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<Zon
   if (!references.length) return null
 
   const slides: ZoneSlide[] = []
-  for (const reference of references) {
-    const result = await deps.lookupScripture(reference)
+  // Every passage at once: for an online translation each lookup is a round
+  // trip, and they used to run one after another (QA retest8).
+  const results = await Promise.all(references.map((reference) => deps.lookupScripture(reference)))
+  for (let k = 0; k < references.length; k++) {
+    const reference = references[k]
+    const result = results[k]
     // One bad reference in a reading must not lose the passages either side of
     // it — the same "a deleted announcement drops out, the rest still works"
     // contract announcementDeck uses.
     if (!result.ok || !result.verses?.length) continue
 
     for (const range of chunkVerses(result.verses, deps.budget)) {
-      const ref = subReference(result.reference ?? reference, range.from, range.to)
+      const ref = rangeReference(result, reference, range)
       const verse: ZoneSlot = { kind: 'scripture', reference: ref }
       // Back Left carries the reference on its own, so the room can always see
       // where the reading is even once the text has scrolled on. Unlike the

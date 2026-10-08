@@ -39,7 +39,7 @@ function ServiceRail(): JSX.Element {
   const liveId = live?.liveServiceItemId ?? null
 
   const handleItemClick = (it: ServiceItem): void => {
-    trigger(String(it.id), () => { sendItemLive(it, 'main') })
+    trigger(String(it.id), () => { sendItemLive(it, 'main') }, () => { void window.wf.liveGoLiveArmed('main') })
   }
 
   // From quick search — added straight onto Live Control's run-of-show
