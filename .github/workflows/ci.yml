@@ -87,6 +87,17 @@ jobs:
 
       - run: npm run build
 
+      # The hosted Windows runner's desktop is 1024x768, which squeezes the
+      # operator window so popovers overlap the buttons under test (a booth PC
+      # is 1080p+). Linux gets 1280x1024 from xvfb-run.
+      - name: Desktop at 1920x1080 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          Add-Type -AssemblyName System.Windows.Forms
+          [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+
       - name: Playwright e2e (Windows)
         if: runner.os == 'Windows'
         run: npx playwright test
