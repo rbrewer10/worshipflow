@@ -6,7 +6,8 @@ import { join } from 'path'
 // so (like sundaySafety.test.ts / loadGenerationGuards.test.ts) these pin the
 // fixes against SOURCE. The behaviour itself is covered by the pure-module
 // tests (liveNav, liveDisplay) and the e2e QA regression suite.
-const main = readFileSync(join(__dirname, 'index.ts'), 'utf8')
+// CRLF on a Windows checkout (CI): compare with \n line ends (QA B10-N2).
+const main = readFileSync(join(__dirname, 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
 
 function body(sig: string, len = 2600): string {
   const i = main.indexOf(sig)
