@@ -53,6 +53,10 @@ export function createRecordingSession(deps: RecordingDeps): RecordingSession {
   // handing every concurrent caller the one in-flight promise instead of
   // starting a second one.
   let inFlightStart: Promise<boolean> | null = null
+  // QA B22: every Go Live (and both of its IPC paths) used to pop the same
+  // "OBS is offline" toast — twice per click, over the TopBar nav. Say it once
+  // per service; it re-arms when the service ends or a recording starts.
+  let offlineToastShown = false
 
   // The actual start attempt, kept separate from ensureStarted so its
   // completion can be observed from the OUTSIDE via .finally() rather than a
@@ -72,9 +76,13 @@ export function createRecordingSession(deps: RecordingDeps): RecordingSession {
   async function attemptStart(serviceId: number | null, serviceName: string, serviceDate: string | null): Promise<boolean> {
     if (!deps.autoRecordEnabled()) return false
     if (!deps.obsConnected()) {
-      deps.toast('Recording skipped — OBS is offline.')
+      if (!offlineToastShown) {
+        offlineToastShown = true
+        deps.toast('Recording skipped — OBS is offline.')
+      }
       return false
     }
+    offlineToastShown = false
     if (!deps.obsRecording()) {
       await deps.startRecord()
     }
@@ -117,6 +125,7 @@ export function createRecordingSession(deps: RecordingDeps): RecordingSession {
     },
 
     async onServiceEnded() {
+      offlineToastShown = false
       if (recordingId == null) return
       const filePath = await deps.stopRecord()
       const endedAt = deps.now()

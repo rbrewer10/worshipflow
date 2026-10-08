@@ -6,6 +6,9 @@ import { useService } from './ServiceContext'
 import type { LiveState } from '../../shared/types'
 import type { SceneConfig } from '../../shared/zoneScenes'
 import { effectiveRouting, matchScene, expandScene } from '../../shared/zoneScenes'
+import type { ServiceControlModeMapping } from '../../shared/serviceControlModes'
+import { DEFAULT_MODE_MAPPING } from '../../shared/serviceControlModes'
+import { lookRouting } from '../../shared/liveLook'
 
 // The Live tab: the click-a-slide grid + the right-hand tools panel, for Main.
 // (The loaded service + output preview live in the shell's left rail —
@@ -21,7 +24,9 @@ function LiveView(): JSX.Element {
   const [live, setLive] = useState<LiveState | null>(null)
   const { activeService } = useService()
 
+  const [modeMapping, setModeMapping] = useState<ServiceControlModeMapping>(DEFAULT_MODE_MAPPING)
   useEffect(() => { void window.wf.scenesGet().then(setSceneConfig) }, [])
+  useEffect(() => { void window.wf.serviceControlModesGet().then(setModeMapping) }, [])
 
   useEffect(() => {
     const off = window.wf.onState((s) => setLive(s.main))
@@ -48,14 +53,17 @@ function LiveView(): JSX.Element {
             vertical space the operator needs for the live text. */}
         <div className="wf-live-bottom flex flex-col gap-2 border-t border-border p-3">
           {liveItem && sceneConfig && (() => {
-            const routing = effectiveRouting(liveItem, sceneConfig)
+            // A one-time Look (Ryan's decision #7) is what the screens show
+            // right now, so the row reflects it; picking a scene here replaces it.
+            const look = live?.liveLook ? lookRouting(live.liveLook, modeMapping, sceneConfig, liveItem.type) : null
+            const routing = look ?? effectiveRouting(liveItem, sceneConfig)
             return (
               <ScenePresetRow
                 config={sceneConfig}
                 itemType={liveItem.type}
                 routing={routing}
                 matched={matchScene(routing, liveItem.type, sceneConfig)}
-                isDefault={liveItem.zoneRouting == null}
+                isDefault={liveItem.zoneRouting == null && !look}
                 onPick={(sceneId) => {
                   const scene = sceneConfig.scenes.find((s) => s.id === sceneId)
                   if (!scene) return
