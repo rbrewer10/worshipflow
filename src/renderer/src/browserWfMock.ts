@@ -392,6 +392,8 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     liveSetBackground: noop,
     songSetFontScale: noop,
     dialogOpenFile: async (): Promise<{ canceled: boolean; filePaths: string[] }> => ({ canceled: true, filePaths: [] }),
+    mediaPick: async (): Promise<{ canceled: boolean; path?: string; error?: string }> => ({ canceled: true }),
+    onMediaRelinked: (): (() => void) => () => undefined,
     bgList: async (): Promise<{ filename: string; path: string; kind: 'upload' | 'generated'; isVideo: boolean; folder: string | null }[]> => [],
     bgUpload: async (srcPath: string): Promise<string> => srcPath,
     bgDelete: noop,
@@ -565,7 +567,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       ({ ok: true, restored: false, fallback: false, stale: false, serviceName: null }),
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),
-    serviceImportFile: async (): Promise<{ canceled: boolean; serviceId: number | null }> => ({ canceled: true, serviceId: null }),
+    serviceImportFile: async (): Promise<import('../../shared/types').ServiceImportResult> => ({ canceled: true, serviceId: null }),
     serviceImportPlan: async (): Promise<{ canceled: boolean; serviceId: number | null; matched: number; missing: string[] }> => ({ canceled: true, serviceId: null, matched: 0, missing: [] }),
 
     templatesList: async (): Promise<any[]> => [],

@@ -1,10 +1,13 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
+import { describeImport, parseServiceBundle, referencedMediaPaths, bundleMediaPaths, rewriteMediaPaths, sameSong, songContentDiffers, songInputFrom, uniqueServiceName, announcementRefs, bundleAnnouncementFrom, announcementInputFrom, sameAnnouncement, remapAnnouncementItem, BUNDLE_VERSION, type BundleAnnouncement, type BundleItem, type ImportSummary } from '../shared/serviceBundle'
+import type { ServiceExportResult, ServiceImportResult } from '../shared/types'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
 import { randomUUID, randomInt, randomBytes } from 'crypto'
 import { createServer, type IncomingMessage } from 'http'
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync, realpathSync, copyFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
+import { promises as fsPromises } from 'fs'
 import os from 'os'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
@@ -110,8 +113,13 @@ import {
   closeDanglingRecordings,
   getRecording,
   setRecordingRender,
-  setRecordingAi
+  setRecordingAi,
+  listStoredMediaPaths,
+  rewriteStoredMediaPaths,
+  databaseMentions,
 } from './db'
+import { readServiceArchive, isServiceArchive, writeServiceArchive, planExportMedia, restoreArchiveMedia, type RestoredMedia } from './serviceArchive'
+import { importMediaFile, mediaProblemFor, migrateOutsidePaths, planImportedMediaCleanup, safeCleanupName, MediaImportRefused, servablePath, hasMediaExtension, isNetworkPath, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
 import {
   listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder,
   listBackgroundFolders, createBackgroundFolder, renameBackgroundFolder, moveBackground, deleteBackgroundFolder
@@ -194,45 +202,18 @@ const iconFile = join(app.getAppPath(), 'build', 'icon.ico')
 const APP_ICON = existsSync(iconFile) ? iconFile : undefined
 
 // Helper to safely resolve a path and ensure it's within allowed media roots
+// The only folders the projector (wf-asset://) and the LAN tablet /file route
+// may load from. Anything an operator picks from elsewhere is copied into
+// imported-media first (QA B2-N1, see mediaImport.ts).
+function mediaRoots(): MediaRoots {
+  const ud = app.getPath('userData')
+  const mediaDir = join(ud, 'imported-media')
+  return { mediaDir, allowedRoots: [join(ud, 'backgrounds'), mediaDir, join(ud, 'generated')], userDataDir: ud }
+}
+
 function validateMediaPath(requestedPath: string): string | null {
-  const allowedRoots = [
-    join(app.getPath('userData'), 'backgrounds'),
-    join(app.getPath('userData'), 'imported-media'),
-    join(app.getPath('userData'), 'generated'),
-  ]
-
-  try {
-    const resolved = resolve(requestedPath)
-    // Resolve to real path (follow symlinks, get canonical path)
-    const realPath = realpathSync(resolved)
-
-    // The church logo image and logo motion background are explicitly chosen by the
-    // user via Settings and can live anywhere they picked them (Downloads, a mapped
-    // drive, etc.). Allow those exact configured files regardless of folder.
-    for (const configured of [logoPath, logoBg]) {
-      if (!configured) continue
-      try {
-        if (realpathSync(resolve(configured)) === realPath) return realPath
-      } catch { /* configured file missing — fall through */ }
-    }
-
-    // Check if REAL path is within any allowed root
-    for (const root of allowedRoots) {
-      const rel = relative(root, realPath)
-      // relative() returns ".." prefix if outside the root. On Windows, relative()
-      // between paths on different drives (or a UNC path) returns an ABSOLUTE path
-      // instead of a ".."-prefixed one, since there's no relative form across drives —
-      // reject that case too, or it would incorrectly pass containment.
-      if (!rel.startsWith('..') && !isAbsolute(rel) && existsSync(realPath)) {
-        return realPath
-      }
-    }
-
-    return null // path is outside allowed roots or doesn't exist
-  } catch (err) {
-    console.error('Invalid path:', requestedPath, err)
-    return null
-  }
+  // Pure logic in mediaImport.ts (servablePath) so it's unit-tested (QA A3-N1).
+  return servablePath(requestedPath, mediaRoots().allowedRoots, [logoPath, logoBg])
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -1898,6 +1879,16 @@ function applyItemTheme(track: TrackId, item: ServiceItem | undefined): void {
 }
 
 function doLoadMedia(track: TrackId, filePath: string, title: string): void {
+  // QA B2-N1 / B3-N4: never fail silently — a file the projector can't load
+  // used to be a blank screen with a 403 only in the log. Here, not in one
+  // caller, so the rail, Volunteer "Go live", Next/Space and the tablet all warn.
+  const problem = mediaProblemFor(filePath, (x) => validateMediaPath(x) !== null)
+  if (problem) {
+    const name = basename(filePath)
+    notifyOperator(problem === 'missing'
+      ? `Can't show “${name}” — the file isn't on this computer any more. Re-link it in Build service.`
+      : `Can't show “${name}” — it isn't in WorshipFlow's media folder. Re-link it in Build service.`, 'warn')
+  }
   const t = tracks[track]
   t.loadGeneration++
   t.hasLiveContent = true
@@ -2158,10 +2149,16 @@ function startTabletServer(): void {
       const ext = (validPath.split('.').pop() ?? '').toLowerCase()
       const MIME: Record<string, string> = {
         jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-        gif: 'image/gif', webp: 'image/webp', avif: 'image/avif',
+        gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', bmp: 'image/bmp',
         mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/mp4',
       }
-      const mime = MIME[ext] ?? 'application/octet-stream'
+      // Media types only (QA A3-N1) — no generic binary fallback.
+      const mime = MIME[ext]
+      if (!mime) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' })
+        res.end('Access denied: not a picture or video')
+        return
+      }
       const safeEnd = (): void => { if (!res.writableEnded) res.end() }
       try {
         const stat = statSync(validPath)
@@ -2182,6 +2179,7 @@ function startTabletServer(): void {
             'Accept-Ranges': 'bytes',
             'Content-Length': end - start + 1,
             'Content-Type': mime,
+            'X-Content-Type-Options': 'nosniff',
             'Cache-Control': 'public, max-age=3600',
           })
           const stream = createReadStream(validPath, { start, end })
@@ -2191,6 +2189,7 @@ function startTabletServer(): void {
           const buf = readFileSync(validPath)
           res.writeHead(200, {
             'Content-Type': mime,
+            'X-Content-Type-Options': 'nosniff',
             'Content-Length': buf.length,
             'Accept-Ranges': 'bytes',
             'Cache-Control': 'public, max-age=3600',
@@ -2847,6 +2846,9 @@ ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
     return
   }
   refreshActiveServiceItems(serviceId)
+  // A just-imported .wfservice (or a service from an older version) may point
+  // at pictures on a USB stick or in Pictures — copy them in now (B2-N1).
+  void migrateOutsideMedia('service opened')
 })
 ipcMain.handle('wf:getActiveServiceId', () => activeServiceId)
 
@@ -3086,6 +3088,22 @@ ipcMain.handle('wf:songs:setBlurBehindText', (_e: unknown, id: number, value: bo
 // (ServiceEditor.tsx's reload()), so a second edit surface calling these
 // IPCs directly would silently reproduce "newly added/edited item can't go
 // live" with nothing to catch it.
+// QA B2-N1: mark items whose picture/video (or background) the projector
+// can't load, so Build service can show a warning + Re-link and Review plan
+// counts it. Computed on read; nothing is stored.
+function withMediaProblems(svc: ServiceFull | null): ServiceFull | null {
+  if (!svc) return svc
+  const servable = (p: string): boolean => validateMediaPath(p) !== null
+  return {
+    ...svc,
+    items: svc.items.map((it) => {
+      const problem = mediaProblemFor(it.type === 'image' ? it.payload.path : undefined, servable)
+      const bgProblem = mediaProblemFor(it.payload.background, servable)
+      return problem || bgProblem ? { ...it, mediaProblem: problem ?? undefined, backgroundProblem: bgProblem ?? undefined } : it
+    })
+  }
+}
+
 function refreshIfActive(serviceId: number | null): void {
   if (serviceId != null && serviceId === activeServiceId) refreshActiveServiceItems(serviceId)
 }
@@ -3094,7 +3112,7 @@ function refreshIfActive(serviceId: number | null): void {
 ipcMain.handle('wf:services:list', () => listServices())
 ipcMain.handle('wf:services:create', (_e, name: string, date?: string) => createService(name, date))
 ipcMain.handle('wf:services:delete', (_e, id: number) => deleteService(id))
-ipcMain.handle('wf:services:get', (_e, id: number) => getService(id))
+ipcMain.handle('wf:services:get', (_e, id: number) => withMediaProblems(getService(id)))
 ipcMain.handle('wf:service:setPublished', (_e, id: number, publishedAt: number | null) => setServicePublished(id, publishedAt))
 ipcMain.handle('wf:service:getTeam', (_e, id: number) => getServiceTeam(id))
 ipcMain.handle('wf:service:setTeam', (_e, id: number, team: import('../shared/types').ServiceTeam) => setServiceTeam(id, team))
@@ -3483,7 +3501,7 @@ ipcMain.handle('wf:app:restoreRecovery', async (): Promise<{
   return { ok: true, restored: restoredAny, fallback: fallbackAny, stale: false, serviceName }
 })
 
-ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ canceled: boolean }> => {
+ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<ServiceExportResult> => {
   const svc = getService(serviceId)
   if (!svc) return { canceled: true }
   const itemsWithSongs = await Promise.all(
@@ -3492,83 +3510,196 @@ ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<{ ca
       return { ...item, song }
     })
   )
-  const bundle = { version: 2, name: svc.name, service_date: svc.service_date, published_at: svc.published_at ?? null, team: svc.team, theme: svc.theme, themeColors: svc.themeColors, items: itemsWithSongs }
+  // B2-N2: embed every announcement the service points at (ref_id or a
+  // block's refIds) — the id alone means nothing on the booth PC.
+  const announcements: Record<string, BundleAnnouncement> = {}
+  for (const item of svc.items) {
+    for (const id of announcementRefs(item)) {
+      const a = getAnnouncement(id)
+      if (a) announcements[String(id)] = bundleAnnouncementFrom(a)
+    }
+  }
+  const bundle = { version: BUNDLE_VERSION, name: svc.name, service_date: svc.service_date, published_at: svc.published_at ?? null, team: svc.team, theme: svc.theme, themeColors: svc.themeColors, items: itemsWithSongs, announcements }
   const { filePath, canceled } = await dialog.showSaveDialog({
     title: 'Export Service',
     defaultPath: `${svc.name.replace(/[/\\?%*:|"<>]/g, '-')}.wfservice`,
     filters: [{ name: 'WorshipFlow Service', extensions: ['wfservice'] }]
   })
   if (canceled || !filePath) return { canceled: true }
-  writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8')
-  return { canceled: false }
+  // Ryan's decision (Oct 2026): carry every picture, background and video the
+  // service uses, so the file opens complete on another PC. Streamed into a
+  // tar (main/serviceArchive.ts) — a big video is never read into memory. A
+  // service with no media stays plain JSON (older builds can open it).
+  const plan = planExportMedia(bundleMediaPaths(bundle, (p) => hasMediaExtension(p)))
+  const json = JSON.stringify({ ...bundle, media: plan.media }, null, 2)
+  try {
+    if (plan.entries.length) await writeServiceArchive(filePath, json, plan.entries)
+    else writeFileSync(filePath, json, 'utf-8')
+  } catch (err) {
+    // e.g. the USB stick was pulled, full or read-only — tell the operator (QA B24).
+    logError(`[export] .wfservice export failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
+    return { canceled: false, error: `Couldn't save the service file: ${err instanceof Error ? err.message : String(err)}` }
+  }
+  if (plan.missing.length) logWarn(`[export] ${plan.missing.length} media file(s) not carried: ${plan.missing.join(', ')}`)
+  logInfo(`[export] saved ${filePath} with ${plan.entries.length} media file(s)`)
+  return { canceled: false, filePath, mediaCount: plan.entries.length, missingMedia: plan.missing.map((p) => p.split(/[\\/]/).pop() ?? p) }
 })
 
-ipcMain.handle('wf:services:import', async (): Promise<{ canceled: boolean; serviceId: number | null }> => {
+ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
   const { filePaths, canceled } = await dialog.showOpenDialog({
     title: 'Import Service',
     filters: [{ name: 'WorshipFlow Service', extensions: ['wfservice'] }],
     properties: ['openFile']
   })
   if (canceled || filePaths.length === 0) return { canceled: true, serviceId: null }
-
-  let bundle: {
-    version: number
-    name: string
-    service_date: string | null
-    published_at?: number | null
-    team?: import('../shared/types').ServiceTeam
-    theme: string | null
-    themeColors: ThemeColors | null
-    items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
-  }
+  // Errors come back to the renderer as a message (toast) — no native dialog,
+  // so live control never waits on a modal (QA A-H4) and a bad file is never
+  // silent (QA B12).
+  let text: string
+  // A file that carries its media (Ryan's decision, Oct 2026) is a tar; every
+  // older .wfservice is plain JSON and imports exactly as before.
+  let archive: Awaited<ReturnType<typeof readServiceArchive>> | null = null
   try {
-    bundle = JSON.parse(readFileSync(filePaths[0], 'utf-8')) as {
-      version: number
-      name: string
-      service_date: string | null
-      published_at?: number | null
-      team?: import('../shared/types').ServiceTeam
-      theme: string | null
-      themeColors: ThemeColors | null
-      items: Array<(ServiceFull['items'][number]) & { song: SongFull | null }>
+    if (await isServiceArchive(filePaths[0])) {
+      archive = await readServiceArchive(filePaths[0])
+      text = archive.json
+    } else {
+      text = readFileSync(filePaths[0], 'utf-8')
     }
   } catch (err) {
-    await dialog.showErrorBox('Import Failed', `Invalid service file: ${err instanceof Error ? err.message : String(err)}`)
-    return { canceled: false, serviceId: null }
+    return { canceled: false, serviceId: null, error: `Couldn't read that file: ${err instanceof Error ? err.message : String(err)}` }
   }
-
-  // Validate structure
-  if (!bundle.version || !Array.isArray(bundle.items)) {
-    await dialog.showErrorBox('Import Failed', 'Invalid service file: missing version or items array')
-    return { canceled: false, serviceId: null }
-  }
-
-  const serviceId = createService(bundle.name, bundle.service_date ?? undefined)
-  if (bundle.theme) setServiceTheme(serviceId, bundle.theme, bundle.themeColors ?? null)
-  if (bundle.team) setServiceTeam(serviceId, bundle.team)
-  if (bundle.published_at) setServicePublished(serviceId, bundle.published_at)
-  for (const item of bundle.items) {
-    let ref_id: number | null = null
-    if (item.type === 'song' && item.song) {
-      const existing = listSongs(item.song.title).find((s) => s.title === item.song!.title)
-      ref_id = existing ? existing.id : createSong({
-        title: item.song.title,
-        author: item.song.author ?? undefined,
-        ccli: item.song.ccli ?? undefined,
-        copyright: item.song.copyright ?? undefined,
-        publisher: item.song.publisher ?? undefined,
-        background: item.song.background,
-        sections: item.song.sections,
-        arrangement: item.song.arrangement ?? undefined,
-        fontScale: item.song.fontScale ?? undefined,
-        linesPerSlide: item.song.linesPerSlide ?? undefined,
-      })
+  const parsed = parseServiceBundle(text)
+  if (!parsed.ok) return { canceled: false, serviceId: null, error: parsed.error }
+  let bundle = parsed.bundle
+  // Copy the carried pictures/videos into imported-media and point the
+  // service at the copies. What isn't in the file stays as it was and is
+  // reported as missing below.
+  let restored: RestoredMedia = { map: new Map(), created: [], refused: [] }
+  if (archive) {
+    try {
+      restored = await restoreArchiveMedia(filePaths[0], archive.entries, bundle.media, mediaRoots().mediaDir)
+    } catch (err) {
+      logError(`[import] couldn't copy the media out of ${filePaths[0]}: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
+      return { canceled: false, serviceId: null, error: `Couldn't copy the pictures and videos out of that file (${err instanceof Error ? err.message : String(err)}). Nothing was changed.` }
     }
-    const itemId = addServiceItem(serviceId, { type: item.type, ref_id, payload: item.payload })
-    if (item.notes) updateServiceItemNotes(itemId, item.notes)
-    if (item.style) setServiceItemStyle(itemId, item.style)
+    bundle = { ...bundle, items: rewriteMediaPaths(bundle.items, restored.map), announcements: rewriteMediaPaths(bundle.announcements, restored.map), theme: bundle.theme != null ? (restored.map.get(bundle.theme) ?? bundle.theme) : null }
   }
-  return { canceled: false, serviceId }
+
+  // B11: a song already in the library whose words differ from the file's copy
+  // used to be silently replaced by the booth copy. Ask what to do instead.
+  type SongPlan = { item: BundleItem; localId: number | null; differs: boolean }
+  const plans: SongPlan[] = bundle.items.filter((it) => it.song).map((item) => {
+    const incoming = item.song!
+    const local = listSongs(incoming.title)
+      .map((s) => getSong(s.id))
+      .find((s): s is SongFull => !!s && sameSong(s, incoming))
+    return { item, localId: local?.id ?? null, differs: local ? songContentDiffers(local, incoming) : false }
+  })
+  const conflicts = [...new Map(plans.filter((p) => p.differs).map((p) => [p.localId, p])).values()]
+  let choice: 'keep' | 'replace' | 'copy' = 'keep'
+  if (conflicts.length) {
+    const names = conflicts.map((p) => `• ${p.item.song!.title}`).join('\n')
+    const opts = {
+      type: 'question' as const,
+      title: 'Songs differ from this computer',
+      message: `${conflicts.length === 1 ? 'This song is' : `${conflicts.length} songs are`} different in the file than in this computer’s library:`,
+      detail: `${names}\n\n“Use the file’s version” updates the library song (every service that uses it will show the new words).`,
+      buttons: ['Keep this computer’s version', 'Use the file’s version', 'Keep both (add as a copy)'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
+    }
+    const parent = operatorWin && !operatorWin.isDestroyed() ? operatorWin : null
+    const res = parent ? await dialog.showMessageBox(parent, opts) : await dialog.showMessageBox(opts)
+    choice = res.response === 1 ? 'replace' : res.response === 2 ? 'copy' : 'keep'
+  }
+
+  const renamedName = uniqueServiceName(bundle.name, listServices().map((sv) => sv.name))
+  const summary: ImportSummary = {
+    serviceName: renamedName, renamedFrom: renamedName !== bundle.name ? bundle.name : null,
+    items: 0, skipped: parsed.skipped, songsAdded: 0, songsMatched: 0,
+    songsUpdated: [], songsKept: [], songsCopied: [],
+    missingMedia: [...new Set([...referencedMediaPaths(bundle), ...bundleMediaPaths(bundle, (p) => hasMediaExtension(p))])].filter((p) => !isNetworkPath(p) && !existsSync(p)),
+    announcementsAdded: 0, announcementsMatched: 0, announcementsMissing: [],
+    newerVersion: parsed.newerVersion,
+    mediaRestored: restored.map.size,
+    mediaRefused: restored.refused
+  }
+  const createdSongs: number[] = []
+  const createdAnnouncements: number[] = []
+  const announcementIds = new Map<number, number>()  // exporting PC's id → this PC's
+  let serviceId: number | null = null
+  const copyIds = new Map<number, number>()  // local song id → its "(from file)" copy
+  try {
+    serviceId = createService(renamedName, bundle.service_date ?? undefined)
+    if (bundle.theme) setServiceTheme(serviceId, bundle.theme, bundle.themeColors ?? null)
+    if (bundle.team) setServiceTeam(serviceId, bundle.team as import('../shared/types').ServiceTeam)
+    // B2-N2: match each embedded announcement to the booth library (same
+    // title + words + display) or add it, then remap the items' ids below.
+    if (Object.keys(bundle.announcements).length) {
+      const local = listAnnouncements().map((a) => getAnnouncement(a.id)).filter((a): a is NonNullable<typeof a> => !!a)
+      for (const [key, incoming] of Object.entries(bundle.announcements)) {
+        const match = local.find((a) => sameAnnouncement(a, incoming))
+        if (match) { announcementIds.set(Number(key), match.id); summary.announcementsMatched!++; continue }
+        const id = createAnnouncement(announcementInputFrom(incoming))
+        createdAnnouncements.push(id)
+        announcementIds.set(Number(key), id)
+        summary.announcementsAdded!++
+      }
+    }
+    for (const item of bundle.items) {
+      let ref_id: number | null = null
+      let payload = item.payload
+      if (item.type === 'announcement') {
+        const remapped = remapAnnouncementItem(item, announcementIds)
+        ref_id = remapped.ref_id
+        payload = remapped.payload
+        if (remapped.missing) summary.announcementsMissing!.push(item.title || 'Announcement')
+      }
+      if (item.song) {
+        const plan = plans.find((p) => p.item === item)!
+        if (plan.localId == null) {
+          ref_id = createSong(songInputFrom(item.song))
+          createdSongs.push(ref_id)
+          summary.songsAdded++
+        } else if (plan.differs && choice === 'copy') {
+          ref_id = copyIds.get(plan.localId) ?? createSong(songInputFrom(item.song, `${item.song.title} (from file)`))
+          if (!copyIds.has(plan.localId)) { copyIds.set(plan.localId, ref_id); createdSongs.push(ref_id); summary.songsCopied.push(item.song.title) }
+        } else {
+          ref_id = plan.localId
+          summary.songsMatched++
+          if (plan.differs && choice === 'keep' && !summary.songsKept.includes(item.song.title)) summary.songsKept.push(item.song.title)
+        }
+      }
+      const itemId = addServiceItem(serviceId, { type: item.type, ref_id, payload, track: item.track })
+      if (item.notes) updateServiceItemNotes(itemId, item.notes)
+      if (item.style) setServiceItemStyle(itemId, item.style)
+      if (item.zoneRouting) setItemZoneRouting(itemId, JSON.stringify(item.zoneRouting))
+      summary.items++
+    }
+    // Keep the published flag the file carried (zone routing above clears it).
+    if (bundle.published_at) setServicePublished(serviceId, bundle.published_at)
+  } catch (err) {
+    // Undo the half-made import rather than leave a partial service behind.
+    logError(`[import] .wfservice import failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
+    try { if (serviceId != null) deleteService(serviceId) } catch { /* best effort */ }
+    for (const id of createdSongs) { try { deleteSong(id) } catch { /* best effort */ } }
+    for (const id of createdAnnouncements) { try { deleteAnnouncement(id) } catch { /* best effort */ } }
+    for (const f of restored.created) { try { unlinkSync(f) } catch { /* best effort */ } }
+    return { canceled: false, serviceId: null, error: `The service couldn't be imported (${err instanceof Error ? err.message : String(err)}). Nothing was changed.` }
+  }
+  // Library updates last, once the service itself imported cleanly.
+  if (choice === 'replace') {
+    for (const p of conflicts) {
+      try { updateSong(p.localId!, songInputFrom(p.item.song!, getSong(p.localId!)?.title ?? p.item.song!.title)); summary.songsUpdated.push(p.item.song!.title) } catch (err) {
+        logError(`[import] couldn't update song ${p.localId}: ${err instanceof Error ? err.message : String(err)}`)
+        summary.songsKept.push(p.item.song!.title)
+      }
+    }
+  }
+  logInfo(`[import] ${describeImport(summary)}`)
+  return { canceled: false, serviceId, summary: describeImport(summary), warn: summary.skipped.length > 0 || summary.missingMedia.length > 0 || (summary.mediaRefused?.length ?? 0) > 0 || (summary.announcementsMissing?.length ?? 0) > 0 || !!summary.newerVersion }
 })
 
 // Import a service plan exported from the Snow Hill Church app (.wfplan / .json).
@@ -3887,6 +4018,110 @@ ipcMain.handle('wf:dialog:openFile', async () => {
     : await dialog.showOpenDialog(opts)
 })
 
+// QA B2-N1: pick a picture/video for the projector (image items, song and item
+// backgrounds) and copy it into WorshipFlow's imported-media folder, returning
+// the copy's path. Storing the original path (Pictures, Downloads, a USB
+// stick) used to give a blank projector, because wf-asset:// only serves files
+// inside the app's own folders. The logo pickers keep wf:dialog:openFile —
+// validateMediaPath explicitly allows the configured logo files.
+ipcMain.handle('wf:media:pick', async (): Promise<{ canceled: boolean; path?: string; error?: string }> => {
+  const opts = {
+    title: 'Choose a picture or video',
+    filters: [
+      { name: 'Pictures and videos', extensions: MEDIA_EXTENSIONS },
+      { name: 'Video', extensions: ['mp4', 'webm', 'mov', 'm4v'] },
+      { name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'] }
+    ],
+    properties: ['openFile'] as ['openFile']
+  }
+  const res = operatorWin
+    ? await dialog.showOpenDialog(operatorWin, opts)
+    : await dialog.showOpenDialog(opts)
+  if (res.canceled || !res.filePaths[0]) return { canceled: true }
+  try {
+    return { canceled: false, path: await importMediaFile(res.filePaths[0], mediaRoots()) }
+  } catch (err) {
+    if (err instanceof MediaImportRefused) return { canceled: false, error: `Can't use ${err.message}.` }
+    const why = (err as NodeJS.ErrnoException)?.code === 'ENOSPC' ? 'the disk is full' : ((err as Error)?.message ?? String(err))
+    logWarn(`[media] couldn't copy ${res.filePaths[0]} into imported-media: ${why}`)
+    return { canceled: false, error: `Couldn't copy ${basename(res.filePaths[0])} into WorshipFlow's media folder (${why}).` }
+  }
+})
+
+// Startup (and after a .wfservice import): copy any stored picture/video path
+// that points outside the app's folders — items saved by 0.20.2 and earlier —
+// into imported-media and rewrite the database to the copy. Files that no
+// longer exist are left alone; Build service flags them with a Re-link button
+// and Go Live warns. Never throws; one run at a time.
+let mediaMigration: Promise<void> | null = null
+const mediaReported = new Set<string>()
+function firstMediaReport(key: string): boolean {
+  if (mediaReported.has(key)) return false
+  mediaReported.add(key)
+  return true
+}
+function migrateOutsideMedia(reason: string): Promise<void> {
+  if (mediaMigration) return mediaMigration
+  mediaMigration = (async () => {
+    try {
+      const { relinked, failed, missing, refused } = await migrateOutsidePaths(listStoredMediaPaths(), mediaRoots(), (p) => validateMediaPath(p) !== null)
+      const rows = rewriteStoredMediaPaths(relinked)
+      if (relinked.size > 0) {
+        logInfo(`[media] ${reason}: copied ${relinked.size} outside picture/video file(s) into imported-media (${rows} row(s) updated)`)
+        refreshIfActive(activeServiceId)
+        operatorWin?.webContents.send('wf:media:relinked', { count: relinked.size })
+        notifyOperator(`Copied ${relinked.size} picture/video file${relinked.size === 1 ? '' : 's'} into WorshipFlow's media folder so ${relinked.size === 1 ? 'it shows' : 'they show'} on the projector.`, 'info')
+      }
+      // Each path is reported once per session, not on every service open (A3-N7).
+      for (const f of failed) if (firstMediaReport(`fail:${f.path}`)) logWarn(`[media] ${reason}: couldn't copy ${f.path}: ${f.error}`)
+      for (const r of refused) if (firstMediaReport(`refused:${r.path}`)) logWarn(`[media] ${reason}: not copying ${r.path} — ${r.reason} (QA A3-N1)`)
+      const newMissing = missing.filter((m) => firstMediaReport(`missing:${m}`))
+      if (newMissing.length > 0) logWarn(`[media] ${reason}: ${newMissing.length} stored picture/video path(s) no longer exist (Build service shows Re-link)`)
+    } catch (err) {
+      logWarn(`[media] ${reason}: migration failed: ${(err as Error)?.message ?? err}`)
+    } finally {
+      mediaMigration = null
+    }
+  })()
+  return mediaMigration
+}
+
+// QA A3-N6: imported-media only ever grew. Once per launch (after the
+// migration): delete copies cut short more than an hour ago, and copies
+// nothing in the database mentions any more — but only after they've been
+// unreferenced for 30 days (remembered in imported-media/.cleanup.json), so
+// an undo, a re-import or restoring a backup still finds them. Never throws;
+// never touches anything but plain files directly inside imported-media.
+async function cleanImportedMedia(): Promise<void> {
+  const { mediaDir } = mediaRoots()
+  const statePath = join(mediaDir, '.cleanup.json')
+  try {
+    if (!existsSync(mediaDir)) return
+    const entries = await fsPromises.readdir(mediaDir, { withFileTypes: true })
+    const files: Array<{ name: string; mtimeMs: number }> = []
+    for (const e of entries) {
+      if (!e.isFile() || !safeCleanupName(e.name)) continue
+      try { files.push({ name: e.name, mtimeMs: (await fsPromises.stat(join(mediaDir, e.name))).mtimeMs }) } catch { /* vanished */ }
+    }
+    let orphanSince: Record<string, number> = {}
+    try { orphanSince = JSON.parse(await fsPromises.readFile(statePath, 'utf8')) as Record<string, number> } catch { /* first run */ }
+    const candidates = files.filter((f) => !f.name.startsWith('.')).map((f) => f.name)
+    const referenced = databaseMentions(candidates)
+    for (const configured of [logoPath, logoBg]) if (configured) referenced.add(basename(configured))
+    const plan = planImportedMediaCleanup(files, (n) => referenced.has(n), orphanSince, Date.now())
+    let freed = 0
+    for (const name of plan.remove) {
+      if (!safeCleanupName(name)) continue
+      const full = join(mediaDir, name)
+      try { freed += (await fsPromises.stat(full)).size; await fsPromises.rm(full, { force: true }) } catch { /* in use / gone */ }
+    }
+    await fsPromises.writeFile(statePath, JSON.stringify(plan.orphanSince))
+    if (plan.remove.length > 0) logInfo(`[media] cleanup: removed ${plan.remove.length} unused/partial file(s) from imported-media (${Math.round(freed / 1048576)} MB)`)
+  } catch (err) {
+    logWarn(`[media] cleanup failed: ${(err as Error)?.message ?? err}`)
+  }
+}
+
 // Create a timestamped backup of the database on app launch
 function createTimestampedBackup(): void {
   const dbPath = join(app.getPath('userData'), 'worshipflow.db')
@@ -4040,8 +4275,19 @@ ipcMain.handle('wf:service:importImages', async (): Promise<{ id: number; name: 
   if (result.canceled || result.filePaths.length === 0) return null
   const files = [...result.filePaths].sort(naturalCompare)
   const name = basename(dirname(files[0])) || 'Imported Service'
+  // Copy each slide into imported-media first (QA B2-N1) — the original
+  // export folder is outside what the projector may load.
+  const copies: string[] = []
+  for (const f of files) {
+    try {
+      copies.push(await importMediaFile(f, mediaRoots()))
+    } catch (err) {
+      logWarn(`[media] importImages: couldn't copy ${f}: ${(err as Error)?.message ?? err}`)
+      copies.push(f) // keep the slide; Build service flags it with Re-link
+    }
+  }
   const id = createService(name)
-  for (const f of files) addServiceItem(id, { type: 'image', payload: { path: f } })
+  for (const f of copies) addServiceItem(id, { type: 'image', payload: { path: f } })
   return { id, name, count: files.length }
 })
 
@@ -4150,6 +4396,8 @@ app.whenReady().then(async () => {
   // attached this opens the zone multiview instead of a stray output window.
   layoutOutputs()
   broadcast()
+  // Copy pictures/videos older versions stored outside the app folder (B2-N1).
+  void migrateOutsideMedia('startup').then(() => cleanImportedMedia())
   // Reconnect to OBS in the background if the operator connected before (non-blocking).
   void initObsAutoConnect()
   // Startup-only update check (never repeats while the app stays open) — see

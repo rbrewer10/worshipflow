@@ -29,7 +29,9 @@ import type {
   ScriptureRefCheck,
   LivecallConfig,
   ServiceTeam,
-  ServiceItemType
+  ServiceItemType,
+  ServiceImportResult,
+  ServiceExportResult
 } from '../shared/types'
 import type { SceneConfig } from '../shared/zoneScenes'
 import type { NdiRuntimeStatus } from '../shared/ndiRuntime'
@@ -191,6 +193,14 @@ const wf = {
     ipcRenderer.invoke('wf:songs:setFontScale', id, scale),
   dialogOpenFile: (): Promise<{ canceled: boolean; filePaths: string[] }> =>
     ipcRenderer.invoke('wf:dialog:openFile'),
+  /** Pick a picture/video and copy it into WorshipFlow's media folder (QA B2-N1). */
+  mediaPick: (): Promise<{ canceled: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke('wf:media:pick'),
+  onMediaRelinked: (cb: (info: { count: number }) => void): (() => void) => {
+    const handler = (_e: unknown, info: { count: number }): void => cb(info)
+    ipcRenderer.on('wf:media:relinked', handler)
+    return () => ipcRenderer.removeListener('wf:media:relinked', handler)
+  },
 
   // Background library
   bgList: (): Promise<{ filename: string; path: string; kind: 'upload' | 'generated'; isVideo: boolean; folder: string | null }[]> =>
@@ -414,9 +424,9 @@ const wf = {
     ipcRenderer.invoke('wf:multiview:open'),
 
   // Service export/import
-  serviceExport: (serviceId: number): Promise<{ canceled: boolean }> =>
+  serviceExport: (serviceId: number): Promise<ServiceExportResult> =>
     ipcRenderer.invoke('wf:services:export', serviceId),
-  serviceImportFile: (): Promise<{ canceled: boolean; serviceId: number | null }> =>
+  serviceImportFile: (): Promise<ServiceImportResult> =>
     ipcRenderer.invoke('wf:services:import'),
   serviceImportPlan: (): Promise<{
     canceled: boolean

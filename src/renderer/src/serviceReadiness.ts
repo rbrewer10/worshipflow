@@ -45,6 +45,19 @@ export function computeServiceReadiness(service: ServiceFull, songs: SongSummary
     if ((item.type === 'text' || item.type === 'sermon') && !Object.values(item.payload).some((value) => typeof value === 'string' && value.trim())) {
       issues.push({ id: `content-${item.id}`, level: 'blocking', label: `Add content to “${itemLabel(item)}”`, detail: 'This item is empty and cannot be reviewed yet.', itemId: item.id })
     }
+    // QA B2-N1: wf:services:get flags media the projector can't load.
+    if (item.type === 'image' && item.mediaProblem) {
+      issues.push({
+        id: `media-${item.id}`, level: 'blocking', label: `Re-link the file for “${itemLabel(item)}”`,
+        detail: item.mediaProblem === 'missing'
+          ? 'The picture or video isn’t on this computer any more — the projector would be blank.'
+          : 'The picture or video is outside WorshipFlow’s media folder — the projector can’t show it.',
+        itemId: item.id
+      })
+    }
+    if (item.backgroundProblem) {
+      issues.push({ id: `media-bg-${item.id}`, level: 'warning', label: `Choose the background for “${itemLabel(item)}” again`, detail: 'Its background file can’t be loaded on this computer, so the theme will show instead.', itemId: item.id })
+    }
     if (item.type === 'song' && item.ref_id != null) {
       const song = songs.find((candidate) => candidate.id === item.ref_id)
       if (song && !song.background) {

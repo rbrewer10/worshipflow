@@ -136,9 +136,10 @@ function SongLibrary(): JSX.Element {
     window.wf.songSetBackground(id, path).then(() => refresh())
   )
   const pickBg = async (id: number): Promise<void> => {
-    const result = await window.wf.dialogOpenFile()
-    if (result.canceled || !result.filePaths[0]) return
-    bgQueue.trigger({ id, path: result.filePaths[0] })
+    const result = await window.wf.mediaPick() // copies into the media folder (B2-N1)
+    if (result.error) { notifyLocal(result.error, 'error'); return }
+    if (result.canceled || !result.path) return
+    bgQueue.trigger({ id, path: result.path })
   }
 
   const clearBg = (id: number): void => {
