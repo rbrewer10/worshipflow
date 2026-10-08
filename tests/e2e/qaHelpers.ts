@@ -116,25 +116,32 @@ export async function relaunchAfterCrash(root: string): Promise<LaunchedApp> {
 }
 
 /**
- * Close the app, but never hang the run on it: if it hasn't exited after
- * `ms`, kill it (whole tree on Windows) and record that it had to. The app's
- * own log and console output are attached to the test either way, so a CI
- * failure says where it stopped. Returns true when the app quit by itself.
+ * Close the app, but never hang the run on it. Playwright's app.close() can
+ * hang on Linux after a renderer crashed even though the app itself quits
+ * (also seen by VS Code's sanity tests, microsoft/vscode#315418), so the
+ * verdict is whether the Electron PROCESS exited by itself within `ms`, not
+ * whether close() settled. Still running after `ms` → killed (whole tree on
+ * Windows) and false. The app's own log and a close summary are attached to
+ * the test, so a CI failure says where it stopped.
  */
 export async function closeAppWithin(launched: LaunchedApp, ms = 20_000): Promise<boolean> {
   const { app, userDataDir, profileDir } = launched
   const proc = app.process()
   const exited = (): boolean => proc.exitCode !== null || proc.signalCode !== null
   const t0 = Date.now()
-  const quit = await Promise.race([
-    app.close().then(() => true, () => exited()),
-    new Promise<boolean>((r) => setTimeout(() => r(false), ms)),
-  ])
-  if (!quit && !exited()) {
-    await crashApp(app).catch(() => { /* already gone */ })
-    test.info().annotations.push({ type: 'app-quit-hung', description: `app.close() did not finish within ${ms} ms; killed` })
-  }
+  let closeSettled = false
+  let exitedAt: number | null = exited() ? 0 : null
+  proc.once('exit', () => { exitedAt ??= Date.now() - t0 })
+  void app.close().catch(() => { /* reported below */ }).finally(() => { closeSettled = true })
+  const sleep = (n: number): Promise<void> => new Promise((r) => setTimeout(r, n))
+  while (Date.now() - t0 < ms && !exited()) await sleep(100)
+  for (let i = 0; i < 30 && exited() && !closeSettled; i++) await sleep(100) // give close() 3 s to notice
+  const quit = exited()
+  if (!quit) await crashApp(app).catch(() => { /* already gone */ })
+  const summary = `process exited by itself: ${quit}${exitedAt != null ? ` (after ${exitedAt} ms)` : ''}; app.close() settled: ${closeSettled}; waited ${Date.now() - t0} ms`
+  test.info().annotations.push({ type: 'close', description: summary })
   try {
+    await attachText('close-summary.txt', summary)
     const logs = join(profileDir, 'logs')
     if (existsSync(logs)) {
       for (const f of readdirSync(logs)) {
@@ -144,7 +151,6 @@ export async function closeAppWithin(launched: LaunchedApp, ms = 20_000): Promis
       }
     }
   } catch { /* diagnostics only */ }
-  test.info().annotations.push({ type: 'close-ms', description: String(Date.now() - t0) })
   rmSync(userDataDir, { recursive: true, force: true })
   return quit
 }
