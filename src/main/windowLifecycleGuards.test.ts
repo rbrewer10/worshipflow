@@ -6,7 +6,8 @@ import { join } from 'path'
 // these pin the wiring against source, like sundaySafety.test.ts. The decisions
 // themselves are unit-tested in src/shared/windowPolicy.test.ts, and the
 // behaviour end-to-end in the QA e2e regression suite.
-const main = readFileSync(join(__dirname, 'index.ts'), 'utf8')
+// CRLF on a Windows checkout (CI): compare with \n line ends (QA B10-N2).
+const main = readFileSync(join(__dirname, 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
 const slice = (sig: string, len: number): string => {
   const i = main.indexOf(sig)
   expect(i, `missing ${sig}`).toBeGreaterThan(-1)
@@ -61,7 +62,7 @@ describe('QA A-H3: renderer crash recovery', () => {
 })
 
 describe('QA A-L3 / A-L4 wiring', () => {
-  const src = readFileSync(join(__dirname, 'index.ts'), 'utf8')
+  const src = readFileSync(join(__dirname, 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
   it('Windows shutdown/log-off records a clean exit', () => {
     expect(src).toMatch(/win\.on\('session-end', onSessionEnd\)/)
     expect(src).toMatch(/function onSessionEnd\(\): void \{[\s\S]*?markCleanExit\(true\)/)
