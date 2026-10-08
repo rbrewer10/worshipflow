@@ -2,12 +2,29 @@ name: CI
 
 on:
   push:
-    branches: [feat/zone-decks, master]
+    # qa/** — the QA candidate branches (e.g. qa/0.20.3-candidate) have no PR
+    # of their own, so without this their merged result never ran on CI.
+    branches: [feat/zone-decks, master, 'qa/**']
   pull_request:
 
+# A newer push to the same branch / PR supersedes the run in flight.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Typecheck, lint and the Vitest unit suite. Windows is the booth PCs'
+  # platform (CRLF checkout, `\` paths); Ubuntu is the developer/QA box and
+  # catches the opposite (POSIX paths, LF), which bit us twice (QA report-a §2,
+  # B10-N2).
   test:
-    runs-on: windows-latest
+    name: typecheck · lint · unit (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -17,10 +34,84 @@ jobs:
           # stream destroy() change that breaks extract-zip/yauzl, silently
           # truncating electron's postinstall extraction (nodejs/node#63487).
           # See the "fix: CI - pin Node to 24.15" commit for full details.
-          node-version: 24.15
+          # Keep in sync with .nvmrc and package.json "engines".
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cache Electron binary
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - run: npm ci
 
       - run: npm run typecheck
 
+      - run: npm run lint
+
       - run: npm test
+
+  # The real built app driven by Playwright (tests/e2e). WF_SIM=1 (set by
+  # tests/e2e/electronApp.ts) gives one simulated output window, so no physical
+  # displays are needed; each test gets a throwaway profile. Linux runs under
+  # Xvfb with --no-sandbox (electronApp.ts adds it on Linux).
+  e2e:
+    name: e2e (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      # Keep the tablet HTTP server off the default port on shared runners.
+      WF_HTTP_PORT: 47393
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cache Electron binary
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # The hosted Windows runner's desktop is 1024x768, which squeezes the
+      # operator window so popovers overlap the buttons under test (a booth PC
+      # is 1080p+). Linux gets 1280x1024 from xvfb-run.
+      - name: Desktop at 1920x1080 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          Add-Type -AssemblyName System.Windows.Forms
+          [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+
+      - name: Playwright e2e (Windows)
+        if: runner.os == 'Windows'
+        run: npx playwright test
+
+      - name: Playwright e2e (Linux, Xvfb)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npx playwright test
+
+      - name: Upload Playwright results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ matrix.os }}
+          path: test-results/
+          retention-days: 7
