@@ -11,6 +11,8 @@ import { liveState, goToLiveControl, goLive, pressKey, openServedPage } from './
 //  #3 Reload projector                                 (PR feat/reload-projector)
 //  #4 Black during the 1.5 s Go Live wait: unchanged   (PR test/black-during-go-live-wait)
 //  #5 zone pages go dark with Black                    (PR fix/zones-dark-on-black)
+//  #6 the Doxology is a song like any other: unchanged (PR test/doxology-is-a-song)
+//  #7 Looks are one-time only                          (PR fix/looks-live-only)
 
 function shownText(p: Page): Promise<string> {
   return p.evaluate(() => {
@@ -242,4 +244,112 @@ test('#2 .wfservice carries its pictures and videos: export, remove the original
     rmSync(media, { recursive: true, force: true })
     await closeApp(app, userDataDir)
   }
+})
+
+test('#6 Doxology: a pasted setlist line becomes the library song, and it goes live like any other song', async () => {
+  test.setTimeout(150_000)
+  const { app, userDataDir } = await launchApp()
+  try {
+    const op = await operatorWindow(app)
+    const out = await outputWindow(app)
+    await completeFirstRun(op, { sample: true })
+    await op.evaluate(async () => {
+      const wf = (window as any).wf
+      const have = ((await wf.songsList('')) as any[]).some((s) => String(s.title).toLowerCase() === 'doxology')
+      if (!have) await wf.songCreate({ title: 'Doxology', sections: [{ kind: 'verse', ordinal: 1, label: 'Verse 1', lyrics: 'Praise God, from whom all blessings flow' }] })
+      const id = await wf.serviceCreate('Doxology Sunday', '2026-10-11')
+      await wf.setActiveService(id)
+    })
+    await op.reload()
+    await op.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 20_000 })
+    await op.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Build service' }).first().click()
+    await op.getByLabel('Show import options').click()
+    await op.getByRole('button', { name: /Paste setlist/ }).click()
+    await op.getByPlaceholder(/Amazing Grace/).fill(['Tithes & Offerings', 'Doxology (No. 95)', 'Amazing Grace'].join('\n'))
+    const preview = op.getByTestId('setlist-preview')
+    await expect(preview.locator('li')).toHaveCount(3)
+    const shown = (await preview.locator('li').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+    expect(shown[1]).toBe('Song Doxology')
+    expect(shown[2]).toBe('Song Amazing Grace')
+    await op.getByRole('button', { name: /Add to this service|Create service/ }).click()
+    await expect(op.getByPlaceholder(/Amazing Grace/)).toBeHidden({ timeout: 20_000 })
+    const items: Array<{ type: string; title: string | null }> = await op.evaluate(async () => {
+      const wf = (window as any).wf
+      const svc = await wf.serviceGet(await wf.getActiveServiceId())
+      const songs = (await wf.songsList('')) as any[]
+      return (svc.items as any[]).map((i) => ({ type: i.type, title: i.type === 'song' ? songs.find((s) => s.id === i.ref_id)?.title ?? null : i.title }))
+    })
+    // Linked to the library song exactly like Amazing Grace — no placeholder, no header.
+    expect(items.filter((i) => i.type === 'song').map((i) => i.title)).toEqual(['Doxology', 'Amazing Grace'])
+    expect(items.filter((i) => i.type === 'placeholder')).toEqual([])
+    await goToLiveControl(op)
+    await goLive(op, 'Doxology')
+    await expect.poll(async () => { const s = await liveState(op); return `${s.mode}|${s.songTitle}` }, { timeout: 10_000 }).toBe('lyrics|Doxology')
+    await expect.poll(() => visibleText(out), { timeout: 10_000 }).toMatch(/Praise God, from whom all blessings flow/i)
+  } finally { await closeApp(app, userDataDir) }
+})
+
+test('#7 Looks are one-time only: a tap changes what is live now, is never saved to the item, and resets when the live item changes', async () => {
+  test.setTimeout(150_000)
+  const { app, userDataDir } = await launchApp()
+  try {
+    const op = await operatorWindow(app)
+    const pageErrors: string[] = []
+    op.on('pageerror', (e) => pageErrors.push(String(e)))
+    await completeFirstRun(op, { sample: true })
+    await goToLiveControl(op)
+    const zoneModes = async (): Promise<string> => Object.values(await op.evaluate(() => (window as any).wf.zoneGetStates()) as Record<string, any>).map((z) => z.mode).join(',')
+    const looks = op.locator('div:has(> div:text-is("Looks"))').first()
+    const chip = (name: string) => looks.getByRole('button', { name, exact: true })
+
+    await goLive(op, 'Amazing Grace')
+    const grace = (await liveState(op)).liveServiceItemId as number
+    const normal = await zoneModes()
+    await expect(chip('Invitation')).toHaveAttribute('aria-pressed', 'false')
+    // The title says what the Look does — and no longer claims to save it.
+    expect(await chip('Invitation').getAttribute('title')).toBe('Lyrics everywhere')
+    expect(await chip('Word').getAttribute('title')).not.toMatch(/saved to/)
+
+    await chip('Invitation').click()
+    await expect.poll(async () => (await liveState(op)).liveLook, { timeout: 5000 }).toBe('invitation')
+    await expect(chip('Invitation')).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(zoneModes, { timeout: 5000 }).not.toBe(normal) // the screens changed, live
+    const invited = await zoneModes()
+    expect(await op.evaluate((id) => (window as any).wf.zoneGetRouting(id), grace)).toBeNull() // never saved to the item
+
+    // Stepping through the same song keeps the Look.
+    await pressKey(app, op, 'ArrowRight')
+    expect((await liveState(op)).liveServiceItemId).toBe(grace)
+    expect((await liveState(op)).liveLook).toBe('invitation')
+    expect(await zoneModes()).toBe(invited)
+
+    // The next item comes up with its own screens; the chip clears.
+    await goLive(op, 'Holy, Holy, Holy')
+    await expect.poll(async () => (await liveState(op)).liveLook ?? null, { timeout: 5000 }).toBeNull()
+    await expect(chip('Invitation')).toHaveAttribute('aria-pressed', 'false')
+    await expect.poll(zoneModes, { timeout: 5000 }).toBe(normal)
+
+    // Back to Amazing Grace: the Look did not stick to it.
+    await goLive(op, 'Amazing Grace')
+    expect((await liveState(op)).liveLook ?? null).toBeNull()
+    await expect.poll(zoneModes, { timeout: 5000 }).toBe(normal)
+    expect(await op.evaluate((id) => (window as any).wf.zoneGetRouting(id), grace)).toBeNull()
+
+    // An item an older build saved a Look on still loads and goes live without
+    // errors, and no chip lights up from it.
+    const holy = await op.evaluate(async () => {
+      const wf = (window as any).wf
+      const svc = await wf.serviceGet(await wf.getActiveServiceId())
+      const songs = (await wf.songsList('')) as any[]
+      return (svc.items as any[]).find((i) => i.type === 'song' && songs.find((s) => s.id === i.ref_id)?.title === 'Holy, Holy, Holy').id as number
+    })
+    await op.evaluate((id) => (window as any).wf.zoneSetRouting(id, { 1: 'lyrics', 2: 'lyrics', 3: 'lyrics', 4: 'lyrics' }), holy)
+    await op.reload()
+    await op.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 20_000 })
+    await goToLiveControl(op)
+    await goLive(op, 'Holy, Holy, Holy')
+    await expect.poll(async () => { const s = await liveState(op); return `${s.mode}|${s.songTitle}|${s.liveLook ?? null}` }, { timeout: 10_000 }).toBe('lyrics|Holy, Holy, Holy|null')
+    for (const name of ['Worship', 'Word', 'Invitation']) await expect(chip(name)).toHaveAttribute('aria-pressed', 'false')
+    expect(pageErrors).toEqual([])
+  } finally { await closeApp(app, userDataDir) }
 })
