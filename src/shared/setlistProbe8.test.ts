@@ -44,7 +44,9 @@ describe('QA B8-N1: song–artist lines are never taken for who\'s serving', () 
   it('a skipped-looking line whose song part is in the library comes in as that song', () => {
     const lib = [{ id: 9, title: 'Sound Tech' }, { id: 10, title: 'Head Usher' }]
     expect(parseSetlist('Sound Tech: Ed Moss')).toEqual([])
-    expect(parseSetlist('Sound Tech: Ed Moss', { library: lib })).toEqual([{ kind: 'song', title: 'Sound Tech' }])
+    // B9-N4: the song–artist form (a dash) only; a colon after a role is who's serving.
+    expect(parseSetlist('Sound Tech \u2013 Ed Moss', { library: lib })).toEqual([{ kind: 'song', title: 'Sound Tech \u2013 Ed Moss' }])
+    expect(parseSetlist('Sound Tech: Ed Moss', { library: lib })).toEqual([])
     expect(parseSetlist('Head Usher \u2014 Cy Long', { library: lib })).toEqual([{ kind: 'song', title: 'Head Usher \u2014 Cy Long' }])
     // Not for the bulletin's own key.
     expect(parseSetlist('* Please stand as you are able', { library: [{ id: 1, title: 'Please stand as you are able' }] })).toEqual([])
