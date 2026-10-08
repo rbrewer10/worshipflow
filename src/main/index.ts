@@ -1499,13 +1499,13 @@ function processIntent(track: TrackId, type: Intent): void {
   const last = t.song.lines.length - 1
   if (type === 'next' || type === 'prev') {
     const dir: 1 | -1 = type === 'next' ? 1 : -1
-    t.textHidden = false
     // Decision table lives in shared/liveNav.ts (unit-tested). Notes on the
     // individual cases:
     //  - countdown: one continuous view. Next moves to the next item (or the
-    //    logo, never the frozen timer value as a lyric slide); Prev moves to
-    //    the previous item or is ignored so the timer keeps running (QA B3 —
-    //    Prev used to fall into "un-blank", freezing e.g. "4:57" on screen).
+    //    logo, never the frozen timer value as a lyric slide); Prev does
+    //    nothing — no item change, no restart, the timer keeps running
+    //    (Ryan's decision; QA B3 — Prev used to fall into "un-blank",
+    //    freezing e.g. "4:57" on screen).
     //  - livecall: one continuous view, not a sequence of slides; un-blanking
     //    flipped it to 'lyrics' and kicked the operator's own output off the
     //    call while zone screens kept showing it.
@@ -1514,6 +1514,10 @@ function processIntent(track: TrackId, type: Intent): void {
     //    their own index — otherwise the first press after going live on a
     //    sermon was swallowed ("Next is broken").
     const action = planNav(dir, { mode: t.mode, hasDeck: !!t.deckSlides, hasSermonSlides: !!t.sermonSlides, index: t.index, lastIndex: last, pristine: !t.hasLiveContent && t.serviceItemId == null })
+    // A press that does nothing (Prev on a countdown, Prev before anything is
+    // live) leaves the track exactly as it was.
+    if (action.kind === 'none') return
+    t.textHidden = false
     if (action.kind === 'start') {
       // Nothing live yet (B2-N3): go live on the first item of this track that
       // can go live — skipping section headers and placeholders.
@@ -1521,7 +1525,6 @@ function processIntent(track: TrackId, type: Intent): void {
       if (first) { logServiceEvent(`${type}: start service at item ${first.id}`); void handleTabletLoadItem(track, first.id) }
       return
     }
-    if (action.kind === 'none') return
     if (action.kind === 'adjacent') {
       const item = adjacentLiveItem(track, action.dir)
       if (item) { void handleTabletLoadItem(track, item.id); return }
