@@ -45,20 +45,36 @@ const backdropShown = (out: Page): Promise<boolean> => out.evaluate(() => [...do
 const secondsOf = (line: string): number => { const [m, s] = line.split(':').map((n) => parseInt(n, 10)); return m * 60 + s }
 
 test('#1 Countdown: Prev does nothing — same item, still counting, not restarted', async () => {
+  test.setTimeout(120_000)
   const { app, userDataDir } = await launchApp()
   try {
     const op = await operatorWindow(app)
     await completeFirstRun(op, { sample: true })
+    // An item before the countdown, so Prev has somewhere it could go.
+    const [, countdown, afterItem]: number[] = await op.evaluate(async () => {
+      const wf = (window as any).wf
+      const sid = await wf.serviceCreate('Countdown Prev', '2026-10-11')
+      await wf.setActiveService(sid)
+      const ids = [
+        await wf.serviceAddItem(sid, { type: 'text', payload: { title: 'Before', body: 'Before the countdown' } }),
+        await wf.serviceAddItem(sid, { type: 'countdown', payload: { seconds: 300 } }),
+        await wf.serviceAddItem(sid, { type: 'text', payload: { title: 'After', body: 'After the countdown' } })
+      ]
+      await wf.serviceRefreshActiveItems(sid) // main's Next/Prev walk the active service's items
+      return ids
+    })
+    await op.reload()
+    await op.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 20_000 })
     await goToLiveControl(op)
-    await goLive(op, 'Amazing Grace') // something before the countdown to go back to
-    await goLive(op, 'Countdown 5:00')
+    await op.evaluate((id) => (window as any).wf.liveGoLiveAt('main', id, 0), countdown)
+    await expect.poll(async () => (await liveState(op)).mode, { timeout: 10_000 }).toBe('countdown')
     await op.waitForTimeout(2500)
     const before = await liveState(op)
-    expect(before.mode).toBe('countdown')
+    expect(before.liveServiceItemId).toBe(countdown)
     await pressKey(app, op, 'ArrowLeft')
     await pressKey(app, op, 'PageUp')
     const after = await liveState(op)
-    expect(after.liveServiceItemId).toBe(before.liveServiceItemId)
+    expect(after.liveServiceItemId).toBe(countdown)
     expect(after.mode).toBe('countdown')
     // still running down from where it was — not back at 5:00
     expect(secondsOf(after.line)).toBeLessThanOrEqual(secondsOf(before.line))
@@ -67,7 +83,7 @@ test('#1 Countdown: Prev does nothing — same item, still counting, not restart
     expect(secondsOf((await liveState(op)).line)).toBeLessThan(secondsOf(after.line))
     // Next still moves on
     await pressKey(app, op, 'ArrowRight')
-    expect((await liveState(op)).liveServiceItemId).not.toBe(before.liveServiceItemId)
+    await expect.poll(async () => (await liveState(op)).liveServiceItemId, { timeout: 5000 }).toBe(afterItem)
   } finally { await closeApp(app, userDataDir) }
 })
 
