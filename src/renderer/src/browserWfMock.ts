@@ -498,6 +498,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
 
     zoneGetRouting: async (): Promise<ZoneRouting | null> => null,
     zoneSetRouting: noop,
+    liveSetLook: async (): Promise<boolean> => false,
     zoneGetSlides: async (): Promise<ZoneSlide[] | null> => null,
     zoneGenerateSlides: async (): Promise<ZoneSlide[] | null> => null,
     zoneSetSlides: noop,

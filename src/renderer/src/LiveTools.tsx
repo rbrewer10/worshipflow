@@ -111,7 +111,7 @@ function LiveTools({ track }: { track: TrackId }): JSX.Element {
       {/* Divider */}
       <div className="border-t border-border" />
 
-      <LooksModeBar liveItemId={live?.liveServiceItemId ?? null} />
+      <LooksModeBar track={track} liveItemId={live?.liveServiceItemId ?? null} liveLook={live?.liveLook ?? null} />
       <LayerStrip
         track={track}
         textHidden={live?.textHidden ?? false}

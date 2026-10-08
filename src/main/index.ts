@@ -34,6 +34,8 @@ import type { ZoneTrackAssignment } from '../shared/zoneTrack'
 import { parseZoneSlides, resolveSlot, slideSummary } from '../shared/zoneSlides'
 import type { ZoneSlide, ZoneSlot } from '../shared/zoneSlides'
 import { validateZonePins } from '../shared/zonePins'
+import { isLookMode, liveLookFor, lookRouting } from '../shared/liveLook'
+import type { LiveLook } from '../shared/liveLook'
 import type { ZonePin, ZonePins } from '../shared/zonePins'
 import { parseLooksConfig, validateLook } from '../shared/zoneLooks'
 import type { Look } from '../shared/zoneLooks'
@@ -459,6 +461,18 @@ const zonePins: Map<ZoneId, ZonePin> = new Map()
 // so the warning has to be one-per-bad-pin, not one-per-broadcast. Cleared
 // wherever zonePins is mutated, so a newly-set bad pin is still reported once.
 const warnedMissingPins = new Set<string>()
+// One-time Looks (Ryan's decision #7): Worship / Word / Invitation tapped on
+// the Live tab change only what's live right now. Held here, in memory, per
+// track — never written to the item, never put in recovery.json — and read
+// through currentLiveLook(), which drops it as soon as the live item changes.
+// It slots in exactly where the item's own routing did (below pins and
+// authored decks), so a Look does on screen what it always did.
+const liveLooks: Record<TrackId, LiveLook | null> = { main: null, second: null }
+function currentLiveLook(track: TrackId): LiveLook | null {
+  const look = liveLookFor(liveLooks[track], tracks[track])
+  if (!look) liveLooks[track] = null
+  return look
+}
 let ccliLicense: string | null = null  // church CCLI license number (loaded from settings)
 let logoPath: string | null = null     // church logo image path for logo zones
 let logoBg: string | null = null       // motion background (video/image) for logo zones
@@ -856,6 +870,7 @@ function renderState(track: TrackId = 'main'): LiveState {
     bgMotion: t.hasLiveContent ? ((t.song.bgMotion as 'pan' | 'zoom' | 'shimmer' | null) ?? null) : null,
     bgFit: t.bgFit,
     liveServiceItemId: t.serviceItemId,
+    liveLook: currentLiveLook(track)?.mode ?? null,
     fontScale: t.fontScale,
     stageMessage: t.stageMessage,
     overlayTicker: t.overlayTicker,
@@ -1064,6 +1079,13 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
           }
         } else {
           routing = defaultRoutingFor(item.type, sceneConfig)
+        }
+        // A one-time Look tapped on this item, during this load, replaces the
+        // item's routing until the live item changes (Ryan's decision #7).
+        const look = currentLiveLook(zoneTrack)
+        if (look) {
+          routing = look.routing
+          routingIsExplicit = true
         }
       }
     }
@@ -3416,6 +3438,8 @@ function rememberActiveService(serviceId: number | null): void {
 
 ipcMain.handle('wf:setActiveService', (_e, serviceId: number | null) => {
   loggedSongIds.clear()  // new/switched service → start CCLI counting fresh
+  liveLooks.main = null
+  liveLooks.second = null
   // Pins belong to the service that was on screen; carrying them into the next
   // one would hold a card from a service nobody is running any more.
   zonePins.clear()
@@ -3794,6 +3818,11 @@ ipcMain.handle('wf:zone:getRouting', (_e, itemId: number): ZoneRouting | null =>
 
 ipcMain.handle('wf:zone:setRouting', (_e, itemId: number, routing: ZoneRouting | null): void => {
   setItemZoneRouting(itemId, routing ? JSON.stringify(routing) : null)
+  // A deliberate screen choice for this item (Build service, or the scene row
+  // under the Live preview) replaces any one-time Look tapped on it.
+  for (const track of ['main', 'second'] as TrackId[]) {
+    if (liveLooks[track]?.itemId === itemId) liveLooks[track] = null
+  }
   // Update item in activeServiceItems cache so zone states re-compute correctly.
   const idx = activeServiceItems.findIndex((it) => it.id === itemId)
   if (idx >= 0) activeServiceItems[idx] = { ...activeServiceItems[idx], zoneRouting: routing }
@@ -3965,6 +3994,24 @@ ipcMain.handle('wf:scenes:set', (_e, config: SceneConfig) => {
 
 // --- Service Control mode mapping (Live Control's Sermon/Worship/Invitation
 // Mode shortcuts — which of the church's own scene presets each one applies) ---
+// Tap a Look (Ryan's decision #7): change what's live right now, for the item
+// that's live right now, and nothing else. Returns false (and changes nothing)
+// when that item isn't live on the track any more or the Look isn't mapped.
+ipcMain.handle('wf:live:setLook', (_e, track: TrackId, itemId: number, mode: unknown): boolean => {
+  assertTrackId(track)
+  if (!isLookMode(mode)) return false
+  const t = tracks[track]
+  if (t.serviceItemId !== itemId) return false
+  const item = activeServiceItems.find((it) => it.id === itemId && it.track === track)
+  if (!item) return false
+  const mapping = parseServiceControlModeMapping(getSetting('service_control_mode_mapping'))
+  const routing = lookRouting(mode, mapping, parseSceneConfig(getSetting('zone_scenes')), item.type)
+  if (!routing) return false
+  liveLooks[track] = { itemId, generation: t.loadGeneration, mode, routing }
+  broadcast()
+  return true
+})
+
 ipcMain.handle('wf:service-control-modes:get', () => parseServiceControlModeMapping(getSetting('service_control_mode_mapping')))
 ipcMain.handle('wf:service-control-modes:set', (_e, mapping: ServiceControlModeMapping) => {
   if (!validateServiceControlModeMapping(mapping)) throw new Error('Invalid service control mode mapping')

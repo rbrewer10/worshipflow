@@ -390,6 +390,10 @@ const wf = {
     ipcRenderer.invoke('wf:zone:getRouting', itemId),
   zoneSetRouting: (itemId: number, routing: ZoneRouting | null): Promise<void> =>
     ipcRenderer.invoke('wf:zone:setRouting', itemId, routing),
+  // One-time Look on the item live right now (Ryan's decision #7) — never
+  // saved to the item; lapses when the live item changes.
+  liveSetLook: (track: TrackId, itemId: number, mode: 'worship' | 'sermon' | 'invitation'): Promise<boolean> =>
+    ipcRenderer.invoke('wf:live:setLook', track, itemId, mode),
   zoneGetSlides: (itemId: number): Promise<ZoneSlide[] | null> =>
     ipcRenderer.invoke('wf:zone:getSlides', itemId),
   zoneGenerateSlides: (item: ServiceItem): Promise<ZoneSlide[] | null> =>
