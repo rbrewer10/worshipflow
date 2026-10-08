@@ -1,4 +1,6 @@
 import { expect, type ElectronApplication, type Page } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
+import { launchApp, type LaunchedApp } from './electronApp'
 
 // Shared bits for the QA regression specs (ported from the 2026-10 QA pass
 // repros in a-extra/*.mjs and b-extra/specs/*.spec.ts).
@@ -66,4 +68,47 @@ export async function openServedPage(app: ElectronApplication, op: Page, path: s
   const page = await pagePromise
   await page.waitForLoadState('domcontentloaded')
   return page
+}
+
+/**
+ * Simulate a crash: kill the app hard and wait until it is really gone. On
+ * Windows a killed electron.exe leaves its renderer/GPU children running for a
+ * moment, and a relaunch in that window loses the single-instance lock and
+ * exits at once ("Process failed to launch!", exit code 0 — first seen on the
+ * candidate's Windows CI). So on Windows the whole tree goes, like a real
+ * crash takes it.
+ */
+export async function crashApp(app: ElectronApplication): Promise<void> {
+  const proc = app.process()
+  const gone = new Promise<void>((resolve) => {
+    if (proc.exitCode !== null || proc.signalCode !== null) resolve()
+    else proc.once('exit', () => resolve())
+  })
+  if (process.platform === 'win32' && proc.pid) {
+    try { execFileSync('taskkill', ['/F', '/T', '/PID', String(proc.pid)], { stdio: 'ignore' }) } catch { proc.kill('SIGKILL') }
+  } else {
+    proc.kill('SIGKILL')
+  }
+  await gone
+  await new Promise((r) => setTimeout(r, 1000))
+}
+
+/**
+ * Launch again on the same profile after crashApp(). Retries only the
+ * "lost the single-instance lock to a process that is still going away" case
+ * (the launch exits immediately); anything else fails the test as before, and
+ * so does an app that still won't start after ~15 s.
+ */
+export async function relaunchAfterCrash(root: string): Promise<LaunchedApp> {
+  let lastErr: unknown
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      return await launchApp({ root })
+    } catch (err) {
+      if (!/Process failed to launch/i.test(String(err))) throw err
+      lastErr = err
+      await new Promise((r) => setTimeout(r, 2500))
+    }
+  }
+  throw lastErr
 }

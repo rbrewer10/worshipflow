@@ -2,7 +2,7 @@ import { test, expect, type Page, type ElectronApplication } from '@playwright/t
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, operatorWindow, outputWindow, completeFirstRun, visibleText } from './electronApp'
-import { liveState, goToLiveControl, goLive, pressKey } from './qaHelpers'
+import { liveState, goToLiveControl, goLive, pressKey, crashApp, relaunchAfterCrash } from './qaHelpers'
 
 // Regression specs for the QA retest3 findings (retest3-a.md / retest3-b.md)
 // that need the real app: A3-N1, A3-N2, B3-N1, B3-N2, B3-N3, B3-N4, B3-N5, B3-N8.
@@ -113,10 +113,9 @@ test('A3-N2: a crash while on Black relaunches on Black (not the lyrics); a cras
     await op.evaluate(() => (window as any).wf.sendIntent('main', 'black'))
     expect((await liveState(op)).mode).toBe('black')
     await op.waitForTimeout(1500) // let the recovery snapshot land
-    first.app.process().kill('SIGKILL')
-    await new Promise((r) => setTimeout(r, 1000))
+    await crashApp(first.app)
 
-    const second = await launchApp({ root })
+    const second = await relaunchAfterCrash(root)
     const op2 = await operatorWindow(second.app)
     const out2 = await outputWindow(second.app)
     await expect.poll(async () => (await liveState(op2)).liveServiceItemId ?? null, { timeout: 20_000 }).toBe(liveId)
@@ -130,10 +129,9 @@ test('A3-N2: a crash while on Black relaunches on Black (not the lyrics); a cras
     await op2.evaluate(() => (window as any).wf.liveSetLayers('main', { textHidden: true }))
     await expect.poll(async () => (await liveState(op2)).textHidden).toBe(true)
     await op2.waitForTimeout(1500)
-    second.app.process().kill('SIGKILL')
-    await new Promise((r) => setTimeout(r, 1000))
+    await crashApp(second.app)
 
-    const third = await launchApp({ root })
+    const third = await relaunchAfterCrash(root)
     try {
       const op3 = await operatorWindow(third.app)
       const out3 = await outputWindow(third.app)
