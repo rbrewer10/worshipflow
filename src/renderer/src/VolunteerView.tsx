@@ -70,7 +70,7 @@ async function loadItem(item: ServiceItem): Promise<void> {
   } else if (item.type === 'scripture') {
     const ref = item.payload.reference as string
     if (!ref) return
-    const ok = await window.wf.liveLoadScripture('main', ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined)
+    const ok = await window.wf.liveLoadScripture('main', ref, item.payload.background as string | null | undefined, item.payload.blurBehindText as boolean | undefined, item.id)
     if (!ok) return
   } else if (item.type === 'text') {
     await window.wf.liveLoadText(
