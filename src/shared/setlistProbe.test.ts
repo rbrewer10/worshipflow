@@ -47,7 +47,7 @@ describe('QA B2-N6: retest2 setlist probe (106 bulletin lines)', () => {
       { kind: 'song', title: 'Holy, Holy, Holy' },
       { kind: 'element', title: 'Welcome & Announcements' },
       { kind: 'element', title: 'Tithes & Offerings' },
-      { kind: 'song', title: 'Doxology' }, // classification held for Ryan — stays a song
+      { kind: 'song', title: 'Doxology' }, // Ryan's decision #6: a song like any other (doxologyIsSong.test.ts)
       { kind: 'scripture', title: 'Romans 8:28-39' },
       { kind: 'sermon', title: 'More Than Conquerors' },
       { kind: 'song', title: 'Just As I Am' },
