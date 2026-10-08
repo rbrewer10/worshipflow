@@ -82,7 +82,8 @@ async function announcementDeck(item: ServiceItem, deps: AutoDeckDeps): Promise<
       const heading: ZoneSlot = slides.length === 0
         ? { kind: 'text', text: 'Announcements' }
         : { kind: 'same' }
-      slides.push(slide(heading, text, LOGO, text))
+      // QA B5-N1: each slide is headed by ITS announcement, not the block's first.
+      slides.push({ ...slide(heading, text, LOGO, text), title: announcement.title })
     }
   }
   return slides.length ? slides : null
