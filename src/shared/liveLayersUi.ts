@@ -1,10 +1,4 @@
-// Operator-side layer feedback and Looks highlight (QA B19, B20).
-import type { ServiceItemType, ZoneRouting } from './types'
-import type { SceneConfig } from './zoneScenes'
-import { effectiveRouting, expandScene } from './zoneScenes'
-import type { ServiceControlMode, ServiceControlModeMapping } from './serviceControlModes'
-import { resolveModeScene } from './serviceControlModes'
-
+// Operator-side layer feedback (QA B20).
 export interface LayerState {
   mode?: string
   textHidden?: boolean
@@ -35,22 +29,7 @@ export function hiddenLayerNotice(state: LayerState | null | undefined): string 
   return null
 }
 
-const sameRouting = (a: ZoneRouting, b: ZoneRouting): boolean => a[1] === b[1] && a[2] === b[2] && a[3] === b[3] && a[4] === b[4]
-
-/**
- * B19: the highlighted Looks chip was local state that never followed the
- * live item. Derive it from the live item's effective routing instead.
- */
-export function activeLookMode(
-  item: { type: ServiceItemType; zoneRouting: ZoneRouting | null } | null | undefined,
-  config: SceneConfig | null,
-  mapping: ServiceControlModeMapping
-): ServiceControlMode | null {
-  if (!item || !config) return null
-  const routing = effectiveRouting(item, config)
-  for (const mode of ['worship', 'sermon', 'invitation'] as ServiceControlMode[]) {
-    const scene = resolveModeScene(mode, mapping, config)
-    if (scene && sameRouting(expandScene(scene, item.type), routing)) return mode
-  }
-  return null
-}
+// The Looks chip highlight used to be derived here from the live item's
+// STORED routing (QA B19). Looks are one-time only now (Ryan's decision #7):
+// the highlight comes from the live state's `liveLook`, and a routing stored
+// on an item by an older build is never read back as a Look. See liveLook.ts.
