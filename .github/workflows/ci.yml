@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [feat/zone-decks, master]
+    # qa/** — the QA candidate branches (e.g. qa/0.20.3-candidate) have no PR
+    # of their own, so without this their merged result never ran on CI.
+    branches: [feat/zone-decks, master, 'qa/**']
   pull_request:
 
 # A newer push to the same branch / PR supersedes the run in flight.
