@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { rmSync } from 'node:fs'
 import { launchApp, closeApp, operatorWindow, outputWindow, completeFirstRun } from './electronApp'
-import { windowList, processExited } from './qaHelpers'
+import { windowList, processExited, closeAppWithin, captureOutput, attachText } from './qaHelpers'
 
 // QA regressions: A-C2, A-H3, A-H7 (a-extra/close-operator.mjs, close-output.mjs, crash-renderer.mjs).
 
@@ -70,22 +70,34 @@ test('A-H7: Alt+F4 on the projector output is blocked while running', async () =
 })
 
 test('A-H3: crashed output and operator renderers reload by themselves', async () => {
-  const { app, userDataDir } = await launchApp()
+  test.setTimeout(120_000)
+  const launched = await launchApp()
+  const { app } = launched
+  const output = captureOutput(app)
+  let quit = false
   try {
     const op = await operatorWindow(app)
     await outputWindow(app)
     await completeFirstRun(op)
     await op.evaluate(() => (window as any).wf.liveLoadText('main', 'Welcome', 'Hello there'))
-    await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer() })
-    await expect.poll(async () => (await windowList(app)).every((w) => !w.crashed), { timeout: 10_000 }).toBe(true)
-    // executeJavaScript on a renderer that is mid-crash/reload never settles, so race it.
-    await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
-      const wc = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('#/output'))!.webContents
-      return Promise.race([wc.executeJavaScript('document.body.innerText') as Promise<string>, new Promise<string>((r) => setTimeout(() => r(''), 1000))])
-    }), { timeout: 15_000 }).toContain('Welcome')
-    await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer() })
-    await expect.poll(async () => (await windowList(app)).every((w) => !w.crashed), { timeout: 10_000 }).toBe(true)
-  } finally { await closeApp(app, userDataDir) }
+    await test.step('crash the output renderer; it reloads and shows what is live', async () => {
+      await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer() })
+      await expect.poll(async () => (await windowList(app)).every((w) => !w.crashed), { timeout: 10_000 }).toBe(true)
+      // executeJavaScript on a renderer that is mid-crash/reload never settles, so race it.
+      await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+        const wc = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('#/output'))!.webContents
+        return Promise.race([wc.executeJavaScript('document.body.innerText') as Promise<string>, new Promise<string>((r) => setTimeout(() => r(''), 1000))])
+      }), { timeout: 15_000 }).toContain('Welcome')
+    }, { timeout: 30_000 })
+    await test.step('crash the operator renderer; it reloads', async () => {
+      await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.forcefullyCrashRenderer() })
+      await expect.poll(async () => (await windowList(app)).every((w) => !w.crashed), { timeout: 10_000 }).toBe(true)
+    }, { timeout: 30_000 })
+  } finally {
+    await test.step('quit', async () => { quit = await closeAppWithin(launched) })
+    await attachText('app-output.txt', output())
+  }
+  expect.soft(quit, 'the app quits normally after its renderers crashed and reloaded').toBe(true)
 })
 
 test('A-N6: after Logo, closing the operator quits without the "projectors are live" prompt', async () => {
@@ -108,7 +120,11 @@ test('A-N6: after Logo, closing the operator quits without the "projectors are l
 })
 
 test('A-N3: an operator that crashed past the cap comes back when the app is launched again', async () => {
-  const { app, userDataDir } = await launchApp()
+  test.setTimeout(120_000)
+  const launched = await launchApp()
+  const { app } = launched
+  const output = captureOutput(app)
+  let quit = false
   try {
     const op = await operatorWindow(app)
     await outputWindow(app)
@@ -122,15 +138,25 @@ test('A-N3: an operator that crashed past the cap comes back when the app is lau
     const operatorCrashed = (): Promise<boolean> => app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('#/output'))!.webContents.isCrashed())
     for (let i = 0; i < 3; i++) {
-      await crashOperator()
-      await expect.poll(operatorCrashed, { timeout: 10_000 }).toBe(false) // reloaded automatically
-      await new Promise((r) => setTimeout(r, 700))
+      await test.step(`crash ${i + 1} reloads automatically`, async () => {
+        await crashOperator()
+        await expect.poll(operatorCrashed, { timeout: 10_000 }).toBe(false) // reloaded automatically
+        await new Promise((r) => setTimeout(r, 700))
+      }, { timeout: 20_000 })
     }
-    await crashOperator() // 4th within a minute: past the cap
-    await new Promise((r) => setTimeout(r, 2000))
-    expect(await operatorCrashed()).toBe(true)
-    // Double-clicking the icon again (what single-instance delivers to us).
-    await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, [], '') })
-    await expect.poll(operatorCrashed, { timeout: 10_000 }).toBe(false)
-  } finally { await closeApp(app, userDataDir) }
+    await test.step('4th crash within a minute stays crashed (past the cap)', async () => {
+      await crashOperator()
+      await new Promise((r) => setTimeout(r, 2000))
+      expect(await operatorCrashed()).toBe(true)
+    }, { timeout: 30_000 })
+    await test.step('launching again revives it', async () => {
+      // Double-clicking the icon again (what single-instance delivers to us).
+      await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, [], '') })
+      await expect.poll(operatorCrashed, { timeout: 10_000 }).toBe(false)
+    }, { timeout: 30_000 })
+  } finally {
+    await test.step('quit', async () => { quit = await closeAppWithin(launched) })
+    await attachText('app-output.txt', output())
+  }
+  expect.soft(quit, 'the app quits normally after its operator renderer crashed and was revived').toBe(true)
 })

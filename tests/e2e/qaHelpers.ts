@@ -1,5 +1,7 @@
-import { expect, type ElectronApplication, type Page } from '@playwright/test'
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
+import { copyFileSync, existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { launchApp, type LaunchedApp } from './electronApp'
 
 // Shared bits for the QA regression specs (ported from the 2026-10 QA pass
@@ -111,4 +113,54 @@ export async function relaunchAfterCrash(root: string): Promise<LaunchedApp> {
     }
   }
   throw lastErr
+}
+
+/**
+ * Close the app, but never hang the run on it: if it hasn't exited after
+ * `ms`, kill it (whole tree on Windows) and record that it had to. The app's
+ * own log and console output are attached to the test either way, so a CI
+ * failure says where it stopped. Returns true when the app quit by itself.
+ */
+export async function closeAppWithin(launched: LaunchedApp, ms = 20_000): Promise<boolean> {
+  const { app, userDataDir, profileDir } = launched
+  const proc = app.process()
+  const exited = (): boolean => proc.exitCode !== null || proc.signalCode !== null
+  const t0 = Date.now()
+  const quit = await Promise.race([
+    app.close().then(() => true, () => exited()),
+    new Promise<boolean>((r) => setTimeout(() => r(false), ms)),
+  ])
+  if (!quit && !exited()) {
+    await crashApp(app).catch(() => { /* already gone */ })
+    test.info().annotations.push({ type: 'app-quit-hung', description: `app.close() did not finish within ${ms} ms; killed` })
+  }
+  try {
+    const logs = join(profileDir, 'logs')
+    if (existsSync(logs)) {
+      for (const f of readdirSync(logs)) {
+        const to = test.info().outputPath(`main-log-${f}`)
+        copyFileSync(join(logs, f), to)
+        await test.info().attach(`main-log-${f}`, { path: to, contentType: 'text/plain' })
+      }
+    }
+  } catch { /* diagnostics only */ }
+  test.info().annotations.push({ type: 'close-ms', description: String(Date.now() - t0) })
+  rmSync(userDataDir, { recursive: true, force: true })
+  return quit
+}
+
+/** Collect the app's stdout/stderr so it can be attached on failure. */
+export function captureOutput(app: ElectronApplication): () => string {
+  const chunks: string[] = []
+  const proc = app.process()
+  proc.stdout?.on('data', (d) => chunks.push(String(d)))
+  proc.stderr?.on('data', (d) => chunks.push(String(d)))
+  return () => chunks.join('')
+}
+
+/** Attach text as a file in the test's output folder (uploaded with CI failures). */
+export async function attachText(name: string, text: string): Promise<void> {
+  const to = test.info().outputPath(name)
+  writeFileSync(to, text)
+  await test.info().attach(name, { path: to, contentType: 'text/plain' })
 }
