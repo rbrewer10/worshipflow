@@ -31,6 +31,17 @@ function shownText(p: Page): Promise<string> {
   }).catch(() => '?')
 }
 
+// The output's own diagnostics badges (unpackaged builds: "OUT 1", fps) aren't audience content.
+const audience = async (out: Page): Promise<string> => (await visibleText(out)).replace(/\bOUT \d+\b/g, '').replace(/\b\d+(\.\d+)? ?fps\b/gi, '').replace(/\s+/g, ' ').trim()
+
+// Is any backdrop (theme gradient, picture, video) painted on the output?
+const backdropShown = (out: Page): Promise<boolean> => out.evaluate(() => [...document.querySelectorAll('div, img, video')].some((el) => {
+  const cs = getComputedStyle(el)
+  if (cs.visibility !== 'visible' || cs.display === 'none' || parseFloat(cs.opacity) === 0) return false
+  if (el.tagName === 'IMG' || el.tagName === 'VIDEO') return (el as HTMLImageElement).getBoundingClientRect().width > 50
+  return cs.backgroundImage !== 'none' && el.getBoundingClientRect().width > 50
+})).catch(() => false)
+
 const secondsOf = (line: string): number => { const [m, s] = line.split(':').map((n) => parseInt(n, 10)); return m * 60 + s }
 
 test('#1 Countdown: Prev does nothing — same item, still counting, not restarted', async () => {
@@ -116,15 +127,17 @@ test('#3 Reload projector: the output reloads and shows what is live now — no 
     await pressKey(app, op, 'ArrowRight') // slide 2: slide 1 on screen after the reload would be stale
     const live = await liveState(op)
     const line2 = String(live.line).split('\n')[0].slice(0, 12).toLowerCase()
-    await expect.poll(async () => (await visibleText(out).catch(() => '')).toLowerCase()).toContain(line2)
+    await expect.poll(async () => (await audience(out).catch(() => '')).toLowerCase()).toContain(line2)
     const markBefore = await out.evaluate(() => { (window as any).__beforeReload = true; return true })
     expect(markBefore).toBe(true)
 
-    await op.getByRole('button', { name: /Outputs & looks/ }).first().click()
-    await op.getByRole('button', { name: /Reload projector/ }).click()
+    // Keyboard, like an operator tabbing: in the e2e window the Live tools
+    // column scrolls under its sticky footer, which swallows a mouse click.
+    await op.getByRole('button', { name: /Outputs & looks/ }).first().press('Enter')
+    await op.getByRole('button', { name: /Reload projector/ }).press('Enter')
     const frames: string[] = []
     const t0 = Date.now()
-    while (Date.now() - t0 < 3000) { frames.push((await visibleText(out).catch(() => '<loading>')).toLowerCase()); await out.waitForTimeout(10) }
+    while (Date.now() - t0 < 3000) { frames.push((await audience(out).catch(() => '<loading>')).toLowerCase()); await out.waitForTimeout(10) }
     // it really reloaded (fresh page), and nothing but black or the live slide was ever shown
     expect(await out.evaluate(() => (window as any).__beforeReload ?? false)).toBe(false)
     const other = frames.filter((f) => f !== '' && f !== '<loading>' && !f.includes(line2))
@@ -136,12 +149,20 @@ test('#3 Reload projector: the output reloads and shows what is live now — no 
 
     // under Black, the reloaded projector stays black
     await pressKey(app, op, 'b')
-    await expect.poll(() => visibleText(out)).toBe('')
-    await op.getByRole('button', { name: /Reload projector/ }).click()
+    await expect.poll(() => audience(out)).toBe('')
+    await op.getByRole('button', { name: /Reload projector/ }).press('Enter')
+    expect(await backdropShown(out)).toBe(false)
     const dark: string[] = []
+    let backdropFrames = 0
     const t1 = Date.now()
-    while (Date.now() - t1 < 2500) { dark.push(await visibleText(out).catch(() => '')); await out.waitForTimeout(10) }
+    while (Date.now() - t1 < 2500) {
+      dark.push(await audience(out).catch(() => ''))
+      if (await backdropShown(out)) backdropFrames++
+      await out.waitForTimeout(5)
+    }
     expect(dark.filter((f) => f !== '')).toEqual([])
+    // a fresh output starts black until the state arrives — never the default theme backdrop
+    expect(backdropFrames, 'frames with a backdrop painted while the screen is Black').toBe(0)
     expect((await liveState(op)).mode).toBe('black')
   } finally { await closeApp(app, userDataDir) }
 })
