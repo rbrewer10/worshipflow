@@ -49,6 +49,15 @@ describe('.wfservice media manifest (v3)', () => {
     expect(text).toMatch(/2 picture\/video files copied onto this computer/)
     expect(text).toMatch(/Left out 1 file that isn’t a real picture or video: evil\.png/)
     expect(text).toMatch(/1 picture\/video file isn’t on this computer or in the file: gone\.mp4/)
+    expect(text).not.toMatch(/already in this computer/)
+  })
+  it('QA B13-N6: copies this PC already had say "already in this computer’s library", not "copied"', () => {
+    const base: ImportSummary = { serviceName: 'S', renamedFrom: null, items: 2, skipped: [], songsAdded: 0, songsMatched: 0, songsUpdated: [], songsKept: [], songsCopied: [], missingMedia: [] }
+    const reused = describeImport({ ...base, mediaRestored: 0, mediaReused: 2 })
+    expect(reused).not.toMatch(/copied onto/)
+    expect(reused).toMatch(/2 picture\/video files were already in this computer’s library — not copied again\./)
+    const mixed = describeImport({ ...base, mediaRestored: 1, mediaReused: 1 })
+    expect(mixed).toMatch(/1 picture\/video file copied onto this computer\. 1 picture\/video file was already in this computer’s library — not copied again\./)
   })
 })
 
@@ -77,7 +86,7 @@ describe('.wfservice media wiring in main (source guard)', () => {
     expect(fn).toMatch(/rewriteMediaPaths\(bundle\.items, restored\.map\)/)
     expect(fn).toMatch(/rewriteMediaPaths\(bundle\.announcements, restored\.map\)/)
     expect(fn).toMatch(/for \(const f of restored\.created\) \{ try \{ unlinkSync\(f\) \}/)
-    expect(fn).toMatch(/mediaRestored: restored\.map\.size/)
+    expect(fn).toMatch(/mediaRestored: restored\.created\.length,\n\s*mediaReused: \[\.\.\.new Set\(restored\.map\.values\(\)\)\]\.filter\(\(f\) => !restored\.created\.includes\(f\)\)\.length/) // QA B13-N6
     expect(fn).toMatch(/importMediaProblems\(/)
   })
   it('a double-clicked service file (argv / second instance / open-file) is queued and imported once the operator renderer is listening (QA B12-N2, B13-N2)', () => {

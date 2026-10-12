@@ -392,6 +392,8 @@ export interface ImportSummary {
   newerVersion?: boolean
   /** Pictures/videos copied out of the file onto this PC (v3). */
   mediaRestored?: number
+  /** Carried pictures/videos this PC already had (same bytes) — reused, not copied again (QA B13-N6). */
+  mediaReused?: number
   /** Carried files left out because their bytes aren't a picture/video. */
   mediaRefused?: string[]
   /** Pictures/videos on a network share (\\\\server\\…) — never carried or probed (QA B12-N6). */
@@ -435,6 +437,7 @@ export function describeImport(s: ImportSummary): string {
   if (s.announcementsMissing?.length) parts.push(`No announcement text in the file for ${s.announcementsMissing.map((t) => `“${t}”`).join(', ')} (saved by an older WorshipFlow) — pick the announcement again in Build service.`)
   if (s.skipped.length) parts.push(`Skipped ${s.skipped.length}: ${s.skipped.join('; ')}.`)
   if (s.mediaRestored) parts.push(`${s.mediaRestored} picture/video file${s.mediaRestored === 1 ? '' : 's'} copied onto this computer.`)
+  if (s.mediaReused) parts.push(`${s.mediaReused} picture/video file${s.mediaReused === 1 ? ' was' : 's were'} already in this computer’s library — not copied again.`)
   if (s.mediaRefused?.length) parts.push(`Left out ${s.mediaRefused.length} file${s.mediaRefused.length === 1 ? '' : 's'} that ${s.mediaRefused.length === 1 ? 'isn’t a real picture or video' : 'aren’t real pictures or videos'}: ${s.mediaRefused.join(', ')}.`)
   if (s.missingMedia.length) parts.push(`${s.missingMedia.length} picture/video file${s.missingMedia.length === 1 ? ' isn’t' : 's aren’t'} on this computer or in the file: ${s.missingMedia.map((p) => p.split(/[\\/]/).pop()).join(', ')}.`)
   if (s.networkMedia?.length) parts.push(`Skipped ${s.networkMedia.length} file${s.networkMedia.length === 1 ? '' : 's'} on a network share (not carried in service files — copy ${s.networkMedia.length === 1 ? 'it' : 'them'} onto this computer and pick again): ${s.networkMedia.join(', ')}.`)

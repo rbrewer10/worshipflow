@@ -3695,7 +3695,9 @@ async function importServiceFile(filePath: string): Promise<ServiceImportResult>
     networkMedia: mediaProblems.network,
     announcementsAdded: 0, announcementsMatched: 0, announcementsMissing: [],
     newerVersion: parsed.newerVersion,
-    mediaRestored: restored.map.size,
+    // QA B13-N6: copies made now vs. identical copies already in imported-media (dedupe)
+    mediaRestored: restored.created.length,
+    mediaReused: [...new Set(restored.map.values())].filter((f) => !restored.created.includes(f)).length,
     mediaRefused: restored.refused
   }
   const createdSongs: number[] = []
