@@ -43,3 +43,21 @@ describe("B12-N8: 'Role<TAB>Name' without a colon", () => {
     expect(got('Pastor\tThe Lord Is My Shepherd')).not.toBe('skip:serving')
   })
 })
+
+describe("B13-N3: 'Role<TAB><library song>' is the song, not who's serving", () => {
+  const songs = ['Silent Night', 'Way Maker', 'Living Hope', 'Cornerstone', 'Ancient Words', 'Graves Into Gardens', 'Mary Hill'].map((title, i) => ({ id: i + 1, title }))
+  it('the right column that is exactly a library title links that song', () => {
+    for (const [line, title] of [['Organist\tSilent Night', 'Silent Night'], ['Worship Leader\tWay Maker', 'Way Maker'], ['Pianist\t\tLiving Hope', 'Living Hope'],
+      ['Song Leader \t Cornerstone', 'Cornerstone'], ['Pastor\tAncient Words', 'Ancient Words'], ['Cantor\tGraves Into Gardens', 'Graves Into Gardens']]) {
+      const r = parseSetlistDetailed(line, { library: songs })
+      expect(r.skipped, line).toEqual([])
+      expect(r.entries.map((e) => `${e.kind}:${e.title}`), line).toHaveLength(1)
+      expect(r.entries[0].kind, line).toBe('song')
+      expect(matchSongTitle(r.entries[0].title, songs), line).toBe(songs.find((s) => s.title === title)!.id)
+    }
+  })
+  it('a person (not in the library), no library, or a near-miss title stays who is serving', () => {
+    for (const line of ['Organist\tIda Ross', 'Greeter\tMary Hill Smith', 'Organist\tSilent Nights']) expect(got(line, songs as typeof lib), line).toBe('skip:serving')
+    expect(got('Organist\tSilent Night')).toBe('skip:serving') // no library to check against
+  })
+})

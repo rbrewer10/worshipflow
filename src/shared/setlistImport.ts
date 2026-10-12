@@ -480,6 +480,14 @@ function skipReason(rawLine: string, line: string): SkipReason | null {
 // a titled name). Known roles, pastor and service-area lines are unchanged.
 function librarySong(line: string, reason: SkipReason, library: Library): string | null {
   if (reason !== 'serving' && reason !== 'notice') return null
+  // B13-N3: 'Organist<TAB>Silent Night' — a known role and a tab, but the right
+  // column is a song in the library (name-shaped titles pass isPersonLike), so
+  // it's the song that role leads, not who is serving. Exact titles only.
+  const roleTab = reason === 'serving' ? ROLE_TAB.exec(line) : null
+  if (roleTab && isRoleTabLine(line)) {
+    const id = matchSongTitle(roleTab[1].trim(), library, { exact: true })
+    return id != null ? (library.find((s) => s.id === id)?.title ?? roleTab[1].trim()) : null
+  }
   if (reason === 'serving' && personnelKind(line) === 'generic') {
     const label = /^(.+?)\s*(?::|\s[-–—])\s*(.+)$/.exec(line)
     if (label && !DATE_OR_TIME.test(label[2]) && matchSongTitle(label[1].trim(), library) != null) {
