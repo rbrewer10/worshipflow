@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { serviceFileFromArgv, chooseExportFormat, describeExport, exportDialogOptions, IMPORT_FILTERS, BUNDLE_FILTER, SERVICE_FILTER } from './serviceFileFormat'
+import { serviceFilesFromArgv, serviceFileFromArgv, chooseExportFormat, describeExport, exportDialogOptions, IMPORT_FILTERS, BUNDLE_FILTER, SERVICE_FILTER } from './serviceFileFormat'
 
 // QA B12-N2: .wfservice is always plain JSON; a service with media saves as .wfbundle.
 describe('service file formats', () => {
@@ -57,5 +57,13 @@ describe('file associations (QA B12-N2)', () => {
     const { readFileSync } = await import('fs')
     const yml = readFileSync(new URL('../../electron-builder.yml', import.meta.url), 'utf8')
     expect(yml).toMatch(/fileAssociations:\s*\n\s*- ext: wfbundle[\s\S]*- ext: wfservice/)
+  })
+})
+
+describe('QA B14-N1: every service file in argv is opened, in order, once', () => {
+  it('keeps all paths in order, drops flags/other files/argv[0] and duplicates', () => {
+    expect(serviceFilesFromArgv(['C:\\WF\\WorshipFlow Pro.exe', 'E:\\A.wfservice', '--flag', 'E:\\B.WFBUNDLE', 'notes.txt', 'E:\\C.wfbundle', 'E:\\A.wfservice']))
+      .toEqual(['E:\\A.wfservice', 'E:\\B.WFBUNDLE', 'E:\\C.wfbundle'])
+    expect(serviceFilesFromArgv(['C:\\x\\evil.wfservice'])).toEqual([])
   })
 })
