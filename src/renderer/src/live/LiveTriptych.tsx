@@ -41,7 +41,7 @@ function LiveTriptych({ track }: { track: TrackId }): JSX.Element {
   )
 
   if (!activeService) {
-    return <div className="flex h-full min-w-0 flex-1 items-center justify-center text-sm text-content-secondary">No service loaded — pick one in the Services tab.</div>
+    return <div className="flex h-full min-w-0 flex-1 items-center justify-center text-sm text-content-secondary">No service loaded — pick one in Build service.</div>
   }
 
   const advance = (): void => { void window.wf.sendIntent(track, 'next') }

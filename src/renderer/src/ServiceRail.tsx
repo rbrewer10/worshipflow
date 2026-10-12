@@ -102,7 +102,7 @@ function ServiceRail(): JSX.Element {
           // per-track ordinal and tapping one would incorrectly go live on Main.
           const mainItems = activeService?.items.filter((it) => it.track === 'main') ?? []
           return mainItems.length === 0 ? (
-            <p className="px-2 py-4 text-center text-sm text-content-secondary">No items — pick a service in the Services tab.</p>
+            <p className="px-2 py-4 text-center text-sm text-content-secondary">No items yet — add some, or pick a service, in Build service.</p>
           ) : (
             mainItems.map((it) => (
               <button

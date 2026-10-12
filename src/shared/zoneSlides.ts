@@ -19,6 +19,12 @@ export interface ZoneSlot {
 
 export interface ZoneSlide {
   zones: Record<ZoneId, ZoneSlot>
+  /**
+   * The heading this slide belongs under on the audience screen, when it differs
+   * slide to slide — an announcement block's slides each carry their own
+   * announcement's title (QA B5-N1). Generated decks only; absent = the item's title.
+   */
+  title?: string
 }
 
 const ZONE_IDS: ZoneId[] = [1, 2, 3, 4]

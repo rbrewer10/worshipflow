@@ -27,11 +27,13 @@ describe('Sunday-morning safety guards', () => {
   })
 
   it('ticker apply runs before the generic lyrics branch', () => {
-    const lyricsAnn = output.indexOf("s.mode === 'lyrics' && s.songTitle === 'Announcement'")
-    const lyricsGeneric = output.indexOf("} else if (s.mode === 'lyrics') {")
-    expect(lyricsAnn, 'ticker sentinel branch missing').toBeGreaterThan(-1)
+    const ticker = output.indexOf("} else if (kind === 'ticker') {")
+    const lyricsGeneric = output.indexOf("} else if (kind === 'lyrics') {")
+    expect(ticker, 'ticker branch missing').toBeGreaterThan(-1)
     expect(lyricsGeneric, 'generic lyrics branch missing').toBeGreaterThan(-1)
-    expect(lyricsAnn).toBeLessThan(lyricsGeneric)
+    expect(ticker).toBeLessThan(lyricsGeneric)
+    // QA A-C1: the old title sentinel must not come back.
+    expect(output).not.toContain("songTitle === 'Announcement'")
   })
 
   it('LiveTriptych does not treat a live sermon as a logo cutaway', () => {

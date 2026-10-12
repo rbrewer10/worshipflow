@@ -255,3 +255,30 @@ describe('deck loading is actually wired up for every auto-decked type', () => {
     expect(source).toMatch(/if \(item\) void loadDeckOnto\(track, item, generation\)/)
   })
 })
+
+describe('autoDeckFor — each block slide is titled by its own announcement (QA B5-N1)', () => {
+  const withAnnouncements = (bodies: Record<number, string>): AutoDeckDeps =>
+    deps({ getAnnouncement: async (id) => (bodies[id] === undefined ? null : { id, title: `A${id}`, body: bodies[id] }) })
+
+  it('2-, 3- and 5-announcement blocks: slide k carries announcement k\'s title', async () => {
+    for (const ids of [[1, 2], [3, 1, 2], [5, 4, 3, 2, 1]]) {
+      const bodies = Object.fromEntries(ids.map((id) => [id, `Body ${id}.`]))
+      const deck = await autoDeckFor(item({ type: 'announcement', payload: { refIds: ids } }), withAnnouncements(bodies))
+      expect(deck!.map((s) => s.title)).toEqual(ids.map((id) => `A${id}`))
+    }
+  })
+  it('a long announcement split across slides keeps its title on every part; a deleted one drops out', async () => {
+    const deck = await autoDeckFor(
+      item({ type: 'announcement', payload: { refIds: [1, 99, 2] } }),
+      withAnnouncements({ 1: 'Aaaa bbbb cccc. Dddd eeee ffff. Gggg hhhh iiii.', 2: 'Two.' })
+    )
+    const titles = deck!.map((s) => s.title)
+    expect(titles.length).toBeGreaterThan(2)
+    expect(titles.slice(0, -1).every((t) => t === 'A1')).toBe(true)
+    expect(titles[titles.length - 1]).toBe('A2')
+  })
+  it('scripture and sermon decks carry no per-slide title (the item title stays)', async () => {
+    const deck = await autoDeckFor(item({ type: 'scripture', payload: { reference: 'John 3:16-18' } }), deps())
+    expect(deck!.every((s) => s.title === undefined)).toBe(true)
+  })
+})

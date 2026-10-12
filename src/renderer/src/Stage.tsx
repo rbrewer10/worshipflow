@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { LiveState } from '../../shared/types'
+import { nextPreview } from '../../shared/liveDisplay'
 import { useChurchName } from './useChurchName'
 
 // Stage / confidence monitor — shown on a screen facing the pastor or worship leader.
@@ -52,7 +53,7 @@ function Stage(): JSX.Element {
     isCountdown ? live?.line ?? '' :
     live?.line ?? ''
 
-  const nextText = (!isBlack && !isLogo && !isCountdown) ? (live?.next ?? '') : ''
+  const nextText = (!isBlack && !isLogo && !isCountdown && live) ? nextPreview(live) : ''
 
   const stageMsg = live?.stageMessage ?? null
   const showMsg = stageMsg && stageMsg !== msgDismissed

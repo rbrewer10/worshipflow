@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { LiveCallViewer } from './livecall/LiveCallViewer'
 import type { LiveState, Mode, ThemeColors } from '../../shared/types'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
 import type { MotionEffect } from '../../shared/themes'
 import { useChurchName } from './useChurchName'
 import { resolveAnnouncementIcon } from './announcementIcons'
+import { audienceKind } from '../../shared/liveDisplay'
+import { fitScale } from '../../shared/fitText'
 
 function toAssetUrl(p: string): string {
   return 'wf-asset://?path=' + encodeURIComponent(p)
@@ -94,23 +96,24 @@ export function useLiveModel(): AudienceModel {
         ccli: s.songCcli ?? null,
         license: s.ccliLicense ?? null
       })
-      if (s.mode === 'countdown') {
+      const kind = audienceKind(s)
+      if (kind === 'countdown') {
         setClockLine(s.line)
         setTickerText('')
-      } else if (s.mode === 'lyrics' && s.songTitle === 'Announcement') {
-        // Tickers load via doLoadText(title: 'Announcement'), which sets mode
-        // 'lyrics'. The old branch lived behind that lyrics case, so tickerText
-        // was always cleared and the scrolling bar never appeared.
+      } else if (kind === 'ticker') {
+        // A ticker-display announcement (explicit isTicker flag — QA A-C1:
+        // the old title-based sentinel also caught every
+        // untitled text card). Must run before the generic lyrics branch.
         setLayers({ front: 0, a: '', b: '' })
         setTickerText(s.line || '')
-      } else if (s.mode === 'lyrics') {
+      } else if (kind === 'lyrics') {
         setLayers((prev) =>
           prev.front === 0
             ? { front: 1, a: prev.a, b: s.line }
             : { front: 0, a: s.line, b: prev.b }
         )
         setTickerText('')
-      } else if (s.mode === 'announcement') {
+      } else if (kind === 'announcement') {
         setAnnouncementTitle(s.songTitle ?? '')
         setAnnouncementBody(s.line ?? '')
         setAnnouncementIcon(s.icon ?? null)
@@ -185,6 +188,10 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
   const colors = resolveColors(theme, slideThemeColors)
   const posAlign = theme.position === 'top' ? 'flex-start' : theme.position === 'bottom' ? 'flex-end' : 'center'
 
+  // The lower-third / ticker strip sits over the bottom of the frame; lyrics
+  // reserve that band so the last line never hides behind it (QA B4).
+  const tickerShowing = !!(overlayTicker || tickerText) && !black && !logo && !countdown && !livecall
+
   const countdownContent = (
     <>
       <div className="mb-[1.5cqh] text-[2.5cqw] font-semibold uppercase tracking-[0.35em] text-blue-200">
@@ -256,9 +263,11 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
       {!black && !logo && !countdown && !livecall && !announcement && !textHidden && (
         <>
           <LyricLayer text={layers.a} show={layers.front === 0} fontScale={fontScale}
-            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText} />
+            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText}
+            reserveBottom={tickerShowing} />
           <LyricLayer text={layers.b} show={layers.front === 1} fontScale={fontScale}
-            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText} />
+            fontFamily={FONT_FAMILY[(songFont as keyof typeof FONT_FAMILY) ?? theme.font]} color={songTextColor ?? colors.text} align={posAlign} blurBehindText={blurBehindText}
+            reserveBottom={tickerShowing} />
         </>
       )}
 
@@ -324,7 +333,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
         />
       )}
 
-      {((overlayTicker || tickerText) && !black && !logo && !countdown && !livecall) && (
+      {tickerShowing && (
         <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t-4 border-amber-500 bg-gradient-to-r from-amber-900/85 via-amber-800/85 to-amber-900/85">
           <div
             className="wf-ticker-track py-[1cqh] text-[1.6cqw] font-bold text-amber-100"
@@ -426,18 +435,70 @@ export function LiveMirror(): JSX.Element {
   return <AudienceStage model={model} />
 }
 
-function LyricLayer({ text, show, fontScale, fontFamily, color, align, blurBehindText }: {
+// Lyrics never overflow the screen (QA B4): the requested size (fontScale, in
+// cqw) is the MAXIMUM; when a slide doesn't fit inside the safe area it is
+// shrunk until it does (binary search, shared/fitText.ts). Re-fits on text,
+// size, font or window-size changes. Before this, Sample Sunday's "Holy, Holy,
+// Holy" v1 overflowed a 1080p output top and bottom.
+const FIT_MIN = 0.35
+function LyricLayer({ text, show, fontScale, fontFamily, color, align, blurBehindText, reserveBottom = false }: {
   text: string; show: boolean; fontScale: number; fontFamily: string; color: string; align: string; blurBehindText: boolean
+  reserveBottom?: boolean
 }): JSX.Element {
+  const boxRef = useRef<HTMLDivElement | null>(null)
+  const bandRef = useRef<HTMLDivElement | null>(null)
+  const textRef = useRef<HTMLSpanElement | null>(null)
+  const [fit, setFit] = useState(1)
+  const [sizeTick, setSizeTick] = useState(0)
+
+  useEffect(() => {
+    const box = boxRef.current
+    if (!box || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setSizeTick((n) => n + 1))
+    ro.observe(box)
+    // Web fonts finishing their load change line widths too.
+    void document.fonts?.ready.then(() => setSizeTick((n) => n + 1))
+    return () => ro.disconnect()
+  }, [])
+
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const span = textRef.current
+    if (!box || !span) return
+    if (!text) { setFit(1); return }
+    const px = (v: string): number => parseFloat(v) || 0
+    const bcs = getComputedStyle(box)
+    let availH = box.clientHeight - px(bcs.paddingTop) - px(bcs.paddingBottom)
+    let availW = box.clientWidth - px(bcs.paddingLeft) - px(bcs.paddingRight)
+    if (bandRef.current) {
+      const ics = getComputedStyle(bandRef.current)
+      availH -= px(ics.paddingTop) + px(ics.paddingBottom)
+      availW = bandRef.current.clientWidth - px(ics.paddingLeft) - px(ics.paddingRight)
+    }
+    if (availH <= 0 || availW <= 0) return
+    const fits = (k: number): boolean => {
+      span.style.fontSize = `${fontScale * k}cqw`
+      const r = span.getBoundingClientRect()
+      return r.height <= availH + 1 && span.scrollWidth <= availW + 1
+    }
+    const k = fitScale(fits, { min: FIT_MIN })
+    span.style.fontSize = `${fontScale * k}cqw`
+    setFit(k)
+  }, [text, fontScale, fontFamily, blurBehindText, reserveBottom, sizeTick])
+
   const textSpan = (
     <span
+      ref={textRef}
       className="font-bold leading-tight"
       style={{
-        fontSize: `${fontScale}cqw`,
+        display: 'inline-block',
+        maxWidth: '100%',
+        fontSize: `${fontScale * fit}cqw`,
         fontFamily,
         color,
         textShadow: '0 3px 24px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)',
-        whiteSpace: 'pre-line'
+        whiteSpace: 'pre-line',
+        overflowWrap: 'anywhere'
       }}
     >
       {text}
@@ -445,11 +506,13 @@ function LyricLayer({ text, show, fontScale, fontFamily, color, align, blurBehin
   )
   return (
     <div
-      className={`absolute inset-0 flex justify-center py-[6cqh] text-center transition-opacity duration-500 ${blurBehindText ? '' : 'px-[8cqw]'}`}
-      style={{ opacity: show ? 1 : 0, alignItems: align }}
+      ref={boxRef}
+      className={`absolute inset-0 flex justify-center pt-[6cqh] text-center transition-opacity duration-500 ${blurBehindText ? '' : 'px-[8cqw]'}`}
+      style={{ opacity: show ? 1 : 0, alignItems: align, paddingBottom: reserveBottom ? '14cqh' : '6cqh' }}
     >
       {blurBehindText ? (
         <div
+          ref={bandRef}
           className="w-full px-[8cqw]"
           style={{
             backdropFilter: 'blur(10px)',
