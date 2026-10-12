@@ -339,6 +339,8 @@ interface LiveTrackState {
   scriptureRef: string | null
   verseNumber: number | null
   countdownTimer: ReturnType<typeof setInterval> | null
+  /** QA B12-N4: the countdown on this track ran out (it went to black on its own). Reset by clearCountdown. */
+  countdownDone: boolean
   autoAdvanceTimer: ReturnType<typeof setInterval> | null
   autoAdvanceDuration: number
   autoAdvanceLoop: boolean
@@ -427,6 +429,7 @@ function createTrackState(song: LiveTrackState['song']): LiveTrackState {
     scriptureRef: null,
     verseNumber: null,
     countdownTimer: null,
+    countdownDone: false,
     autoAdvanceTimer: null,
     autoAdvanceDuration: 0,
     autoAdvanceLoop: false,
@@ -760,6 +763,23 @@ function armStageRehearsalAnnouncementLoop(queue: number[]): void {
 function clearCountdown(track: TrackId): void {
   const t = tracks[track]
   if (t.countdownTimer) { clearInterval(t.countdownTimer); t.countdownTimer = null }
+  t.countdownDone = false
+}
+/** QA B12-N4: what's behind a Black/Logo blank on this track, countdown-wise. */
+function countdownUnder(track: TrackId): 'running' | 'done' | null {
+  const t = tracks[track]
+  return t.countdownTimer ? 'running' : t.countdownDone ? 'done' : null
+}
+/**
+ * QA B12-N4: Black/Logo over a countdown only HIDES it — the timer keeps
+ * running. Coming back (Live/Unblack, Next, Prev) shows the live countdown in
+ * countdown mode, never the last value frozen as a bare lyric slide. If it ran
+ * out while hidden, coming back shows the logo (nothing to resume).
+ */
+function resumeCountdown(track: TrackId): void {
+  const t = tracks[track]
+  if (t.countdownTimer) { t.mode = 'countdown' as Mode; logServiceEvent('countdown resumed') }
+  else { clearCountdown(track); t.song = { title: '', lines: [], background: null }; t.mode = 'logo' }
 }
 function clearAutoAdvance(track: TrackId): void {
   const t = tracks[track]
@@ -1551,7 +1571,7 @@ function processIntent(track: TrackId, type: Intent): void {
     //    verses-sermons, which deliberately sit at mode 'logo' and advance on
     //    their own index — otherwise the first press after going live on a
     //    sermon was swallowed ("Next is broken").
-    const action = planNav(dir, { mode: t.mode, hasDeck: !!t.deckSlides, hasSermonSlides: !!t.sermonSlides, index: t.index, lastIndex: last, pristine: !t.hasLiveContent && t.serviceItemId == null })
+    const action = planNav(dir, { mode: t.mode, hasDeck: !!t.deckSlides, hasSermonSlides: !!t.sermonSlides, index: t.index, lastIndex: last, pristine: !t.hasLiveContent && t.serviceItemId == null, countdown: countdownUnder(track) })
     // A press that does nothing (Prev on a countdown, Prev before anything is
     // live) leaves the track exactly as it was.
     if (action.kind === 'none') return
@@ -1573,15 +1593,22 @@ function processIntent(track: TrackId, type: Intent): void {
       }
       // fallback 'none' (e.g. Prev with nothing before a countdown): leave the
       // track as it is — the countdown timer keeps running.
+    } else if (action.kind === 'resume-countdown') {
+      resumeCountdown(track)
     } else if (action.kind === 'unblank') {
       clearCountdown(track); t.mode = 'lyrics'
     } else {
       t.index += action.delta
       logServiceEvent(`${type}: ${t.index}/${last}`)
     }
-  } else if (type === 'black') { clearCountdown(track); t.mode = 'black'; t.blankedAtGeneration = t.loadGeneration; logServiceEvent('black') }
-  else if (type === 'logo') { clearCountdown(track); t.mode = 'logo'; t.blankedAtGeneration = t.loadGeneration; logServiceEvent('logo') }
-  else if (type === 'lyrics') {
+  } else if (type === 'black') { if (!countdownUnder(track)) clearCountdown(track); t.mode = 'black'; t.blankedAtGeneration = t.loadGeneration; logServiceEvent('black') }
+  else if (type === 'logo') { if (!countdownUnder(track)) clearCountdown(track); t.mode = 'logo'; t.blankedAtGeneration = t.loadGeneration; logServiceEvent('logo') }
+  else if (type === 'lyrics' && countdownUnder(track)) {
+    // QA B12-N4: Live/Unblack over a (hidden) countdown brings the countdown back.
+    resumeCountdown(track)
+    t.textHidden = false
+    t.bgHidden = false
+  } else if (type === 'lyrics') {
     clearCountdown(track)
     t.mode = 'lyrics'
     t.textHidden = false
@@ -1874,6 +1901,7 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
     remaining--
     if (remaining <= 0) {
       clearCountdown(track)
+      t.countdownDone = true
       t.song = { title: 'Countdown', lines: ['0:00'], background: bg }
       t.mode = 'black'
       broadcast()

@@ -14,6 +14,8 @@ export interface NavInput {
   lastIndex: number
   /** Nothing has gone live on this track yet this session (QA B2-N3). */
   pristine?: boolean
+  /** QA B12-N4: a countdown is running under a Black/Logo blank, or ran out under it. */
+  countdown?: 'running' | 'done' | null
 }
 
 export type NavAction =
@@ -27,6 +29,8 @@ export type NavAction =
   | { kind: 'start' }
   /** Nothing to do (Prev with nothing live). */
   | { kind: 'none' }
+  /** QA B12-N4: Black/Logo was hiding a countdown — show it again (or the logo if it ran out). */
+  | { kind: 'resume-countdown' }
 
 export function planNav(dir: 1 | -1, s: NavInput): NavAction {
   // QA B2-N3: with nothing live yet, Space/N/→ did nothing visible while the
@@ -40,6 +44,12 @@ export function planNav(dir: 1 | -1, s: NavInput): NavAction {
   // no countdown restart — the timer keeps running. A stray Left/PgUp before
   // the service must not pull the pre-service loop off the screens.
   if (s.mode === 'countdown') return dir === 1 ? { kind: 'adjacent', dir, fallback: 'logo-after-countdown' } : { kind: 'none' }
+  // QA B12-N4: Black/Logo over a countdown only hides it (the timer keeps
+  // running). Next/Prev un-blank back to the live countdown, as on a song
+  // they un-blank the slide — never the last value frozen as a lyric. If it
+  // ran out while hidden there is nothing to show: Next moves on, Prev stays.
+  if ((s.mode === 'black' || s.mode === 'logo') && s.countdown === 'running') return { kind: 'resume-countdown' }
+  if ((s.mode === 'black' || s.mode === 'logo') && s.countdown === 'done') return dir === 1 ? { kind: 'adjacent', dir, fallback: 'logo-after-countdown' } : { kind: 'none' }
   // A live call is one continuous view too (see processIntent's comment).
   if (s.mode === 'livecall') return { kind: 'adjacent', dir, fallback: 'logo' }
   // QA B3-N8: an announcement card is content, not a blank — the "un-blank"
