@@ -23,7 +23,9 @@ import { createHash } from 'crypto'
 import { createReadStream, createWriteStream, existsSync, promises as fsp, statSync, type WriteStream } from 'fs'
 import { once } from 'events'
 import { basename, dirname, join } from 'path'
+import { Transform } from 'stream'
 import { pipeline } from 'stream/promises'
+import { storedMediaStem } from '../shared/mediaName'
 import { archiveEntryName, type BundleMedia } from '../shared/serviceBundle'
 import { contentMatchesExtension, hasMediaExtension, isNetworkPath, sniffMedia } from './mediaImport'
 
@@ -296,17 +298,64 @@ export function planExportMedia(paths: readonly string[]): ExportMediaPlan {
 }
 
 /**
- * The imported-media name for a carried file: its base name plus a hash of the
- * exporting PC's path and its size, so importing the same file again reuses
- * the copy and two different "cross.jpg" never collide.
+ * The imported-media name for a carried file: its original name (without any
+ * hash we added on an earlier trip — QA B12 watch item) plus the first 64 bits
+ * of the sha256 of its BYTES (QA B12-N1). The same picture arriving again —
+ * from the same file, a re-saved file, or another PC — lands on the same name
+ * and is reused instead of copied a second time.
  */
-export function bundledMediaName(originalPath: string, size: number): string {
+export function contentMediaName(originalPath: string, sha256hex: string): string {
   const base = baseOf(originalPath)
   const dot = base.lastIndexOf('.')
   const ext = dot > 0 ? base.slice(dot).toLowerCase().replace(/[^.a-z0-9]/g, '') : ''
-  const stem = (dot > 0 ? base.slice(0, dot) : base).replace(/[^A-Za-z0-9 _.-]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 60) || 'media'
-  const hash = createHash('sha1').update(`wfservice|${originalPath}|${size}`).digest('hex').slice(0, 10)
-  return `${stem}-${hash}${ext}`
+  return `${storedMediaStem(originalPath)}-${sha256hex.slice(0, 16)}${ext}`
+}
+
+/** QA B12-N3: never unpack more than this from one file, whatever it claims. */
+export const MAX_EXTRACT_BYTES = 64 * 1024 ** 3
+/** QA B12-N3: leave this much free on the drive after unpacking. */
+export const FREE_SPACE_MARGIN = 512 * 1024 ** 2
+
+/** Bytes free for this user on the drive holding `dir`, or null if it can't be told. */
+export async function freeBytes(dir: string): Promise<number | null> {
+  try {
+    const st = await fsp.statfs(dir)
+    return Number(st.bavail) * Number(st.bsize)
+  } catch {
+    return null
+  }
+}
+
+const gib = (n: number): string => `${(n / 1024 ** 3).toFixed(1)} GB`
+
+/** Thrown before anything is unpacked when the file can't (or mustn't) be unpacked. */
+export class ExtractRefused extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ExtractRefused'
+  }
+}
+
+/** Stream one entry to a temp file in `dir`, hashing as it goes. */
+async function extractHashed(path: string, entry: ArchiveEntry, dir: string): Promise<{ tmp: string; sha256: string }> {
+  // Named like every other partial copy so the A3-N6 sweep removes it if we die mid-copy.
+  const tmp = join(dir, `incoming-${Math.random().toString(36).slice(2, 8)}.part-${process.pid}-${Date.now()}`)
+  const hash = createHash('sha256')
+  try {
+    if (entry.size === 0) await fsp.writeFile(tmp, Buffer.alloc(0), { flag: 'wx' })
+    else
+      await pipeline(
+        createReadStream(path, { start: entry.offset, end: entry.offset + entry.size - 1 }),
+        new Transform({ transform(chunk: Buffer, _enc, cb) { hash.update(chunk); cb(null, chunk) } }),
+        createWriteStream(tmp, { flags: 'wx' })
+      )
+    const st = await fsp.stat(tmp)
+    if (st.size !== entry.size) throw new Error('the copy came out the wrong size')
+    return { tmp, sha256: hash.digest('hex') }
+  } catch (err) {
+    await fsp.rm(tmp, { force: true }).catch(() => undefined)
+    throw err
+  }
 }
 
 export interface RestoredMedia {
@@ -314,8 +363,15 @@ export interface RestoredMedia {
   map: Map<string, string>
   /** Copies made by this import (removed again if the import fails). */
   created: string[]
-  /** Base names left out because their bytes aren't a picture/video. */
+  /** Base names left out because their bytes aren't a picture/video (each once). */
   refused: string[]
+}
+
+export interface RestoreOptions {
+  /** Free-space probe (tests stub it). */
+  free?: (dir: string) => Promise<number | null>
+  /** Size of the archive file (defaults to a stat of it). */
+  archiveBytes?: number
 }
 
 /**
@@ -323,33 +379,62 @@ export interface RestoredMedia {
  * `media/<name>` entries the manifest names are read; the bytes must be a
  * picture/video matching the extension (QA A4-N1 rule); destination names are
  * generated here, never taken from the archive.
+ *
+ * QA B12-N3: each entry is unpacked at most once however many manifest rows
+ * point at it; the total is capped by the archive's own size (entries can't
+ * overlap into more bytes than the file holds) and MAX_EXTRACT_BYTES; and the
+ * free space is checked BEFORE anything is written.
  */
 export async function restoreArchiveMedia(
   archivePath: string,
   entries: ReadonlyMap<string, ArchiveEntry>,
   media: readonly BundleMedia[],
-  mediaDir: string
+  mediaDir: string,
+  opts: RestoreOptions = {}
 ): Promise<RestoredMedia> {
   const out: RestoredMedia = { map: new Map(), created: [], refused: [] }
   if (media.length === 0) return out
+  // Plan: which entries to unpack, and which rows point at each.
+  const rowsByEntry = new Map<string, { entry: ArchiveEntry; first: string; paths: string[] }>()
+  const refused = new Set<string>()
+  const seen = new Set<string>()
+  for (const m of media) {
+    if (seen.has(m.path)) continue
+    seen.add(m.path)
+    const entry = MEDIA_ENTRY.test(m.file) ? entries.get(m.file) : undefined
+    if (!entry) continue // not in the file → reported as missing
+    if (!hasMediaExtension(m.path) || !contentMatchesExtension(m.path, sniffMedia(await readEntryHead(archivePath, entry)))) {
+      refused.add(baseOf(m.path))
+      continue
+    }
+    const g = rowsByEntry.get(m.file)
+    if (g) g.paths.push(m.path)
+    else rowsByEntry.set(m.file, { entry, first: m.path, paths: [m.path] })
+  }
+  out.refused = [...refused]
+  if (rowsByEntry.size === 0) return out
+
+  const total = [...rowsByEntry.values()].reduce((n, g) => n + g.entry.size, 0)
+  const archiveBytes = opts.archiveBytes ?? (await fsp.stat(archivePath)).size
+  if (total > archiveBytes || total > MAX_EXTRACT_BYTES)
+    throw new ExtractRefused(`the file lists ${gib(total)} of pictures and videos, more than it ${total > archiveBytes ? `holds (${gib(archiveBytes)})` : `may unpack (${gib(MAX_EXTRACT_BYTES)})`} — it may be damaged`)
   await fsp.mkdir(mediaDir, { recursive: true })
+  const free = await (opts.free ?? freeBytes)(mediaDir)
+  if (free != null && free < total + FREE_SPACE_MARGIN)
+    throw new ExtractRefused(`not enough free space on this computer for its pictures and videos (needs ${gib(total + FREE_SPACE_MARGIN)}, ${gib(free)} free)`)
+
   try {
-    for (const m of media) {
-      if (out.map.has(m.path)) continue
-      const entry = MEDIA_ENTRY.test(m.file) ? entries.get(m.file) : undefined
-      if (!entry) continue // not in the file → reported as missing
-      if (!hasMediaExtension(m.path) || !contentMatchesExtension(m.path, sniffMedia(await readEntryHead(archivePath, entry)))) {
-        out.refused.push(baseOf(m.path))
-        continue
-      }
-      const dest = join(mediaDir, bundledMediaName(m.path, entry.size))
+    for (const g of rowsByEntry.values()) {
+      const { tmp, sha256 } = await extractHashed(archivePath, g.entry, mediaDir)
+      const dest = join(mediaDir, contentMediaName(g.first, sha256))
       let have = false
-      try { have = existsSync(dest) && statSync(dest).size === entry.size } catch { have = false }
-      if (!have) {
-        await extractEntry(archivePath, entry, dest)
+      try { have = existsSync(dest) && statSync(dest).size === g.entry.size } catch { have = false }
+      if (have) await fsp.rm(tmp, { force: true }).catch(() => undefined)
+      else {
+        await fsp.rename(tmp, dest)
         out.created.push(dest)
       }
-      out.map.set(m.path, dest)
+      for (const p of g.paths) out.map.set(p, dest)
     }
   } catch (err) {
     for (const f of out.created) await fsp.rm(f, { force: true }).catch(() => undefined)

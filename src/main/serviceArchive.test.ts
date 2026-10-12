@@ -1,10 +1,11 @@
+import { createHash } from 'crypto'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync, openSync, ftruncateSync, writeSync, closeSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
   writeServiceArchive, readServiceArchive, isServiceArchive, extractEntry, tarHeader,
-  planExportMedia, restoreArchiveMedia, bundledMediaName, MEDIA_ENTRY, SERVICE_JSON,
+  planExportMedia, restoreArchiveMedia, contentMediaName, ExtractRefused, MAX_EXTRACT_BYTES, MEDIA_ENTRY, SERVICE_JSON,
   isTarHeader, removeStaleParts, PartLeftError
 } from './serviceArchive'
 
@@ -115,7 +116,7 @@ describe('import: restoring carried media', () => {
     expect(r.created).toHaveLength(2)
     const cross = r.map.get(media[0].path)!
     expect(cross.startsWith(mediaDir)).toBe(true)
-    expect(cross.endsWith(bundledMediaName(media[0].path, PNG.length))).toBe(true)
+    expect(cross.endsWith(contentMediaName(media[0].path, createHash('sha256').update(PNG).digest('hex')))).toBe(true)
     expect(readFileSync(cross).equals(PNG)).toBe(true)
     // importing the same file again reuses the copies
     const again = await restoreArchiveMedia(arch, entries, media, mediaDir)
@@ -133,11 +134,16 @@ describe('import: restoring carried media', () => {
     ], mediaDir)
     expect(r.refused).toEqual(['evil.png', 'db.sqlite'])
     expect(r.map.size).toBe(0)
-    expect(readdirSync(mediaDir)).toEqual([])
+    expect(existsSync(mediaDir) ? readdirSync(mediaDir) : []).toEqual([])
   })
-  it('generated names are filesystem-safe and differ for different source paths', () => {
-    expect(bundledMediaName('C:\\a\\Cross: Easter?.JPG', 10)).toMatch(/^Cross- Easter--[0-9a-f]{10}\.jpg$/)
-    expect(bundledMediaName('C:\\a\\cross.jpg', 10)).not.toBe(bundledMediaName('C:\\b\\cross.jpg', 10))
+  it('generated names are filesystem-safe, keyed by content, and never compound hashes', () => {
+    const h = 'ab'.repeat(32)
+    expect(contentMediaName('C:\\a\\Cross: Easter?.JPG', h)).toBe('Cross- Easter--abababababababab.jpg')
+    expect(contentMediaName('C:\\a\\cross.jpg', h)).toBe(contentMediaName('D:\\b\\cross.jpg', h))
+    expect(contentMediaName('C:\\a\\cross.jpg', h)).not.toBe(contentMediaName('C:\\a\\cross.jpg', 'cd'.repeat(32)))
+    // a copy that already went round once (and an older double-hashed one) gets ONE hash
+    expect(contentMediaName('C:\\WF\\imported-media\\cross-0123456789abcdef.png', h)).toBe('cross-abababababababab.png')
+    expect(contentMediaName('/x/imported-media/cross-0123456789-abcdef0123.png', h)).toBe('cross-abababababababab.png')
   })
 })
 
@@ -171,5 +177,61 @@ describe('QA B12-N7: archive detection and partial files', () => {
     expect((err as PartLeftError).leftover).toBeNull()
     expect(String((err as Error).message)).toMatch(/ENOENT/)
     expect(readdirSync(dir)).toEqual([])
+  })
+})
+
+describe('QA B12-N1/N3: content-hash dedupe, one copy per entry, size and space checks', () => {
+  async function archiveWith(files: Array<{ entry: string; bytes: Buffer }>): Promise<string> {
+    const srcs = files.map((f, i) => { const p = join(dir, `n1src${i}`); writeFileSync(p, f.bytes); return { src: p, entry: f.entry } })
+    const out = join(dir, `n1-${Math.random().toString(36).slice(2)}.wfbundle`)
+    await writeServiceArchive(out, '{"version":3}', srcs)
+    return out
+  }
+  it('the same bytes under a different path/name (or from a re-saved file) reuse the existing copy', async () => {
+    const mediaDir = join(dir, 'imported-media')
+    const a1 = await archiveWith([{ entry: 'media/0001-cross.png', bytes: PNG }])
+    const r1 = await restoreArchiveMedia(a1, (await readServiceArchive(a1)).entries, [{ path: 'C:\\A\\cross.png', file: 'media/0001-cross.png', size: PNG.length }], mediaDir)
+    expect(r1.created).toHaveLength(1)
+    // another PC, another folder, same picture, same size → same copy
+    const a2 = await archiveWith([{ entry: 'media/0001-cross.png', bytes: PNG }])
+    const r2 = await restoreArchiveMedia(a2, (await readServiceArchive(a2)).entries, [{ path: 'E:\\Stick\\Pics\\cross.png', file: 'media/0001-cross.png', size: PNG.length }], mediaDir)
+    expect(r2.created).toEqual([])
+    expect(r2.map.get('E:\\Stick\\Pics\\cross.png')).toBe(r1.created[0])
+    // same path and size, DIFFERENT bytes → a new copy, never the stale one
+    const PNG2 = Buffer.concat([PNG.subarray(0, PNG.length - 1), Buffer.from([PNG[PNG.length - 1] ^ 1])])
+    const a3 = await archiveWith([{ entry: 'media/0001-cross.png', bytes: PNG2 }])
+    const r3 = await restoreArchiveMedia(a3, (await readServiceArchive(a3)).entries, [{ path: 'C:\\A\\cross.png', file: 'media/0001-cross.png', size: PNG2.length }], mediaDir)
+    expect(r3.created).toHaveLength(1)
+    expect(r3.created[0]).not.toBe(r1.created[0])
+    expect(readFileSync(r3.created[0]).equals(PNG2)).toBe(true)
+    expect(readdirSync(mediaDir).filter((n) => n.includes('.part-'))).toEqual([])
+  })
+  it('many manifest rows pointing at one entry copy it once and all point at that copy', async () => {
+    const mediaDir = join(dir, 'imported-media')
+    const arch = await archiveWith([{ entry: 'media/0001-loop.mp4', bytes: MP4_HEAD }])
+    const rows = Array.from({ length: 50 }, (_, i) => ({ path: `C:\\v\\loop${i}.mp4`, file: 'media/0001-loop.mp4', size: MP4_HEAD.length }))
+    const r = await restoreArchiveMedia(arch, (await readServiceArchive(arch)).entries, rows, mediaDir)
+    expect(r.created).toHaveLength(1)
+    expect(new Set(r.map.values())).toEqual(new Set(r.created))
+    expect(r.map.size).toBe(50)
+    expect(readdirSync(mediaDir)).toHaveLength(1)
+  })
+  it('refuses to unpack more than the file holds, more than the cap, or more than the free space — before writing anything', async () => {
+    const mediaDir = join(dir, 'imported-media')
+    const arch = await archiveWith([{ entry: 'media/0001-loop.mp4', bytes: MP4_HEAD }])
+    const { entries } = await readServiceArchive(arch)
+    const row = [{ path: 'C:\\v\\loop.mp4', file: 'media/0001-loop.mp4', size: MP4_HEAD.length }]
+    await expect(restoreArchiveMedia(arch, entries, row, mediaDir, { archiveBytes: MP4_HEAD.length - 1 })).rejects.toThrow(/more than it holds/)
+    const huge = new Map([['media/0001-loop.mp4', { ...entries.get('media/0001-loop.mp4')!, size: MAX_EXTRACT_BYTES + 1 }]])
+    await expect(restoreArchiveMedia(arch, huge, row, mediaDir, { archiveBytes: MAX_EXTRACT_BYTES * 2 })).rejects.toThrow(/may unpack/)
+    await expect(restoreArchiveMedia(arch, entries, row, mediaDir, { free: async () => 1024 })).rejects.toBeInstanceOf(ExtractRefused)
+    await expect(restoreArchiveMedia(arch, entries, row, mediaDir, { free: async () => 1024 })).rejects.toThrow(/not enough free space/)
+    expect(existsSync(mediaDir) ? readdirSync(mediaDir) : []).toEqual([])
+  })
+  it('a refused file is listed once however many rows name it', async () => {
+    const arch = await archiveWith([{ entry: 'media/0001-evil.png', bytes: Buffer.from('#!/bin/sh\necho hi\n') }])
+    const rows = [1, 2, 3].map((i) => ({ path: `C:\\x${i}\\evil.png`, file: 'media/0001-evil.png', size: 18 }))
+    const r = await restoreArchiveMedia(arch, (await readServiceArchive(arch)).entries, rows, join(dir, 'imported-media'))
+    expect(r.refused).toEqual(['evil.png'])
   })
 })

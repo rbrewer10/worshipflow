@@ -14,6 +14,7 @@
 import { createHash } from 'crypto'
 import { promises as fsp, constants as fsConstants, createWriteStream, existsSync, statSync, realpathSync } from 'fs'
 import { pipeline } from 'stream/promises'
+import { storedMediaStem } from '../shared/mediaName'
 import { basename, extname, join, relative, isAbsolute, resolve, sep } from 'path'
 
 export const MEDIA_EXTENSIONS = ['mp4', 'webm', 'mov', 'm4v', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']
@@ -83,11 +84,7 @@ export function isInsideRoots(p: string, roots: string[]): boolean {
  */
 export function importedMediaName(srcPath: string, size: number, mtimeMs: number): string {
   const ext = extname(srcPath).toLowerCase()
-  const stem = basename(srcPath, extname(srcPath))
-    .replace(/[^A-Za-z0-9 _.-]+/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 60) || 'media'
+  const stem = storedMediaStem(srcPath) // never a hash on a hash (QA B12 watch item)
   const hash = createHash('sha1').update(`${resolve(srcPath)}|${size}|${Math.round(mtimeMs)}`).digest('hex').slice(0, 10)
   return `${stem}-${hash}${ext}`
 }
