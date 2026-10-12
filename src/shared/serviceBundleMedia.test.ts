@@ -99,7 +99,7 @@ describe('.wfservice media wiring in main (source guard)', () => {
     expect(main).toMatch(/ipcMain\.on\('wf:services:openerReady', \(e, ready: unknown\) => \{\n\s*if \(!operatorWin \|\| operatorWin\.isDestroyed\(\) \|\| e\.sender !== operatorWin\.webContents\) return/)
     expect(main).toMatch(/did-start-loading', \(\) => \{ shellOpenReady = false \}/)
     expect(main).toMatch(/if \(!shellOpenQueue\.includes\(filePath\)\) shellOpenQueue\.push\(filePath\)/)
-    const preload = readFileSync(join(__dirname, '..', 'preload', 'index.ts'), 'utf8')
+    const preload = readFileSync(join(__dirname, '..', 'preload', 'index.ts'), 'utf8').replace(/\r\n/g, '\n') // CRLF on a Windows checkout
     expect(preload).toMatch(/ipcRenderer\.on\('wf:services:opened', handler\)\n\s*ipcRenderer\.send\('wf:services:openerReady', true\)/)
   })
 })
