@@ -84,6 +84,7 @@ export interface ArchiveMedia {
  * reports it); a file that changes size while being copied is an error too.
  */
 export async function writeServiceArchive(destPath: string, json: string, media: readonly ArchiveMedia[]): Promise<void> {
+  const folderWasThere = existsSync(dirname(destPath))
   await removeStaleParts(dirname(destPath))
   const tmp = partName(destPath)
   const out = createWriteStream(tmp, { flags: 'wx' })
@@ -119,10 +120,7 @@ export async function writeServiceArchive(destPath: string, json: string, media:
     out.destroy()
     // QA B12-N7: best effort — a pulled stick can't be cleaned. Say so, so the
     // operator knows a partial file may be on it.
-    let left = false
-    await fsp.rm(tmp, { force: true }).catch(() => { left = true })
-    if (!left) left = existsSync(tmp)
-    throw new PartLeftError(err, left ? basename(tmp) : null)
+    throw new PartLeftError(err, await dropPart(tmp, folderWasThere))
   }
 }
 
@@ -131,16 +129,14 @@ export async function writeServiceArchive(destPath: string, json: string, media:
  * a temp name then rename, the partial removed (or reported) on failure.
  */
 export async function writePlainServiceFile(destPath: string, json: string): Promise<void> {
+  const folderWasThere = existsSync(dirname(destPath))
   await removeStaleParts(dirname(destPath))
   const tmp = partName(destPath)
   try {
     await fsp.writeFile(tmp, json, { encoding: 'utf8', flag: 'wx' })
     await fsp.rename(tmp, destPath)
   } catch (err) {
-    let left = false
-    await fsp.rm(tmp, { force: true }).catch(() => { left = true })
-    if (!left) left = existsSync(tmp)
-    throw new PartLeftError(err, left ? basename(tmp) : null)
+    throw new PartLeftError(err, await dropPart(tmp, folderWasThere))
   }
 }
 
@@ -156,6 +152,20 @@ export class PartLeftError extends Error {
 }
 
 const PART_RE = /\.part-\d+-(\d+)$/
+const OUR_PART_RE = /\.(wfservice|wfbundle)\.part-/i // QA B13-N8: Windows names are case-insensitive (.WFBUNDLE)
+
+/**
+ * Remove a failed write's partial file. Returns its name when it may still be
+ * on the drive: it couldn't be removed, or the whole folder vanished mid-write
+ * (QA B13-N8: a pulled stick — the partial is on the stick, out of reach until
+ * it's plugged back in; the next save to that folder sweeps it).
+ */
+async function dropPart(tmp: string, folderWasThere: boolean): Promise<string | null> {
+  let left = false
+  await fsp.rm(tmp, { force: true }).catch(() => { left = true })
+  if (!left) left = existsSync(tmp) || (folderWasThere && !existsSync(dirname(tmp)))
+  return left ? basename(tmp) : null
+}
 const partName = (destPath: string): string => `${destPath}.part-${process.pid}-${Date.now()}`
 
 /**
@@ -169,7 +179,7 @@ export async function removeStaleParts(dir: string, now = Date.now(), maxAgeMs =
   try { names = await fsp.readdir(dir) } catch { return removed }
   for (const n of names) {
     const m = PART_RE.exec(n)
-    if (!m || !/\.(wfservice|wfbundle)\.part-/.test(n)) continue
+    if (!m || !OUR_PART_RE.test(n)) continue
     if (now - Number(m[1]) < maxAgeMs) continue
     try { await fsp.rm(join(dir, n), { force: true }); removed.push(n) } catch { /* best effort */ }
   }
@@ -191,6 +201,44 @@ function headerChecksum(h: Buffer): number {
 export function isTarHeader(h: Buffer): boolean {
   if (h.length < BLOCK || h.toString('latin1', 257, 262) !== 'ustar') return false
   return parseOctal(h, 148, 8) === headerChecksum(h)
+}
+
+/** QA B13-N1: a plain-JSON service is read whole; nothing real comes near this. */
+export const MAX_PLAIN_SERVICE_BYTES = 64 * 1024 * 1024
+
+export type ServiceFileKind = { kind: 'archive' } | { kind: 'json' } | { kind: 'refused'; error: string }
+
+/**
+ * QA B13-N1: decide how to read a service file WITHOUT reading it whole.
+ * B12-N7 made "is it a tar?" need a valid checksum, so a big bundle with a
+ * damaged first header fell through to the JSON path, which read all 1.6 GB
+ * into memory and crashed the app. Now:
+ *  - a valid ustar header → archive;
+ *  - the ustar magic, or a .wfbundle that doesn't start like JSON, but a bad
+ *    checksum → "damaged (bad header)";
+ *  - anything over MAX_PLAIN_SERVICE_BYTES → refused, never read;
+ *  - otherwise JSON.
+ */
+export async function classifyServiceFile(path: string): Promise<ServiceFileKind> {
+  const fh = await fsp.open(path, 'r')
+  let size: number
+  const head = Buffer.alloc(BLOCK)
+  let got: number
+  try {
+    size = (await fh.stat()).size
+    got = (await fh.read(head, 0, BLOCK, 0)).bytesRead
+  } finally {
+    await fh.close()
+  }
+  const h = head.subarray(0, got)
+  if (got === BLOCK && isTarHeader(h)) return { kind: 'archive' }
+  const magic = got >= 262 && h.toString('latin1', 257, 262) === 'ustar'
+  const looksJson = /^(?:\uFEFF)?\s*\{/.test(h.toString('utf8'))
+  if ((magic && !looksJson) || (/\.wfbundle$/i.test(path) && !looksJson))
+    return { kind: 'refused', error: 'the service file is damaged (bad header) — was it copied completely? Save it again from the PC that made it.' }
+  if (size > MAX_PLAIN_SERVICE_BYTES)
+    return { kind: 'refused', error: `it isn't a WorshipFlow service file (${Math.round(size / 1024 ** 2)} MB, far bigger than any service — is it a video or another file renamed?)` }
+  return { kind: 'json' }
 }
 
 /** Does the file start with a ustar header (a media bundle) rather than JSON? */

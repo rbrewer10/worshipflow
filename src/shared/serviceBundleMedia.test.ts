@@ -49,6 +49,15 @@ describe('.wfservice media manifest (v3)', () => {
     expect(text).toMatch(/2 picture\/video files copied onto this computer/)
     expect(text).toMatch(/Left out 1 file that isn’t a real picture or video: evil\.png/)
     expect(text).toMatch(/1 picture\/video file isn’t on this computer or in the file: gone\.mp4/)
+    expect(text).not.toMatch(/already in this computer/)
+  })
+  it('QA B13-N6: copies this PC already had say "already in this computer’s library", not "copied"', () => {
+    const base: ImportSummary = { serviceName: 'S', renamedFrom: null, items: 2, skipped: [], songsAdded: 0, songsMatched: 0, songsUpdated: [], songsKept: [], songsCopied: [], missingMedia: [] }
+    const reused = describeImport({ ...base, mediaRestored: 0, mediaReused: 2 })
+    expect(reused).not.toMatch(/copied onto/)
+    expect(reused).toMatch(/2 picture\/video files were already in this computer’s library — not copied again\./)
+    const mixed = describeImport({ ...base, mediaRestored: 1, mediaReused: 1 })
+    expect(mixed).toMatch(/1 picture\/video file copied onto this computer\. 1 picture\/video file was already in this computer’s library — not copied again\./)
   })
 })
 
@@ -70,20 +79,28 @@ describe('.wfservice media wiring in main (source guard)', () => {
     const at = main.indexOf('async function importServiceFile(filePath: string)')
     expect(at).toBeGreaterThan(-1)
     const fn = main.slice(at, main.indexOf('\n}\n', at))
-    expect(fn).toMatch(/if \(await isServiceArchive\(filePath\)\)/)
+    expect(fn).toMatch(/const kind = await classifyServiceFile\(filePath\)\n\s*if \(kind\.kind === 'refused'\) return/)
+    expect(fn.indexOf('classifyServiceFile(')).toBeLessThan(fn.indexOf('readFileSync(filePath'))
     expect(fn.indexOf('restoreArchiveMedia(')).toBeGreaterThan(-1)
     expect(fn.indexOf('restoreArchiveMedia(')).toBeLessThan(fn.indexOf('createService('))
     expect(fn).toMatch(/rewriteMediaPaths\(bundle\.items, restored\.map\)/)
     expect(fn).toMatch(/rewriteMediaPaths\(bundle\.announcements, restored\.map\)/)
     expect(fn).toMatch(/for \(const f of restored\.created\) \{ try \{ unlinkSync\(f\) \}/)
-    expect(fn).toMatch(/mediaRestored: restored\.map\.size/)
+    expect(fn).toMatch(/mediaRestored: restored\.created\.length,\n\s*mediaReused: \[\.\.\.new Set\(restored\.map\.values\(\)\)\]\.filter\(\(f\) => !restored\.created\.includes\(f\)\)\.length/) // QA B13-N6
     expect(fn).toMatch(/importMediaProblems\(/)
   })
-  it('a double-clicked service file (argv / second instance) is imported once the operator window has loaded (QA B12-N2)', () => {
-    expect(main).toMatch(/let pendingShellOpen: string \| null = serviceFileFromArgv\(process\.argv\)/)
+  it('a double-clicked service file (argv / second instance / open-file) is queued and imported once the operator renderer is listening (QA B12-N2, B13-N2)', () => {
+    expect(main).toMatch(/const atLaunch = serviceFileFromArgv\(process\.argv\); if \(atLaunch\) shellOpenQueue\.push\(atLaunch\)/)
     expect(main).toMatch(/app\.on\('second-instance', \(_e, argv\) => \{[\s\S]*?openServiceFileFromShell\(serviceFileFromArgv\(argv\)\)/)
-    expect(main).toMatch(/void flushShellOpen\(\) \/\/ a service file double-clicked/)
-    expect(main).toMatch(/operatorWin\.webContents\.send\('wf:services:opened', res\)/)
+    const flush = main.slice(main.indexOf('async function flushShellOpen('), main.indexOf('function openServiceFileFromShell('))
+    expect(flush).not.toMatch(/isLoading\(\)/) // B13-N2: true inside did-finish-load on Electron 33
+    expect(flush).toMatch(/!shellOpenReady/)
+    expect(flush).toMatch(/operatorWin\.webContents\.send\('wf:services:opened', res\)/)
+    expect(main).toMatch(/ipcMain\.on\('wf:services:openerReady', \(e, ready: unknown\) => \{\n\s*if \(!operatorWin \|\| operatorWin\.isDestroyed\(\) \|\| e\.sender !== operatorWin\.webContents\) return/)
+    expect(main).toMatch(/did-start-loading', \(\) => \{ shellOpenReady = false \}/)
+    expect(main).toMatch(/if \(!shellOpenQueue\.includes\(filePath\)\) shellOpenQueue\.push\(filePath\)/)
+    const preload = readFileSync(join(__dirname, '..', 'preload', 'index.ts'), 'utf8')
+    expect(preload).toMatch(/ipcRenderer\.on\('wf:services:opened', handler\)\n\s*ipcRenderer\.send\('wf:services:openerReady', true\)/)
   })
 })
 

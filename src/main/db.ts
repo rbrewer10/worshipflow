@@ -1,6 +1,6 @@
 import { app, safeStorage } from 'electron'
 import { normalizeCcli, titleMatchIsSameSong } from '../shared/songMatch'
-import { mediaDisplayName } from '../shared/mediaName'
+import { mediaDisplayName, disambiguateMediaTitles } from '../shared/mediaName'
 import { join, dirname } from 'path'
 import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, statSync } from 'fs'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
@@ -1241,7 +1241,7 @@ export function getService(id: number): ServiceFull | null {
     })
   }
   stmt.free()
-  return { ...svc, items }
+  return { ...svc, items: disambiguateMediaTitles(items) }
 }
 
 export function addServiceItem(serviceId: number, item: NewServiceItem): number {

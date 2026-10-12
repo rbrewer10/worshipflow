@@ -1,12 +1,12 @@
 import { createHash } from 'crypto'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync, openSync, ftruncateSync, writeSync, closeSync, statSync } from 'fs'
+import { watch, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync, openSync, ftruncateSync, writeSync, closeSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
   writeServiceArchive, readServiceArchive, isServiceArchive, extractEntry, tarHeader,
   planExportMedia, restoreArchiveMedia, contentMediaName, ExtractRefused, MAX_EXTRACT_BYTES, MEDIA_ENTRY, SERVICE_JSON,
-  isTarHeader, removeStaleParts, PartLeftError, writePlainServiceFile
+  isTarHeader, removeStaleParts, PartLeftError, writePlainServiceFile, classifyServiceFile, MAX_PLAIN_SERVICE_BYTES
 } from './serviceArchive'
 
 // Ryan's decision (Oct 2026): a .wfservice carries every picture, background
@@ -183,6 +183,26 @@ describe('QA B12-N7: archive detection and partial files', () => {
     expect((await removeStaleParts(dir, now)).sort()).toEqual([old, oldSvc].sort())
     expect(readdirSync(dir).sort()).toEqual([fresh, 'Sunday.wfservice', 'notes.txt.part-1-1'].sort())
   })
+  it('QA B13-N8: stale partials are swept whatever the case of the extension (.WFBUNDLE / .WfService)', async () => {
+    const now = 1_800_000_000_000
+    const up = `BIG.WFBUNDLE.part-1-${now - 11 * 60_000}`
+    const mixed = `Sun.WfService.part-2-${now - 11 * 60_000}`
+    const freshUp = `BIG.WFBUNDLE.part-1-${now - 1000}`
+    for (const n of [up, mixed, freshUp, 'clip.MP4.part-1-1']) writeFileSync(join(dir, n), 'x')
+    expect((await removeStaleParts(dir, now)).sort()).toEqual([up, mixed].sort())
+    expect(readdirSync(dir).sort()).toEqual([freshUp, 'clip.MP4.part-1-1'].sort())
+  })
+  it('QA B13-N8: a drive that vanishes mid-save (stick pulled) names the partial left on it', async () => {
+    const stick = join(dir, 'stick'); mkdirSync(stick)
+    const src = join(dir, 'big.png'); writeFileSync(src, Buffer.alloc(32 << 20, 7))
+    // "pull the stick" the moment the partial file appears on it
+    const w = watch(stick, () => { w.close(); rmSync(stick, { recursive: true, force: true }) })
+    const err = await writeServiceArchive(join(stick, 'S.wfbundle'), '{}', [{ src, entry: 'media/0001-big.png' }]).catch((e) => e)
+    w.close()
+    expect(err).toBeInstanceOf(PartLeftError)
+    expect(existsSync(stick)).toBe(false)
+    expect((err as PartLeftError).leftover).toMatch(/^S\.wfbundle\.part-\d+-\d+$/)
+  })
   it('a failed write removes its partial file and says nothing was left; the error keeps the cause', async () => {
     const out = join(dir, 'S.wfbundle')
     const err = await writeServiceArchive(out, '{}', [{ src: join(dir, 'gone.png'), entry: 'media/0001-gone.png' }]).catch((e) => e)
@@ -260,5 +280,39 @@ describe('QA B12-N2: plain .wfservice writer', () => {
     expect(err).toBeInstanceOf(PartLeftError)
     expect(err.leftover).toBeNull()
     expect(readdirSync(dir).filter((n) => n.includes('.part-'))).toEqual([])
+  })
+})
+
+describe('QA B13-N1: a big or damaged file is never read whole', () => {
+  const sparse = (name: string, head: Buffer, size: number): string => {
+    const p = join(dir, name)
+    const fd = openSync(p, 'w'); writeSync(fd, head); ftruncateSync(fd, size); closeSync(fd)
+    return p
+  }
+  it('a bundle whose first header checksum is damaged says "damaged (bad header)" — by magic or by .wfbundle', async () => {
+    const png = join(dir, 'a.png'); writeFileSync(png, PNG)
+    const good = join(dir, 'good.wfbundle')
+    await writeServiceArchive(good, '{"version":3}', [{ src: png, entry: 'media/0001-a.png' }])
+    expect(await classifyServiceFile(good)).toEqual({ kind: 'archive' })
+    const bad = Buffer.from(readFileSync(good)); bad[0] ^= 0x20 // name byte: checksum no longer matches
+    for (const name of ['bad.wfbundle', 'bad.wfservice']) {
+      const p = sparse(name, bad, MAX_PLAIN_SERVICE_BYTES + 4096) // big, like the 1.6 GB stick copy
+      const k = await classifyServiceFile(p)
+      expect(k.kind).toBe('refused')
+      expect((k as { error: string }).error).toMatch(/damaged \(bad header\)/)
+    }
+    // a .wfbundle without even the magic (zeroed start of a half-copied file)
+    const zero = sparse('zero.wfbundle', Buffer.alloc(512), 2048)
+    expect((await classifyServiceFile(zero) as { error: string }).error).toMatch(/damaged \(bad header\)/)
+  })
+  it('anything else over 64 MB is refused without reading it; small JSON (any extension) is JSON', async () => {
+    const vid = sparse('sermon.wfservice', MP4_HEAD, MAX_PLAIN_SERVICE_BYTES + 1)
+    const k = await classifyServiceFile(vid)
+    expect(k.kind).toBe('refused')
+    expect((k as { error: string }).error).toMatch(/isn't a WorshipFlow service file \(64 MB/)
+    const j = join(dir, 'renamed.wfbundle'); writeFileSync(j, '\uFEFF  {"version":2,"items":[]}')
+    expect(await classifyServiceFile(j)).toEqual({ kind: 'json' })
+    const old = join(dir, 'old.wfservice'); writeFileSync(old, '{"version":2,"items":[]}')
+    expect(await classifyServiceFile(old)).toEqual({ kind: 'json' })
   })
 })

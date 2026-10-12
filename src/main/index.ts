@@ -134,7 +134,7 @@ import {
   rewriteStoredMediaPaths,
   databaseMentions,
 } from './db'
-import { readServiceArchive, isServiceArchive, writeServiceArchive, writePlainServiceFile, planExportMedia, restoreArchiveMedia, PartLeftError, type RestoredMedia } from './serviceArchive'
+import { readServiceArchive, classifyServiceFile, writeServiceArchive, writePlainServiceFile, planExportMedia, restoreArchiveMedia, PartLeftError, type RestoredMedia } from './serviceArchive'
 import { chooseExportFormat, describeExport, exportDialogOptions, IMPORT_FILTERS, PLAIN_SERVICE_VERSION, serviceFileFromArgv } from '../shared/serviceFileFormat'
 import { importMediaFile, mediaProblemFor, migrateOutsidePaths, planImportedMediaCleanup, safeCleanupName, MediaImportRefused, servablePath, hasMediaExtension, isNetworkPath, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
 import {
@@ -2966,7 +2966,10 @@ function createOperator(): void {
       if (response === 1) app.quit()
     }).catch(() => { operatorCloseConfirmOpen = false })
   })
-  operatorWin.on('closed', () => { operatorWin = null })
+  operatorWin.on('closed', () => { operatorWin = null; shellOpenReady = false })
+  // QA B13-N2: a (re)loading operator has no listener until its renderer says so.
+  operatorWin.webContents.on('did-start-loading', () => { shellOpenReady = false })
+  operatorWin.webContents.on('render-process-gone', () => { shellOpenReady = false })
   watchRenderer(operatorWin, 'operator', 'The operator screen')
   watchSessionEnd(operatorWin)
   operatorWin.webContents.on('did-finish-load', () => {
@@ -2979,7 +2982,6 @@ function createOperator(): void {
     // resetting here just brings the flag back in line with reality instead
     // of leaving Sound Check blocked with no visible cause or way to clear it.
     setRoomFeedActive(false)
-    void flushShellOpen() // a service file double-clicked to start the app (QA B12-N2)
   })
   loadRoute(operatorWin, '/')
 }
@@ -4273,7 +4275,7 @@ ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<Serv
     // e.g. the USB stick was pulled, full or read-only — tell the operator (QA B24).
     logError(`[export] service export failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
     // QA B12-N7: the partial file is removed when it can be; say so when it can't (stick pulled).
-    const left = err instanceof PartLeftError && err.leftover ? ` A partial file “${err.leftover}” may be left on the drive and couldn't be removed — delete it when the drive is back.` : ''
+    const left = err instanceof PartLeftError && err.leftover ? ` A partial file “${err.leftover}” may be left on the drive — a later save to that folder clears it, or delete it yourself.` : ''
     return { canceled: false, error: `Couldn't save the service file: ${err instanceof Error ? err.message : String(err)}.${left}` }
   }
   if (plan.skipped.length) logWarn(`[export] ${plan.skipped.length} media file(s) not carried: ${plan.skipped.map((s) => `${s.path} (${s.reason})`).join(', ')}`)
@@ -4303,29 +4305,44 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
 // already running, hands argv to the running copy (second-instance). The file
 // is imported once the operator window has loaded; the renderer is told the
 // result so it can say what happened and open the service.
-let pendingShellOpen: string | null = serviceFileFromArgv(process.argv)
+// QA B13-N2: with WorshipFlow CLOSED, the double-clicked file arrived in argv
+// but was never imported — the flush ran inside did-finish-load, where
+// webContents.isLoading() is still true (Electron 33), and never retried. The
+// operator window's renderer now says when its listener is up
+// ('wf:services:openerReady'); files opened before that (argv at launch, a
+// second instance or open-file during startup) are queued and each imported once.
+const shellOpenQueue: string[] = []
+{ const atLaunch = serviceFileFromArgv(process.argv); if (atLaunch) shellOpenQueue.push(atLaunch) }
+let shellOpenReady = false
 let shellOpenRunning = false
 async function flushShellOpen(): Promise<void> {
-  if (shellOpenRunning || !pendingShellOpen || !operatorWin || operatorWin.isDestroyed() || operatorWin.webContents.isLoading()) return
-  const filePath = pendingShellOpen
-  pendingShellOpen = null
+  if (shellOpenRunning || !shellOpenReady || shellOpenQueue.length === 0 || !operatorWin || operatorWin.isDestroyed()) return
   shellOpenRunning = true
   try {
-    let res: ServiceImportResult
-    try { res = await importServiceFile(filePath) } catch (err) {
-      res = { canceled: false, serviceId: null, error: `The service couldn’t be imported: ${err instanceof Error ? err.message : String(err)}` }
+    while (shellOpenQueue.length && shellOpenReady && operatorWin && !operatorWin.isDestroyed()) {
+      const filePath = shellOpenQueue.shift()!
+      let res: ServiceImportResult
+      try { res = await importServiceFile(filePath) } catch (err) {
+        res = { canceled: false, serviceId: null, error: `The service couldn’t be imported: ${err instanceof Error ? err.message : String(err)}` }
+      }
+      logInfo(`[import] opened from the shell: ${filePath} → ${res.error ? `error: ${res.error}` : `service ${res.serviceId}`}`)
+      if (operatorWin && !operatorWin.isDestroyed()) operatorWin.webContents.send('wf:services:opened', res)
     }
-    if (operatorWin && !operatorWin.isDestroyed()) operatorWin.webContents.send('wf:services:opened', res)
   } finally {
     shellOpenRunning = false
-    if (pendingShellOpen) void flushShellOpen()
   }
 }
 function openServiceFileFromShell(filePath: string | null): void {
   if (!filePath) return
-  pendingShellOpen = filePath
+  if (!shellOpenQueue.includes(filePath)) shellOpenQueue.push(filePath) // the same file twice during startup: once
   void flushShellOpen()
 }
+ipcMain.on('wf:services:openerReady', (e, ready: unknown) => {
+  if (!operatorWin || operatorWin.isDestroyed() || e.sender !== operatorWin.webContents) return
+  shellOpenReady = ready === true
+  if (!shellOpenReady) return
+  void flushShellOpen()
+})
 
 /**
  * Import one .wfbundle / .wfservice (either kind, decided by content — QA
@@ -4340,7 +4357,10 @@ async function importServiceFile(filePath: string): Promise<ServiceImportResult>
   // older .wfservice is plain JSON and imports exactly as before.
   let archive: Awaited<ReturnType<typeof readServiceArchive>> | null = null
   try {
-    if (await isServiceArchive(filePath)) {
+    // QA B13-N1: decided from the first block and the size — a big file is never read whole.
+    const kind = await classifyServiceFile(filePath)
+    if (kind.kind === 'refused') return { canceled: false, serviceId: null, error: `Couldn't read that file: ${kind.error}` }
+    if (kind.kind === 'archive') {
       archive = await readServiceArchive(filePath)
       text = archive.json
     } else {
@@ -4406,7 +4426,9 @@ async function importServiceFile(filePath: string): Promise<ServiceImportResult>
     networkMedia: mediaProblems.network,
     announcementsAdded: 0, announcementsMatched: 0, announcementsMissing: [],
     newerVersion: parsed.newerVersion,
-    mediaRestored: restored.map.size,
+    // QA B13-N6: copies made now vs. identical copies already in imported-media (dedupe)
+    mediaRestored: restored.created.length,
+    mediaReused: [...new Set(restored.map.values())].filter((f) => !restored.created.includes(f)).length,
     mediaRefused: restored.refused
   }
   const createdSongs: number[] = []

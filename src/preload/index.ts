@@ -454,7 +454,8 @@ const wf = {
   onServiceFileOpened: (cb: (res: ServiceImportResult) => void): (() => void) => {
     const handler = (_e: unknown, res: ServiceImportResult): void => cb(res)
     ipcRenderer.on('wf:services:opened', handler)
-    return () => ipcRenderer.removeListener('wf:services:opened', handler)
+    ipcRenderer.send('wf:services:openerReady', true) // QA B13-N2: main imports queued files only once this listener is up
+    return () => { ipcRenderer.removeListener('wf:services:opened', handler); ipcRenderer.send('wf:services:openerReady', false) }
   },
   serviceImportPlan: (): Promise<{
     canceled: boolean
