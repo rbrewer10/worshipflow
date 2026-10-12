@@ -50,9 +50,16 @@ function slideText(xml: string): string {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
+// Basename that splits on BOTH separators: the dialog hands us Windows paths
+// on the booth PC, and path.basename on any other OS would keep "C:\songs\"
+// in the title.
+function fileBaseName(filePath: string): string {
+  return filePath.split(/[\\/]/).pop() || basename(filePath)
+}
+
 // Title from filename: drop extension, tidy separators.
 function titleFromFile(filePath: string): string {
-  return basename(filePath)
+  return fileBaseName(filePath)
     .replace(/\.ppt[xm]?$/i, '')
     .replace(/[_]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -76,7 +83,7 @@ export async function parsePptx(filePath: string, buffer: Buffer): Promise<Parse
     if (text) slides.push(text)
   }
 
-  return { fileName: basename(filePath), title: titleFromFile(filePath), slides }
+  return { fileName: fileBaseName(filePath), title: titleFromFile(filePath), slides }
 }
 
 // --- Service import: each slide → text + (best-effort) background image ---
