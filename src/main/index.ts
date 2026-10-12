@@ -119,7 +119,7 @@ import {
   databaseMentions,
 } from './db'
 import { readServiceArchive, classifyServiceFile, writeServiceArchive, writePlainServiceFile, planExportMedia, restoreArchiveMedia, PartLeftError, type RestoredMedia } from './serviceArchive'
-import { chooseExportFormat, describeExport, exportDialogOptions, IMPORT_FILTERS, PLAIN_SERVICE_VERSION, serviceFileFromArgv } from '../shared/serviceFileFormat'
+import { chooseExportFormat, describeExport, exportDialogOptions, IMPORT_FILTERS, PLAIN_SERVICE_VERSION, serviceFileFromArgv, serviceFilesFromArgv } from '../shared/serviceFileFormat'
 import { importMediaFile, mediaProblemFor, migrateOutsidePaths, planImportedMediaCleanup, safeCleanupName, MediaImportRefused, servablePath, hasMediaExtension, isNetworkPath, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
 import {
   listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder,
@@ -246,7 +246,7 @@ if (!gotSingleInstanceLock) {
       if (operatorWin.isMinimized()) operatorWin.restore()
       operatorWin.focus()
     }
-    openServiceFileFromShell(serviceFileFromArgv(argv)) // QA B12-N2: a double-clicked service file
+    for (const f of serviceFilesFromArgv(argv)) openServiceFileFromShell(f) // QA B12-N2 / B14-N1: every double-clicked service file, in order
   })
   app.on('open-file', (e, filePath) => { e.preventDefault(); openServiceFileFromShell(serviceFileFromArgv(['', filePath])) })
 }
@@ -3581,7 +3581,8 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
 // ('wf:services:openerReady'); files opened before that (argv at launch, a
 // second instance or open-file during startup) are queued and each imported once.
 const shellOpenQueue: string[] = []
-{ const atLaunch = serviceFileFromArgv(process.argv); if (atLaunch) shellOpenQueue.push(atLaunch) }
+// QA B14-N1: every file at launch, not just the last (multi-select → Open).
+for (const atLaunch of serviceFilesFromArgv(process.argv)) shellOpenQueue.push(atLaunch)
 let shellOpenReady = false
 let shellOpenRunning = false
 async function flushShellOpen(): Promise<void> {

@@ -90,8 +90,8 @@ describe('.wfservice media wiring in main (source guard)', () => {
     expect(fn).toMatch(/importMediaProblems\(/)
   })
   it('a double-clicked service file (argv / second instance / open-file) is queued and imported once the operator renderer is listening (QA B12-N2, B13-N2)', () => {
-    expect(main).toMatch(/const atLaunch = serviceFileFromArgv\(process\.argv\); if \(atLaunch\) shellOpenQueue\.push\(atLaunch\)/)
-    expect(main).toMatch(/app\.on\('second-instance', \(_e, argv\) => \{[\s\S]*?openServiceFileFromShell\(serviceFileFromArgv\(argv\)\)/)
+    expect(main).toMatch(/for \(const atLaunch of serviceFilesFromArgv\(process\.argv\)\) shellOpenQueue\.push\(atLaunch\)/)
+    expect(main).toMatch(/app\.on\('second-instance', \(_e, argv\) => \{[\s\S]*?for \(const f of serviceFilesFromArgv\(argv\)\) openServiceFileFromShell\(f\)/)
     const flush = main.slice(main.indexOf('async function flushShellOpen('), main.indexOf('function openServiceFileFromShell('))
     expect(flush).not.toMatch(/isLoading\(\)/) // B13-N2: true inside did-finish-load on Electron 33
     expect(flush).toMatch(/!shellOpenReady/)

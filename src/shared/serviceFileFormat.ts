@@ -73,6 +73,19 @@ export function describeExport(o: ExportOutcome): { text: string; warn: boolean 
 }
 
 /** The service file Windows/macOS passed on the command line, if any (last one wins; flags ignored). */
+/**
+ * QA B14-N1: every service file in argv, in the order given (multi-select →
+ * Open hands them all over at once), each path once.
+ */
+export function serviceFilesFromArgv(argv: readonly string[]): string[] {
+  const out: string[] = []
+  for (let i = 1; i < argv.length; i++) {
+    const a = argv[i]
+    if (a && !a.startsWith('-') && /\.(wfbundle|wfservice)$/i.test(a) && !out.includes(a)) out.push(a)
+  }
+  return out
+}
+
 export function serviceFileFromArgv(argv: readonly string[]): string | null {
   for (let i = argv.length - 1; i >= 1; i--) {
     const a = argv[i]
