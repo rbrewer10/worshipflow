@@ -20,12 +20,13 @@
 // names it makes itself (no path in the archive ever becomes a path on disk).
 
 import { createHash } from 'crypto'
-import { createReadStream, createWriteStream, existsSync, promises as fsp, statSync, type WriteStream } from 'fs'
+import { closeSync, createReadStream, createWriteStream, existsSync, openSync, promises as fsp, readSync, statSync, type WriteStream } from 'fs'
 import { once } from 'events'
 import { basename, dirname, join } from 'path'
 import { Transform } from 'stream'
 import { pipeline } from 'stream/promises'
 import { storedMediaStem } from '../shared/mediaName'
+import type { MediaSkipReason } from '../shared/serviceFileFormat'
 import { archiveEntryName, type BundleMedia } from '../shared/serviceBundle'
 import { contentMatchesExtension, hasMediaExtension, isNetworkPath, sniffMedia } from './mediaImport'
 
@@ -118,6 +119,24 @@ export async function writeServiceArchive(destPath: string, json: string, media:
     out.destroy()
     // QA B12-N7: best effort — a pulled stick can't be cleaned. Say so, so the
     // operator knows a partial file may be on it.
+    let left = false
+    await fsp.rm(tmp, { force: true }).catch(() => { left = true })
+    if (!left) left = existsSync(tmp)
+    throw new PartLeftError(err, left ? basename(tmp) : null)
+  }
+}
+
+/**
+ * QA B12-N2: a plain .wfservice (JSON, no media), written the same safe way —
+ * a temp name then rename, the partial removed (or reported) on failure.
+ */
+export async function writePlainServiceFile(destPath: string, json: string): Promise<void> {
+  await removeStaleParts(dirname(destPath))
+  const tmp = partName(destPath)
+  try {
+    await fsp.writeFile(tmp, json, { encoding: 'utf8', flag: 'wx' })
+    await fsp.rename(tmp, destPath)
+  } catch (err) {
     let left = false
     await fsp.rm(tmp, { force: true }).catch(() => { left = true })
     if (!left) left = existsSync(tmp)
@@ -264,32 +283,51 @@ export async function extractEntry(path: string, entry: ArchiveEntry, destPath: 
 
 const baseOf = (p: string): string => p.split(/[\\/]/).pop() ?? p
 
+/** Why a referenced file isn't carried (QA B12-N6: say the real reason). */
+export interface SkippedMedia { path: string; reason: MediaSkipReason }
+
 export interface ExportMediaPlan {
   /** The manifest written into service.json. */
   media: BundleMedia[]
   /** What to stream into the archive. */
   entries: ArchiveMedia[]
-  /** Referenced files that can't be carried (gone, not a file, on a network share, too big) — the operator is warned. */
-  missing: string[]
+  /** Referenced files that can't be carried, each once, with the reason — the operator is told. */
+  skipped: SkippedMedia[]
+}
+
+function readHead(p: string, n = 32): Buffer {
+  const fd = openSync(p, 'r')
+  try {
+    const buf = Buffer.alloc(n)
+    return buf.subarray(0, readSync(fd, buf, 0, n, 0))
+  } finally {
+    closeSync(fd)
+  }
 }
 
 /** Decide which of the service's media paths go into the file. */
 export function planExportMedia(paths: readonly string[]): ExportMediaPlan {
-  const plan: ExportMediaPlan = { media: [], entries: [], missing: [] }
-  for (const p of paths) {
+  const plan: ExportMediaPlan = { media: [], entries: [], skipped: [] }
+  for (const p of new Set(paths)) {
     // Never probe a \\server path read back from the database (it can hang
     // for a minute on a dead share — same rule as mediaImport's migration).
-    if (isNetworkPath(p) || !hasMediaExtension(p)) { plan.missing.push(p); continue }
+    if (isNetworkPath(p)) { plan.skipped.push({ path: p, reason: 'network' }); continue }
+    if (!hasMediaExtension(p)) { plan.skipped.push({ path: p, reason: 'notMedia' }); continue }
     let size: number
     try {
       const st = statSync(p)
-      if (!st.isFile()) { plan.missing.push(p); continue }
+      if (!st.isFile()) { plan.skipped.push({ path: p, reason: 'missing' }); continue }
       size = st.size
     } catch {
-      plan.missing.push(p)
+      plan.skipped.push({ path: p, reason: 'missing' })
       continue
     }
-    if (size > MAX_ENTRY_BYTES) { plan.missing.push(p); continue }
+    if (size > MAX_ENTRY_BYTES) { plan.skipped.push({ path: p, reason: 'tooBig' }); continue }
+    // QA B12-N6: judge by the bytes, as import does — a text file named
+    // fake.png isn't carried (and isn't counted as a picture).
+    let head: Buffer
+    try { head = readHead(p) } catch { plan.skipped.push({ path: p, reason: 'missing' }); continue }
+    if (!contentMatchesExtension(p, sniffMedia(head))) { plan.skipped.push({ path: p, reason: 'notMedia' }); continue }
     const file = archiveEntryName(plan.media.length, p)
     plan.media.push({ path: p, file, size })
     plan.entries.push({ src: p, entry: file })
@@ -365,6 +403,8 @@ export interface RestoredMedia {
   created: string[]
   /** Base names left out because their bytes aren't a picture/video (each once). */
   refused: string[]
+  /** The exporting PC's paths of those files (so they aren't also listed as missing). */
+  refusedPaths: string[]
 }
 
 export interface RestoreOptions {
@@ -392,7 +432,7 @@ export async function restoreArchiveMedia(
   mediaDir: string,
   opts: RestoreOptions = {}
 ): Promise<RestoredMedia> {
-  const out: RestoredMedia = { map: new Map(), created: [], refused: [] }
+  const out: RestoredMedia = { map: new Map(), created: [], refused: [], refusedPaths: [] }
   if (media.length === 0) return out
   // Plan: which entries to unpack, and which rows point at each.
   const rowsByEntry = new Map<string, { entry: ArchiveEntry; first: string; paths: string[] }>()
@@ -405,6 +445,7 @@ export async function restoreArchiveMedia(
     if (!entry) continue // not in the file → reported as missing
     if (!hasMediaExtension(m.path) || !contentMatchesExtension(m.path, sniffMedia(await readEntryHead(archivePath, entry)))) {
       refused.add(baseOf(m.path))
+      out.refusedPaths.push(m.path)
       continue
     }
     const g = rowsByEntry.get(m.file)

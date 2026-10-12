@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, screen, ipcMain, dialog, protocol, net } from 'electron'
-import { describeImport, parseServiceBundle, referencedMediaPaths, bundleMediaPaths, rewriteMediaPaths, sameSong, songContentDiffers, songInputFrom, uniqueServiceName, announcementRefs, bundleAnnouncementFrom, announcementInputFrom, sameAnnouncement, remapAnnouncementItem, BUNDLE_VERSION, type BundleAnnouncement, type BundleItem, type ImportSummary } from '../shared/serviceBundle'
+import { describeImport, importMediaProblems, parseServiceBundle, referencedMediaPaths, bundleMediaPaths, rewriteMediaPaths, sameSong, songContentDiffers, songInputFrom, uniqueServiceName, announcementRefs, bundleAnnouncementFrom, announcementInputFrom, sameAnnouncement, remapAnnouncementItem, BUNDLE_VERSION, type BundleAnnouncement, type BundleItem, type ImportSummary } from '../shared/serviceBundle'
 import type { ServiceExportResult, ServiceImportResult } from '../shared/types'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
@@ -118,7 +118,8 @@ import {
   rewriteStoredMediaPaths,
   databaseMentions,
 } from './db'
-import { readServiceArchive, isServiceArchive, writeServiceArchive, planExportMedia, restoreArchiveMedia, PartLeftError, type RestoredMedia } from './serviceArchive'
+import { readServiceArchive, isServiceArchive, writeServiceArchive, writePlainServiceFile, planExportMedia, restoreArchiveMedia, PartLeftError, type RestoredMedia } from './serviceArchive'
+import { chooseExportFormat, describeExport, exportDialogOptions, IMPORT_FILTERS, PLAIN_SERVICE_VERSION, serviceFileFromArgv } from '../shared/serviceFileFormat'
 import { importMediaFile, mediaProblemFor, migrateOutsidePaths, planImportedMediaCleanup, safeCleanupName, MediaImportRefused, servablePath, hasMediaExtension, isNetworkPath, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
 import {
   listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder,
@@ -240,12 +241,14 @@ if (!gotSingleInstanceLock) {
   // the whenReady body also guards on the lock as belt-and-suspenders.
   app.exit(0)
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_e, argv) => {
     if (operatorWin) {
       if (operatorWin.isMinimized()) operatorWin.restore()
       operatorWin.focus()
     }
+    openServiceFileFromShell(serviceFileFromArgv(argv)) // QA B12-N2: a double-clicked service file
   })
+  app.on('open-file', (e, filePath) => { e.preventDefault(); openServiceFileFromShell(serviceFileFromArgv(['', filePath])) })
 }
 
 // Canonical live state — one LiveTrackState per track (Main always exists;
@@ -2461,6 +2464,7 @@ function createOperator(): void {
     // resetting here just brings the flag back in line with reality instead
     // of leaving Sound Check blocked with no visible cause or way to clear it.
     setRoomFeedActive(false)
+    void flushShellOpen() // a service file double-clicked to start the app (QA B12-N2)
   })
   loadRoute(operatorWin, '/')
 }
@@ -3520,40 +3524,83 @@ ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<Serv
     }
   }
   const bundle = { version: BUNDLE_VERSION, name: svc.name, service_date: svc.service_date, published_at: svc.published_at ?? null, team: svc.team, theme: svc.theme, themeColors: svc.themeColors, items: itemsWithSongs, announcements }
-  const { filePath, canceled } = await dialog.showSaveDialog({
-    title: 'Export Service',
-    defaultPath: `${svc.name.replace(/[/\\?%*:|"<>]/g, '-')}.wfservice`,
-    filters: [{ name: 'WorshipFlow Service', extensions: ['wfservice'] }]
-  })
-  if (canceled || !filePath) return { canceled: true }
   // Ryan's decision (Oct 2026): carry every picture, background and video the
   // service uses, so the file opens complete on another PC. Streamed into a
-  // tar (main/serviceArchive.ts) — a big video is never read into memory. A
-  // service with no media stays plain JSON (older builds can open it).
+  // tar (main/serviceArchive.ts) — a big video is never read into memory.
+  // QA B12-N2: that file is a .wfbundle; a .wfservice is always plain JSON
+  // (older builds open it). The dialog offers both, the bundle first when
+  // the service has media; the extension the operator ends up with decides.
   const plan = planExportMedia(bundleMediaPaths(bundle, (p) => hasMediaExtension(p)))
-  const json = JSON.stringify({ ...bundle, media: plan.media }, null, 2)
+  const hasMedia = plan.entries.length > 0
+  const picked = await dialog.showSaveDialog({ title: 'Export Service', ...exportDialogOptions(svc.name, hasMedia) })
+  if (picked.canceled || !picked.filePath) return { canceled: true }
+  const { filePath, format } = chooseExportFormat(picked.filePath, hasMedia)
   try {
-    if (plan.entries.length) await writeServiceArchive(filePath, json, plan.entries)
-    else writeFileSync(filePath, json, 'utf-8')
+    if (format === 'wfbundle') await writeServiceArchive(filePath, JSON.stringify({ ...bundle, media: plan.media }, null, 2), plan.entries)
+    else await writePlainServiceFile(filePath, JSON.stringify({ ...bundle, version: PLAIN_SERVICE_VERSION }, null, 2))
   } catch (err) {
     // e.g. the USB stick was pulled, full or read-only — tell the operator (QA B24).
-    logError(`[export] .wfservice export failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
+    logError(`[export] service export failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
     // QA B12-N7: the partial file is removed when it can be; say so when it can't (stick pulled).
     const left = err instanceof PartLeftError && err.leftover ? ` A partial file “${err.leftover}” may be left on the drive and couldn't be removed — delete it when the drive is back.` : ''
     return { canceled: false, error: `Couldn't save the service file: ${err instanceof Error ? err.message : String(err)}.${left}` }
   }
-  if (plan.missing.length) logWarn(`[export] ${plan.missing.length} media file(s) not carried: ${plan.missing.join(', ')}`)
-  logInfo(`[export] saved ${filePath} with ${plan.entries.length} media file(s)`)
-  return { canceled: false, filePath, mediaCount: plan.entries.length, missingMedia: plan.missing.map((p) => p.split(/[\\/]/).pop() ?? p) }
+  if (plan.skipped.length) logWarn(`[export] ${plan.skipped.length} media file(s) not carried: ${plan.skipped.map((s) => `${s.path} (${s.reason})`).join(', ')}`)
+  logInfo(`[export] saved ${filePath} as ${format} with ${format === 'wfbundle' ? plan.entries.length : 0} media file(s)`)
+  const told = describeExport({
+    fileName: filePath.split(/[\\/]/).pop() ?? filePath,
+    format,
+    mediaCount: format === 'wfbundle' ? plan.entries.length : 0,
+    leftOut: format === 'wfservice' ? plan.entries.length + plan.skipped.length : 0,
+    skipped: plan.skipped.map((s) => ({ name: s.path.split(/[\\/]/).pop() ?? s.path, reason: s.reason }))
+  })
+  return { canceled: false, filePath, summary: told.text, warn: told.warn }
 })
 
 ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
   const { filePaths, canceled } = await dialog.showOpenDialog({
     title: 'Import Service',
-    filters: [{ name: 'WorshipFlow Service', extensions: ['wfservice'] }],
+    filters: IMPORT_FILTERS,
     properties: ['openFile']
   })
   if (canceled || filePaths.length === 0) return { canceled: true, serviceId: null }
+  return importServiceFile(filePaths[0])
+})
+
+// QA B12-N2: double-clicking a .wfbundle/.wfservice (file associations in
+// electron-builder.yml) opens WorshipFlow with the path in argv — or, when it's
+// already running, hands argv to the running copy (second-instance). The file
+// is imported once the operator window has loaded; the renderer is told the
+// result so it can say what happened and open the service.
+let pendingShellOpen: string | null = serviceFileFromArgv(process.argv)
+let shellOpenRunning = false
+async function flushShellOpen(): Promise<void> {
+  if (shellOpenRunning || !pendingShellOpen || !operatorWin || operatorWin.isDestroyed() || operatorWin.webContents.isLoading()) return
+  const filePath = pendingShellOpen
+  pendingShellOpen = null
+  shellOpenRunning = true
+  try {
+    let res: ServiceImportResult
+    try { res = await importServiceFile(filePath) } catch (err) {
+      res = { canceled: false, serviceId: null, error: `The service couldn’t be imported: ${err instanceof Error ? err.message : String(err)}` }
+    }
+    if (operatorWin && !operatorWin.isDestroyed()) operatorWin.webContents.send('wf:services:opened', res)
+  } finally {
+    shellOpenRunning = false
+    if (pendingShellOpen) void flushShellOpen()
+  }
+}
+function openServiceFileFromShell(filePath: string | null): void {
+  if (!filePath) return
+  pendingShellOpen = filePath
+  void flushShellOpen()
+}
+
+/**
+ * Import one .wfbundle / .wfservice (either kind, decided by content — QA
+ * B12-N2). Used by the Import dialog and by a file opened from Explorer.
+ */
+async function importServiceFile(filePath: string): Promise<ServiceImportResult> {
   // Errors come back to the renderer as a message (toast) — no native dialog,
   // so live control never waits on a modal (QA A-H4) and a bad file is never
   // silent (QA B12).
@@ -3562,11 +3609,11 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
   // older .wfservice is plain JSON and imports exactly as before.
   let archive: Awaited<ReturnType<typeof readServiceArchive>> | null = null
   try {
-    if (await isServiceArchive(filePaths[0])) {
-      archive = await readServiceArchive(filePaths[0])
+    if (await isServiceArchive(filePath)) {
+      archive = await readServiceArchive(filePath)
       text = archive.json
     } else {
-      text = readFileSync(filePaths[0], 'utf-8')
+      text = readFileSync(filePath, 'utf-8')
     }
   } catch (err) {
     return { canceled: false, serviceId: null, error: `Couldn't read that file: ${err instanceof Error ? err.message : String(err)}` }
@@ -3577,12 +3624,12 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
   // Copy the carried pictures/videos into imported-media and point the
   // service at the copies. What isn't in the file stays as it was and is
   // reported as missing below.
-  let restored: RestoredMedia = { map: new Map(), created: [], refused: [] }
+  let restored: RestoredMedia = { map: new Map(), created: [], refused: [], refusedPaths: [] }
   if (archive) {
     try {
-      restored = await restoreArchiveMedia(filePaths[0], archive.entries, bundle.media, mediaRoots().mediaDir)
+      restored = await restoreArchiveMedia(filePath, archive.entries, bundle.media, mediaRoots().mediaDir)
     } catch (err) {
-      logError(`[import] couldn't copy the media out of ${filePaths[0]}: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
+      logError(`[import] couldn't copy the media out of ${filePath}: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
       return { canceled: false, serviceId: null, error: `Couldn't copy the pictures and videos out of that file (${err instanceof Error ? err.message : String(err)}). Nothing was changed.` }
     }
     bundle = { ...bundle, items: rewriteMediaPaths(bundle.items, restored.map), announcements: rewriteMediaPaths(bundle.announcements, restored.map), theme: bundle.theme != null ? (restored.map.get(bundle.theme) ?? bundle.theme) : null }
@@ -3618,11 +3665,14 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
   }
 
   const renamedName = uniqueServiceName(bundle.name, listServices().map((sv) => sv.name))
+  // QA B12-N6: each problem file once — refused, on a network share, or missing.
+  const mediaProblems = importMediaProblems([...referencedMediaPaths(bundle), ...bundleMediaPaths(bundle, (p) => hasMediaExtension(p))], restored.refusedPaths, isNetworkPath, existsSync)
   const summary: ImportSummary = {
     serviceName: renamedName, renamedFrom: renamedName !== bundle.name ? bundle.name : null,
     items: 0, skipped: parsed.skipped, songsAdded: 0, songsMatched: 0,
     songsUpdated: [], songsKept: [], songsCopied: [],
-    missingMedia: [...new Set([...referencedMediaPaths(bundle), ...bundleMediaPaths(bundle, (p) => hasMediaExtension(p))])].filter((p) => !isNetworkPath(p) && !existsSync(p)),
+    missingMedia: mediaProblems.missing,
+    networkMedia: mediaProblems.network,
     announcementsAdded: 0, announcementsMatched: 0, announcementsMissing: [],
     newerVersion: parsed.newerVersion,
     mediaRestored: restored.map.size,
@@ -3701,8 +3751,8 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
     }
   }
   logInfo(`[import] ${describeImport(summary)}`)
-  return { canceled: false, serviceId, summary: describeImport(summary), warn: summary.skipped.length > 0 || summary.missingMedia.length > 0 || (summary.mediaRefused?.length ?? 0) > 0 || (summary.announcementsMissing?.length ?? 0) > 0 || !!summary.newerVersion }
-})
+  return { canceled: false, serviceId, summary: describeImport(summary), warn: summary.skipped.length > 0 || summary.missingMedia.length > 0 || (summary.networkMedia?.length ?? 0) > 0 || (summary.mediaRefused?.length ?? 0) > 0 || (summary.announcementsMissing?.length ?? 0) > 0 || !!summary.newerVersion }
+}
 
 // Import a service plan exported from the Snow Hill Church app (.wfplan / .json).
 // Songs are matched to the library by title; scripture/sermon map to their real

@@ -6,7 +6,7 @@ import { join } from 'path'
 import {
   writeServiceArchive, readServiceArchive, isServiceArchive, extractEntry, tarHeader,
   planExportMedia, restoreArchiveMedia, contentMediaName, ExtractRefused, MAX_EXTRACT_BYTES, MEDIA_ENTRY, SERVICE_JSON,
-  isTarHeader, removeStaleParts, PartLeftError
+  isTarHeader, removeStaleParts, PartLeftError, writePlainServiceFile
 } from './serviceArchive'
 
 // Ryan's decision (Oct 2026): a .wfservice carries every picture, background
@@ -91,8 +91,21 @@ describe('export plan', () => {
     const plan = planExportMedia([a, join(dir, 'gone.mp4'), '\\\\server\\share\\x.jpg', join(dir, 'notes.txt'), dir + '.jpg'])
     expect(plan.media).toEqual([{ path: a, file: 'media/0001-Cross Photo-.png', size: PNG.length }])
     expect(plan.entries).toEqual([{ src: a, entry: 'media/0001-Cross Photo-.png' }])
-    expect(plan.missing).toHaveLength(4)
+    expect(plan.skipped.map((x) => x.reason)).toEqual(['missing', 'network', 'notMedia', 'missing'])
     for (const m of plan.media) expect(m.file).toMatch(MEDIA_ENTRY)
+  })
+  it('QA B12-N6: names the real reason, judges by content, lists each path once', () => {
+    const fake = join(dir, 'fake.png'); writeFileSync(fake, 'just some text, not a picture')
+    const real = join(dir, 'real.png'); writeFileSync(real, PNG)
+    const unc = '\\\\booth\\media\\loop.mp4'
+    const plan = planExportMedia([fake, real, unc, real, unc, join(dir, 'gone.jpg')])
+    expect(plan.entries.map((e) => e.src)).toEqual([real])
+    expect(plan.skipped).toEqual([{ path: fake, reason: 'notMedia' }, { path: unc, reason: 'network' }, { path: join(dir, 'gone.jpg'), reason: 'missing' }])
+  })
+  it.skipIf(process.platform === 'win32')('QA B12-N6: a file over 8 GiB is "too big", not "not found"', () => {
+    const big = join(dir, 'huge.mp4')
+    const fd = openSync(big, 'w'); writeSync(fd, MP4_HEAD); ftruncateSync(fd, 8 * 1024 ** 3 + 10); closeSync(fd) // sparse
+    expect(planExportMedia([big]).skipped).toEqual([{ path: big, reason: 'tooBig' }])
   })
 })
 
@@ -233,5 +246,19 @@ describe('QA B12-N1/N3: content-hash dedupe, one copy per entry, size and space 
     const rows = [1, 2, 3].map((i) => ({ path: `C:\\x${i}\\evil.png`, file: 'media/0001-evil.png', size: 18 }))
     const r = await restoreArchiveMedia(arch, (await readServiceArchive(arch)).entries, rows, join(dir, 'imported-media'))
     expect(r.refused).toEqual(['evil.png'])
+  })
+})
+
+describe('QA B12-N2: plain .wfservice writer', () => {
+  it('writes JSON via a temp name and leaves no partial behind on failure', async () => {
+    const out = join(dir, 'plain.wfservice')
+    await writePlainServiceFile(out, '{"version":2,"items":[]}')
+    expect(readFileSync(out, 'utf8')).toBe('{"version":2,"items":[]}')
+    expect(await isServiceArchive(out)).toBe(false)
+    const bad = join(dir, 'no-such-dir', 'x.wfservice')
+    const err = await writePlainServiceFile(bad, '{}').catch((e) => e)
+    expect(err).toBeInstanceOf(PartLeftError)
+    expect(err.leftover).toBeNull()
+    expect(readdirSync(dir).filter((n) => n.includes('.part-'))).toEqual([])
   })
 })
