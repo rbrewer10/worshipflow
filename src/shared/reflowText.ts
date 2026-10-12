@@ -13,13 +13,38 @@
 // slide is currently being built. See the 2026-08-05 design spec.
 import type { SectionKind, SongSection } from './types'
 
-const KNOWN_KINDS: SectionKind[] = ['verse', 'chorus', 'bridge', 'tag', 'intro', 'ending']
+// Section label words and the kind each maps to (QA B8: "Pre-Chorus",
+// "Refrain", "Interlude", "Outro"… used to be projected as lyrics).
+const LABEL_WORDS: Array<[RegExp, SectionKind]> = [
+  [/^verse$/, 'verse'],
+  [/^(chorus|refrain)$/, 'chorus'],
+  [/^pre[- ]?chorus$/, 'section'],
+  [/^bridge$/, 'bridge'],
+  [/^tag$/, 'tag'],
+  [/^intro$/, 'intro'],
+  [/^(ending|outro|coda)$/, 'ending'],
+  [/^(interlude|instrumental|vamp|turnaround|misc)$/, 'section'],
+]
+
+// One label line, tolerating the common variants: "Verse 1", "Verse 1:",
+// "[Chorus]", "(Bridge)", "CHORUS", "Bridge (x2)", "Chorus x2", "Chorus 2 (Repeat)".
+// Spacing between parts is limited so a lyric line that merely starts with the
+// word (or "chorus            99") isn't swallowed.
+const LABEL_LINE = /^[[(]?\s?([a-z]+(?:[- ]?[a-z]+)?)(?: {1,2}(\d{1,2}[a-z]?))?\s?[\])]?\s?:?(?: {0,2}\(?\s?(?:x\s?\d+|\d+\s?x|repeat(?: \d+x)?)\s?\)?)?\s?:?$/i
 
 function matchLabel(line: string): SectionKind | null {
   const trimmed = line.trim()
-  if (trimmed.length > 14) return null
-  const word = trimmed.toLowerCase().replace(/\s*\d+\s*$/, '')
-  return KNOWN_KINDS.find((k) => word === k) ?? null
+  if (!trimmed || trimmed.length > 26) return null
+  const m = trimmed.match(LABEL_LINE)
+  if (!m) return null
+  const word = m[1].toLowerCase()
+  for (const [re, kind] of LABEL_WORDS) if (re.test(word)) return kind
+  return null
+}
+
+/** True when a line is a section label ("Verse 1", "[Chorus]", "Pre-Chorus:"…). */
+export function isSectionLabel(line: string): boolean {
+  return matchLabel(line) !== null
 }
 
 function trimBlankEdges(lines: string[]): string[] {

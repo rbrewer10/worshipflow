@@ -10,6 +10,7 @@ import SaveStatusBadge from './SaveStatusBadge'
 import Modal from './Modal'
 import { AnnouncementLayer } from './Output'
 import { ANNOUNCEMENT_ICON_COMPONENTS, ANNOUNCEMENT_ICON_LABELS, resolveAnnouncementIcon } from './announcementIcons'
+import { localDateString } from '../../shared/localDate'
 
 // Live preview has no per-announcement theme override to draw on (unlike
 // slides, which can carry style.colors) — announcements always render over
@@ -52,7 +53,7 @@ export default function AnnouncementEditor({ id, onSaved }: { id: number; onSave
     })
   }
 
-  const expired = announcementExpired(a, new Date().toISOString().slice(0, 10))
+  const expired = announcementExpired(a, localDateString())
 
   const summary = ((): string => {
     if (a.frequency === 'once') return a.startDate ? `One time on ${a.startDate}` : 'One time (pick a date)'

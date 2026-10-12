@@ -30,6 +30,7 @@ import { announcementMatchesDate, announcementExpired } from '../shared/announce
 import { relocateStoredPath } from '../shared/pathRelocation'
 import { splitLyricLines } from '../shared/lyrics'
 import type { ZoneSlide } from '../shared/zoneSlides'
+import { localDateString } from '../shared/localDate'
 
 let db: Database
 let dbPath = ''
@@ -785,7 +786,7 @@ function fmtSeconds(s: number): string {
 }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
+  return localDateString()
 }
 
 function rowToAnnouncement(r: {

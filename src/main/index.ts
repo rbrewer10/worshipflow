@@ -18,7 +18,8 @@ import type { SceneConfig } from '../shared/zoneScenes'
 import { parseServiceControlModeMapping, validateServiceControlModeMapping } from '../shared/serviceControlModes'
 import type { ServiceControlModeMapping } from '../shared/serviceControlModes'
 import { parseZoneTrackAssignment, validateZoneTrackAssignment } from '../shared/zoneTrack'
-import { parseReferenceList, formatReferenceList, subReference } from '../shared/scriptureRefs'
+import { parseReferenceList, formatReferenceList, rangeReference, verseLines, deckVerseText } from '../shared/scriptureRefs'
+import { normalizeReference } from '../shared/scriptureParse'
 import { reflowSlideTexts } from '../shared/reflowText'
 import { chunkVerses } from '../shared/chunkText'
 import type { ZoneTrackAssignment } from '../shared/zoneTrack'
@@ -1525,7 +1526,8 @@ async function loadDeckOnto(track: TrackId, item: ServiceItem, generation: numbe
       // The await may have let something newer load onto this track.
       if (tracks[track].loadGeneration !== generation) return true
       if (result.ok && result.verses) {
-        tracks[track].deckScripture.set(`${i}:${zoneId}`, result.verses.map((v) => v.text).join(' '))
+        // Numbered, with chapter marks (QA B5-N5); a one-slide, one-verse reading stays plain.
+        tracks[track].deckScripture.set(`${i}:${zoneId}`, deckVerseText(result.verses, { alone: slides.length === 1 }))
       } else {
         logWarn(`[deck] scripture lookup failed for "${slot.reference}" on slide ${i + 1} zone ${zoneId}`)
       }
@@ -1598,20 +1600,28 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
 // Fetch a non-KJV translation from the free bible-api.com (no key). Falls back
 // to bundled offline KJV if there's no internet or the lookup fails.
 async function fetchScripture(reference: string, translation: BibleTranslation): Promise<ScriptureResult> {
+  // Read the reference with the same grammar as KJV first (QA B4-N1): a
+  // reference KJV can't address fails the same way online, without a network
+  // round trip, and the API gets the canonical form ("Mark 4:35-41", never an
+  // en dash or "Psalm 23, 24").
+  const kjv = lookupScripture(reference)
+  if (!kjv.ok && !/^Internal error/.test(kjv.error ?? '')) return kjv
+  const query = kjv.ok ? (kjv.reference ?? reference) : normalizeReference(reference)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 4000)
   try {
-    const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${translation}`
+    const url = `https://bible-api.com/${encodeURIComponent(query)}?translation=${translation}`
     const res = await fetch(url, { signal: controller.signal })
     clearTimeout(timeout)
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = (await res.json()) as { reference?: string; verses?: { verse: number; text: string }[] }
+    const data = (await res.json()) as { reference?: string; verses?: { verse: number; chapter?: number; text: string }[] }
     if (!data.verses || data.verses.length === 0) throw new Error('no verses')
     return {
       ok: true,
-      reference: data.reference ?? reference,
-      verses: data.verses.map((v) => ({ n: v.verse, text: v.text.replace(/\s+/g, ' ').trim() }))
+      reference: data.reference ?? query,
+      book: kjv.ok ? kjv.book : undefined,
+      verses: data.verses.map((v) => ({ n: v.verse, ...(typeof v.chapter === 'number' ? { c: v.chapter } : {}), text: v.text.replace(/\s+/g, ' ').trim() }))
     }
   } catch (err) {
     clearTimeout(timeout)
@@ -1641,28 +1651,36 @@ async function doLoadScripture(track: TrackId, reference: string, background?: s
   const lines: string[] = []
   let resolvedTitle: string | null = null
   let sawFallback = false
+  const missed: string[] = []
   for (const ref of refs) {
     const result = bibleTranslation === 'kjv'
       ? lookupScripture(ref)
       : await fetchScripture(ref, bibleTranslation)
     if (!result.ok || !result.verses?.length) {
       logWarn(`[scripture] lookup failed for reference="${ref}" translation=${bibleTranslation}`)
+      missed.push(ref)
       continue
     }
     if (result.usedFallback) sawFallback = true
     if (!resolvedTitle) resolvedTitle = result.reference ?? ref
-    lines.push(
-      ...(result.verses.length === 1
-        ? [result.verses[0].text]
-        : result.verses.map((v) => `${v.n}  ${v.text}`))
-    )
+    lines.push(...verseLines(result.verses))
   }
   // Only a reading where NOTHING resolved is a failure; one bad reference among
   // several still shows the passages either side of it.
-  if (!lines.length) return false
+  if (!lines.length) {
+    // QA B4-N1: this used to return silently — Go Live did nothing, no toast.
+    // Not for a superseded load (the operator has already moved on).
+    if (tracks[track].loadGeneration === generation) {
+      notifyOperator(`Couldn't find “${reference}” — nothing went live. Fix the reference in Build service (e.g. "John 3:16-18").`, 'warn')
+    }
+    return false
+  }
   if (tracks[track].loadGeneration !== generation) {
     logWarn(`[scripture] discarding stale lookup for reference="${reference}" — track "${track}" moved on while fetching`)
     return false
+  }
+  if (missed.length) {
+    notifyOperator(`Skipped ${missed.map((r) => `“${r}”`).join(', ')} — couldn't find ${missed.length === 1 ? 'that passage' : 'those passages'}. The rest of the reading is live.`, 'warn')
   }
   if (sawFallback) {
     notifyOperator(`Online lookup failed — showing KJV for "${reference}"`, 'warn')
@@ -1846,11 +1864,7 @@ async function computeItemSourceSlides(item: ServiceItem): Promise<string[]> {
     for (const ref of refs) {
       const result = bibleTranslation === 'kjv' ? lookupScripture(ref) : await fetchScripture(ref, bibleTranslation)
       if (!result.ok || !result.verses?.length) continue
-      lines.push(
-        ...(result.verses.length === 1
-          ? [result.verses[0].text]
-          : result.verses.map((v) => `${v.n}  ${v.text}`))
-      )
+      lines.push(...verseLines(result.verses))
     }
     return lines
   }
@@ -3660,9 +3674,7 @@ ipcMain.handle('wf:scripture:chunkRefs', (_e, reference: string): string[] => {
   if (!ref) return []
   const result = lookupScripture(ref)
   if (!result.ok || !result.verses?.length) return []
-  return chunkVerses(result.verses, zoneChunkBudget()).map((range) =>
-    subReference(result.reference ?? ref, range.from, range.to)
-  )
+  return chunkVerses(result.verses, zoneChunkBudget()).map((range) => rangeReference(result, ref, range))
 })
 
 ipcMain.handle('wf:scripture:validate', (_e, field: string) => {
