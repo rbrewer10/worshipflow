@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { AlertTriangle, Film, Image as ImageIcon, Upload } from 'lucide-react'
 import { notifyLocal } from '../NotifyToasts'
+import { mediaDisplayName } from '../../../shared/mediaName'
 
 interface ImageEditorProps {
   imagePath: string
@@ -31,7 +32,7 @@ export const ImageEditor = memo(function ImageEditor({ imagePath, onPathChange, 
             ? <Film size={14} className="shrink-0 text-content-secondary" />
             : <ImageIcon size={14} className="shrink-0 text-content-secondary" />}
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-content-secondary" title={imagePath}>
-            {imagePath.split(/[/\\]/).pop()}
+            {mediaDisplayName(imagePath)}
           </span>
         </div>
       ) : (

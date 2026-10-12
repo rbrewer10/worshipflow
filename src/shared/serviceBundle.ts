@@ -394,6 +394,32 @@ export interface ImportSummary {
   mediaRestored?: number
   /** Carried files left out because their bytes aren't a picture/video. */
   mediaRefused?: string[]
+  /** Pictures/videos on a network share (\\\\server\\…) — never carried or probed (QA B12-N6). */
+  networkMedia?: string[]
+}
+
+/**
+ * QA B12-N6: what the operator is told about media after an import — each
+ * file once, in one bucket: refused (bytes aren't a picture/video), on a
+ * network share (skipped, not probed), or not on this computer nor in the file.
+ * Names are base names, deduplicated.
+ */
+export function importMediaProblems(
+  paths: readonly string[],
+  refusedPaths: readonly string[],
+  isNetwork: (p: string) => boolean,
+  exists: (p: string) => boolean
+): { missing: string[]; network: string[] } {
+  const base = (p: string): string => p.split(/[\\/]/).pop() ?? p
+  const refused = new Set(refusedPaths)
+  const missing = new Set<string>()
+  const network = new Set<string>()
+  for (const p of new Set(paths)) {
+    if (refused.has(p)) continue
+    if (isNetwork(p)) network.add(base(p))
+    else if (!exists(p)) missing.add(base(p))
+  }
+  return { missing: [...missing], network: [...network] }
 }
 
 /** One short paragraph for the operator. */
@@ -411,5 +437,6 @@ export function describeImport(s: ImportSummary): string {
   if (s.mediaRestored) parts.push(`${s.mediaRestored} picture/video file${s.mediaRestored === 1 ? '' : 's'} copied onto this computer.`)
   if (s.mediaRefused?.length) parts.push(`Left out ${s.mediaRefused.length} file${s.mediaRefused.length === 1 ? '' : 's'} that ${s.mediaRefused.length === 1 ? 'isn’t a real picture or video' : 'aren’t real pictures or videos'}: ${s.mediaRefused.join(', ')}.`)
   if (s.missingMedia.length) parts.push(`${s.missingMedia.length} picture/video file${s.missingMedia.length === 1 ? ' isn’t' : 's aren’t'} on this computer or in the file: ${s.missingMedia.map((p) => p.split(/[\\/]/).pop()).join(', ')}.`)
+  if (s.networkMedia?.length) parts.push(`Skipped ${s.networkMedia.length} file${s.networkMedia.length === 1 ? '' : 's'} on a network share (not carried in service files — copy ${s.networkMedia.length === 1 ? 'it' : 'them'} onto this computer and pick again): ${s.networkMedia.join(', ')}.`)
   return parts.join(' ')
 }

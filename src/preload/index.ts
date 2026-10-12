@@ -443,6 +443,12 @@ const wf = {
     ipcRenderer.invoke('wf:services:export', serviceId),
   serviceImportFile: (): Promise<ServiceImportResult> =>
     ipcRenderer.invoke('wf:services:import'),
+  /** QA B12-N2: a service file double-clicked in Explorer was imported (or failed). */
+  onServiceFileOpened: (cb: (res: ServiceImportResult) => void): (() => void) => {
+    const handler = (_e: unknown, res: ServiceImportResult): void => cb(res)
+    ipcRenderer.on('wf:services:opened', handler)
+    return () => ipcRenderer.removeListener('wf:services:opened', handler)
+  },
   serviceImportPlan: (): Promise<{
     canceled: boolean
     serviceId: number | null

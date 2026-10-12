@@ -479,10 +479,10 @@ export interface ServiceExportResult {
   canceled: boolean
   filePath?: string
   error?: string
-  /** Pictures/videos carried in the file (Ryan's decision, Oct 2026). */
-  mediaCount?: number
-  /** Base names of referenced media that couldn't be carried (not found, too big, on a network share). */
-  missingMedia?: string[]
+  /** What was saved, what's in the file and what isn't, and why (QA B12-N2/N6). */
+  summary?: string
+  /** Something the service uses isn't in the file. */
+  warn?: boolean
 }
 
 export interface ServiceImportResult {

@@ -571,6 +571,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
     multiviewOpen: noop,
     serviceExport: async (): Promise<{ canceled: boolean }> => ({ canceled: true }),
     serviceImportFile: async (): Promise<import('../../shared/types').ServiceImportResult> => ({ canceled: true, serviceId: null }),
+    onServiceFileOpened: (): (() => void) => () => undefined,
     serviceImportPlan: async (): Promise<{ canceled: boolean; serviceId: number | null; matched: number; missing: string[] }> => ({ canceled: true, serviceId: null, matched: 0, missing: [] }),
 
     templatesList: async (): Promise<any[]> => [],

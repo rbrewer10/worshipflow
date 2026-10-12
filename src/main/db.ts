@@ -1,5 +1,6 @@
 import { app, safeStorage } from 'electron'
 import { normalizeCcli, titleMatchIsSameSong } from '../shared/songMatch'
+import { mediaDisplayName } from '../shared/mediaName'
 import { join, dirname } from 'path'
 import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, statSync } from 'fs'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
@@ -1090,7 +1091,8 @@ function itemTitle(type: string, refId: number | null, payload: Record<string, u
   if (type === 'sermon') return (payload.title as string) || 'Sermon'
   if (type === 'image') {
     const p = (payload.path as string) || ''
-    return p.split(/[/\\]/).pop() || 'Image'
+    // QA B12 watch item: show the original name, not our stored copy's hash.
+    return mediaDisplayName(p) || 'Image'
   }
   if (type === 'header') return (payload.label as string) || 'Section'
   if (type === 'placeholder') return (payload.label as string) || 'Placeholder — TBD'

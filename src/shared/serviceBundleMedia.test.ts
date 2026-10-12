@@ -55,20 +55,48 @@ describe('.wfservice media manifest (v3)', () => {
 describe('.wfservice media wiring in main (source guard)', () => {
   const main = readFileSync(join(__dirname, '..', 'main', 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
   const handler = (name: string): string => { const at = main.indexOf(`ipcMain.handle('${name}'`); return main.slice(at, main.indexOf('\n})\n', at)) }
-  it('export plans the media from a deep walk and streams a tar when there is any (plain JSON otherwise), reporting what was not carried', () => {
+  it('export plans the media from a deep walk; .wfbundle is a tar, .wfservice is always plain JSON (QA B12-N2), and says what was not carried', () => {
     const fn = handler('wf:services:export')
     expect(fn).toMatch(/planExportMedia\(bundleMediaPaths\(bundle, \(p\) => hasMediaExtension\(p\)\)\)/)
-    expect(fn).toMatch(/if \(plan\.entries\.length\) await writeServiceArchive\(filePath, json, plan\.entries\)\n\s*else writeFileSync\(filePath, json, 'utf-8'\)/)
-    expect(fn).toMatch(/missingMedia: plan\.missing/)
+    expect(fn.indexOf('planExportMedia(')).toBeLessThan(fn.indexOf('showSaveDialog('))
+    expect(fn).toMatch(/showSaveDialog\(\{ title: 'Export Service', \.\.\.exportDialogOptions\(svc\.name, hasMedia\) \}\)/)
+    expect(fn).toMatch(/chooseExportFormat\(picked\.filePath, hasMedia\)/)
+    expect(fn).toMatch(/if \(format === 'wfbundle'\) await writeServiceArchive\(filePath, JSON\.stringify\(\{ \.\.\.bundle, media: plan\.media \}, null, 2\), plan\.entries\)\n\s*else await writePlainServiceFile\(filePath, JSON\.stringify\(\{ \.\.\.bundle, version: PLAIN_SERVICE_VERSION \}, null, 2\)\)/)
+    expect(fn).toMatch(/describeExport\(/)
   })
   it('import detects a tar, restores media before creating anything, rewrites references and undoes copies on failure', () => {
-    const fn = handler('wf:services:import')
-    expect(fn).toMatch(/if \(await isServiceArchive\(filePaths\[0\]\)\)/)
+    // the dialog accepts both kinds and hands the path to importServiceFile (also used for Explorer double-clicks, QA B12-N2)
+    expect(handler('wf:services:import')).toMatch(/filters: IMPORT_FILTERS[\s\S]*return importServiceFile\(filePaths\[0\]\)/)
+    const at = main.indexOf('async function importServiceFile(filePath: string)')
+    expect(at).toBeGreaterThan(-1)
+    const fn = main.slice(at, main.indexOf('\n}\n', at))
+    expect(fn).toMatch(/if \(await isServiceArchive\(filePath\)\)/)
     expect(fn.indexOf('restoreArchiveMedia(')).toBeGreaterThan(-1)
     expect(fn.indexOf('restoreArchiveMedia(')).toBeLessThan(fn.indexOf('createService('))
     expect(fn).toMatch(/rewriteMediaPaths\(bundle\.items, restored\.map\)/)
     expect(fn).toMatch(/rewriteMediaPaths\(bundle\.announcements, restored\.map\)/)
     expect(fn).toMatch(/for \(const f of restored\.created\) \{ try \{ unlinkSync\(f\) \}/)
     expect(fn).toMatch(/mediaRestored: restored\.map\.size/)
+    expect(fn).toMatch(/importMediaProblems\(/)
+  })
+  it('a double-clicked service file (argv / second instance) is imported once the operator window has loaded (QA B12-N2)', () => {
+    expect(main).toMatch(/let pendingShellOpen: string \| null = serviceFileFromArgv\(process\.argv\)/)
+    expect(main).toMatch(/app\.on\('second-instance', \(_e, argv\) => \{[\s\S]*?openServiceFileFromShell\(serviceFileFromArgv\(argv\)\)/)
+    expect(main).toMatch(/void flushShellOpen\(\) \/\/ a service file double-clicked/)
+    expect(main).toMatch(/operatorWin\.webContents\.send\('wf:services:opened', res\)/)
+  })
+})
+
+// QA B12-N6: import lists each media problem once and mentions skipped network files.
+describe('import media problems', () => {
+  it('buckets each file once: refused, network share, missing', async () => {
+    const { importMediaProblems, describeImport } = await import('./serviceBundle')
+    const paths = ['C:\\a\\fake.png', 'C:\\a\\fake.png', '\\\\booth\\m\\loop.mp4', '\\\\booth\\m\\loop.mp4', 'C:\\a\\gone.jpg', 'D:\\b\\gone.jpg', 'C:\\a\\here.png']
+    const r = importMediaProblems(paths, ['C:\\a\\fake.png'], (p) => p.startsWith('\\\\'), (p) => p.endsWith('here.png'))
+    expect(r).toEqual({ missing: ['gone.jpg'], network: ['loop.mp4'] })
+    const text = describeImport({ serviceName: 'S', renamedFrom: null, items: 1, skipped: [], songsAdded: 0, songsMatched: 0, songsUpdated: [], songsKept: [], songsCopied: [], missingMedia: r.missing, networkMedia: r.network, mediaRefused: ['fake.png'] })
+    expect(text.match(/fake\.png/g)).toHaveLength(1)
+    expect(text.match(/gone\.jpg/g)).toHaveLength(1)
+    expect(text).toMatch(/Skipped 1 file on a network share .*: loop\.mp4\./)
   })
 })
