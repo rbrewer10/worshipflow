@@ -524,6 +524,7 @@ export function installBrowserWfMock(target: Window | { wf?: Window['wf'] }): vo
       Object.assign(mockPins, look.pins)
     },
     reloadProjector: async (): Promise<number> => 1,
+    onOutputResumeVideo: (): (() => void) => () => undefined,
     zoneSafetyReset: async (): Promise<void> => {
       mockPins[1] = { kind: 'mode', mode: 'logo' }
       mockPins[2] = { kind: 'mode', mode: 'logo' }

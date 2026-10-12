@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { VideoResume } from '../shared/videoResume'
 import type {
   Intent,
   LiveState,
@@ -390,6 +391,12 @@ const wf = {
   zoneSafetyReset: (): Promise<void> => ipcRenderer.invoke('wf:zone:safetyReset'),
   /** Reload the projector output window(s); resolves to how many were reloaded. */
   reloadProjector: (): Promise<number> => ipcRenderer.invoke('wf:output:reload'),
+  /** QA B12-N5: after a Reload projector, where the background video was (output windows only). */
+  onOutputResumeVideo: (cb: (r: VideoResume) => void): (() => void) => {
+    const handler = (_e: unknown, r: VideoResume): void => cb(r)
+    ipcRenderer.on('wf:output:resumeVideo', handler)
+    return () => ipcRenderer.removeListener('wf:output:resumeVideo', handler)
+  },
   zoneGetStates: (): Promise<Record<ZoneId, ZoneState>> =>
     ipcRenderer.invoke('wf:zone:getStates'),
   zoneGetIp: (): Promise<string> =>

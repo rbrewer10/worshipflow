@@ -21,15 +21,15 @@ const body = (src: string, sig: string): string => {
 
 describe('Reload projector', () => {
   it('main reloads every live output window and reports how many', () => {
-    const fn = body(main, 'function reloadProjectorWindows(): number {')
-    expect(fn).toMatch(/for \(const w of outputWins\.values\(\)\)/)
+    const fn = body(main, 'async function reloadProjectorWindows(): Promise<number> {')
+    expect(fn).toMatch(/for \(const w of \[\.\.\.outputWins\.values\(\)\]\)/)
     expect(fn).toMatch(/if \(w\.isDestroyed\(\)\) continue/)
     expect(fn).toMatch(/w\.webContents\.reloadIgnoringCache\(\)/)
     expect(fn).toMatch(/return reloaded/)
-    expect(main).toContain("ipcMain.handle('wf:output:reload', (): number => reloadProjectorWindows())")
+    expect(main).toContain("ipcMain.handle('wf:output:reload', (): Promise<number> => reloadProjectorWindows())")
   })
   it('it touches no live state (no broadcast, no track/mode change)', () => {
-    const fn = body(main, 'function reloadProjectorWindows(): number {')
+    const fn = body(main, 'async function reloadProjectorWindows(): Promise<number> {')
     expect(fn).not.toMatch(/tracks\[|\.mode =|broadcast\(|processIntent|clearCountdown/)
   })
   it('a reloaded output is sent the current state as soon as it has loaded', () => {

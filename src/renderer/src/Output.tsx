@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { resumeTime, RESUME_MAX_AGE_MS, type VideoResume } from '../../shared/videoResume'
 import { LiveCallViewer } from './livecall/LiveCallViewer'
 import type { LiveState, Mode, ThemeColors } from '../../shared/types'
 import { getTheme, resolveColors, staticBackgroundCss, FONT_FAMILY } from '../../shared/themes'
@@ -139,6 +140,19 @@ export function useLiveModel(): AudienceModel {
 // (cqw/cqh) and declares itself a size container, so it renders identically whether
 // it fills a whole output window or a small preview card. Holds no authority — the
 // model tells it what to show.
+// QA B12-N5: the background video position handed back after a Reload projector.
+let pendingVideoResume: VideoResume | null = null
+function applyVideoResume(v: HTMLVideoElement, src: string): void {
+  const r = pendingVideoResume
+  if (!r || v.readyState < 1) return
+  pendingVideoResume = null
+  if (r.src !== src || Date.now() - r.capturedAt > RESUME_MAX_AGE_MS) return
+  try {
+    v.currentTime = resumeTime(r, Date.now(), v.duration)
+    if (r.paused) v.pause()
+  } catch { /* a seek that fails just plays from where it is */ }
+}
+
 export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element {
   const {
     mode, layers, bgSrc, clockLine, fontScale, tickerText, overlayTicker, textHidden, bgHidden, bgFit, bgMotion,
@@ -148,6 +162,15 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
   const [bgReady, setBgReady] = useState(false)
   const [logoImg, setLogoImg] = useState<string | null>(null)
   const churchName = useChurchName()
+
+  // QA B12-N5: after Reload projector, put the background video back where it was.
+  const bgVideoRef = useRef<HTMLVideoElement | null>(null)
+  const bgSrcRef = useRef(bgSrc)
+  bgSrcRef.current = bgSrc
+  useEffect(() => window.wf.onOutputResumeVideo?.((r) => {
+    pendingVideoResume = r
+    if (bgVideoRef.current && bgSrcRef.current) applyVideoResume(bgVideoRef.current, bgSrcRef.current)
+  }), [])
 
   // Reset ready-state when source changes so gradient shows while new video loads.
   useEffect(() => { setBgReady(false) }, [bgSrc])
@@ -217,6 +240,9 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
         isVideo(bgSrc) ? (
           <video
             key={bgSrc}
+            ref={bgVideoRef}
+            data-wf-bg=""
+            data-wf-src={bgSrc}
             className="absolute inset-0 h-full w-full transition-opacity duration-700"
             style={{ opacity: showVideo ? 1 : 0, visibility: bgVisibility, objectFit: bgFit }}
             src={toAssetUrl(bgSrc)}
@@ -226,6 +252,7 @@ export function AudienceStage({ model }: { model: AudienceModel }): JSX.Element 
             playsInline
             onCanPlay={() => setBgReady(true)}
             onError={() => setBgReady(false)}
+            onLoadedMetadata={(e) => applyVideoResume(e.currentTarget, bgSrc)}
           />
         ) : (
           <div
