@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp, closeApp, operatorWindow, outputWindow, completeFirstRun, visibleText } from './electronApp'
-import { liveState, goToLiveControl, goLive, pressKey, openServedPage } from './qaHelpers'
+import { liveState, goToLiveControl, goLive, pressKey, openServedPage, stubSave, stubOpen, saveFromBuild, tarEntries } from './qaHelpers'
 
 // Ryan's decisions on Church Tech's open questions (Oct 2026), one test each:
 //  #1 Prev during a countdown does nothing            (PR fix/countdown-prev-stay)
@@ -189,14 +189,16 @@ test('#3 Reload projector: the output reloads and shows what is live now — no 
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5f0000000049454e44ae426082', 'hex')
 const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom', 'latin1'), Buffer.alloc(4096, 1)])
 
-test('#2 a service file carries its pictures and videos (.wfbundle): export, remove the originals, import — the service is complete', async () => {
-  test.setTimeout(120_000)
+test('#2 a service file carries its pictures and videos (.wfbundle): export, remove the originals, import — the service is complete, with the pictures as they were when saved', async () => {
+  test.setTimeout(150_000)
   const { app, userDataDir } = await launchApp()
   const media = mkdtempSync(join(tmpdir(), 'wf-media-'))
   try {
     const op = await operatorWindow(app)
     await completeFirstRun(op, { sample: false })
-    const cross = join(media, 'cross.png'); writeFileSync(cross, PNG)
+    const OLD_PNG = Buffer.concat([PNG, Buffer.from('this week')])
+    const NEW_PNG = Buffer.concat([PNG, Buffer.from('next week')]) // same size, another picture
+    const cross = join(media, 'cross.png'); writeFileSync(cross, OLD_PNG)
     const loop = join(media, 'loop.mp4'); writeFileSync(loop, MP4)
     const svcId: number = await op.evaluate(async ({ cross, loop }) => {
       const wf = (window as any).wf
@@ -205,41 +207,55 @@ test('#2 a service file carries its pictures and videos (.wfbundle): export, rem
       await wf.serviceAddItem(id, { type: 'text', payload: { title: 'Welcome', body: 'Welcome home', background: loop } })
       return id
     }, { cross, loop })
+    // saved for this Sunday; then the picture is replaced in place (same name, same size) and saved again for next week
     const file = join(media, 'USB Sunday.wfbundle') // QA B12-N2: a service with media is a .wfbundle
-    await app.evaluate(({ dialog }, p) => { (dialog as any).showSaveDialog = async () => ({ canceled: false, filePath: p }) }, file)
-    const exp = await op.evaluate((id) => (window as any).wf.serviceExport(id), svcId)
-    expect(exp.error).toBeUndefined()
-    expect(exp.summary).toMatch(/with 2 picture\/video files/)
-    expect(exp.warn).toBe(false)
-    expect(readFileSync(file).toString('latin1', 257, 262)).toBe('ustar')
+    await stubSave(app, file)
+    expect((await op.evaluate((id) => (window as any).wf.serviceExport(id), svcId)).error).toBeUndefined()
+    expect(tarEntries(file).slice(1).map((e) => e.size).sort((x, y) => x - y)).toEqual([OLD_PNG.length, MP4.length])
+    writeFileSync(cross, NEW_PNG)
+    const next = join(media, 'USB Sunday next.wfbundle')
+    await stubSave(app, next)
+    expect((await op.evaluate((id) => (window as any).wf.serviceExport(id), svcId)).error).toBeUndefined()
+    // saved from Build like the operator does: the toast says what's in the file
+    await stubSave(app, join(media, 'USB Sunday copy.wfbundle'))
+    const said = await saveFromBuild(op, svcId)
+    expect(said).toMatch(/Saved USB Sunday copy\.wfbundle with 2 picture\/video files/)
+    expect(said).not.toMatch(/not found|weren’t found|wasn’t found|Not in the file/)
 
     // "another PC": the originals and any copies are gone
     rmSync(cross); rmSync(loop)
     const imported = join(userDataDir, 'userData', 'imported-media')
     if (existsSync(imported)) for (const f of readdirSync(imported)) rmSync(join(imported, f), { force: true })
 
-    await app.evaluate(({ dialog }, p) => { (dialog as any).showOpenDialog = async () => ({ canceled: false, filePaths: [p] }) }, file)
-    const res = await op.evaluate(() => (window as any).wf.serviceImportFile())
-    expect(res.error).toBeUndefined()
-    expect(res.summary).toMatch(/2 picture\/video files copied onto this computer/)
-    expect(res.summary).not.toMatch(/isn’t on this computer|aren’t on this computer/)
-    const items: any[] = await op.evaluate(async (id) => (await (window as any).wf.serviceGet(id)).items, res.serviceId)
-    const img = items.find((i) => i.type === 'image')!.payload.path as string
-    const bg = items.find((i) => i.type === 'text')!.payload.background as string
-    for (const [p, bytes] of [[img, PNG], [bg, MP4]] as const) {
+    const open = async (p: string): Promise<{ img: string; bg: string; summary: string }> => {
+      await stubOpen(app, p)
+      const res = await op.evaluate(() => (window as any).wf.serviceImportFile())
+      expect(res.error, p).toBeUndefined()
+      const items: any[] = await op.evaluate(async (id) => (await (window as any).wf.serviceGet(id)).items, res.serviceId)
+      return { img: items.find((i) => i.type === 'image')!.payload.path, bg: items.find((i) => i.type === 'text')!.payload.background, summary: res.summary }
+    }
+    const first = await open(file)
+    expect(first.summary).toMatch(/2 picture\/video files copied onto this computer/)
+    expect(first.summary).not.toMatch(/isn’t on this computer|aren’t on this computer/)
+    for (const [p, bytes] of [[first.img, OLD_PNG], [first.bg, MP4]] as const) {
       expect(p.startsWith(imported)).toBe(true)
       expect(readFileSync(p).equals(bytes)).toBe(true)
     }
+    // next week's file shows next week's picture — never the copy left from the earlier file
+    const second = await open(next)
+    expect(readFileSync(second.img).equals(NEW_PNG), 'the replaced picture, not the stale copy').toBe(true)
+    expect(readFileSync(first.img).equals(OLD_PNG), 'the first service keeps its own picture').toBe(true)
+    expect(readFileSync(second.bg).equals(MP4)).toBe(true)
 
-    // and a file missing at export time is named in the warning, not silently dropped
-    const gone = await op.evaluate(async (p) => {
+    // and a file missing at save time is named in the warning, with the reason, not silently dropped
+    const goneId: number = await op.evaluate(async (p) => {
       const wf = (window as any).wf
       const id = await wf.serviceCreate('Missing media', '2026-10-11')
       await wf.serviceAddItem(id, { type: 'image', payload: { path: p } })
-      return wf.serviceExport(id)
+      return id
     }, join(media, 'not-there.jpg'))
-    expect(gone.summary).toMatch(/Not in the file: not-there\.jpg \(not found on this computer\)/)
-    expect(gone.warn).toBe(true)
+    await stubSave(app, join(media, 'Missing media.wfbundle'))
+    expect(await saveFromBuild(op, goneId)).toMatch(/not-there\.jpg \(not found on this computer\)/)
   } finally {
     rmSync(media, { recursive: true, force: true })
     await closeApp(app, userDataDir)
