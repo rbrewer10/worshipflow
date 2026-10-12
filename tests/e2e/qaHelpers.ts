@@ -1,6 +1,6 @@
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, type LaunchedApp } from './electronApp'
 
@@ -186,3 +186,38 @@ export async function crashRenderer(app: ElectronApplication, which: 'output' | 
     else win.webContents.forcefullyCrashRenderer()
   }, which)
 }
+
+// QA retest 13 (R2): behaviour-level helpers — what's on disk and what the operator is told,
+// never result fields or DOM hooks only newer builds have.
+/** Entries of a ustar file, read straight from disk. */
+export function tarEntries(p: string): Array<{ name: string; size: number }> {
+  const buf = readFileSync(p)
+  const out: Array<{ name: string; size: number }> = []
+  for (let off = 0; off + 512 <= buf.length;) {
+    const h = buf.subarray(off, off + 512)
+    if (h.every((b) => b === 0)) break
+    const field = (a: number, n: number): string => h.toString('latin1', a, a + n).split('\0')[0]
+    const size = parseInt(field(124, 12).trim() || '0', 8)
+    out.push({ name: field(0, 100), size })
+    off += 512 + Math.ceil(size / 512) * 512
+  }
+  return out
+}
+
+export const stubSave = (app: ElectronApplication, p: string): Promise<void> => app.evaluate(({ dialog }, p) => { (dialog as any).showSaveDialog = async () => ({ canceled: false, filePath: p }) }, p)
+export const stubOpen = (app: ElectronApplication, p: string): Promise<void> => app.evaluate(({ dialog }, p) => { (dialog as any).showOpenDialog = async () => ({ canceled: false, filePaths: [p] }) }, p)
+export const toasts = (op: Page): Promise<string[]> =>
+  op.locator('div.fixed.inset-x-0.top-3 > div, [role=status], [role=alert]').allInnerTexts().then((a) => a.map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean))
+
+/** Open the service in Build, press "Save to file" like the operator, and return the toast it shows. */
+export async function saveFromBuild(op: Page, serviceId: number): Promise<string> {
+  await op.evaluate((id) => (window as any).wf.setActiveService(id), serviceId)
+  await op.reload()
+  await op.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 20_000 })
+  await op.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Build service' }).first().click()
+  await op.getByRole('button', { name: 'Save service to file' }).click()
+  let said = ''
+  await expect.poll(async () => { said = (await toasts(op)).find((t) => /Saved |Couldn/.test(t)) ?? ''; return said }, { timeout: 15_000 }).not.toBe('')
+  return said
+}
+

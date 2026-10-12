@@ -23,6 +23,8 @@ export interface LaunchOptions {
   /** Re-use an existing throwaway root (simulates relaunching on the same PC). */
   root?: string
   env?: Record<string, string>
+  /** Extra command-line arguments after the app's own (e.g. a service file, as Explorer passes it — QA B13-N2). */
+  args?: string[]
 }
 
 const MAIN_JS = join(__dirname, '..', '..', 'out', 'main', 'index.js')
@@ -33,6 +35,7 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<LaunchedApp> 
   const args = [MAIN_JS, `--user-data-dir=${profileDir}`]
   // GitHub's Linux runners (and most containers) have no usable setuid sandbox.
   if (process.platform === 'linux') args.push('--no-sandbox')
+  args.push(...(opts.args ?? []))
   const app = await electron.launch({
     executablePath: require('electron') as unknown as string,
     args,
