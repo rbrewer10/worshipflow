@@ -118,7 +118,7 @@ import {
   rewriteStoredMediaPaths,
   databaseMentions,
 } from './db'
-import { readServiceArchive, isServiceArchive, writeServiceArchive, planExportMedia, restoreArchiveMedia, type RestoredMedia } from './serviceArchive'
+import { readServiceArchive, isServiceArchive, writeServiceArchive, planExportMedia, restoreArchiveMedia, PartLeftError, type RestoredMedia } from './serviceArchive'
 import { importMediaFile, mediaProblemFor, migrateOutsidePaths, planImportedMediaCleanup, safeCleanupName, MediaImportRefused, servablePath, hasMediaExtension, isNetworkPath, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
 import {
   listBackgrounds, copyBackground, deleteBackground, openBackgroundsFolder,
@@ -3538,7 +3538,9 @@ ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<Serv
   } catch (err) {
     // e.g. the USB stick was pulled, full or read-only — tell the operator (QA B24).
     logError(`[export] .wfservice export failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
-    return { canceled: false, error: `Couldn't save the service file: ${err instanceof Error ? err.message : String(err)}` }
+    // QA B12-N7: the partial file is removed when it can be; say so when it can't (stick pulled).
+    const left = err instanceof PartLeftError && err.leftover ? ` A partial file “${err.leftover}” may be left on the drive and couldn't be removed — delete it when the drive is back.` : ''
+    return { canceled: false, error: `Couldn't save the service file: ${err instanceof Error ? err.message : String(err)}.${left}` }
   }
   if (plan.missing.length) logWarn(`[export] ${plan.missing.length} media file(s) not carried: ${plan.missing.join(', ')}`)
   logInfo(`[export] saved ${filePath} with ${plan.entries.length} media file(s)`)

@@ -4,7 +4,8 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import {
   writeServiceArchive, readServiceArchive, isServiceArchive, extractEntry, tarHeader,
-  planExportMedia, restoreArchiveMedia, bundledMediaName, MEDIA_ENTRY, SERVICE_JSON
+  planExportMedia, restoreArchiveMedia, bundledMediaName, MEDIA_ENTRY, SERVICE_JSON,
+  isTarHeader, removeStaleParts, PartLeftError
 } from './serviceArchive'
 
 // Ryan's decision (Oct 2026): a .wfservice carries every picture, background
@@ -137,5 +138,38 @@ describe('import: restoring carried media', () => {
   it('generated names are filesystem-safe and differ for different source paths', () => {
     expect(bundledMediaName('C:\\a\\Cross: Easter?.JPG', 10)).toMatch(/^Cross- Easter--[0-9a-f]{10}\.jpg$/)
     expect(bundledMediaName('C:\\a\\cross.jpg', 10)).not.toBe(bundledMediaName('C:\\b\\cross.jpg', 10))
+  })
+})
+
+describe('QA B12-N7: archive detection and partial files', () => {
+  it('plain JSON with "ustar" at byte 257 is still JSON (the header checksum must be valid too)', async () => {
+    const json = JSON.stringify({ version: 2, name: 'x'.repeat(240), note: 'ustar is a word in this file', items: [] })
+    const pad = 257 - json.indexOf('ustar')
+    const text = JSON.stringify({ version: 2, name: 'x'.repeat(240 + pad), note: 'ustar is a word in this file', items: [] })
+    expect(Buffer.from(text).toString('latin1', 257, 262)).toBe('ustar')
+    const f = join(dir, 'odd.wfservice'); writeFileSync(f, text)
+    expect(await isServiceArchive(f)).toBe(false)
+    // a real header still counts, and a broken checksum doesn't
+    const h = tarHeader('service.json', 2, 0)
+    expect(isTarHeader(h)).toBe(true)
+    const bad = Buffer.from(h); bad[0] ^= 1
+    expect(isTarHeader(bad)).toBe(false)
+  })
+  it('stale partial files of ours (over 10 minutes old) are removed on the next save to that folder; fresh ones and other files stay', async () => {
+    const now = 1_800_000_000_000
+    const old = `Big.wfbundle.part-123-${now - 11 * 60_000}`
+    const oldSvc = `Big.wfservice.part-9-${now - 60 * 60_000}`
+    const fresh = `Big.wfbundle.part-123-${now - 60_000}`
+    for (const n of [old, oldSvc, fresh, 'notes.txt.part-1-1', 'Sunday.wfservice']) writeFileSync(join(dir, n), 'x')
+    expect((await removeStaleParts(dir, now)).sort()).toEqual([old, oldSvc].sort())
+    expect(readdirSync(dir).sort()).toEqual([fresh, 'Sunday.wfservice', 'notes.txt.part-1-1'].sort())
+  })
+  it('a failed write removes its partial file and says nothing was left; the error keeps the cause', async () => {
+    const out = join(dir, 'S.wfbundle')
+    const err = await writeServiceArchive(out, '{}', [{ src: join(dir, 'gone.png'), entry: 'media/0001-gone.png' }]).catch((e) => e)
+    expect(err).toBeInstanceOf(PartLeftError)
+    expect((err as PartLeftError).leftover).toBeNull()
+    expect(String((err as Error).message)).toMatch(/ENOENT/)
+    expect(readdirSync(dir)).toEqual([])
   })
 })

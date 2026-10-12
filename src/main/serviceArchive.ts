@@ -22,7 +22,7 @@
 import { createHash } from 'crypto'
 import { createReadStream, createWriteStream, existsSync, promises as fsp, statSync, type WriteStream } from 'fs'
 import { once } from 'events'
-import { join } from 'path'
+import { basename, dirname, join } from 'path'
 import { pipeline } from 'stream/promises'
 import { archiveEntryName, type BundleMedia } from '../shared/serviceBundle'
 import { contentMatchesExtension, hasMediaExtension, isNetworkPath, sniffMedia } from './mediaImport'
@@ -81,7 +81,8 @@ export interface ArchiveMedia {
  * reports it); a file that changes size while being copied is an error too.
  */
 export async function writeServiceArchive(destPath: string, json: string, media: readonly ArchiveMedia[]): Promise<void> {
-  const tmp = `${destPath}.part-${process.pid}-${Date.now()}`
+  await removeStaleParts(dirname(destPath))
+  const tmp = partName(destPath)
   const out = createWriteStream(tmp, { flags: 'wx' })
   const failed = new Promise<never>((_, reject) => out.once('error', reject))
   failed.catch(() => undefined)
@@ -113,18 +114,71 @@ export async function writeServiceArchive(destPath: string, json: string, media:
     await fsp.rename(tmp, destPath)
   } catch (err) {
     out.destroy()
-    await fsp.rm(tmp, { force: true }).catch(() => undefined)
-    throw err
+    // QA B12-N7: best effort — a pulled stick can't be cleaned. Say so, so the
+    // operator knows a partial file may be on it.
+    let left = false
+    await fsp.rm(tmp, { force: true }).catch(() => { left = true })
+    if (!left) left = existsSync(tmp)
+    throw new PartLeftError(err, left ? basename(tmp) : null)
   }
 }
 
-/** Does the file start with a ustar header (a media-carrying .wfservice)? */
+/** The write failed; `leftover` names a partial file that couldn't be removed. */
+export class PartLeftError extends Error {
+  readonly leftover: string | null
+  constructor(cause: unknown, leftover: string | null) {
+    super(cause instanceof Error ? cause.message : String(cause))
+    this.name = 'PartLeftError'
+    this.leftover = leftover
+    if (cause instanceof Error && cause.stack) this.stack = cause.stack
+  }
+}
+
+const PART_RE = /\.part-\d+-(\d+)$/
+const partName = (destPath: string): string => `${destPath}.part-${process.pid}-${Date.now()}`
+
+/**
+ * QA B12-N7: a stick pulled mid-export keeps its `<name>.wf….part-<pid>-<ms>`.
+ * The next export to that folder removes ours that are over 10 minutes old
+ * (never a write in flight). Best effort; never throws.
+ */
+export async function removeStaleParts(dir: string, now = Date.now(), maxAgeMs = 10 * 60_000): Promise<string[]> {
+  const removed: string[] = []
+  let names: string[]
+  try { names = await fsp.readdir(dir) } catch { return removed }
+  for (const n of names) {
+    const m = PART_RE.exec(n)
+    if (!m || !/\.(wfservice|wfbundle)\.part-/.test(n)) continue
+    if (now - Number(m[1]) < maxAgeMs) continue
+    try { await fsp.rm(join(dir, n), { force: true }); removed.push(n) } catch { /* best effort */ }
+  }
+  return removed
+}
+
+/** The checksum a ustar header block should carry (its checksum field counted as spaces). */
+function headerChecksum(h: Buffer): number {
+  let sum = 0
+  for (let i = 0; i < BLOCK; i++) sum += i >= 148 && i < 156 ? 32 : h[i]
+  return sum
+}
+
+/**
+ * Is this block a real ustar header? The magic alone isn't enough (QA B12-N7):
+ * a plain-JSON service whose bytes 257–261 happen to read "ustar" was refused
+ * as a damaged archive. A header also has to carry a valid checksum.
+ */
+export function isTarHeader(h: Buffer): boolean {
+  if (h.length < BLOCK || h.toString('latin1', 257, 262) !== 'ustar') return false
+  return parseOctal(h, 148, 8) === headerChecksum(h)
+}
+
+/** Does the file start with a ustar header (a media bundle) rather than JSON? */
 export async function isServiceArchive(path: string): Promise<boolean> {
   const fh = await fsp.open(path, 'r')
   try {
     const head = Buffer.alloc(BLOCK)
     const { bytesRead } = await fh.read(head, 0, BLOCK, 0)
-    return bytesRead === BLOCK && head.toString('latin1', 257, 262) === 'ustar'
+    return bytesRead === BLOCK && isTarHeader(head)
   } finally {
     await fh.close()
   }
@@ -155,9 +209,7 @@ export async function readServiceArchive(path: string): Promise<{ json: string; 
       if (bytesRead < BLOCK) break
       if (h.every((b) => b === 0)) break // end-of-archive
       if (h.toString('latin1', 257, 262) !== 'ustar') throw new Error('not a WorshipFlow service archive')
-      let sum = 0
-      for (let i = 0; i < BLOCK; i++) sum += i >= 148 && i < 156 ? 32 : h[i]
-      if (parseOctal(h, 148, 8) !== sum) throw new Error('the service file is damaged (bad header)')
+      if (parseOctal(h, 148, 8) !== headerChecksum(h)) throw new Error('the service file is damaged (bad header)')
       const size = parseOctal(h, 124, 12)
       if (!Number.isFinite(size) || size < 0) throw new Error('the service file is damaged (bad size)')
       const name = h.toString('utf8', 0, 100).replace(/\0.*$/s, '')
