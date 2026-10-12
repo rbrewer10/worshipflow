@@ -23,6 +23,7 @@ import { getRelay } from './livecall/useLiveCall'
 import NotifyToasts, { notifyLocal } from './NotifyToasts'
 import { hasFailedSaves } from './saveRegistry'
 import LaunchSetup from './LaunchSetup'
+import ServiceFileOpener from './ServiceFileOpener'
 
 export type View =
   | 'home' | 'live' | 'service'
@@ -199,6 +200,7 @@ function AppShell(): JSX.Element {
     return (
       <ServiceProvider>
         <NotifyToasts />
+        <ServiceFileOpener openView={null} />
         <VolunteerView onExit={() => setView('home')} />
       </ServiceProvider>
     )
@@ -206,6 +208,7 @@ function AppShell(): JSX.Element {
   return (
     <ServiceProvider>
       <NotifyToasts />
+      <ServiceFileOpener openView={view === 'live' ? null : () => setView('service')} />
       <div className="flex h-screen flex-col overflow-hidden bg-app text-content-primary">
         <TopBar view={view} setView={setView} />
         <div className="flex min-h-0 flex-1 flex-col">

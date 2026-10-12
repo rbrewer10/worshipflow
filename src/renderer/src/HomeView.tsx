@@ -6,6 +6,7 @@ import { useService } from './ServiceContext'
 import { usePreflightChecks } from './usePreflightChecks'
 import { computeServiceReadiness } from './serviceReadiness'
 import BrandMark from './BrandMark'
+import { exportServiceToFile, importServiceFromFile } from './serviceFileActions'
 
 type IconType = ComponentType<{ size?: number | string; className?: string }>
 
@@ -31,7 +32,7 @@ function greeting(): string {
 }
 
 function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
-  const { activeService } = useService()
+  const { activeService, refreshServices, selectService } = useService()
   const { checks, needsAttention } = usePreflightChecks()
   const [songs, setSongs] = useState<SongSummary[]>([])
   const hasService = activeService != null
@@ -60,11 +61,10 @@ function HomeView({ setView }: { setView: (v: View) => void }): JSX.Element {
     else if (card.action === 'multiview') window.wf.multiviewOpen()
     else if (card.action === 'stage') window.wf.stageOpen()
     else if (card.action === 'export') {
-      if (activeService) void window.wf.serviceExport(activeService.id)
+      if (activeService) void exportServiceToFile(activeService.id)
     } else if (card.action === 'import') {
-      void window.wf.serviceImportFile().then((res) => {
-        if (!res.canceled && res.serviceId != null) setView('service')
-      })
+      // Open the imported service, not just the Build tab (QA B24).
+      void importServiceFromFile((id) => { refreshServices(); selectService(id); setView('service') })
     } else if (card.action === 'overlay') {
       void Promise.all([window.wf.zoneGetIp(), window.wf.getTabletPort()]).then(([ip, port]) => {
         const url = `http://${ip}:${port}/overlay`

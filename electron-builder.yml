@@ -92,3 +92,15 @@ publish:
   provider: github
   owner: rbrewer10
   repo: worshipflow
+
+# QA B12-N2: double-clicking a service file opens it in WorshipFlow.
+# .wfbundle carries pictures & videos (0.20.3+); .wfservice is plain JSON.
+fileAssociations:
+  - ext: wfbundle
+    name: WorshipFlow Service Bundle
+    description: WorshipFlow service with pictures & videos
+    role: Editor
+  - ext: wfservice
+    name: WorshipFlow Service
+    description: WorshipFlow service
+    role: Editor

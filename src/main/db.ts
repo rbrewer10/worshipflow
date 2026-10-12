@@ -1,4 +1,5 @@
 import { app, safeStorage } from 'electron'
+import { mediaDisplayName, disambiguateMediaTitles } from '../shared/mediaName'
 import { join, dirname } from 'path'
 import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, statSync } from 'fs'
 import initSqlJs, { type Database } from 'sql.js'
@@ -295,6 +296,95 @@ function relocateMovedDataPaths(): void {
   if (changed > 0) {
     console.log(`[relocateMovedDataPaths] fixed ${changed} path(s) that had moved to this machine/user`)
   }
+}
+
+// QA B2-N1: every media path the database stores (song/announcement
+// backgrounds, announcement icon files, image items' `path`, any item
+// `background`). Used by the "copy outside pictures into imported-media"
+// migration in index.ts. Non-file markers (theme:/icon:) are left out.
+export function listStoredMediaPaths(): string[] {
+  const out = new Set<string>()
+  const add = (v: unknown): void => {
+    if (typeof v === 'string' && v.trim() && !v.startsWith('theme:') && !v.startsWith('icon:')) out.add(v)
+  }
+  const songStmt = db.prepare("SELECT background FROM song WHERE background IS NOT NULL AND background != ''")
+  while (songStmt.step()) add(songStmt.getAsObject().background)
+  songStmt.free()
+  const annStmt = db.prepare('SELECT background, icon FROM announcement')
+  while (annStmt.step()) { const r = annStmt.getAsObject(); add(r.background); add(r.icon) }
+  annStmt.free()
+  const itemStmt = db.prepare("SELECT payload_json FROM service_item WHERE payload_json LIKE '%background%' OR payload_json LIKE '%\"path\"%'")
+  while (itemStmt.step()) {
+    const raw = itemStmt.getAsObject().payload_json
+    if (typeof raw !== 'string') continue
+    try {
+      const payload = JSON.parse(raw) as Record<string, unknown>
+      add(payload.background)
+      add(payload.path)
+    } catch { /* malformed payload — skip */ }
+  }
+  itemStmt.free()
+  return [...out]
+}
+
+// QA A3-N6 cleanup: which of these imported-media file names does ANY text
+// value in ANY table still mention? Deliberately broader than
+// listStoredMediaPaths() — PPTX decks, settings, future columns — because a
+// false "unused" would delete a picture someone still needs on Sunday.
+export function databaseMentions(names: string[]): Set<string> {
+  const found = new Set<string>()
+  if (names.length === 0) return found
+  const pending = new Set(names)
+  const tables: string[] = []
+  const t = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+  while (t.step()) tables.push(String(t.getAsObject().name))
+  t.free()
+  for (const table of tables) {
+    if (pending.size === 0) break
+    const stmt = db.prepare(`SELECT * FROM "${table.replace(/"/g, '""')}"`)
+    while (stmt.step() && pending.size > 0) {
+      for (const v of stmt.get()) {
+        if (typeof v !== 'string' || v.length < 5) continue
+        for (const n of pending) if (v.includes(n)) { found.add(n); pending.delete(n) }
+      }
+    }
+    stmt.free()
+  }
+  return found
+}
+
+// Swap stored media paths old → new everywhere listStoredMediaPaths() looks,
+// then persist once. Exact-string matches only, so nothing else is touched.
+// Returns how many rows changed.
+export function rewriteStoredMediaPaths(map: Map<string, string>): number {
+  if (map.size === 0) return 0
+  let changed = 0
+  const swap = (v: unknown): unknown => (typeof v === 'string' && map.has(v) ? map.get(v) : v)
+  for (const [from, to] of map) {
+    db.run('UPDATE song SET background = ? WHERE background = ?', [to, from])
+    changed += db.getRowsModified()
+    db.run('UPDATE announcement SET background = ? WHERE background = ?', [to, from])
+    changed += db.getRowsModified()
+    db.run('UPDATE announcement SET icon = ? WHERE icon = ?', [to, from])
+    changed += db.getRowsModified()
+  }
+  const rows: { id: number; payload_json: string }[] = []
+  const stmt = db.prepare("SELECT id, payload_json FROM service_item WHERE payload_json LIKE '%background%' OR payload_json LIKE '%\"path\"%'")
+  while (stmt.step()) rows.push(stmt.getAsObject() as unknown as { id: number; payload_json: string })
+  stmt.free()
+  for (const row of rows) {
+    let payload: Record<string, unknown>
+    try { payload = JSON.parse(row.payload_json) } catch { continue }
+    const nextBg = swap(payload.background)
+    const nextPath = swap(payload.path)
+    if (nextBg === payload.background && nextPath === payload.path) continue
+    if (payload.background !== undefined) payload.background = nextBg
+    if (payload.path !== undefined) payload.path = nextPath
+    db.run('UPDATE service_item SET payload_json = ? WHERE id = ?', [JSON.stringify(payload), row.id])
+    changed++
+  }
+  if (changed > 0) persist()
+  return changed
 }
 
 // Pure so it's unit-testable without a DB — trims and collapses internal
@@ -918,7 +1008,8 @@ function itemTitle(type: string, refId: number | null, payload: Record<string, u
   if (type === 'sermon') return (payload.title as string) || 'Sermon'
   if (type === 'image') {
     const p = (payload.path as string) || ''
-    return p.split(/[/\\]/).pop() || 'Image'
+    // QA B12 watch item: show the original name, not our stored copy's hash.
+    return mediaDisplayName(p) || 'Image'
   }
   if (type === 'header') return (payload.label as string) || 'Section'
   if (type === 'placeholder') return (payload.label as string) || 'Placeholder — TBD'
@@ -1067,7 +1158,7 @@ export function getService(id: number): ServiceFull | null {
     })
   }
   stmt.free()
-  return { ...svc, items }
+  return { ...svc, items: disambiguateMediaTitles(items) }
 }
 
 export function addServiceItem(serviceId: number, item: NewServiceItem): number {

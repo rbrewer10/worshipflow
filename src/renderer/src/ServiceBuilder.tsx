@@ -9,6 +9,7 @@ import StartSundayModal, { type SundayTemplateChoice } from './StartSundayModal'
 import { DEFAULT_SERVICE_TEMPLATES } from './defaultServiceTemplates'
 import { notifyLocal, notifyLocalAction } from './NotifyToasts'
 import SetlistImport from './SetlistImport'
+import { exportServiceToFile, importServiceFromFile } from './serviceFileActions'
 
 function nextSundayISO(): string {
   const date = new Date()
@@ -100,15 +101,11 @@ function ServiceBuilder({ onOpenLive }: { onOpenLive?: () => void }): JSX.Elemen
 
   const exportService = async (): Promise<void> => {
     if (openId == null) return
-    await window.wf.serviceExport(openId)
+    await exportServiceToFile(openId)
   }
 
   const importServiceFile = async (): Promise<void> => {
-    const res = await window.wf.serviceImportFile()
-    if (!res.canceled && res.serviceId != null) {
-      refreshServices()
-      open(res.serviceId)
-    }
+    await importServiceFromFile((id) => { refreshServices(); open(id) })
   }
 
   const importPlan = async (): Promise<void> => {

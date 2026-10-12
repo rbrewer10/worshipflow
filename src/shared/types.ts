@@ -223,6 +223,12 @@ export interface ServiceItem {
   style: ItemStyle | null
   zoneRouting: ZoneRouting | null
   track: TrackId
+  /** Set by wf:services:get when the projector can't load this image item's
+   *  file: 'missing' (not on this computer) or 'outside' (not in WorshipFlow's
+   *  media folders). QA B2-N1. Never stored. */
+  mediaProblem?: 'missing' | 'outside'
+  /** Same, for the item's own `payload.background`. */
+  backgroundProblem?: 'missing' | 'outside'
 }
 
 export interface ServiceFull extends ServiceSummary {
@@ -446,4 +452,24 @@ export interface RecordingSidecar {
   service: { id: number | null; name: string; date: string | null }
   recording: { startedAt: number; durationMs: number; file: string }
   markers: Array<{ kind: RecordingMarkerKind; label: string; offsetMs: number }>
+}
+
+// Result of File → Import service (.wfservice). `error` and `summary` are
+// plain sentences for an operator toast (QA B12 / B24).
+export interface ServiceExportResult {
+  canceled: boolean
+  filePath?: string
+  error?: string
+  /** What was saved, what's in the file and what isn't, and why (QA B12-N2/N6). */
+  summary?: string
+  /** Something the service uses isn't in the file. */
+  warn?: boolean
+}
+
+export interface ServiceImportResult {
+  canceled: boolean
+  serviceId: number | null
+  error?: string
+  summary?: string
+  warn?: boolean
 }

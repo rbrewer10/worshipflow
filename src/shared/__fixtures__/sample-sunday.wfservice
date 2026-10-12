@@ -1,0 +1,283 @@
+{
+  "version": 2,
+  "name": "Sample Sunday",
+  "service_date": null,
+  "published_at": null,
+  "team": {
+    "people": [],
+    "assignments": {}
+  },
+  "theme": null,
+  "themeColors": null,
+  "items": [
+    {
+      "id": 1,
+      "ordinal": 0,
+      "type": "header",
+      "ref_id": null,
+      "payload": {
+        "label": "Welcome"
+      },
+      "title": "Welcome",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": null
+    },
+    {
+      "id": 2,
+      "ordinal": 1,
+      "type": "countdown",
+      "ref_id": null,
+      "payload": {
+        "seconds": 300
+      },
+      "title": "Countdown 5:00",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": null
+    },
+    {
+      "id": 3,
+      "ordinal": 2,
+      "type": "text",
+      "ref_id": null,
+      "payload": {
+        "title": "Welcome",
+        "body": "Welcome to worship. Please silence your phones."
+      },
+      "title": "Welcome",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": null
+    },
+    {
+      "id": 4,
+      "ordinal": 3,
+      "type": "header",
+      "ref_id": null,
+      "payload": {
+        "label": "Worship"
+      },
+      "title": "Worship",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": null
+    },
+    {
+      "id": 5,
+      "ordinal": 4,
+      "type": "song",
+      "ref_id": 1,
+      "payload": {},
+      "title": "Amazing Grace",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": {
+        "id": 1,
+        "title": "Amazing Grace",
+        "author": "John Newton",
+        "ccli": "22025",
+        "copyright": "Public Domain",
+        "publisher": null,
+        "background": null,
+        "arrangement": null,
+        "fontScale": null,
+        "linesPerSlide": null,
+        "bgMotion": null,
+        "textColor": null,
+        "font": null,
+        "blurBehindText": false,
+        "sections": [
+          {
+            "id": 1,
+            "kind": "verse",
+            "label": "Verse 1",
+            "ordinal": 0,
+            "lyrics": "Amazing grace, how sweet the sound\nThat saved a wretch like me\nI once was lost, but now am found\nWas blind, but now I see"
+          },
+          {
+            "id": 2,
+            "kind": "verse",
+            "label": "Verse 2",
+            "ordinal": 1,
+            "lyrics": "'Twas grace that taught my heart to fear\nAnd grace my fears relieved\nHow precious did that grace appear\nThe hour I first believed"
+          },
+          {
+            "id": 3,
+            "kind": "verse",
+            "label": "Verse 3",
+            "ordinal": 2,
+            "lyrics": "When we've been there ten thousand years\nBright shining as the sun\nWe've no less days to sing God's praise\nThan when we first begun"
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "ordinal": 5,
+      "type": "song",
+      "ref_id": 2,
+      "payload": {},
+      "title": "Come Thou Fount of Every Blessing",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": {
+        "id": 2,
+        "title": "Come Thou Fount of Every Blessing",
+        "author": "Robert Robinson",
+        "ccli": null,
+        "copyright": "Public Domain",
+        "publisher": null,
+        "background": null,
+        "arrangement": null,
+        "fontScale": null,
+        "linesPerSlide": null,
+        "bgMotion": null,
+        "textColor": null,
+        "font": null,
+        "blurBehindText": false,
+        "sections": [
+          {
+            "id": 4,
+            "kind": "verse",
+            "label": "Verse 1",
+            "ordinal": 0,
+            "lyrics": "Come, Thou Fount of every blessing\nTune my heart to sing Thy grace\nStreams of mercy, never ceasing\nCall for songs of loudest praise"
+          },
+          {
+            "id": 5,
+            "kind": "verse",
+            "label": "Verse 2",
+            "ordinal": 1,
+            "lyrics": "Here I raise my Ebenezer\nHither by Thy help I've come\nAnd I hope, by Thy good pleasure\nSafely to arrive at home"
+          },
+          {
+            "id": 6,
+            "kind": "verse",
+            "label": "Verse 3",
+            "ordinal": 2,
+            "lyrics": "Prone to wander, Lord, I feel it\nProne to leave the God I love\nHere's my heart, O take and seal it\nSeal it for Thy courts above"
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "ordinal": 6,
+      "type": "header",
+      "ref_id": null,
+      "payload": {
+        "label": "Word"
+      },
+      "title": "Word",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": null
+    },
+    {
+      "id": 8,
+      "ordinal": 7,
+      "type": "scripture",
+      "ref_id": null,
+      "payload": {
+        "reference": "John 3:16-17"
+      },
+      "title": "John 3:16-17",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": null
+    },
+    {
+      "id": 9,
+      "ordinal": 8,
+      "type": "sermon",
+      "ref_id": null,
+      "payload": {
+        "title": "Sample message",
+        "speaker": "Pastor",
+        "passage": "John 3:16"
+      },
+      "title": "Sample message",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": null
+    },
+    {
+      "id": 10,
+      "ordinal": 9,
+      "type": "header",
+      "ref_id": null,
+      "payload": {
+        "label": "Response"
+      },
+      "title": "Response",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": null
+    },
+    {
+      "id": 11,
+      "ordinal": 10,
+      "type": "song",
+      "ref_id": 3,
+      "payload": {},
+      "title": "Holy, Holy, Holy",
+      "notes": null,
+      "style": null,
+      "zoneRouting": null,
+      "track": "main",
+      "song": {
+        "id": 3,
+        "title": "Holy, Holy, Holy",
+        "author": "Reginald Heber",
+        "ccli": null,
+        "copyright": "Public Domain",
+        "publisher": null,
+        "background": null,
+        "arrangement": null,
+        "fontScale": null,
+        "linesPerSlide": null,
+        "bgMotion": null,
+        "textColor": null,
+        "font": null,
+        "blurBehindText": false,
+        "sections": [
+          {
+            "id": 7,
+            "kind": "verse",
+            "label": "Verse 1",
+            "ordinal": 0,
+            "lyrics": "Holy, holy, holy! Lord God Almighty\nEarly in the morning our song shall rise to Thee\nHoly, holy, holy! Merciful and mighty\nGod in three persons, blessed Trinity"
+          },
+          {
+            "id": 8,
+            "kind": "verse",
+            "label": "Verse 2",
+            "ordinal": 1,
+            "lyrics": "Holy, holy, holy! All the saints adore Thee\nCasting down their golden crowns around the glassy sea\nCherubim and seraphim falling down before Thee\nWhich wert, and art, and evermore shalt be"
+          }
+        ]
+      }
+    }
+  ]
+}
