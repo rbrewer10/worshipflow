@@ -114,3 +114,21 @@ describe('Black/Logo over a countdown (QA B12-N4)', () => {
     expect(main).toMatch(/clearCountdown\(track\)\n\s*t\.countdownDone = true\n\s*t\.song = \{ title: 'Countdown', lines: \['0:00'\]/)
   })
 })
+
+// QA B13-N4/N5: what a countdown leaves behind when it runs out while hidden.
+describe('countdown running out under Logo/Black (QA B13-N4, B13-N5) — main wiring', () => {
+  const main = readFileSync(join(__dirname, '..', 'main', 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
+  const expiry = main.slice(main.indexOf('t.countdownTimer = setInterval(() => {'), main.indexOf("t.song = { title: 'Countdown', lines: [fmt(remaining)], background: bg }\n    broadcast()"))
+  it('under Logo it stays on the Logo; visible or under Black it ends on Black', () => {
+    expect(expiry).toMatch(/t\.countdownDone = true/)
+    expect(expiry).toMatch(/if \(t\.mode !== 'logo'\) t\.mode = 'black'/)
+    expect(expiry).not.toMatch(/\n\s*t\.mode = 'black'\n/)
+  })
+  it('zones routed to the countdown show the logo, not a frozen "0:00", once nothing is counting', () => {
+    const zones = main.slice(main.indexOf('function computeZoneStates()'), main.indexOf('function zoneStateFromSlot('))
+    const stale = zones.indexOf("} else if (mode === 'countdown' && !t.countdownTimer && t.mode !== 'countdown') {")
+    expect(stale).toBeGreaterThan(-1)
+    expect(stale).toBeLessThan(zones.indexOf("} else if (mode === 'countdown') {"))
+    expect(zones.slice(stale, zones.indexOf("} else if (mode === 'countdown') {"))).toMatch(/base\.mode = 'logo'\n\s*base\.imagePath = logoPath/)
+  })
+})
