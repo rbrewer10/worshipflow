@@ -80,11 +80,18 @@ describe('.wfservice media wiring in main (source guard)', () => {
     expect(fn).toMatch(/mediaRestored: restored\.map\.size/)
     expect(fn).toMatch(/importMediaProblems\(/)
   })
-  it('a double-clicked service file (argv / second instance) is imported once the operator window has loaded (QA B12-N2)', () => {
-    expect(main).toMatch(/let pendingShellOpen: string \| null = serviceFileFromArgv\(process\.argv\)/)
+  it('a double-clicked service file (argv / second instance / open-file) is queued and imported once the operator renderer is listening (QA B12-N2, B13-N2)', () => {
+    expect(main).toMatch(/const atLaunch = serviceFileFromArgv\(process\.argv\); if \(atLaunch\) shellOpenQueue\.push\(atLaunch\)/)
     expect(main).toMatch(/app\.on\('second-instance', \(_e, argv\) => \{[\s\S]*?openServiceFileFromShell\(serviceFileFromArgv\(argv\)\)/)
-    expect(main).toMatch(/void flushShellOpen\(\) \/\/ a service file double-clicked/)
-    expect(main).toMatch(/operatorWin\.webContents\.send\('wf:services:opened', res\)/)
+    const flush = main.slice(main.indexOf('async function flushShellOpen('), main.indexOf('function openServiceFileFromShell('))
+    expect(flush).not.toMatch(/isLoading\(\)/) // B13-N2: true inside did-finish-load on Electron 33
+    expect(flush).toMatch(/!shellOpenReady/)
+    expect(flush).toMatch(/operatorWin\.webContents\.send\('wf:services:opened', res\)/)
+    expect(main).toMatch(/ipcMain\.on\('wf:services:openerReady', \(e, ready: unknown\) => \{\n\s*if \(!operatorWin \|\| operatorWin\.isDestroyed\(\) \|\| e\.sender !== operatorWin\.webContents\) return/)
+    expect(main).toMatch(/did-start-loading', \(\) => \{ shellOpenReady = false \}/)
+    expect(main).toMatch(/if \(!shellOpenQueue\.includes\(filePath\)\) shellOpenQueue\.push\(filePath\)/)
+    const preload = readFileSync(join(__dirname, '..', 'preload', 'index.ts'), 'utf8')
+    expect(preload).toMatch(/ipcRenderer\.on\('wf:services:opened', handler\)\n\s*ipcRenderer\.send\('wf:services:openerReady', true\)/)
   })
 })
 

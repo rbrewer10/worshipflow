@@ -2455,7 +2455,10 @@ function createOperator(): void {
     shell.openExternal(d.url)
     return { action: 'deny' }
   })
-  operatorWin.on('closed', () => { operatorWin = null })
+  operatorWin.on('closed', () => { operatorWin = null; shellOpenReady = false })
+  // QA B13-N2: a (re)loading operator has no listener until its renderer says so.
+  operatorWin.webContents.on('did-start-loading', () => { shellOpenReady = false })
+  operatorWin.webContents.on('render-process-gone', () => { shellOpenReady = false })
   operatorWin.webContents.on('did-finish-load', () => {
     // A renderer reload discards the JS realm without running React's
     // unmount cleanup, so useRoomFeed's roomFeedNotifyCapturing(false) call
@@ -2464,7 +2467,6 @@ function createOperator(): void {
     // resetting here just brings the flag back in line with reality instead
     // of leaving Sound Check blocked with no visible cause or way to clear it.
     setRoomFeedActive(false)
-    void flushShellOpen() // a service file double-clicked to start the app (QA B12-N2)
   })
   loadRoute(operatorWin, '/')
 }
@@ -3572,29 +3574,44 @@ ipcMain.handle('wf:services:import', async (): Promise<ServiceImportResult> => {
 // already running, hands argv to the running copy (second-instance). The file
 // is imported once the operator window has loaded; the renderer is told the
 // result so it can say what happened and open the service.
-let pendingShellOpen: string | null = serviceFileFromArgv(process.argv)
+// QA B13-N2: with WorshipFlow CLOSED, the double-clicked file arrived in argv
+// but was never imported — the flush ran inside did-finish-load, where
+// webContents.isLoading() is still true (Electron 33), and never retried. The
+// operator window's renderer now says when its listener is up
+// ('wf:services:openerReady'); files opened before that (argv at launch, a
+// second instance or open-file during startup) are queued and each imported once.
+const shellOpenQueue: string[] = []
+{ const atLaunch = serviceFileFromArgv(process.argv); if (atLaunch) shellOpenQueue.push(atLaunch) }
+let shellOpenReady = false
 let shellOpenRunning = false
 async function flushShellOpen(): Promise<void> {
-  if (shellOpenRunning || !pendingShellOpen || !operatorWin || operatorWin.isDestroyed() || operatorWin.webContents.isLoading()) return
-  const filePath = pendingShellOpen
-  pendingShellOpen = null
+  if (shellOpenRunning || !shellOpenReady || shellOpenQueue.length === 0 || !operatorWin || operatorWin.isDestroyed()) return
   shellOpenRunning = true
   try {
-    let res: ServiceImportResult
-    try { res = await importServiceFile(filePath) } catch (err) {
-      res = { canceled: false, serviceId: null, error: `The service couldn’t be imported: ${err instanceof Error ? err.message : String(err)}` }
+    while (shellOpenQueue.length && shellOpenReady && operatorWin && !operatorWin.isDestroyed()) {
+      const filePath = shellOpenQueue.shift()!
+      let res: ServiceImportResult
+      try { res = await importServiceFile(filePath) } catch (err) {
+        res = { canceled: false, serviceId: null, error: `The service couldn’t be imported: ${err instanceof Error ? err.message : String(err)}` }
+      }
+      logInfo(`[import] opened from the shell: ${filePath} → ${res.error ? `error: ${res.error}` : `service ${res.serviceId}`}`)
+      if (operatorWin && !operatorWin.isDestroyed()) operatorWin.webContents.send('wf:services:opened', res)
     }
-    if (operatorWin && !operatorWin.isDestroyed()) operatorWin.webContents.send('wf:services:opened', res)
   } finally {
     shellOpenRunning = false
-    if (pendingShellOpen) void flushShellOpen()
   }
 }
 function openServiceFileFromShell(filePath: string | null): void {
   if (!filePath) return
-  pendingShellOpen = filePath
+  if (!shellOpenQueue.includes(filePath)) shellOpenQueue.push(filePath) // the same file twice during startup: once
   void flushShellOpen()
 }
+ipcMain.on('wf:services:openerReady', (e, ready: unknown) => {
+  if (!operatorWin || operatorWin.isDestroyed() || e.sender !== operatorWin.webContents) return
+  shellOpenReady = ready === true
+  if (!shellOpenReady) return
+  void flushShellOpen()
+})
 
 /**
  * Import one .wfbundle / .wfservice (either kind, decided by content — QA
