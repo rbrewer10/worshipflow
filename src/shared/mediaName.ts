@@ -36,3 +36,27 @@ export function storedMediaStem(path: string): string {
   const { stem } = split(path.split(/[\\/]/).pop() ?? path)
   return stripMediaHash(stem).replace(/[^A-Za-z0-9 _.-]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 60) || 'media'
 }
+
+/**
+ * QA B13-N7: titles show the original file name, so two different pictures
+ * that were both called "cross.png" got the same label in the rail and Build.
+ * When one title stands for more than one file in a service, the second file
+ * becomes "cross.png (2)", the third "(3)" — in running order; rows showing
+ * the same file keep the same label, and unique titles are untouched.
+ */
+export function disambiguateMediaTitles<T extends { type: string; title: string; payload: Record<string, unknown> }>(items: T[]): T[] {
+  const files = new Map<string, string[]>() // title → distinct paths, first seen first
+  for (const it of items) {
+    if (it.type !== 'image') continue
+    const p = String(it.payload.path ?? '')
+    const list = files.get(it.title) ?? []
+    if (!list.includes(p)) list.push(p)
+    files.set(it.title, list)
+  }
+  return items.map((it) => {
+    if (it.type !== 'image') return it
+    const list = files.get(it.title)!
+    const n = list.indexOf(String(it.payload.path ?? ''))
+    return list.length > 1 && n > 0 ? { ...it, title: `${it.title} (${n + 1})` } : it
+  })
+}
