@@ -225,7 +225,9 @@ function isHeadingLine(line: string): boolean {
 export function cleanLine(raw: string): string {
   let line = raw
     .replace(/&amp;/gi, '&').replace(/&nbsp;/gi, ' ').replace(/&#0*39;|&apos;|&rsquo;|&lsquo;/gi, "'").replace(/&quot;|&ldquo;|&rdquo;/gi, '"')
-    .replace(/[\u00A0\u2007\u202F]/g, ' ')
+    // B12-N8: every other width of space too — en/em/thin/hair/figure
+    // (U+2000–200A), medium mathematical (U+205F) and ideographic (U+3000).
+    .replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
     // B11-N1: a double space inside a line ('Amazing  Grace', 'Head  Usher: …')
     // is one space. A tab or three or more spaces stay: they are the
     // bulletin's column breaks (splitLeader); see flattenColumns.
@@ -378,6 +380,18 @@ function personnelKind(line: string): PersonnelKind | null {
   return null
 }
 const isPersonnelLine = (line: string): boolean => personnelKind(line) != null
+// B12-N8: a who's-serving table pasted without colons — 'Greeter<TAB>Mary Hill',
+// 'Song Leader<TAB>Ann Lee', 'Pastor<TAB>Rev. Ryan Brewer'. Only a KNOWN role
+// (or pastor) on the left of a tab and a person's name on the right; every
+// other tab column ('Call to Worship<TAB>Pastor Jim', 'Amazing Grace<TAB>Chris
+// Tomlin', 'Hymn of Praise<TAB>No. 89<TAB>…') reads as before.
+const ROLE_TAB = new RegExp(`^(?:the )?(?:${KNOWN_LABEL}|(?:senior |associate |lead |guest |visiting |youth |executive )?pastor)[ ]*\\t+[ \\t]*([^\\t]+?)\\s*$`, 'i')
+function isRoleTabLine(line: string): boolean {
+  const m = ROLE_TAB.exec(line)
+  if (!m) return false
+  const who = m[1].trim()
+  return isPersonLike(who) || TITLED_PERSON.test(who)
+}
 // "Liturgist: Psalm 23": the reading the role names.
 function personnelReading(line: string): string | null {
   const m = PERSONNEL.exec(line)
@@ -444,6 +458,7 @@ function skipReason(rawLine: string, line: string): SkipReason | null {
   if (isHeadingLine(line)) return 'heading'
   if (isSmallPrint(line)) return 'notice'
   if (isPersonnelLine(line)) return 'serving'
+  if (isRoleTabLine(line)) return 'serving'
   return null
 }
 
