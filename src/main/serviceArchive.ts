@@ -193,6 +193,44 @@ export function isTarHeader(h: Buffer): boolean {
   return parseOctal(h, 148, 8) === headerChecksum(h)
 }
 
+/** QA B13-N1: a plain-JSON service is read whole; nothing real comes near this. */
+export const MAX_PLAIN_SERVICE_BYTES = 64 * 1024 * 1024
+
+export type ServiceFileKind = { kind: 'archive' } | { kind: 'json' } | { kind: 'refused'; error: string }
+
+/**
+ * QA B13-N1: decide how to read a service file WITHOUT reading it whole.
+ * B12-N7 made "is it a tar?" need a valid checksum, so a big bundle with a
+ * damaged first header fell through to the JSON path, which read all 1.6 GB
+ * into memory and crashed the app. Now:
+ *  - a valid ustar header → archive;
+ *  - the ustar magic, or a .wfbundle that doesn't start like JSON, but a bad
+ *    checksum → "damaged (bad header)";
+ *  - anything over MAX_PLAIN_SERVICE_BYTES → refused, never read;
+ *  - otherwise JSON.
+ */
+export async function classifyServiceFile(path: string): Promise<ServiceFileKind> {
+  const fh = await fsp.open(path, 'r')
+  let size: number
+  const head = Buffer.alloc(BLOCK)
+  let got: number
+  try {
+    size = (await fh.stat()).size
+    got = (await fh.read(head, 0, BLOCK, 0)).bytesRead
+  } finally {
+    await fh.close()
+  }
+  const h = head.subarray(0, got)
+  if (got === BLOCK && isTarHeader(h)) return { kind: 'archive' }
+  const magic = got >= 262 && h.toString('latin1', 257, 262) === 'ustar'
+  const looksJson = /^(?:\uFEFF)?\s*\{/.test(h.toString('utf8'))
+  if ((magic && !looksJson) || (/\.wfbundle$/i.test(path) && !looksJson))
+    return { kind: 'refused', error: 'the service file is damaged (bad header) — was it copied completely? Save it again from the PC that made it.' }
+  if (size > MAX_PLAIN_SERVICE_BYTES)
+    return { kind: 'refused', error: `it isn't a WorshipFlow service file (${Math.round(size / 1024 ** 2)} MB, far bigger than any service — is it a video or another file renamed?)` }
+  return { kind: 'json' }
+}
+
 /** Does the file start with a ustar header (a media bundle) rather than JSON? */
 export async function isServiceArchive(path: string): Promise<boolean> {
   const fh = await fsp.open(path, 'r')

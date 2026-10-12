@@ -118,7 +118,7 @@ import {
   rewriteStoredMediaPaths,
   databaseMentions,
 } from './db'
-import { readServiceArchive, isServiceArchive, writeServiceArchive, writePlainServiceFile, planExportMedia, restoreArchiveMedia, PartLeftError, type RestoredMedia } from './serviceArchive'
+import { readServiceArchive, classifyServiceFile, writeServiceArchive, writePlainServiceFile, planExportMedia, restoreArchiveMedia, PartLeftError, type RestoredMedia } from './serviceArchive'
 import { chooseExportFormat, describeExport, exportDialogOptions, IMPORT_FILTERS, PLAIN_SERVICE_VERSION, serviceFileFromArgv } from '../shared/serviceFileFormat'
 import { importMediaFile, mediaProblemFor, migrateOutsidePaths, planImportedMediaCleanup, safeCleanupName, MediaImportRefused, servablePath, hasMediaExtension, isNetworkPath, MEDIA_EXTENSIONS, type MediaRoots } from './mediaImport'
 import {
@@ -3609,7 +3609,10 @@ async function importServiceFile(filePath: string): Promise<ServiceImportResult>
   // older .wfservice is plain JSON and imports exactly as before.
   let archive: Awaited<ReturnType<typeof readServiceArchive>> | null = null
   try {
-    if (await isServiceArchive(filePath)) {
+    // QA B13-N1: decided from the first block and the size — a big file is never read whole.
+    const kind = await classifyServiceFile(filePath)
+    if (kind.kind === 'refused') return { canceled: false, serviceId: null, error: `Couldn't read that file: ${kind.error}` }
+    if (kind.kind === 'archive') {
       archive = await readServiceArchive(filePath)
       text = archive.json
     } else {
