@@ -1201,6 +1201,12 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
       base.title = live.songTitle
       if (!live.next) base.nextItemTitle = nextItemTitleFor(zoneTrack)
       // No background on stage monitor.
+    } else if (mode === 'countdown' && !t.countdownTimer && t.mode !== 'countdown') {
+      // QA B13-N5: the countdown already ran out (under Black/Logo, or Unblack
+      // after it) — nothing is counting, so no frozen "0:00": show the logo.
+      base.mode = 'logo'
+      base.imagePath = logoPath
+      base.background = logoBg
     } else if (mode === 'countdown') {
       // Parse countdown from the live line ("M:SS" format).
       const parts = live.line.split(':')
@@ -1904,7 +1910,9 @@ function doLoadCountdown(track: TrackId, seconds: number, background?: string | 
       clearCountdown(track)
       t.countdownDone = true
       t.song = { title: 'Countdown', lines: ['0:00'], background: bg }
-      t.mode = 'black'
+      // QA B13-N4: run out under Logo → stays on the Logo (as 986f did); a
+      // visible countdown (or one hidden under Black) ends on Black.
+      if (t.mode !== 'logo') t.mode = 'black'
       broadcast()
       return
     }
