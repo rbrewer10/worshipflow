@@ -1053,6 +1053,12 @@ function computeZoneStates(): Record<ZoneId, ZoneState> {
         base.passage = (sermonItem.payload.passage as string | undefined) || null
       }
       applyZoneBackground(base, live.background, live)
+    } else if (mode === 'stage' && countdownUnder(zoneTrack) === 'done' && t.song?.title === 'Countdown' && t.mode !== 'countdown') {
+      // QA B14 (Z4): the stage monitor after a countdown ran out under Logo/
+      // Black — nothing is counting, so the logo, not "Countdown 0:00".
+      base.mode = 'logo'
+      base.imagePath = logoPath
+      base.background = logoBg
     } else if (mode === 'stage') {
       // Stage always shows lyrics content with next preview.
       base.line = live.line
