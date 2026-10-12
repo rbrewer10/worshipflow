@@ -189,7 +189,7 @@ test('#3 Reload projector: the output reloads and shows what is live now — no 
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5f0000000049454e44ae426082', 'hex')
 const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom', 'latin1'), Buffer.alloc(4096, 1)])
 
-test('#2 .wfservice carries its pictures and videos: export, remove the originals, import — the service is complete', async () => {
+test('#2 a service file carries its pictures and videos (.wfbundle): export, remove the originals, import — the service is complete', async () => {
   test.setTimeout(120_000)
   const { app, userDataDir } = await launchApp()
   const media = mkdtempSync(join(tmpdir(), 'wf-media-'))
@@ -205,12 +205,12 @@ test('#2 .wfservice carries its pictures and videos: export, remove the original
       await wf.serviceAddItem(id, { type: 'text', payload: { title: 'Welcome', body: 'Welcome home', background: loop } })
       return id
     }, { cross, loop })
-    const file = join(media, 'USB Sunday.wfservice')
+    const file = join(media, 'USB Sunday.wfbundle') // QA B12-N2: a service with media is a .wfbundle
     await app.evaluate(({ dialog }, p) => { (dialog as any).showSaveDialog = async () => ({ canceled: false, filePath: p }) }, file)
     const exp = await op.evaluate((id) => (window as any).wf.serviceExport(id), svcId)
     expect(exp.error).toBeUndefined()
-    expect(exp.mediaCount).toBe(2)
-    expect(exp.missingMedia).toEqual([])
+    expect(exp.summary).toMatch(/with 2 picture\/video files/)
+    expect(exp.warn).toBe(false)
     expect(readFileSync(file).toString('latin1', 257, 262)).toBe('ustar')
 
     // "another PC": the originals and any copies are gone
@@ -238,8 +238,8 @@ test('#2 .wfservice carries its pictures and videos: export, remove the original
       await wf.serviceAddItem(id, { type: 'image', payload: { path: p } })
       return wf.serviceExport(id)
     }, join(media, 'not-there.jpg'))
-    expect(gone.mediaCount).toBe(0)
-    expect(gone.missingMedia).toEqual(['not-there.jpg'])
+    expect(gone.summary).toMatch(/Not in the file: not-there\.jpg \(not found on this computer\)/)
+    expect(gone.warn).toBe(true)
   } finally {
     rmSync(media, { recursive: true, force: true })
     await closeApp(app, userDataDir)
