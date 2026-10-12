@@ -4,6 +4,7 @@ import { nextOrderSnapshot, pickAdjacentItem } from '../shared/deckAdjacent'
 import { describeImport, importMediaProblems, parseServiceBundle, referencedMediaPaths, bundleMediaPaths, rewriteMediaPaths, sameSong, songContentDiffers, songInputFrom, uniqueServiceName, announcementRefs, bundleAnnouncementFrom, announcementInputFrom, sameAnnouncement, remapAnnouncementItem, BUNDLE_VERSION, type BundleAnnouncement, type BundleItem, type ImportSummary } from '../shared/serviceBundle'
 import type { ServiceExportResult, ServiceImportResult } from '../shared/types'
 import { OPERATOR_MIN_WIDTH } from '../shared/layoutLimits'
+import { READ_OUTPUT_VIDEO_JS, isVideoSnapshot, type VideoResume } from '../shared/videoResume'
 import { registerSoundCheckHandlers } from './sound-check/sound-check-ipc'
 import { SoundCheckState } from './sound-check/sound-check-state'
 import { join, basename, dirname, resolve, relative, isAbsolute } from 'path'
@@ -3983,17 +3984,38 @@ ipcMain.handle('wf:zone:safetyReset', (): void => {
 // too). Each one repaints what's live NOW from createOutput's did-finish-load
 // push, and useLiveModel starts on black until that state arrives — so the
 // reload never flashes old content or the bare theme backdrop.
-function reloadProjectorWindows(): number {
+// QA B12-N5: a playing background video used to restart from 0 — read where
+// it is (and whether it's paused) first, hand that back once reloaded. A hung
+// or crashed window can't answer: give up after 300 ms and reload anyway.
+async function readOutputVideo(w: BrowserWindow): Promise<VideoResume | null> {
+  try {
+    const v: unknown = await Promise.race([
+      w.webContents.executeJavaScript(READ_OUTPUT_VIDEO_JS, true),
+      new Promise((resolve) => setTimeout(() => resolve(null), 300))
+    ])
+    return isVideoSnapshot(v) ? { ...v, capturedAt: Date.now() } : null
+  } catch {
+    return null
+  }
+}
+async function reloadProjectorWindows(): Promise<number> {
   let reloaded = 0
-  for (const w of outputWins.values()) {
+  for (const w of [...outputWins.values()]) {
     if (w.isDestroyed()) continue
+    const video = w.webContents.isCrashed() ? null : await readOutputVideo(w)
+    if (w.isDestroyed()) continue
+    if (video) {
+      w.webContents.once('did-finish-load', () => {
+        if (!w.isDestroyed()) w.webContents.send('wf:output:resumeVideo', video)
+      })
+    }
     w.webContents.reloadIgnoringCache()
     reloaded++
   }
   logInfo(`[window] operator reloaded ${reloaded} projector window(s)`)
   return reloaded
 }
-ipcMain.handle('wf:output:reload', (): number => reloadProjectorWindows())
+ipcMain.handle('wf:output:reload', (): Promise<number> => reloadProjectorWindows())
 
 ipcMain.handle('wf:zone:getStates', (): Record<ZoneId, ZoneState> => {
   return computeZoneStates()
