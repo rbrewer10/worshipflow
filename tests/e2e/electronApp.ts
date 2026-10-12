@@ -47,7 +47,8 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<LaunchedApp> 
 
 export async function closeApp(app: ElectronApplication, userDataDir: string): Promise<void> {
   await app.close().catch(() => { /* already gone */ })
-  rmSync(userDataDir, { recursive: true, force: true })
+  // Windows: Chromium helpers can hold the profile for a moment after close (EPERM/EBUSY) — retry.
+  rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
 }
 
 function isOperatorUrl(url: string): boolean {
