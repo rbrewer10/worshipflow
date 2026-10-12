@@ -131,4 +131,11 @@ describe('countdown running out under Logo/Black (QA B13-N4, B13-N5) — main wi
     expect(stale).toBeLessThan(zones.indexOf("} else if (mode === 'countdown') {"))
     expect(zones.slice(stale, zones.indexOf("} else if (mode === 'countdown') {"))).toMatch(/base\.mode = 'logo'\n\s*base\.imagePath = logoPath/)
   })
+  it('the stage monitor (Zone 4) shows the logo, not "Countdown 0:00", once a countdown ran out (QA B14 Z4)', () => {
+    const zones = main.slice(main.indexOf('function computeZoneStates()'), main.indexOf('function zoneStateFromSlot('))
+    const guard = zones.indexOf("} else if (mode === 'stage' && countdownUnder(zoneTrack) === 'done' && t.song?.title === 'Countdown' && t.mode !== 'countdown') {")
+    expect(guard).toBeGreaterThan(-1)
+    expect(guard).toBeLessThan(zones.indexOf("} else if (mode === 'stage') {"))
+    expect(zones.slice(guard, zones.indexOf("} else if (mode === 'stage') {"))).toMatch(/base\.mode = 'logo'\n\s*base\.imagePath = logoPath/)
+  })
 })
