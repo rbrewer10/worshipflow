@@ -32,7 +32,8 @@ describe('export toast', () => {
       skipped: [{ name: 'sermon.mp4', reason: 'tooBig' }, { name: 'loop.mp4', reason: 'network' }, { name: 'fake.png', reason: 'notMedia' }, { name: 'gone.jpg', reason: 'missing' }, { name: 'gone.jpg', reason: 'missing' }]
     })
     expect(r.warn).toBe(true)
-    expect(r.text).toBe('Saved Sunday.wfbundle with 2 picture/video files (opens in WorshipFlow 0.20.3 or newer). Not in the file: sermon.mp4 (too big to carry (over 8 GB)); loop.mp4 (on a network share — copy it onto this computer first); fake.png (not a real picture or video); gone.jpg (not found on this computer).')
+    expect(r.text).not.toMatch(/\([^()]*\(/) // QA B13-N8: no nested brackets
+    expect(r.text).toBe('Saved Sunday.wfbundle with 2 picture/video files (opens in WorshipFlow 0.20.3 or newer). Not in the file: sermon.mp4 (over 8 GB, too big to carry); loop.mp4 (on a network share — copy it onto this computer first); fake.png (not a real picture or video); gone.jpg (not found on this computer).')
     expect(r.text).not.toMatch(/sermon\.mp4[^;]*not found/)
   })
   it('a plain .wfservice says media was left out and how to carry it', () => {

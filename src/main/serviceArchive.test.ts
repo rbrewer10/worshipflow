@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync, openSync, ftruncateSync, writeSync, closeSync, statSync } from 'fs'
+import { watch, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync, openSync, ftruncateSync, writeSync, closeSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
@@ -182,6 +182,26 @@ describe('QA B12-N7: archive detection and partial files', () => {
     for (const n of [old, oldSvc, fresh, 'notes.txt.part-1-1', 'Sunday.wfservice']) writeFileSync(join(dir, n), 'x')
     expect((await removeStaleParts(dir, now)).sort()).toEqual([old, oldSvc].sort())
     expect(readdirSync(dir).sort()).toEqual([fresh, 'Sunday.wfservice', 'notes.txt.part-1-1'].sort())
+  })
+  it('QA B13-N8: stale partials are swept whatever the case of the extension (.WFBUNDLE / .WfService)', async () => {
+    const now = 1_800_000_000_000
+    const up = `BIG.WFBUNDLE.part-1-${now - 11 * 60_000}`
+    const mixed = `Sun.WfService.part-2-${now - 11 * 60_000}`
+    const freshUp = `BIG.WFBUNDLE.part-1-${now - 1000}`
+    for (const n of [up, mixed, freshUp, 'clip.MP4.part-1-1']) writeFileSync(join(dir, n), 'x')
+    expect((await removeStaleParts(dir, now)).sort()).toEqual([up, mixed].sort())
+    expect(readdirSync(dir).sort()).toEqual([freshUp, 'clip.MP4.part-1-1'].sort())
+  })
+  it('QA B13-N8: a drive that vanishes mid-save (stick pulled) names the partial left on it', async () => {
+    const stick = join(dir, 'stick'); mkdirSync(stick)
+    const src = join(dir, 'big.png'); writeFileSync(src, Buffer.alloc(32 << 20, 7))
+    // "pull the stick" the moment the partial file appears on it
+    const w = watch(stick, () => { w.close(); rmSync(stick, { recursive: true, force: true }) })
+    const err = await writeServiceArchive(join(stick, 'S.wfbundle'), '{}', [{ src, entry: 'media/0001-big.png' }]).catch((e) => e)
+    w.close()
+    expect(err).toBeInstanceOf(PartLeftError)
+    expect(existsSync(stick)).toBe(false)
+    expect((err as PartLeftError).leftover).toMatch(/^S\.wfbundle\.part-\d+-\d+$/)
   })
   it('a failed write removes its partial file and says nothing was left; the error keeps the cause', async () => {
     const out = join(dir, 'S.wfbundle')

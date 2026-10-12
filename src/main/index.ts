@@ -3544,7 +3544,7 @@ ipcMain.handle('wf:services:export', async (_e, serviceId: number): Promise<Serv
     // e.g. the USB stick was pulled, full or read-only — tell the operator (QA B24).
     logError(`[export] service export failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
     // QA B12-N7: the partial file is removed when it can be; say so when it can't (stick pulled).
-    const left = err instanceof PartLeftError && err.leftover ? ` A partial file “${err.leftover}” may be left on the drive and couldn't be removed — delete it when the drive is back.` : ''
+    const left = err instanceof PartLeftError && err.leftover ? ` A partial file “${err.leftover}” may be left on the drive — a later save to that folder clears it, or delete it yourself.` : ''
     return { canceled: false, error: `Couldn't save the service file: ${err instanceof Error ? err.message : String(err)}.${left}` }
   }
   if (plan.skipped.length) logWarn(`[export] ${plan.skipped.length} media file(s) not carried: ${plan.skipped.map((s) => `${s.path} (${s.reason})`).join(', ')}`)

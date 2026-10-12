@@ -84,6 +84,7 @@ export interface ArchiveMedia {
  * reports it); a file that changes size while being copied is an error too.
  */
 export async function writeServiceArchive(destPath: string, json: string, media: readonly ArchiveMedia[]): Promise<void> {
+  const folderWasThere = existsSync(dirname(destPath))
   await removeStaleParts(dirname(destPath))
   const tmp = partName(destPath)
   const out = createWriteStream(tmp, { flags: 'wx' })
@@ -119,10 +120,7 @@ export async function writeServiceArchive(destPath: string, json: string, media:
     out.destroy()
     // QA B12-N7: best effort — a pulled stick can't be cleaned. Say so, so the
     // operator knows a partial file may be on it.
-    let left = false
-    await fsp.rm(tmp, { force: true }).catch(() => { left = true })
-    if (!left) left = existsSync(tmp)
-    throw new PartLeftError(err, left ? basename(tmp) : null)
+    throw new PartLeftError(err, await dropPart(tmp, folderWasThere))
   }
 }
 
@@ -131,16 +129,14 @@ export async function writeServiceArchive(destPath: string, json: string, media:
  * a temp name then rename, the partial removed (or reported) on failure.
  */
 export async function writePlainServiceFile(destPath: string, json: string): Promise<void> {
+  const folderWasThere = existsSync(dirname(destPath))
   await removeStaleParts(dirname(destPath))
   const tmp = partName(destPath)
   try {
     await fsp.writeFile(tmp, json, { encoding: 'utf8', flag: 'wx' })
     await fsp.rename(tmp, destPath)
   } catch (err) {
-    let left = false
-    await fsp.rm(tmp, { force: true }).catch(() => { left = true })
-    if (!left) left = existsSync(tmp)
-    throw new PartLeftError(err, left ? basename(tmp) : null)
+    throw new PartLeftError(err, await dropPart(tmp, folderWasThere))
   }
 }
 
@@ -156,6 +152,20 @@ export class PartLeftError extends Error {
 }
 
 const PART_RE = /\.part-\d+-(\d+)$/
+const OUR_PART_RE = /\.(wfservice|wfbundle)\.part-/i // QA B13-N8: Windows names are case-insensitive (.WFBUNDLE)
+
+/**
+ * Remove a failed write's partial file. Returns its name when it may still be
+ * on the drive: it couldn't be removed, or the whole folder vanished mid-write
+ * (QA B13-N8: a pulled stick — the partial is on the stick, out of reach until
+ * it's plugged back in; the next save to that folder sweeps it).
+ */
+async function dropPart(tmp: string, folderWasThere: boolean): Promise<string | null> {
+  let left = false
+  await fsp.rm(tmp, { force: true }).catch(() => { left = true })
+  if (!left) left = existsSync(tmp) || (folderWasThere && !existsSync(dirname(tmp)))
+  return left ? basename(tmp) : null
+}
 const partName = (destPath: string): string => `${destPath}.part-${process.pid}-${Date.now()}`
 
 /**
@@ -169,7 +179,7 @@ export async function removeStaleParts(dir: string, now = Date.now(), maxAgeMs =
   try { names = await fsp.readdir(dir) } catch { return removed }
   for (const n of names) {
     const m = PART_RE.exec(n)
-    if (!m || !/\.(wfservice|wfbundle)\.part-/.test(n)) continue
+    if (!m || !OUR_PART_RE.test(n)) continue
     if (now - Number(m[1]) < maxAgeMs) continue
     try { await fsp.rm(join(dir, n), { force: true }); removed.push(n) } catch { /* best effort */ }
   }

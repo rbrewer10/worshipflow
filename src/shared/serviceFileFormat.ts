@@ -37,7 +37,7 @@ export function chooseExportFormat(filePath: string, hasMedia: boolean): { fileP
 export type MediaSkipReason = 'missing' | 'tooBig' | 'network' | 'notMedia'
 
 const REASON_TEXT: Record<MediaSkipReason, string> = {
-  tooBig: 'too big to carry (over 8 GB)',
+  tooBig: 'over 8 GB, too big to carry', // QA B13-N8: no nested brackets inside “name (reason)”
   network: 'on a network share — copy it onto this computer first',
   notMedia: 'not a real picture or video',
   missing: 'not found on this computer'
