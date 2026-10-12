@@ -42,6 +42,12 @@ const NOT_SCRIPTURE = /Start slide|Service begins|^Start\b/i
 // The Stage window: drop the header up to its slide counter, keep the current slide.
 const stageCurrent = (t: string): string => t.replace(/^.*?\d+ (of|\/) \d+\s*/, '').split(/ Next\b/i)[0]
 
+// QA B14-N2: this spec was timing-sensitive under load (fixed sleeps around the
+// 1.5 s Go live window, and the projector read at a fixed 3.5 s). It now waits
+// on state: the item being live, the projector text settling, and the final
+// projector text by poll. The sampling window for stray frames is unchanged.
+test.describe.configure({ mode: 'serial', retries: 0 })
+
 test('B8-N2: no un-numbered pre-deck verse text when a reading follows a countdown or Black/Logo', async () => {
   test.setTimeout(300_000)
   const { app, userDataDir } = await launchApp()
@@ -65,11 +71,11 @@ test('B8-N2: no un-numbered pre-deck verse text when a reading follows a countdo
     })
     const titles = items.map((i) => i.title)
     await op.reload()
-    await op.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 20_000 })
+    await op.getByRole('navigation', { name: 'Main' }).waitFor({ timeout: 40_000 })
     const out = await outputWindow(app)
     await op.evaluate(() => (window as any).wf.stageOpen())
     const stageWin = await (async () => {
-      const deadline = Date.now() + 15_000
+      const deadline = Date.now() + 40_000
       while (Date.now() < deadline) {
         const p = app.windows().find((w) => w.url().includes('#/stage'))
         if (p) { await p.waitForLoadState('domcontentloaded'); return p }
@@ -89,13 +95,21 @@ test('B8-N2: no un-numbered pre-deck verse text when a reading follows a countdo
     }
     const settle = async (k: number): Promise<void> => {
       await goLiveButton(k).click()
-      await expect.poll(async () => (await liveState(op)).liveServiceItemId, { timeout: 10_000 }).toBe(items[k].id)
-      await op.waitForTimeout(2600)  // past the pending window, fully faded in
+      await expect.poll(async () => (await liveState(op)).liveServiceItemId, { timeout: 30_000 }).toBe(items[k].id)
+      // fully faded in: the projector shows the same non-empty text twice, 400 ms apart
+      let prev = ''
+      await expect.poll(async () => {
+        const now = await shownText(out)
+        const stable = now !== '' && now !== '?' && now === prev
+        prev = now
+        if (!stable) await op.waitForTimeout(400)
+        return stable
+      }, { timeout: 30_000, intervals: [0] }).toBe(true)
     }
 
     const frames: string[] = []
     // Act, then sample OUT, the Stage window and Zone 3 every ~25 ms for 3 s.
-    const sample = async (label: string, act: () => Promise<void>, key?: { press: string; at: number }): Promise<string> => {
+    const sample = async (label: string, act: () => Promise<void>, key?: { press: string; at: number }, wantOut?: RegExp): Promise<string> => {
       const t0 = Date.now()
       await act()
       let pressed = !key
@@ -110,6 +124,18 @@ test('B8-N2: no un-numbered pre-deck verse text when a reading follows a countdo
         lastOut = o
         await op.waitForTimeout(15)
       }
+      // QA B14-N2: under load the crossfade can end after the sampling window;
+      // keep sampling until the projector reaches the expected reading.
+      if (wantOut) {
+        await expect.poll(async () => {
+          const [o, s, z] = await Promise.all([shownText(out), shownText(stageWin), shownText(z3)])
+          for (const [name, text] of [['OUT', o], ['STAGE', stageCurrent(s)], ['Z3', z]] as const) {
+            if (UNNUMBERED.test(text) && !NOT_SCRIPTURE.test(text)) frames.push(`${label} late ${name} "${text.slice(0, 60)}"`)
+          }
+          lastOut = o
+          return o
+        }, { timeout: 30_000, message: `${label}: projector once live` }).toMatch(wantOut)
+      }
       return lastOut
     }
 
@@ -117,17 +143,17 @@ test('B8-N2: no un-numbered pre-deck verse text when a reading follows a countdo
       // Countdown → John 3:16-18 by Space (the countdown is one slide).
       await settle(0)
       await focusOperator()
-      let settled = await sample(`R${round} countdown→Space`, () => op.keyboard.press('Space'))
+      let settled = await sample(`R${round} countdown→Space`, () => op.keyboard.press('Space'), undefined, /^3:16 For God so loved/)
       expect(settled, 'projector after Space from the countdown').toMatch(/^3:16 For God so loved/)
       // Countdown → Mark 4:35-41 by a clicked Go live.
       await settle(0)
-      settled = await sample(`R${round} countdown→click Mark`, () => goLiveButton(3).click())
+      settled = await sample(`R${round} countdown→click Mark`, () => goLiveButton(3).click(), undefined, /^4:35 And the same day/)
       expect(settled, 'projector after Go live from the countdown').toMatch(/^4:35 And the same day/)
       // Black / Logo pressed late in the pending window, then the reading goes live.
       for (const [k, press, first] of [[4, 'b', /^46:1 To the chief Musician/], [5, 'l', /^8:28 And we know/]] as const) {
         await settle(2)
         await focusOperator()
-        settled = await sample(`R${round} ${press}@1300 ${titles[k]}`, () => goLiveButton(k).click(), { press, at: 1300 })
+        settled = await sample(`R${round} ${press}@1300 ${titles[k]}`, () => goLiveButton(k).click(), { press, at: 1300 }, first)
         expect(settled, `${titles[k]}: projector once live`).toMatch(first)
       }
     }
