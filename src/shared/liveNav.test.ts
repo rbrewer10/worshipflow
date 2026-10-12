@@ -83,3 +83,34 @@ describe('Countdown Prev wiring (source guard, Ryan\'s decision)', () => {
     expect(after.indexOf('clearCountdown')).toBeGreaterThan(none)
   })
 })
+
+// QA B12-N4: Black over a countdown used to clear the timer; any way out of
+// Black then froze the last value ("4:58") as a bare lyric on OUT, stage and zones.
+describe('Black/Logo over a countdown (QA B12-N4)', () => {
+  const nav = { hasDeck: false, hasSermonSlides: false, index: 0, lastIndex: 0, pristine: false }
+  it('Next and Prev bring the running countdown back — never un-blank to a lyric', () => {
+    for (const mode of ['black', 'logo']) {
+      expect(planNav(1, { ...nav, mode, countdown: 'running' })).toEqual({ kind: 'resume-countdown' })
+      expect(planNav(-1, { ...nav, mode, countdown: 'running' })).toEqual({ kind: 'resume-countdown' })
+    }
+  })
+  it('a countdown that ran out while hidden: Next moves on (logo if nothing after), Prev stays', () => {
+    expect(planNav(1, { ...nav, mode: 'black', countdown: 'done' })).toEqual({ kind: 'adjacent', dir: 1, fallback: 'logo-after-countdown' })
+    expect(planNav(-1, { ...nav, mode: 'black', countdown: 'done' })).toEqual({ kind: 'none' })
+  })
+  it('a song blanked by Black still just un-blanks', () => {
+    expect(planNav(1, { ...nav, mode: 'black', lastIndex: 3, countdown: null })).toEqual({ kind: 'unblank' })
+  })
+  const main = readFileSync(join(__dirname, '..', 'main', 'index.ts'), 'utf8').replace(/\r\n/g, '\n')
+  it('Black/Logo keep the countdown timer; Live/Unblack, Next and Prev resume it in countdown mode', () => {
+    expect(main).toMatch(/type === 'black'\) \{ if \(!countdownUnder\(track\)\) clearCountdown\(track\); t\.mode = 'black'/)
+    expect(main).toMatch(/type === 'logo'\) \{ if \(!countdownUnder\(track\)\) clearCountdown\(track\); t\.mode = 'logo'/)
+    expect(main).toMatch(/type === 'lyrics' && countdownUnder\(track\)\) \{\s*\/\/[^\n]*\n\s*resumeCountdown\(track\)/)
+    expect(main).toMatch(/action\.kind === 'resume-countdown'\) \{\s*resumeCountdown\(track\)/)
+    expect(main).toMatch(/countdown: countdownUnder\(track\)/)
+    const fn = main.slice(main.indexOf('function resumeCountdown('), main.indexOf('function resumeCountdown(') + 400)
+    expect(fn).toMatch(/if \(t\.countdownTimer\) \{ t\.mode = 'countdown' as Mode/)
+    // the timer's own end marks it done (so un-blanking after it ran out shows no frozen 0:00)
+    expect(main).toMatch(/clearCountdown\(track\)\n\s*t\.countdownDone = true\n\s*t\.song = \{ title: 'Countdown', lines: \['0:00'\]/)
+  })
+})
